@@ -23,6 +23,7 @@ fi
 : "${KUBERMATICCOMMIT:="$(git rev-parse HEAD)"}"
 : "${GITTAG:=$(git describe --tags --always)}"
 : "${KUBERMATIC_EDITION:=ee}"
+: "${IS_KUBERMATIC_UPSTREAM:="false"}"
 
 export KUBERMATIC_EDITION
 
@@ -34,12 +35,17 @@ export KUBERMATIC_EDITION
 # If you're running with locally committed and not yet pushed changes, you must
 # override those variables, e.g. KUBERMATICCOMMIT=v2.13.1-sys11-12 GITTAG=v2.13.1-sys11-12 ... ./sys11-run-controller.sh
 
-export KEYCLOAK_EXTERNAL_ADMIN_PASSWORD="$(cat ${INSTALLER_DIR}/kubermatic/values.yaml | yq .keycloak.external.adminPassword -r)"
-export KEYCLOAK_EXTERNAL_ADMIN_USER="$(cat ${INSTALLER_DIR}/kubermatic/values.yaml | yq .keycloak.external.adminUser -r)"
-export KEYCLOAK_EXTERNAL_URL="$(cat ${INSTALLER_DIR}/kubermatic/values.yaml | yq .keycloak.external.url -r)"
-export KEYCLOAK_INTERNAL_ADMIN_PASSWORD="$(cat ${INSTALLER_DIR}/kubermatic/values.yaml | yq .keycloak.internal.adminPassword -r)"
-export KEYCLOAK_INTERNAL_ADMIN_USER="$(cat ${INSTALLER_DIR}/kubermatic/values.yaml | yq .keycloak.internal.adminUser -r)"
-export KEYCLOAK_INTERNAL_URL="$(cat ${INSTALLER_DIR}/kubermatic/values.yaml | yq .keycloak.internal.url -r)"
+if [[ "${IS_KUBERMATIC_UPSTREAM}" != "true" ]]; then
+  export KEYCLOAK_EXTERNAL_ADMIN_PASSWORD="$(cat ${INSTALLER_DIR}/kubermatic/values.yaml | yq .keycloak.external.adminPassword -r)"
+  export KEYCLOAK_EXTERNAL_ADMIN_USER="$(cat ${INSTALLER_DIR}/kubermatic/values.yaml | yq .keycloak.external.adminUser -r)"
+  export KEYCLOAK_EXTERNAL_URL="$(cat ${INSTALLER_DIR}/kubermatic/values.yaml | yq .keycloak.external.url -r)"
+  export KEYCLOAK_INTERNAL_ADMIN_PASSWORD="$(cat ${INSTALLER_DIR}/kubermatic/values.yaml | yq .keycloak.internal.adminPassword -r)"
+  export KEYCLOAK_INTERNAL_ADMIN_USER="$(cat ${INSTALLER_DIR}/kubermatic/values.yaml | yq .keycloak.internal.adminUser -r)"
+  export KEYCLOAK_INTERNAL_URL="$(cat ${INSTALLER_DIR}/kubermatic/values.yaml | yq .keycloak.internal.url -r)"
+  SYS11_OPTIONS="-keycloak-cache-expiry=2h -monitoring-environment-label=${KUBERMATIC_ENV}"
+else
+  SYS11_OPTIONS=
+fi
 
 dockercfgjson="$(mktemp)"
 trap "rm -f $dockercfgjson" EXIT
@@ -98,8 +104,7 @@ if [[ "${DEBUG}" == "true" ]]; then
       -nodeport-range=30000-32767 \
       -docker-pull-config-json-file="$dockercfgjson" \
       -feature-gates=etcdLauncher=true \
-      -keycloak-cache-expiry=2h \
-      -monitoring-environment-label=${KUBERMATIC_ENV} \
+      ${SYS11_OPTIONS} \
       -monitoring-scrape-annotation-prefix=monitoring.metakube.de \
       -namespace=kubermatic \
       -worker-name=${KUBERMATIC_WORKERNAME} \
@@ -133,8 +138,7 @@ else
       -nodeport-range=30000-32767 \
       -docker-pull-config-json-file="$dockercfgjson" \
       -feature-gates=etcdLauncher=true \
-      -keycloak-cache-expiry=2h \
-      -monitoring-environment-label=${KUBERMATIC_ENV} \
+      ${SYS11_OPTIONS} \
       -monitoring-scrape-annotation-prefix=monitoring.metakube.de \
       -namespace=kubermatic \
       -worker-name=${KUBERMATIC_WORKERNAME} \
