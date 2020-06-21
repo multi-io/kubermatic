@@ -20,6 +20,8 @@ fi
 : "${GITTAG:=$(git describe --tags --always)}"
 : "${DYNAMIC_DATACENTERS:="false"}"   # true | false | absent  -- absent meaning pass neither -datacenters= nor -dynamic-datacenters= (2.15+)
 : "${IS_KUBERMATIC_UPSTREAM:="false"}"
+: "${KUBERMATIC_IMAGE:="docker.io/syseleven/kubermatic"}"
+: "${DNATCONTROLLER_IMAGE:="docker.io/syseleven/kubeletdnat-controller"}"
 
 # $KUBERMATICCOMMIT and $GITTAG must refer to git tag names for which we've built and uploaded kubermatic images
 # (because those tags will set as image tag for user cluster apiserver pod sidecar containers, e.g. the
@@ -109,8 +111,8 @@ while true; do
           -backup-container=./hack/sys11-store-container.yaml \
           -cleanup-container=./hack/sys11-cleanup-container.yaml \
           -worker-count=1 \
-          -kubermatic-image=docker.io/syseleven/kubermatic \
-          -dnatcontroller-image=syseleven/kubeletdnat-controller \
+          -kubermatic-image=${KUBERMATIC_IMAGE} \
+          -dnatcontroller-image=${DNATCONTROLLER_IMAGE} \
           ${DISABLE_LE_OPTION} \
           -v=8 $@ &
 
@@ -139,8 +141,8 @@ while true; do
           -backup-container=./hack/sys11-store-container.yaml \
           -cleanup-container=./hack/sys11-cleanup-container.yaml \
           -worker-count=1 \
-          -kubermatic-image=docker.io/syseleven/kubermatic \
-          -dnatcontroller-image=syseleven/kubeletdnat-controller \
+          -kubermatic-image=${KUBERMATIC_IMAGE} \
+          -dnatcontroller-image=${DNATCONTROLLER_IMAGE} \
           ${DISABLE_LE_OPTION} \
           -v=6 $@ &
 
