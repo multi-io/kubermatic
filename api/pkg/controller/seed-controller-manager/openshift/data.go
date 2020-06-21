@@ -272,6 +272,19 @@ func (od *openshiftData) DNATControllerImage() string {
 	return od.ImageRegistry(registry) + "/" + imageWithoutRegistry
 }
 
+func (od *openshiftData) EtcdLauncherImageBase() string {
+	etcdImageSplit := strings.Split(od.dnatControllerImage, "/")
+	var registry, imageWithoutRegistry string
+	if len(etcdImageSplit) != 3 {
+		registry = "docker.io"
+		imageWithoutRegistry = strings.Join(etcdImageSplit, "/")
+	} else {
+		registry = etcdImageSplit[0]
+		imageWithoutRegistry = strings.Join(etcdImageSplit[1:], "/")
+	}
+	return od.ImageRegistry(registry) + "/" + imageWithoutRegistry
+}
+
 func (od *openshiftData) SupportsFailureDomainZoneAntiAffinity() bool {
 	return od.supportsFailureDomainZoneAntiAffinity
 }
