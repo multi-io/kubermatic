@@ -280,7 +280,7 @@ func (d *TemplateData) KubermaticAPIImage() string {
 	apiImageSplit := strings.Split(d.kubermaticImage, "/")
 	var registry, imageWithoutRegistry string
 	if len(apiImageSplit) != 3 {
-		registry = "docker.io"
+		registry = RegistryDocker
 		imageWithoutRegistry = strings.Join(apiImageSplit, "/")
 	} else {
 		registry = apiImageSplit[0]
@@ -293,7 +293,7 @@ func (d *TemplateData) DNATControllerImage() string {
 	dnatControllerImageSplit := strings.Split(d.dnatControllerImage, "/")
 	var registry, imageWithoutRegistry string
 	if len(dnatControllerImageSplit) != 3 {
-		registry = "docker.io"
+		registry = RegistryDocker
 		imageWithoutRegistry = strings.Join(dnatControllerImageSplit, "/")
 	} else {
 		registry = dnatControllerImageSplit[0]
@@ -306,7 +306,7 @@ func (d *TemplateData) EtcdLauncherImageBase() string {
 	etcImageSplit := strings.Split(d.etcdLauncherImageBase, "/")
 	var registry, imageWithoutRegistry string
 	if len(etcImageSplit) != 3 {
-		registry = "docker.io"
+		registry = RegistryDocker
 		imageWithoutRegistry = strings.Join(etcImageSplit, "/")
 	} else {
 		registry = etcImageSplit[0]

@@ -246,7 +246,7 @@ func (od *openshiftData) KubermaticAPIImage() string {
 	apiImageSplit := strings.Split(od.kubermaticImage, "/")
 	var registry, imageWithoutRegistry string
 	if len(apiImageSplit) != 3 {
-		registry = "docker.io"
+		registry = kubernetesresources.RegistryDocker
 		imageWithoutRegistry = strings.Join(apiImageSplit, "/")
 	} else {
 		registry = apiImageSplit[0]
@@ -263,7 +263,7 @@ func (od *openshiftData) DNATControllerImage() string {
 	dnatControllerImageSplit := strings.Split(od.dnatControllerImage, "/")
 	var registry, imageWithoutRegistry string
 	if len(dnatControllerImageSplit) != 3 {
-		registry = "docker.io"
+		registry = kubernetesresources.RegistryDocker
 		imageWithoutRegistry = strings.Join(dnatControllerImageSplit, "/")
 	} else {
 		registry = dnatControllerImageSplit[0]
@@ -276,7 +276,7 @@ func (od *openshiftData) EtcdLauncherImageBase() string {
 	etcdImageSplit := strings.Split(od.dnatControllerImage, "/")
 	var registry, imageWithoutRegistry string
 	if len(etcdImageSplit) != 3 {
-		registry = "docker.io"
+		registry = kubernetesresources.RegistryDocker
 		imageWithoutRegistry = strings.Join(etcdImageSplit, "/")
 	} else {
 		registry = etcdImageSplit[0]
