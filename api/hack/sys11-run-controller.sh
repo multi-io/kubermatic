@@ -22,6 +22,8 @@ fi
 : "${IS_KUBERMATIC_UPSTREAM:="false"}"
 : "${KUBERMATIC_IMAGE:="docker.io/syseleven/kubermatic"}"
 : "${DNATCONTROLLER_IMAGE:="docker.io/syseleven/kubeletdnat-controller"}"
+: "${ETCD_LAUNCHER_IMAGE_BASE:="docker.io/syseleven/etcd-launcher-"}"
+: "${KUBERMATIC_EDITION:=ee}"
 
 # $KUBERMATICCOMMIT and $GITTAG must refer to git tag names for which we've built and uploaded kubermatic images
 # (because those tags will set as image tag for user cluster apiserver pod sidecar containers, e.g. the
@@ -41,6 +43,8 @@ if [[ "${IS_KUBERMATIC_UPSTREAM}" != "true" ]]; then
 else
   SYS11_OPTIONS=
 fi
+
+export KUBERMATIC_EDITION
 
 dockercfgjson="$(mktemp)"
 trap "rm -f $dockercfgjson" EXIT
@@ -113,6 +117,7 @@ while true; do
           -worker-count=1 \
           -kubermatic-image=${KUBERMATIC_IMAGE} \
           -dnatcontroller-image=${DNATCONTROLLER_IMAGE} \
+          -etcd-launcher-image-base=${ETCD_LAUNCHER_IMAGE_BASE} \
           ${DISABLE_LE_OPTION} \
           -v=8 $@ &
 
@@ -143,6 +148,7 @@ while true; do
           -worker-count=1 \
           -kubermatic-image=${KUBERMATIC_IMAGE} \
           -dnatcontroller-image=${DNATCONTROLLER_IMAGE} \
+          -etcd-launcher-image-base=${ETCD_LAUNCHER_IMAGE_BASE} \
           ${DISABLE_LE_OPTION} \
           -v=6 $@ &
 
