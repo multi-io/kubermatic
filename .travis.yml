@@ -1,7 +1,7 @@
 sudo: required
 
 services:
-- docker
+  - docker
 
 language: generic
 
@@ -10,4 +10,6 @@ env:
     secure: EVFdxm0ayIOvfy4T0dEy2/ClK7mmqATquv3T65+terlDGznfMhXhfLSPM5bwOvfpsEOALXtU+iPynpherMUhxoqQJN2pg/luVbXD0XelFbjhwVu8Kpqxw+NnSl4gL1/D1L2euao1+8aGMMTbfYTGNGtkxJ2KFtXFISzPndqGLoo7Rvwn7Q9cUJ2aE/U3Cp5yILCUSwsy8YwhV8VKR8Gpayi3JNJkNHJiYn4tpAtDvW1V07p/UpTIaby4IOYdopYueGfIwILYkq1yoP/vaqsL0X9kQjUcRvcoqpxluvhGhOx8DbsVJ5qR4sWaV9lpOAYa4jWa7FhZrfFM1F/TrMvNCKybNyd5H6ADowzbs5FVFdQ7hR97RlzJx3l7aMZaLf5m+99yMm3WOCre0U6PCFS0UNf+JvsU+9v8HZZ1TAX3sbDc0a1nQZXpmwtKtq9FmVV9gjzEheU27du48R3FwFSDr8H0380HcKkzHKkBWn8OXBDMacIPT6+xZQ5+RoqbOAbws8yLWgszaFJY1SRfSqx251ZGDg9zTnGLPxsy/4ZD2zZuGdslEEqFVmU8By7OfbxNpQK+LhDd0OR4uQ2dSoGPnTrdJeCgqouuQyVljDB0qs9vbjV4ihwDmNpZmJ+sM0rX/qspDGKFFps+tay8/sHWAGtfshGZHrdOlTHU/l5/m/A=
 
 script:
-- api/hack/ci/ci-oklischat-build-and-push-all.sh oklischat $(basename "${TRAVIS_BRANCH}")
+  - api/hack/ci/ci-oklischat-check.sh
+  - api/hack/ci/ci-oklischat-unittest.sh
+  - api/hack/ci/ci-oklischat-build-and-push-all.sh oklischat $(basename "${TRAVIS_BRANCH}")
