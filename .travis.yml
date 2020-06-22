@@ -12,4 +12,4 @@ env:
 script:
   - api/hack/ci/ci-oklischat-check.sh
   - api/hack/ci/ci-oklischat-unittest.sh
-  - api/hack/ci/ci-oklischat-build-and-push-all.sh oklischat $(basename "${TRAVIS_BRANCH}")
+  - 'if [[ -n "$TRAVIS_TAG" ]]; then api/hack/ci/ci-oklischat-build-and-push-all.sh oklischat $(basename "${TRAVIS_TAG}"); fi'
