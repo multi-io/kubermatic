@@ -22,7 +22,7 @@ fi
 : "${IS_KUBERMATIC_UPSTREAM:="false"}"
 : "${KUBERMATIC_IMAGE:="docker.io/syseleven/kubermatic"}"
 : "${DNATCONTROLLER_IMAGE:="docker.io/syseleven/kubeletdnat-controller"}"
-: "${ETCD_LAUNCHER_IMAGE_BASE:="docker.io/syseleven/etcd-launcher-"}"
+: "${ETCD_LAUNCHER_IMAGE:="docker.io/syseleven/etcd-launcher-v34"}"
 : "${KUBERMATIC_EDITION:=ee}"
 
 # $KUBERMATICCOMMIT and $GITTAG must refer to git tag names for which we've built and uploaded kubermatic images
@@ -117,7 +117,7 @@ while true; do
           -worker-count=1 \
           -kubermatic-image=${KUBERMATIC_IMAGE} \
           -dnatcontroller-image=${DNATCONTROLLER_IMAGE} \
-          -etcd-launcher-image-base=${ETCD_LAUNCHER_IMAGE_BASE} \
+          -etcd-launcher-image=${ETCD_LAUNCHER_IMAGE} \
           ${DISABLE_LE_OPTION} \
           -v=8 $@ &
 
@@ -148,7 +148,7 @@ while true; do
           -worker-count=1 \
           -kubermatic-image=${KUBERMATIC_IMAGE} \
           -dnatcontroller-image=${DNATCONTROLLER_IMAGE} \
-          -etcd-launcher-image-base=${ETCD_LAUNCHER_IMAGE_BASE} \
+          -etcd-launcher-image=${ETCD_LAUNCHER_IMAGE} \
           ${DISABLE_LE_OPTION} \
           -v=6 $@ &
 
