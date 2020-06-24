@@ -818,6 +818,33 @@
         }
       }
     },
+    "/api/v1/me/logout": {
+      "post": {
+        "description": "Enforces user to login again with the new token.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "users"
+        ],
+        "summary": "Adds current authorization bearer token to the blacklist.",
+        "operationId": "logoutCurrentUser",
+        "responses": {
+          "200": {
+            "$ref": "#/responses/empty"
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
     "/api/v1/me/settings": {
       "get": {
         "produces": [
@@ -4146,6 +4173,58 @@
         }
       }
     },
+    "/api/v1/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/providers/openstack/availabilityzones": {
+      "get": {
+        "description": "Lists availability zones from openstack",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "openstack"
+        ],
+        "operationId": "listOpenstackAvailabilityZonesNoCredentials",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "DC",
+            "name": "dc",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OpenstackAvailabilityZone",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/OpenstackAvailabilityZone"
+              }
+            }
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
     "/api/v1/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/providers/openstack/networks": {
       "get": {
         "description": "Lists networks from openstack",
@@ -6947,6 +7026,72 @@
         }
       }
     },
+    "/api/v1/providers/openstack/availabilityzones": {
+      "get": {
+        "description": "Lists availability zones from openstack",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "openstack"
+        ],
+        "operationId": "listOpenstackAvailabilityZones",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "Username",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "Password",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "Domain",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "Tenant",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "TenantID",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "DatacenterName",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "Credential",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OpenstackAvailabilityZone",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/OpenstackAvailabilityZone"
+              }
+            }
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
     "/api/v1/providers/openstack/networks": {
       "get": {
         "description": "Lists networks from openstack",
@@ -7546,6 +7691,31 @@
             "description": "CredentialList",
             "schema": {
               "$ref": "#/definitions/CredentialList"
+            }
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/seed": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "seed"
+        ],
+        "operationId": "listSeedNames",
+        "responses": {
+          "200": {
+            "description": "SeedNamesList",
+            "schema": {
+              "$ref": "#/definitions/SeedNamesList"
             }
           },
           "default": {
@@ -11252,6 +11422,18 @@
       },
       "x-go-package": "github.com/kubermatic/kubermatic/api/pkg/crd/kubermatic/v1"
     },
+    "OpenstackAvailabilityZone": {
+      "type": "object",
+      "title": "OpenstackAvailabilityZone is the object representing a openstack availability zone.",
+      "properties": {
+        "name": {
+          "description": "Name is the name of the availability zone",
+          "type": "string",
+          "x-go-name": "Name"
+        }
+      },
+      "x-go-package": "github.com/kubermatic/kubermatic/api/pkg/api/v1"
+    },
     "OpenstackCloudSpec": {
       "type": "object",
       "title": "OpenstackCloudSpec specifies access data to an OpenStack cloud.",
@@ -12199,6 +12381,13 @@
           "type": "string",
           "x-go-name": "SeedDNSOverwrite"
         }
+      },
+      "x-go-package": "github.com/kubermatic/kubermatic/api/pkg/api/v1"
+    },
+    "SeedNamesList": {
+      "type": "array",
+      "items": {
+        "type": "string"
       },
       "x-go-package": "github.com/kubermatic/kubermatic/api/pkg/api/v1"
     },

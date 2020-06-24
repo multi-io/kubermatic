@@ -545,6 +545,13 @@ type OpenstackSecurityGroup struct {
 	Name string `json:"name"`
 }
 
+// OpenstackAvailabilityZone is the object representing a openstack availability zone.
+// swagger:model OpenstackAvailabilityZone
+type OpenstackAvailabilityZone struct {
+	// Name is the name of the availability zone
+	Name string `json:"name"`
+}
+
 // VSphereNetwork is the object representing a vsphere network.
 // swagger:model VSphereNetwork
 type VSphereNetwork struct {
@@ -1516,6 +1523,9 @@ type SeedSpec struct {
 	// Optional: ExposeStrategy explicitly sets the expose strategy for this seed cluster, if not set, the default provided by the master is used.
 	ExposeStrategy corev1.ServiceType `json:"expose_strategy,omitempty"`
 }
+
+// swagger:model SeedNamesList
+type SeedNamesList []string
 
 const (
 	// NodeDeletionFinalizer indicates that the nodes still need cleanup
