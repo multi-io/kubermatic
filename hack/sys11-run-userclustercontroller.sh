@@ -8,7 +8,7 @@ if [[ -z "$USERCLUSTER" ]]; then
   exit 1
 fi
 
-: "${SRC_DIR:=$(go env GOPATH)/src/github.com/kubermatic/kubermatic/api}"
+: "${SRC_DIR:=$(go env GOPATH)/src/github.com/kubermatic/kubermatic}"
 : "${KUBERMATIC_WORKERNAME:=${KUBERMATIC_WORKERNAME:-${USERNAME}}}"
 : "${INSTALLER_DIR:="$(go env GOPATH)/src/gitlab.syseleven.de/kubernetes/kubermatic-installer"}"
 : "${KUBERMATIC_ENV:=dev}"
