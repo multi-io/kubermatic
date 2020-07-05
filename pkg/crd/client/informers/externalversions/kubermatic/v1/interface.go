@@ -14,6 +14,8 @@ type Interface interface {
 	AddonConfigs() AddonConfigInformer
 	// Clusters returns a ClusterInformer.
 	Clusters() ClusterInformer
+	// EtcdBackups returns a EtcdBackupInformer.
+	EtcdBackups() EtcdBackupInformer
 	// KubermaticSettings returns a KubermaticSettingInformer.
 	KubermaticSettings() KubermaticSettingInformer
 	// Projects returns a ProjectInformer.
@@ -50,6 +52,11 @@ func (v *version) AddonConfigs() AddonConfigInformer {
 // Clusters returns a ClusterInformer.
 func (v *version) Clusters() ClusterInformer {
 	return &clusterInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// EtcdBackups returns a EtcdBackupInformer.
+func (v *version) EtcdBackups() EtcdBackupInformer {
+	return &etcdBackupInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // KubermaticSettings returns a KubermaticSettingInformer.
