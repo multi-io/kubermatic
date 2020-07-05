@@ -55,6 +55,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&UserSSHKeyList{},
 		&Cluster{},
 		&ClusterList{},
+		&EtcdBackup{},
+		&EtcdBackupList{},
 		&User{},
 		&UserList{},
 		&Project{},
