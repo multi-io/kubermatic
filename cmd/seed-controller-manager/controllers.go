@@ -25,6 +25,7 @@ import (
 
 	"github.com/kubermatic/kubermatic/pkg/controller/seed-controller-manager/addon"
 	"github.com/kubermatic/kubermatic/pkg/controller/seed-controller-manager/addoninstaller"
+	backupcontroller "github.com/kubermatic/kubermatic/pkg/controller/seed-controller-manager/backup"
 	backupschedulecontroller "github.com/kubermatic/kubermatic/pkg/controller/seed-controller-manager/backupschedule"
 	cloudcontroller "github.com/kubermatic/kubermatic/pkg/controller/seed-controller-manager/cloud"
 	"github.com/kubermatic/kubermatic/pkg/controller/seed-controller-manager/clustercomponentdefaulter"
@@ -51,6 +52,7 @@ var AllControllers = map[string]controllerCreator{
 	updatecontroller.ControllerName:               createUpdateController,
 	addon.ControllerName:                          createAddonController,
 	addoninstaller.ControllerName:                 createAddonInstallerController,
+	backupcontroller.ControllerName:               createBackupController,
 	backupschedulecontroller.ControllerName:       createBackupScheduleController,
 	monitoring.ControllerName:                     createMonitoringController,
 	cloudcontroller.ControllerName:                createCloudController,
@@ -172,6 +174,15 @@ func createKubernetesController(ctrlCtx *controllerContext) error {
 			EtcdDataCorruptionChecks:     ctrlCtx.runOptions.featureGates.Enabled(features.EtcdDataCorruptionChecks),
 			KubernetesOIDCAuthentication: ctrlCtx.runOptions.featureGates.Enabled(features.OpenIDAuthPlugin),
 		},
+	)
+}
+
+func createBackupController(ctrlCtx *controllerContext) error {
+	return backupcontroller.Add(
+		ctrlCtx.mgr,
+		ctrlCtx.log,
+		ctrlCtx.runOptions.workerCount,
+		ctrlCtx.runOptions.workerName,
 	)
 }
 
