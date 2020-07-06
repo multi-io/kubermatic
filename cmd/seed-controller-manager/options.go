@@ -30,7 +30,7 @@ import (
 
 	"github.com/kubermatic/kubermatic/pkg/cluster/client"
 	"github.com/kubermatic/kubermatic/pkg/controller/operator/common"
-	backupcontroller "github.com/kubermatic/kubermatic/pkg/controller/seed-controller-manager/backup"
+	backupcontroller "github.com/kubermatic/kubermatic/pkg/controller/seed-controller-manager/backupschedule"
 	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
 	"github.com/kubermatic/kubermatic/pkg/features"
 	"github.com/kubermatic/kubermatic/pkg/provider"

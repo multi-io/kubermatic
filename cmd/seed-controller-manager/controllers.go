@@ -25,7 +25,7 @@ import (
 
 	"github.com/kubermatic/kubermatic/pkg/controller/seed-controller-manager/addon"
 	"github.com/kubermatic/kubermatic/pkg/controller/seed-controller-manager/addoninstaller"
-	backupcontroller "github.com/kubermatic/kubermatic/pkg/controller/seed-controller-manager/backup"
+	backupschedulecontroller "github.com/kubermatic/kubermatic/pkg/controller/seed-controller-manager/backupschedule"
 	cloudcontroller "github.com/kubermatic/kubermatic/pkg/controller/seed-controller-manager/cloud"
 	"github.com/kubermatic/kubermatic/pkg/controller/seed-controller-manager/clustercomponentdefaulter"
 	kubernetescontroller "github.com/kubermatic/kubermatic/pkg/controller/seed-controller-manager/kubernetes"
@@ -51,7 +51,7 @@ var AllControllers = map[string]controllerCreator{
 	updatecontroller.ControllerName:               createUpdateController,
 	addon.ControllerName:                          createAddonController,
 	addoninstaller.ControllerName:                 createAddonInstallerController,
-	backupcontroller.ControllerName:               createBackupController,
+	backupschedulecontroller.ControllerName:       createBackupScheduleController,
 	monitoring.ControllerName:                     createMonitoringController,
 	cloudcontroller.ControllerName:                createCloudController,
 	openshiftcontroller.ControllerName:            createOpenshiftController,
@@ -175,7 +175,7 @@ func createKubernetesController(ctrlCtx *controllerContext) error {
 	)
 }
 
-func createBackupController(ctrlCtx *controllerContext) error {
+func createBackupScheduleController(ctrlCtx *controllerContext) error {
 	storeContainer, err := getContainerFromFile(ctrlCtx.runOptions.backupContainerFile)
 	if err != nil {
 		return err
@@ -188,7 +188,7 @@ func createBackupController(ctrlCtx *controllerContext) error {
 	if err != nil {
 		return fmt.Errorf("failed to parse %s as duration: %v", ctrlCtx.runOptions.backupInterval, err)
 	}
-	return backupcontroller.Add(
+	return backupschedulecontroller.Add(
 		ctrlCtx.log,
 		ctrlCtx.mgr,
 		ctrlCtx.runOptions.workerCount,
