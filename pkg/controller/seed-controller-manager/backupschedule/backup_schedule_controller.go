@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package backup
+package backupschedule
 
 import (
 	"context"
@@ -72,7 +72,7 @@ const (
 	// clusterEnvVarKey defines the environment variable key for the cluster name
 	clusterEnvVarKey = "CLUSTER"
 
-	ControllerName = "kubermatic_backup_controller"
+	ControllerName = "kubermatic_backup_schedule_controller"
 )
 
 type Reconciler struct {
@@ -233,7 +233,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 		r.Client,
 		r.workerName,
 		cluster,
-		kubermaticv1.ClusterConditionBackupControllerReconcilingSuccess,
+		kubermaticv1.ClusterConditionBackupScheduleControllerReconcilingSuccess,
 		func() (*reconcile.Result, error) {
 			return nil, r.reconcile(ctx, log, cluster)
 		},
