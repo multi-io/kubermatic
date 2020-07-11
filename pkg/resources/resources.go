@@ -189,6 +189,8 @@ const (
 	ApiserverEtcdClientCertificateSecretName = "apiserver-etcd-client-certificate"
 	//ApiserverFrontProxyClientCertificateSecretName is the name for the secret containing the apiserver's client certificate for proxy auth
 	ApiserverFrontProxyClientCertificateSecretName = "apiserver-proxy-client-certificate"
+	//BackupControllerEtcdClientCertificateSecretName is the name for the secret containing the client certificate used by the backup controller for authenticating against etcd
+	BackupControllerEtcdClientCertificateSecretName = "backup-controller-etcd-client-certificate"
 	// DexCASecretName is the name of the secret that contains the Dex CA bundle
 	DexCASecretName = "dex-ca"
 	// DexCAFileName is the name of Dex CA bundle file
@@ -415,6 +417,11 @@ const (
 	ApiserverProxyClientCertificateCertSecretKey = "apiserver-proxy-client.crt"
 	// ApiserverProxyClientCertificateKeySecretKey apiserver-proxy-client.key
 	ApiserverProxyClientCertificateKeySecretKey = "apiserver-proxy-client.key"
+
+	// BackupControllerEtcdClientCertificateCertSecretKey backup-controller-etcd-client.crt
+	BackupControllerEtcdClientCertificateCertSecretKey = "backup-controller-etcd-client.crt"
+	// BackupControllerEtcdClientCertificateKeySecretKey backup-controller-etcd-client.key
+	BackupControllerEtcdClientCertificateKeySecretKey = "backup-controller-etcd-client.key"
 
 	// BackupEtcdClientCertificateCertSecretKey backup-etcd-client.crt
 	BackupEtcdClientCertificateCertSecretKey = "backup-etcd-client.crt"
