@@ -198,7 +198,9 @@ func takeSnapshot(ctx context.Context, log *zap.SugaredLogger, client *clientv3.
 	log.Info("created temporary db file", zap.String("path", partpath))
 
 	var rd io.ReadCloser
-	rd, err = client.Snapshot(ctx)
+	deadlinedCtx, cancel := context.WithTimeout(ctx, 30 * time.Second)
+	defer cancel()
+	rd, err = client.Snapshot(deadlinedCtx)
 	if err != nil {
 		return err
 	}
