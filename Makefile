@@ -29,10 +29,11 @@ LDFLAGS += -extldflags '-static' \
   -X github.com/kubermatic/kubermatic/pkg/resources.KUBERMATICGITTAG=$(GITTAG) \
   -X github.com/kubermatic/kubermatic/pkg/controller/operator/common.KUBERMATICDOCKERTAG=$(KUBERMATICDOCKERTAG) \
   -X github.com/kubermatic/kubermatic/pkg/controller/operator/common.UIDOCKERTAG=$(UIDOCKERTAG)
+LDFLAGS_EXTRA=-w
 HAS_DEP:= $(shell command -v dep 2> /dev/null)
 HAS_GIT:= $(shell command -v git 2> /dev/null)
 BUILD_DEST?=_build
-GOTOOLFLAGS?=$(GOBUILDFLAGS) -ldflags '-w $(LDFLAGS)'
+GOTOOLFLAGS?=$(GOBUILDFLAGS) -ldflags '$(LDFLAGS_EXTRA) $(LDFLAGS)' $(GOTOOLFLAGS_EXTRA)
 
 default: all
 
