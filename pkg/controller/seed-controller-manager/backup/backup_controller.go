@@ -18,8 +18,10 @@ package backup
 
 import (
 	"context"
+	"fmt"
 	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
 	kubermaticv1helper "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1/helper"
+	"go.etcd.io/etcd/clientv3"
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -35,7 +37,8 @@ import (
 )
 
 const (
-	ControllerName = "kubermatic_backup_controller"
+	ControllerName       = "kubermatic_backup_controller"
+	defaultClusterSize   = 3
 )
 
 // Reconciler stores necessary components that are required to create etcd backups
@@ -128,5 +131,42 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, back
 
 	log.Infof("Reconciling backup: meta=%v/%v spec.name=%v", backup.Namespace, backup.Name, backup.Spec.Name)
 
+	client, err := getEtcdClient(cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	err = takeSnapshot(client)
+	if err != nil {
+		return nil, err
+	}
+
 	return nil, nil
+}
+
+func getEtcdClient(cluster *kubermaticv1.Cluster) (*clientv3.Client, error) {
+	clusterSize := cluster.Spec.EtcdClusterSize
+	if clusterSize == 0 {
+		clusterSize = defaultClusterSize
+	}
+	endpoints := []string{}
+	for i := 0; i < clusterSize; i++ {
+		endpoints = append(endpoints, fmt.Sprintf("etcd-%d.etcd.%s.svc.cluster.local:2380", i, cluster.Status.NamespaceName))
+	}
+	var err error
+	for i := 0; i < 5; i++ {
+		cli, err := clientv3.New(clientv3.Config{
+			Endpoints:   endpoints,
+			DialTimeout: 2 * time.Second,
+		})
+		if err == nil && cli != nil {
+			return cli, nil
+		}
+		time.Sleep(5 * time.Second)
+	}
+	return nil, fmt.Errorf("failed to establish client connection: %v", err)
+}
+
+func takeSnapshot(client *clientv3.Client) error {
+	return nil
 }
