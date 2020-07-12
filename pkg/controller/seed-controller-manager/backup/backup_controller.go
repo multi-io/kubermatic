@@ -32,10 +32,8 @@ import (
 	"os"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 	"time"
@@ -44,9 +42,6 @@ import (
 const (
 	ControllerName       = "kubermatic_backup_controller"
 	defaultClusterSize   = 3
-	BackupPhaseRunning   = "Running"
-	BackupPhaseCompleted = "Completed"
-	BackupPhaseFailed    = "Failed"
 )
 
 // Reconciler stores necessary components that are required to create etcd backups
@@ -84,13 +79,7 @@ func Add(
 		return err
 	}
 
-	backupPredicate := predicate.Funcs{
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			new := e.ObjectNew.(*kubermaticv1.EtcdBackup)
-			return new.Status.Phase != BackupPhaseCompleted && new.Status.Phase != BackupPhaseFailed
-		},
-	}
-	return c.Watch(&source.Kind{Type: &kubermaticv1.EtcdBackup{}}, &handler.EnqueueRequestForObject{}, backupPredicate)
+	return c.Watch(&source.Kind{Type: &kubermaticv1.EtcdBackup{}}, &handler.EnqueueRequestForObject{})
 }
 
 func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
@@ -144,9 +133,6 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, back
 	}
 
 	log.Infof("Reconciling backup: meta=%v/%v spec.name=%v", backup.Namespace, backup.Name, backup.Spec.Name)
-
-	backup.Status.Phase = BackupPhaseRunning
-	// TODO update
 
 	client, err := getEtcdClient(cluster)
 	if err != nil {

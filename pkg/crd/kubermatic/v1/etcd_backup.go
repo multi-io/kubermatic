@@ -61,19 +61,8 @@ type EtcdBackupList struct {
 }
 
 type EtcdBackupStatus struct {
-	Phase      EtcdBackupPhase       `json:"phase"`
 	Conditions []EtcdBackupCondition `json:"conditions,omitempty"`
 }
-
-type EtcdBackupPhase string
-
-const (
-	EtcdBackupPhaseNew        EtcdBackupPhase = "New"
-	EtcdBackupPhaseInProgress EtcdBackupPhase = "InProgress"
-	EtcdBackupPhaseCompleted  EtcdBackupPhase = "Completed"
-	EtcdBackupPhaseFailed     EtcdBackupPhase = "Failed"
-	EtcdBackupPhaseDeleting   EtcdBackupPhase = "Deleting"
-)
 
 type EtcdBackupConditionType string
 
