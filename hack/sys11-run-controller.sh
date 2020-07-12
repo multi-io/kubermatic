@@ -83,101 +83,79 @@ fi
 
 # TODO extract hack/sys11-store-container.yaml / hack/sys11-cleanup-container.yaml from the installer
 
-while true; do
-    if [[ "${DEBUG}" == "true" ]]; then
-        make KUBERMATICCOMMIT=$KUBERMATICCOMMIT GITTAG=$GITTAG GOTOOLFLAGS_EXTRA="-gcflags='all=-N -l'" LDFLAGS_EXTRA="" -C ${SRC_DIR} seed-controller-manager
-    else
-        make KUBERMATICCOMMIT=$KUBERMATICCOMMIT GITTAG=$GITTAG -C ${SRC_DIR} seed-controller-manager
-    fi
+if [[ "${DEBUG}" == "true" ]]; then
+    make KUBERMATICCOMMIT=$KUBERMATICCOMMIT GITTAG=$GITTAG GOTOOLFLAGS_EXTRA="-gcflags='all=-N -l'" LDFLAGS_EXTRA="" -C ${SRC_DIR} seed-controller-manager
+else
+    make KUBERMATICCOMMIT=$KUBERMATICCOMMIT GITTAG=$GITTAG -C ${SRC_DIR} seed-controller-manager
+fi
 
-    cd ${SRC_DIR}
-    if [[ "${DEBUG}" == "true" ]]; then
-        dlv --listen=:2345 --headless=true --api-version=2 --accept-multiclient exec ./_build/seed-controller-manager -- \
-          ${DC_OPTION} \
-          -datacenter-name=${KUBERMATIC_CLUSTER} \
-          -kubeconfig=$seedKubeconfig \
-          -versions=${RESOURCES_DIR}/versions.yaml \
-          -updates=${RESOURCES_DIR}/updates.yaml \
-          -kubernetes-addons-path=${INSTALLER_DIR}/kubermatic/cluster-addons/addons \
-          -openshift-addons-path=../openshift_addons \
-          -kubernetes-addons-list=$defaultAddons \
-          -overwrite-registry= \
-          ${SYS11_OPTIONS} \
-          -feature-gates= \
-          -monitoring-scrape-annotation-prefix=monitoring.metakube.de \
-          -namespace=kubermatic \
-          ${WORKER_OPTION} \
-          -external-url=${EXTERNAL_URL} \
-          -docker-pull-config-json-file="$dockercfgjson" \
-          -monitoring-scrape-annotation-prefix=${KUBERMATIC_ENV} \
-          -logtostderr=1 \
-          -log-debug=1 \
-          -backup-container=./hack/sys11-store-container.yaml \
-          -cleanup-container=./hack/sys11-cleanup-container.yaml \
-          -worker-count=1 \
-          -kubermatic-image=${KUBERMATIC_IMAGE} \
-          -dnatcontroller-image=${DNATCONTROLLER_IMAGE} \
-          -etcd-launcher-image-base=${ETCD_LAUNCHER_IMAGE_BASE} \
-          ${DISABLE_LE_OPTION} \
-          -v=8 $@ &
+cd ${SRC_DIR}
+if [[ "${DEBUG}" == "true" ]]; then
+    exec dlv --listen=:2345 --headless=true --api-version=2 --accept-multiclient exec ./_build/seed-controller-manager -- \
+      ${DC_OPTION} \
+      -datacenter-name=${KUBERMATIC_CLUSTER} \
+      -kubeconfig=$seedKubeconfig \
+      -versions=${RESOURCES_DIR}/versions.yaml \
+      -updates=${RESOURCES_DIR}/updates.yaml \
+      -kubernetes-addons-path=${INSTALLER_DIR}/kubermatic/cluster-addons/addons \
+      -openshift-addons-path=../openshift_addons \
+      -kubernetes-addons-list=$defaultAddons \
+      -overwrite-registry= \
+      ${SYS11_OPTIONS} \
+      -feature-gates= \
+      -monitoring-scrape-annotation-prefix=monitoring.metakube.de \
+      -namespace=kubermatic \
+      ${WORKER_OPTION} \
+      -external-url=${EXTERNAL_URL} \
+      -docker-pull-config-json-file="$dockercfgjson" \
+      -monitoring-scrape-annotation-prefix=${KUBERMATIC_ENV} \
+      -logtostderr=1 \
+      -log-debug=1 \
+      -backup-container=./hack/sys11-store-container.yaml \
+      -cleanup-container=./hack/sys11-cleanup-container.yaml \
+      -worker-count=1 \
+      -kubermatic-image=${KUBERMATIC_IMAGE} \
+      -dnatcontroller-image=${DNATCONTROLLER_IMAGE} \
+      -etcd-launcher-image-base=${ETCD_LAUNCHER_IMAGE_BASE} \
+      ${DISABLE_LE_OPTION} \
+      -v=8 $@
 
-        PID=$!
-    else
-        ./_build/seed-controller-manager \
-          ${DC_OPTION} \
-          -datacenter-name=${KUBERMATIC_CLUSTER} \
-          -kubeconfig=$seedKubeconfig \
-          -versions=${RESOURCES_DIR}/versions.yaml \
-          -updates=${RESOURCES_DIR}/updates.yaml \
-          -kubernetes-addons-path=${INSTALLER_DIR}/kubermatic/cluster-addons/addons \
-          -openshift-addons-path=../openshift_addons \
-          -kubernetes-addons-list=$defaultAddons \
-          -overwrite-registry= \
-          ${SYS11_OPTIONS} \
-          -feature-gates= \
-          -monitoring-scrape-annotation-prefix=monitoring.metakube.de \
-          -namespace=kubermatic \
-          ${WORKER_OPTION} \
-          -external-url=${EXTERNAL_URL} \
-          -docker-pull-config-json-file="$dockercfgjson" \
-          -monitoring-scrape-annotation-prefix=${KUBERMATIC_ENV} \
-          -logtostderr=1 \
-          -log-debug=1 \
-          -backup-container=./hack/sys11-store-container.yaml \
-          -cleanup-container=./hack/sys11-cleanup-container.yaml \
-          -worker-count=1 \
-          -kubermatic-image=${KUBERMATIC_IMAGE} \
-          -dnatcontroller-image=${DNATCONTROLLER_IMAGE} \
-          -etcd-launcher-image-base=${ETCD_LAUNCHER_IMAGE_BASE} \
-          ${DISABLE_LE_OPTION} \
-          -v=6 $@ &
+else
+    exec ./_build/seed-controller-manager \
+      ${DC_OPTION} \
+      -datacenter-name=${KUBERMATIC_CLUSTER} \
+      -kubeconfig=$seedKubeconfig \
+      -versions=${RESOURCES_DIR}/versions.yaml \
+      -updates=${RESOURCES_DIR}/updates.yaml \
+      -kubernetes-addons-path=${INSTALLER_DIR}/kubermatic/cluster-addons/addons \
+      -openshift-addons-path=../openshift_addons \
+      -kubernetes-addons-list=$defaultAddons \
+      -overwrite-registry= \
+      ${SYS11_OPTIONS} \
+      -feature-gates= \
+      -monitoring-scrape-annotation-prefix=monitoring.metakube.de \
+      -namespace=kubermatic \
+      ${WORKER_OPTION} \
+      -external-url=${EXTERNAL_URL} \
+      -docker-pull-config-json-file="$dockercfgjson" \
+      -monitoring-scrape-annotation-prefix=${KUBERMATIC_ENV} \
+      -logtostderr=1 \
+      -log-debug=1 \
+      -backup-container=./hack/sys11-store-container.yaml \
+      -cleanup-container=./hack/sys11-cleanup-container.yaml \
+      -worker-count=1 \
+      -kubermatic-image=${KUBERMATIC_IMAGE} \
+      -dnatcontroller-image=${DNATCONTROLLER_IMAGE} \
+      -etcd-launcher-image-base=${ETCD_LAUNCHER_IMAGE_BASE} \
+      ${DISABLE_LE_OPTION} \
+      -v=6 $@
 
-          # TODO
-          #-in-cluster-prometheus-rules-file="$inClusterPrometheusRulesFile" \
-          #-seed-admissionwebhook-cert-file=/opt/seed-webhook-serving-cert/serverCert.pem
-          #-seed-admissionwebhook-key-file=/opt/seed-webhook-serving-cert/serverKey.pem
-          #-oidc-ca-file=../../secrets/seed-clusters/dev.kubermatic.io/caBundle.pem \
-          #-oidc-issuer-url=$(vault kv get -field=oidc-issuer-url dev/seed-clusters/dev.kubermatic.io) \
-          #-oidc-issuer-client-id=$(vault kv get -field=oidc-issuer-client-id dev/seed-clusters/dev.kubermatic.io) \
-          #-oidc-issuer-client-secret=$(vault kv get -field=oidc-issuer-client-secret dev/seed-clusters/dev.kubermatic.io) \
-
-        PID=$!
-    fi
-
-
-
-    if [[ -x "$(command -v inotifywait)" ]]; then
-        inotifywait -r -e modify ${SRC_DIR}
-    elif [[ -x "$(command -v fswatch)" ]]; then
-        fswatch --one-event ${SRC_DIR}
-    else
-        echo "Can not watch changes because neither fswatch (MAC) nor inotifywait found"
-        kill ${PID}
-        exit 1
-    fi
-
-
-    echo "Change in kubermatic detected, recompiling and restarting"
-
-    kill ${PID} || true
-done
+      # TODO
+      #-in-cluster-prometheus-rules-file="$inClusterPrometheusRulesFile" \
+      #-seed-admissionwebhook-cert-file=/opt/seed-webhook-serving-cert/serverCert.pem
+      #-seed-admissionwebhook-key-file=/opt/seed-webhook-serving-cert/serverKey.pem
+      #-oidc-ca-file=../../secrets/seed-clusters/dev.kubermatic.io/caBundle.pem \
+      #-oidc-issuer-url=$(vault kv get -field=oidc-issuer-url dev/seed-clusters/dev.kubermatic.io) \
+      #-oidc-issuer-client-id=$(vault kv get -field=oidc-issuer-client-id dev/seed-clusters/dev.kubermatic.io) \
+      #-oidc-issuer-client-secret=$(vault kv get -field=oidc-issuer-client-secret dev/seed-clusters/dev.kubermatic.io) \
+fi
