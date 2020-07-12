@@ -168,7 +168,8 @@ func getEtcdClient(cluster *kubermaticv1.Cluster) (*clientv3.Client, error) {
 	}
 	endpoints := []string{}
 	for i := 0; i < clusterSize; i++ {
-		endpoints = append(endpoints, fmt.Sprintf("etcd-%d.etcd.%s.svc.cluster.local:2380", i, cluster.Status.NamespaceName))
+		//endpoints = append(endpoints, fmt.Sprintf("etcd-%d.etcd.%s.svc.cluster.local:2380", i, cluster.Status.NamespaceName))
+		endpoints = append(endpoints, fmt.Sprintf("127.0.0.1:%i380", 2+i))  // local debugging
 	}
 	var err error
 	for i := 0; i < 5; i++ {
