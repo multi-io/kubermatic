@@ -18,13 +18,8 @@ package backup
 
 import (
 	"context"
-	"fmt"
 	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
 	kubermaticv1helper "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1/helper"
-	"github.com/kubermatic/kubermatic/pkg/resources"
-	"github.com/kubermatic/kubermatic/pkg/resources/certificates"
-	"github.com/kubermatic/kubermatic/pkg/resources/certificates/triple"
-	"github.com/kubermatic/kubermatic/pkg/resources/reconciling"
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -133,39 +128,5 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, back
 
 	log.Infof("Reconciling backup: meta=%v/%v spec.name=%v", backup.Namespace, backup.Name, backup.Spec.Name)
 
-	if err := r.ensureSecrets(ctx, cluster); err != nil {
-		return nil, fmt.Errorf("failed to create the etcd client certificate: %v", err)
-	}
-
 	return nil, nil
-}
-
-func (r *Reconciler) ensureSecrets(ctx context.Context, cluster *kubermaticv1.Cluster) error {
-	secretName := resources.BackupControllerEtcdClientCertificateSecretName
-
-	getCA := func() (*triple.KeyPair, error) {
-		return resources.GetClusterRootCA(ctx, cluster.Status.NamespaceName, r.Client)
-	}
-
-	_, creator := certificates.GetClientCertificateCreator(
-		secretName,
-		"backup",
-		nil,
-		resources.BackupControllerEtcdClientCertificateCertSecretKey,
-		resources.BackupControllerEtcdClientCertificateKeySecretKey,
-		getCA,
-	)()
-
-	wrappedCreator := reconciling.SecretObjectWrapper(creator)
-	wrappedCreator = reconciling.OwnerRefWrapper(resources.GetClusterRef(cluster))(wrappedCreator)
-
-	err := reconciling.EnsureNamedObject(
-		ctx,
-		types.NamespacedName{Namespace: cluster.Status.NamespaceName, Name: secretName},
-		wrappedCreator, r.Client, &corev1.Secret{}, false)
-	if err != nil {
-		return fmt.Errorf("failed to ensure Secret %q: %v", secretName, err)
-	}
-
-	return nil
 }
