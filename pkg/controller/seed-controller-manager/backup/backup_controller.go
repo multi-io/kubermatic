@@ -18,19 +18,24 @@ package backup
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
 	kubermaticv1helper "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1/helper"
 	"go.etcd.io/etcd/clientv3"
 	"go.uber.org/zap"
+	"io"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"os"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 	"time"
@@ -39,6 +44,9 @@ import (
 const (
 	ControllerName       = "kubermatic_backup_controller"
 	defaultClusterSize   = 3
+	BackupPhaseRunning   = "Running"
+	BackupPhaseCompleted = "Completed"
+	BackupPhaseFailed    = "Failed"
 )
 
 // Reconciler stores necessary components that are required to create etcd backups
@@ -76,7 +84,13 @@ func Add(
 		return err
 	}
 
-	return c.Watch(&source.Kind{Type: &kubermaticv1.EtcdBackup{}}, &handler.EnqueueRequestForObject{})
+	backupPredicate := predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			new := e.ObjectNew.(*kubermaticv1.EtcdBackup)
+			return new.Status.Phase != BackupPhaseCompleted && new.Status.Phase != BackupPhaseFailed
+		},
+	}
+	return c.Watch(&source.Kind{Type: &kubermaticv1.EtcdBackup{}}, &handler.EnqueueRequestForObject{}, backupPredicate)
 }
 
 func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
@@ -131,12 +145,15 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, back
 
 	log.Infof("Reconciling backup: meta=%v/%v spec.name=%v", backup.Namespace, backup.Name, backup.Spec.Name)
 
+	backup.Status.Phase = BackupPhaseRunning
+	// TODO update
+
 	client, err := getEtcdClient(cluster)
 	if err != nil {
 		return nil, err
 	}
 
-	err = takeSnapshot(client)
+	err = takeSnapshot(ctx, log, client, backup, cluster)
 	if err != nil {
 		return nil, err
 	}
@@ -167,6 +184,51 @@ func getEtcdClient(cluster *kubermaticv1.Cluster) (*clientv3.Client, error) {
 	return nil, fmt.Errorf("failed to establish client connection: %v", err)
 }
 
-func takeSnapshot(client *clientv3.Client) error {
+func takeSnapshot(ctx context.Context, log *zap.SugaredLogger, client *clientv3.Client, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
+	targetFile := fmt.Sprintf("/Users/oklischat/tmp/etcdbackups/backup-%s-%s", cluster.Name, backup.Name)
+	partpath := targetFile + ".part"
+	defer os.RemoveAll(partpath)
+
+	var f *os.File
+	f, err := os.OpenFile(partpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
+		return fmt.Errorf("could not open %s (%v)", partpath, err)
+	}
+	log.Info("created temporary db file", zap.String("path", partpath))
+
+	var rd io.ReadCloser
+	rd, err = client.Snapshot(ctx)
+	if err != nil {
+		return err
+	}
+	log.Info("fetching snapshot")
+	var size int64
+	size, err = io.Copy(f, rd)
+	if err != nil {
+		return err
+	}
+	if !hasChecksum(size) {
+		return fmt.Errorf("sha256 checksum not found [bytes: %d]", size)
+	}
+	if err = f.Sync(); err != nil {
+		return err
+	}
+	if err = f.Close(); err != nil {
+		return err
+	}
+	log.Info("fetched snapshot")
+
+	if err = os.Rename(partpath, targetFile); err != nil {
+		return fmt.Errorf("could not rename %s to %s (%v)", partpath, targetFile, err)
+	}
+	log.Info("saved", zap.String("path", targetFile))
 	return nil
+}
+
+// hasChecksum returns "true" if the file size "n"
+// has appended sha256 hash digest.
+func hasChecksum(n int64) bool {
+	// 512 is chosen because it's a minimum disk sector size
+	// smaller than (and multiplies to) OS page size in most systems
+	return (n % 512) == sha256.Size
 }
