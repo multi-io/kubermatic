@@ -28,7 +28,7 @@ const (
 	// EtcdBackupKindName represents "Kind" defined in Kubernetes
 	EtcdBackupKindName = "EtcdBackup"
 
-	EtcdBackupResourcesCreated EtcdBackupConditionType = "EtcdBackupResourcesCreatedSuccessfully"
+	EtcdBackupCreated EtcdBackupConditionType = "EtcdBackupCreatedSuccessfully"
 )
 
 //+genclient

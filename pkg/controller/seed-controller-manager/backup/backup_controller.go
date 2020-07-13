@@ -27,6 +27,7 @@ import (
 	"io"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"os"
@@ -132,7 +133,11 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, back
 		return &reconcile.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
-	log.Infof("Reconciling backup: meta=%v/%v spec.name=%v", backup.Namespace, backup.Name, backup.Spec.Name)
+	if backupCreated(backup) {
+		return nil, nil
+	}
+
+	log.Debugf("Reconciling backup: meta=%v/%v spec.name=%v", backup.Namespace, backup.Name, backup.Spec.Name)
 
 	client, err := getEtcdClient(cluster)
 	if err != nil {
@@ -144,7 +149,57 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, back
 		return nil, err
 	}
 
+	if err = r.setAndPersistBackupCondition(ctx, backup, kubermaticv1.EtcdBackupCreated, corev1.ConditionTrue); err != nil {
+		return nil, fmt.Errorf("failed to set add EtcdBackupCreated Condition: %v", err)
+	}
+
 	return nil, nil
+}
+
+func (r *Reconciler) setAndPersistBackupCondition(ctx context.Context, backup *kubermaticv1.EtcdBackup, condType kubermaticv1.EtcdBackupConditionType, status corev1.ConditionStatus) error {
+	_, cond := getBackupCondition(backup, condType)
+	if cond != nil && cond.Status == status {
+		return nil
+	}
+	oldBackup := backup.DeepCopy()
+	setBackupCondition(backup, condType, status)
+	return r.Client.Patch(ctx, backup, ctrlruntimeclient.MergeFrom(oldBackup))
+}
+
+func backupCreated(backup *kubermaticv1.EtcdBackup) bool {
+	_, cond := getBackupCondition(backup, kubermaticv1.EtcdBackupCreated)
+	if cond != nil && cond.Status == corev1.ConditionTrue {
+		return true
+	}
+	return false
+}
+
+func setBackupCondition(backup *kubermaticv1.EtcdBackup, condType kubermaticv1.EtcdBackupConditionType, status corev1.ConditionStatus) {
+	idx, cond := getBackupCondition(backup, condType)
+	if cond == nil {
+		cond = &kubermaticv1.EtcdBackupCondition{}
+		cond.Type = condType
+		cond.Status = status
+		cond.LastHeartbeatTime = metav1.Now()
+		cond.LastTransitionTime = metav1.Now()
+		backup.Status.Conditions = append(backup.Status.Conditions, *cond)
+		return
+	}
+	if cond.Status != status {
+		cond.LastTransitionTime = metav1.Now()
+		cond.Status = status
+	}
+	cond.LastHeartbeatTime = metav1.Now()
+	backup.Status.Conditions[idx] = *cond
+}
+
+func getBackupCondition(backup *kubermaticv1.EtcdBackup, condType kubermaticv1.EtcdBackupConditionType) (int, *kubermaticv1.EtcdBackupCondition) {
+	for i, c := range backup.Status.Conditions {
+		if c.Type == condType {
+			return i, &c
+		}
+	}
+	return -1, nil
 }
 
 func getEtcdClient(cluster *kubermaticv1.Cluster) (*clientv3.Client, error) {
