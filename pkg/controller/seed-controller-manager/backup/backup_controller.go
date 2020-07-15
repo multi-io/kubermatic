@@ -22,6 +22,7 @@ import (
 	"fmt"
 	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
 	kubermaticv1helper "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1/helper"
+	"github.com/minio/minio-go"
 	"go.etcd.io/etcd/clientv3"
 	"go.uber.org/zap"
 	"io"
@@ -41,8 +42,8 @@ import (
 )
 
 const (
-	ControllerName       = "kubermatic_backup_controller"
-	defaultClusterSize   = 3
+	ControllerName     = "kubermatic_backup_controller"
+	defaultClusterSize = 3
 )
 
 // Reconciler stores necessary components that are required to create etcd backups
@@ -50,7 +51,12 @@ type Reconciler struct {
 	log        *zap.SugaredLogger
 	workerName string
 	ctrlruntimeclient.Client
-	recorder record.EventRecorder
+	recorder          record.EventRecorder
+	snapshotDir       string
+	s3Endpoint        string
+	s3BucketName      string
+	s3AccessKeyID     string
+	s3SecretAccessKey string
 }
 
 // Add creates a new Backup controller that is responsible for
@@ -60,15 +66,25 @@ func Add(
 	log *zap.SugaredLogger,
 	numWorkers int,
 	workerName string,
+	snapshotDir string,
+	s3Endpoint string,
+	s3BucketName string,
+	s3AccessKeyID string,
+	s3SecretAccessKey string,
 ) error {
 	log = log.Named(ControllerName)
 	client := mgr.GetClient()
 
 	reconciler := &Reconciler{
-		log:        log,
-		Client:     client,
-		workerName: workerName,
-		recorder:   mgr.GetEventRecorderFor(ControllerName),
+		log:               log,
+		Client:            client,
+		workerName:        workerName,
+		recorder:          mgr.GetEventRecorderFor(ControllerName),
+		snapshotDir:       snapshotDir,
+		s3Endpoint:        s3Endpoint,
+		s3BucketName:      s3BucketName,
+		s3AccessKeyID:     s3AccessKeyID,
+		s3SecretAccessKey: s3SecretAccessKey,
 	}
 
 	ctrlOptions := controller.Options{
@@ -139,12 +155,17 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, back
 
 	log.Debugf("Reconciling backup: meta=%v/%v spec.name=%v", backup.Namespace, backup.Name, backup.Spec.Name)
 
-	client, err := getEtcdClient(cluster)
+	err := r.takeSnapshot(ctx, log, backup, cluster)
 	if err != nil {
 		return nil, err
 	}
 
-	err = takeSnapshot(ctx, log, client, backup, cluster)
+	err = r.uploadSnapshot(ctx, log, backup, cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	err = r.cleanupSnapshot(ctx, log, backup, cluster)
 	if err != nil {
 		return nil, err
 	}
@@ -202,44 +223,29 @@ func getBackupCondition(backup *kubermaticv1.EtcdBackup, condType kubermaticv1.E
 	return -1, nil
 }
 
-func getEtcdClient(cluster *kubermaticv1.Cluster) (*clientv3.Client, error) {
-	clusterSize := cluster.Spec.EtcdClusterSize
-	if clusterSize == 0 {
-		clusterSize = defaultClusterSize
-	}
-	endpoints := []string{}
-	for i := 0; i < clusterSize; i++ {
-		//endpoints = append(endpoints, fmt.Sprintf("etcd-%d.etcd.%s.svc.cluster.local:2380", i, cluster.Status.NamespaceName))
-		endpoints = append(endpoints, fmt.Sprintf("127.0.0.1:%v380", 2+i))  // local debugging
-	}
-	var err error
-	for i := 0; i < 5; i++ {
-		cli, err := clientv3.New(clientv3.Config{
-			Endpoints:   endpoints,
-			DialTimeout: 2 * time.Second,
-		})
-		if err == nil && cli != nil {
-			return cli, nil
-		}
-		time.Sleep(5 * time.Second)
-	}
-	return nil, fmt.Errorf("failed to establish client connection: %v", err)
+func backupFileName(backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) string {
+	return fmt.Sprintf("%s-%s", cluster.Name, backup.Name)
 }
 
-func takeSnapshot(ctx context.Context, log *zap.SugaredLogger, client *clientv3.Client, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
-	targetFile := fmt.Sprintf("/Users/oklischat/tmp/etcdbackups/backup-%s-%s", cluster.Name, backup.Name)
-	partpath := targetFile + ".part"
-	defer os.RemoveAll(partpath)
+func (r *Reconciler) takeSnapshot(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
+	client, err := getEtcdClient(cluster)
+	if err != nil {
+		return err
+	}
+
+	snapshotFileName := fmt.Sprintf("/%s/%s", r.snapshotDir, backupFileName(backup, cluster))
+	partFile := snapshotFileName + ".part"
+	defer os.RemoveAll(partFile)
 
 	var f *os.File
-	f, err := os.OpenFile(partpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	f, err = os.OpenFile(partFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
-		return fmt.Errorf("could not open %s (%v)", partpath, err)
+		return fmt.Errorf("could not open %s (%v)", partFile, err)
 	}
-	log.Info("created temporary db file", zap.String("path", partpath))
+	log.Info("created temporary db file", zap.String("path", partFile))
 
 	var rd io.ReadCloser
-	deadlinedCtx, cancel := context.WithTimeout(ctx, 30 * time.Second)
+	deadlinedCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	rd, err = client.Snapshot(deadlinedCtx)
 	if err != nil {
@@ -262,11 +268,35 @@ func takeSnapshot(ctx context.Context, log *zap.SugaredLogger, client *clientv3.
 	}
 	log.Info("fetched snapshot")
 
-	if err = os.Rename(partpath, targetFile); err != nil {
-		return fmt.Errorf("could not rename %s to %s (%v)", partpath, targetFile, err)
+	if err = os.Rename(partFile, snapshotFileName); err != nil {
+		return fmt.Errorf("could not rename %s to %s (%v)", partFile, snapshotFileName, err)
 	}
-	log.Info("saved", zap.String("path", targetFile))
+	log.Info("saved", zap.String("path", snapshotFileName))
 	return nil
+}
+
+func getEtcdClient(cluster *kubermaticv1.Cluster) (*clientv3.Client, error) {
+	clusterSize := cluster.Spec.EtcdClusterSize
+	if clusterSize == 0 {
+		clusterSize = defaultClusterSize
+	}
+	endpoints := []string{}
+	for i := 0; i < clusterSize; i++ {
+		//endpoints = append(endpoints, fmt.Sprintf("etcd-%d.etcd.%s.svc.cluster.local:2380", i, cluster.Status.NamespaceName))
+		endpoints = append(endpoints, fmt.Sprintf("127.0.0.1:%v380", 2+i)) // local debugging
+	}
+	var err error
+	for i := 0; i < 5; i++ {
+		cli, err := clientv3.New(clientv3.Config{
+			Endpoints:   endpoints,
+			DialTimeout: 2 * time.Second,
+		})
+		if err == nil && cli != nil {
+			return cli, nil
+		}
+		time.Sleep(5 * time.Second)
+	}
+	return nil, fmt.Errorf("failed to establish client connection: %v", err)
 }
 
 // hasChecksum returns "true" if the file size "n"
@@ -275,4 +305,36 @@ func hasChecksum(n int64) bool {
 	// 512 is chosen because it's a minimum disk sector size
 	// smaller than (and multiplies to) OS page size in most systems
 	return (n % 512) == sha256.Size
+}
+
+func (r *Reconciler) uploadSnapshot(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
+	// TODO long-lived client, possibly one per worker (since I think it's not thread-safe)
+	client, err := minio.New(r.s3Endpoint, r.s3AccessKeyID, r.s3SecretAccessKey, true)
+	if err != nil {
+		return err
+	}
+	client.SetAppInfo("kubermatic", "v0.1")
+
+	exists, err := client.BucketExists(r.s3BucketName)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		log.Debugf("Creating bucket: %v", r.s3BucketName)
+		if err := client.MakeBucket(r.s3BucketName, ""); err != nil {
+			return err
+		}
+	}
+
+	objectName := backupFileName(backup, cluster)
+	snapshotFileName := fmt.Sprintf("/%s/%s", r.snapshotDir, objectName)
+
+	_, err = client.FPutObject(r.s3BucketName, objectName, snapshotFileName, minio.PutObjectOptions{})
+
+	return err
+}
+
+func (r *Reconciler) cleanupSnapshot(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
+	snapshotFileName := fmt.Sprintf("/%s/%s", r.snapshotDir, backupFileName(backup, cluster))
+	return os.RemoveAll(snapshotFileName)
 }
