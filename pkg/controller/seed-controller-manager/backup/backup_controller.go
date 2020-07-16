@@ -276,7 +276,7 @@ func (r *Reconciler) takeSnapshot(ctx context.Context, log *zap.SugaredLogger, b
 }
 
 func getEtcdClient(cluster *kubermaticv1.Cluster) (*clientv3.Client, error) {
-	clusterSize := cluster.Spec.EtcdClusterSize
+	clusterSize := cluster.Spec.ComponentsOverride.Etcd.ClusterSize
 	if clusterSize == 0 {
 		clusterSize = defaultClusterSize
 	}
