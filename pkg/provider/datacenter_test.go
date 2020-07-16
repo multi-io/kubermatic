@@ -18,6 +18,7 @@ package provider
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
 	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
@@ -31,7 +32,7 @@ func TestSeedGetterFactorySetsDefaults(t *testing.T) {
 	t.Parallel()
 	initSeed := &kubermaticv1.Seed{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      defaultSeedName,
+			Name:      DefaultSeedName,
 			Namespace: "my-ns",
 		},
 		Spec: kubermaticv1.SeedSpec{
@@ -43,7 +44,7 @@ func TestSeedGetterFactorySetsDefaults(t *testing.T) {
 	}
 	client := fakectrlruntimeclient.NewFakeClientWithScheme(scheme.Scheme, initSeed)
 
-	seedGetter, err := SeedGetterFactory(context.Background(), client, defaultSeedName, "my-ns")
+	seedGetter, err := SeedGetterFactory(context.Background(), client, DefaultSeedName, "my-ns")
 	if err != nil {
 		t.Fatalf("failed getting seedGetter: %v", err)
 	}
@@ -61,7 +62,7 @@ func TestSeedsGetterFactorySetsDefaults(t *testing.T) {
 	t.Parallel()
 	initSeed := &kubermaticv1.Seed{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      defaultSeedName,
+			Name:      DefaultSeedName,
 			Namespace: "my-ns",
 		},
 		Spec: kubermaticv1.SeedSpec{
@@ -81,12 +82,29 @@ func TestSeedsGetterFactorySetsDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed calling seedsGetter: %v", err)
 	}
-	if _, exists := seeds[defaultSeedName]; !exists || len(seeds) != 1 {
+	if _, exists := seeds[DefaultSeedName]; !exists || len(seeds) != 1 {
 		t.Fatalf("expceted to get a map with exactly one key `my-seed`, got %v", seeds)
 	}
-	seed := seeds[defaultSeedName]
+	seed := seeds[DefaultSeedName]
 	if seed.Spec.Datacenters["a"].Node.ProxySettings.HTTPProxy.String() != "seed-proxy" {
 		t.Errorf("expected the datacenters http proxy setting to get set but was %v",
 			seed.Spec.Datacenters["a"].Node.ProxySettings.HTTPProxy)
+	}
+}
+
+func TestSeedsGetterFactoryNoSeed(t *testing.T) {
+	t.Parallel()
+	// No seed is returned by the fake client
+	client := fakectrlruntimeclient.NewFakeClientWithScheme(scheme.Scheme)
+	seedsGetter, err := SeedsGetterFactory(context.Background(), client, "my-ns")
+	if err != nil {
+		t.Fatalf("failed getting seedsGetter: %v", err)
+	}
+	seeds, err := seedsGetter()
+	if err != nil {
+		t.Fatalf("error occurred while calling seedsGetter: %v", err)
+	}
+	if !reflect.DeepEqual(seeds, emptySeedMap) {
+		t.Errorf("Expected no seed, but got %d: %v", len(seeds), seeds)
 	}
 }

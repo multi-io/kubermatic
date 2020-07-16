@@ -20,6 +20,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/kubermatic/kubermatic/pkg/resources"
+	"github.com/kubermatic/kubermatic/pkg/util/edition"
 )
 
 func Hello(log *zap.SugaredLogger, app string, verbose bool) {
@@ -28,5 +29,5 @@ func Hello(log *zap.SugaredLogger, app string, verbose bool) {
 		log = log.With("commit", resources.KUBERMATICCOMMIT)
 	}
 
-	log.Infof("Starting Kubermatic %s (%s)...", app, resources.KubermaticEdition)
+	log.Infof("Starting Kubermatic %s (%s)...", app, edition.KubermaticEdition)
 }

@@ -72,88 +72,93 @@ type Routing struct {
 	adminProvider                         provider.AdminProvider
 	admissionPluginProvider               provider.AdmissionPluginsProvider
 	settingsWatcher                       watcher.SettingsWatcher
+	userWatcher                           watcher.UserWatcher
 }
 
 // NewRouting creates a new Routing.
-func NewRouting(
-	logger *zap.SugaredLogger,
-	presetsProvider provider.PresetProvider,
-	seedsGetter provider.SeedsGetter,
-	seedsClientGetter provider.SeedClientGetter,
-	clusterProviderGetter provider.ClusterProviderGetter,
-	addonProviderGetter provider.AddonProviderGetter,
-	addonConfigProvider provider.AddonConfigProvider,
-	newSSHKeyProvider provider.SSHKeyProvider,
-	privilegedSSHKeyProvider provider.PrivilegedSSHKeyProvider,
-	userProvider provider.UserProvider,
-	serviceAccountProvider provider.ServiceAccountProvider,
-	privilegedServiceAccountProvider provider.PrivilegedServiceAccountProvider,
-	serviceAccountTokenProvider provider.ServiceAccountTokenProvider,
-	privilegedServiceAccountTokenProvider provider.PrivilegedServiceAccountTokenProvider,
-	projectProvider provider.ProjectProvider,
-	privilegedProject provider.PrivilegedProjectProvider,
-	oidcIssuerVerifier auth.OIDCIssuerVerifier,
-	tokenVerifiers auth.TokenVerifier,
-	tokenExtractors auth.TokenExtractor,
-	updateManager common.UpdateManager,
-	prometheusClient prometheusapi.Client,
-	projectMemberProvider provider.ProjectMemberProvider,
-	privilegedProjectMemberProvider provider.PrivilegedProjectMemberProvider,
-	userProjectMapper provider.ProjectMemberMapper,
-	saTokenAuthenticator serviceaccount.TokenAuthenticator,
-	saTokenGenerator serviceaccount.TokenGenerator,
-	eventRecorderProvider provider.EventRecorderProvider,
-	exposeStrategy corev1.ServiceType,
-	accessibleAddons sets.String,
-	userInfoGetter provider.UserInfoGetter,
-	settingsProvider provider.SettingsProvider,
-	adminProvider provider.AdminProvider,
-	admissionPluginProvider provider.AdmissionPluginsProvider,
-	settingsWatcher watcher.SettingsWatcher,
-) Routing {
+func NewRouting(routingParams RoutingParams) Routing {
 	return Routing{
-		log:                                   logger,
-		presetsProvider:                       presetsProvider,
-		seedsGetter:                           seedsGetter,
-		seedsClientGetter:                     seedsClientGetter,
-		clusterProviderGetter:                 clusterProviderGetter,
-		addonProviderGetter:                   addonProviderGetter,
-		addonConfigProvider:                   addonConfigProvider,
-		sshKeyProvider:                        newSSHKeyProvider,
-		privilegedSSHKeyProvider:              privilegedSSHKeyProvider,
-		userProvider:                          userProvider,
-		serviceAccountProvider:                serviceAccountProvider,
-		privilegedServiceAccountProvider:      privilegedServiceAccountProvider,
-		serviceAccountTokenProvider:           serviceAccountTokenProvider,
-		privilegedServiceAccountTokenProvider: privilegedServiceAccountTokenProvider,
-		projectProvider:                       projectProvider,
-		privilegedProjectProvider:             privilegedProject,
+		log:                                   routingParams.Log,
+		presetsProvider:                       routingParams.PresetsProvider,
+		seedsGetter:                           routingParams.SeedsGetter,
+		seedsClientGetter:                     routingParams.SeedsClientGetter,
+		clusterProviderGetter:                 routingParams.ClusterProviderGetter,
+		addonProviderGetter:                   routingParams.AddonProviderGetter,
+		addonConfigProvider:                   routingParams.AddonConfigProvider,
+		sshKeyProvider:                        routingParams.SSHKeyProvider,
+		privilegedSSHKeyProvider:              routingParams.PrivilegedSSHKeyProvider,
+		userProvider:                          routingParams.UserProvider,
+		serviceAccountProvider:                routingParams.ServiceAccountProvider,
+		privilegedServiceAccountProvider:      routingParams.PrivilegedServiceAccountProvider,
+		serviceAccountTokenProvider:           routingParams.ServiceAccountTokenProvider,
+		privilegedServiceAccountTokenProvider: routingParams.PrivilegedServiceAccountTokenProvider,
+		projectProvider:                       routingParams.ProjectProvider,
+		privilegedProjectProvider:             routingParams.PrivilegedProjectProvider,
 		logger:                                log.NewLogfmtLogger(os.Stderr),
-		oidcIssuerVerifier:                    oidcIssuerVerifier,
-		tokenVerifiers:                        tokenVerifiers,
-		tokenExtractors:                       tokenExtractors,
-		updateManager:                         updateManager,
-		prometheusClient:                      prometheusClient,
-		projectMemberProvider:                 projectMemberProvider,
-		privilegedProjectMemberProvider:       privilegedProjectMemberProvider,
-		userProjectMapper:                     userProjectMapper,
-		saTokenAuthenticator:                  saTokenAuthenticator,
-		saTokenGenerator:                      saTokenGenerator,
-		eventRecorderProvider:                 eventRecorderProvider,
-		exposeStrategy:                        exposeStrategy,
-		accessibleAddons:                      accessibleAddons,
-		userInfoGetter:                        userInfoGetter,
-		settingsProvider:                      settingsProvider,
-		adminProvider:                         adminProvider,
-		admissionPluginProvider:               admissionPluginProvider,
-		settingsWatcher:                       settingsWatcher,
+		oidcIssuerVerifier:                    routingParams.OIDCIssuerVerifier,
+		tokenVerifiers:                        routingParams.TokenVerifiers,
+		tokenExtractors:                       routingParams.TokenExtractors,
+		updateManager:                         routingParams.UpdateManager,
+		prometheusClient:                      routingParams.PrometheusClient,
+		projectMemberProvider:                 routingParams.ProjectMemberProvider,
+		privilegedProjectMemberProvider:       routingParams.PrivilegedProjectMemberProvider,
+		userProjectMapper:                     routingParams.UserProjectMapper,
+		saTokenAuthenticator:                  routingParams.SATokenAuthenticator,
+		saTokenGenerator:                      routingParams.SATokenGenerator,
+		eventRecorderProvider:                 routingParams.EventRecorderProvider,
+		exposeStrategy:                        routingParams.ExposeStrategy,
+		accessibleAddons:                      routingParams.AccessibleAddons,
+		userInfoGetter:                        routingParams.UserInfoGetter,
+		settingsProvider:                      routingParams.SettingsProvider,
+		adminProvider:                         routingParams.AdminProvider,
+		admissionPluginProvider:               routingParams.AdmissionPluginProvider,
+		settingsWatcher:                       routingParams.SettingsWatcher,
+		userWatcher:                           routingParams.UserWatcher,
 	}
 }
 
 func (r Routing) defaultServerOptions() []httptransport.ServerOption {
 	return []httptransport.ServerOption{
 		httptransport.ServerErrorLogger(r.logger),
-		httptransport.ServerErrorEncoder(errorEncoder),
+		httptransport.ServerErrorEncoder(ErrorEncoder),
 		httptransport.ServerBefore(middleware.TokenExtractor(r.tokenExtractors)),
 	}
+}
+
+type RoutingParams struct {
+	Log                                   *zap.SugaredLogger
+	PresetsProvider                       provider.PresetProvider
+	SeedsGetter                           provider.SeedsGetter
+	SeedsClientGetter                     provider.SeedClientGetter
+	SSHKeyProvider                        provider.SSHKeyProvider
+	PrivilegedSSHKeyProvider              provider.PrivilegedSSHKeyProvider
+	UserProvider                          provider.UserProvider
+	ServiceAccountProvider                provider.ServiceAccountProvider
+	PrivilegedServiceAccountProvider      provider.PrivilegedServiceAccountProvider
+	ServiceAccountTokenProvider           provider.ServiceAccountTokenProvider
+	PrivilegedServiceAccountTokenProvider provider.PrivilegedServiceAccountTokenProvider
+	ProjectProvider                       provider.ProjectProvider
+	PrivilegedProjectProvider             provider.PrivilegedProjectProvider
+	OIDCIssuerVerifier                    auth.OIDCIssuerVerifier
+	TokenVerifiers                        auth.TokenVerifier
+	TokenExtractors                       auth.TokenExtractor
+	ClusterProviderGetter                 provider.ClusterProviderGetter
+	AddonProviderGetter                   provider.AddonProviderGetter
+	AddonConfigProvider                   provider.AddonConfigProvider
+	UpdateManager                         common.UpdateManager
+	PrometheusClient                      prometheusapi.Client
+	ProjectMemberProvider                 provider.ProjectMemberProvider
+	PrivilegedProjectMemberProvider       provider.PrivilegedProjectMemberProvider
+	UserProjectMapper                     provider.ProjectMemberMapper
+	SATokenAuthenticator                  serviceaccount.TokenAuthenticator
+	SATokenGenerator                      serviceaccount.TokenGenerator
+	EventRecorderProvider                 provider.EventRecorderProvider
+	ExposeStrategy                        corev1.ServiceType
+	AccessibleAddons                      sets.String
+	UserInfoGetter                        provider.UserInfoGetter
+	SettingsProvider                      provider.SettingsProvider
+	AdminProvider                         provider.AdminProvider
+	AdmissionPluginProvider               provider.AdmissionPluginsProvider
+	SettingsWatcher                       watcher.SettingsWatcher
+	UserWatcher                           watcher.UserWatcher
 }

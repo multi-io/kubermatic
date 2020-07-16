@@ -21,6 +21,7 @@ import (
 
 	"github.com/Masterminds/semver"
 
+	"github.com/kubermatic/kubermatic/pkg/controller/master-controller-manager/rbac"
 	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
 	ksemver "github.com/kubermatic/kubermatic/pkg/semver"
 	"github.com/kubermatic/machine-controller/pkg/apis/cluster/v1alpha1"
@@ -29,17 +30,6 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	cmdv1 "k8s.io/client-go/tools/clientcmd/api/v1"
 )
-
-// LegacyObjectMeta is an object storing common metadata for persistable objects.
-// Deprecated: LegacyObjectMeta is deprecated use ObjectMeta instead.
-type LegacyObjectMeta struct {
-	Name            string `json:"name"`
-	ResourceVersion string `json:"resourceVersion,omitempty"`
-	UID             string `json:"uid,omitempty"`
-
-	Annotations map[string]string `json:"annotations,omitempty"`
-	Labels      map[string]string `json:"labels,omitempty"`
-}
 
 // ObjectMeta defines the set of fields that objects returned from the API have
 // swagger:model ObjectMeta
@@ -113,9 +103,13 @@ type DatacenterList []Datacenter
 // Datacenter is the object representing a Kubernetes infra datacenter.
 // swagger:model Datacenter
 type Datacenter struct {
-	Metadata LegacyObjectMeta `json:"metadata,omitempty"`
-	Spec     DatacenterSpec   `json:"spec,omitempty"`
-	Seed     bool             `json:"seed,omitempty"`
+	Metadata DatacenterMeta `json:"metadata,omitempty"`
+	Spec     DatacenterSpec `json:"spec,omitempty"`
+}
+
+// DatacenterMeta holds datacenter metadata information.
+type DatacenterMeta struct {
+	Name string `json:"name"`
 }
 
 // AWSSize represents a object of AWS size.
@@ -411,6 +405,38 @@ type User struct {
 	Projects []ProjectGroup `json:"projects,omitempty"`
 
 	Settings *kubermaticv1.UserSettings `json:"userSettings,omitempty"`
+}
+
+func ConvertInternalUserToExternal(internalUser *kubermaticv1.User, includeSettings bool, bindings ...*kubermaticv1.UserProjectBinding) *User {
+	apiUser := &User{
+		ObjectMeta: ObjectMeta{
+			ID:                internalUser.Name,
+			Name:              internalUser.Spec.Name,
+			CreationTimestamp: NewTime(internalUser.CreationTimestamp.Time),
+		},
+		Email:   internalUser.Spec.Email,
+		IsAdmin: internalUser.Spec.IsAdmin,
+	}
+
+	if includeSettings {
+		apiUser.Settings = internalUser.Spec.Settings
+	}
+
+	for _, binding := range bindings {
+		bindingAlreadyExists := false
+		for _, pg := range apiUser.Projects {
+			if pg.ID == binding.Spec.ProjectID && pg.GroupPrefix == binding.Spec.Group {
+				bindingAlreadyExists = true
+				break
+			}
+		}
+		if !bindingAlreadyExists {
+			groupPrefix := rbac.ExtractGroupPrefix(binding.Spec.Group)
+			apiUser.Projects = append(apiUser.Projects, ProjectGroup{ID: binding.Spec.ProjectID, GroupPrefix: groupPrefix})
+		}
+	}
+
+	return apiUser
 }
 
 // Admin represents admin user

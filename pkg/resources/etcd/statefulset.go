@@ -109,13 +109,14 @@ func StatefulSetCreator(data etcdStatefulSetCreatorData, enableDataCorruptionChe
 			if err != nil {
 				return nil, err
 			}
+
 			set.Spec.Template.Spec.Containers = []corev1.Container{
 				{
 					Name: resources.EtcdStatefulSetName,
 
 					Image:           image,
 					ImagePullPolicy: corev1.PullIfNotPresent,
-					Command:         []string{"/usr/local/bin/etcd-launcher"},
+					Command:         []string{"/usr/local/bin/etcd-launcher"}, Args: getLauncherArgs(enableDataCorruptionChecks),
 					Env: []corev1.EnvVar{
 						{
 							Name: "POD_NAME",
@@ -149,7 +150,7 @@ func StatefulSetCreator(data etcdStatefulSetCreatorData, enableDataCorruptionChe
 							Value: data.Cluster().Name,
 						},
 						{
-							Name:  "ECTD_CLUSTER_SIZE",
+							Name:  "ETCD_CLUSTER_SIZE",
 							Value: strconv.Itoa(replicas),
 						},
 						{
@@ -341,7 +342,7 @@ func getLauncherImage(data etcdStatefulSetCreatorData) (string, error) {
 }
 
 func computeReplicas(data etcdStatefulSetCreatorData, set *appsv1.StatefulSet) int {
-	etcdClusterSize := data.Cluster().Spec.EtcdClusterSize
+	etcdClusterSize := data.Cluster().Spec.ComponentsOverride.Etcd.ClusterSize
 	// handle existing clusters that don't have a configured size
 	if etcdClusterSize < kubermaticv1.DefaultEtcdClusterSize {
 		etcdClusterSize = kubermaticv1.DefaultEtcdClusterSize
@@ -350,11 +351,11 @@ func computeReplicas(data etcdStatefulSetCreatorData, set *appsv1.StatefulSet) i
 		return etcdClusterSize
 	}
 	replicas := int(*set.Spec.Replicas)
-	isEtcdHealthy := data.Cluster().Status.ExtendedHealth.Etcd == kubermaticv1.HealthStatusUp
 	// at required size. do nothing
 	if etcdClusterSize == replicas {
 		return replicas
 	}
+	isEtcdHealthy := data.Cluster().Status.ExtendedHealth.Etcd == kubermaticv1.HealthStatusUp
 	if isEtcdHealthy { // no scaling until we are healthy
 		if etcdClusterSize > replicas {
 			return replicas + 1
@@ -362,4 +363,19 @@ func computeReplicas(data etcdStatefulSetCreatorData, set *appsv1.StatefulSet) i
 		return replicas - 1
 	}
 	return replicas
+}
+
+func getLauncherArgs(enableCorruptionCheck bool) []string {
+	command := []string{"-namespace", "$(NAMESPACE)",
+		"-etcd-cluster-size", "$(ETCD_CLUSTER_SIZE)",
+		"-pod-name", "$(POD_NAME)",
+		"-pod-ip", "$(POD_IP)",
+		"-api-version", "$(ETCDCTL_API)",
+		"-token", "$(TOKEN)",
+		"-initial-state", "$(INITIAL_STATE)",
+	}
+	if enableCorruptionCheck {
+		command = append(command, "-enable-corruption-check")
+	}
+	return command
 }

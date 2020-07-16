@@ -804,9 +804,9 @@ func (r *runner) GetGlobalSettings() (*apiv1.GlobalSettings, error) {
 	return convertGlobalSettings(responseSettings.Payload), nil
 }
 
-func (r *runner) UpdateGlobalSettings(s string) (*apiv1.GlobalSettings, error) {
+func (r *runner) UpdateGlobalSettings(patch json.RawMessage) (*apiv1.GlobalSettings, error) {
 	params := &admin.PatchKubermaticSettingsParams{
-		Patch: []uint8(s),
+		Patch: &patch,
 	}
 	params.WithTimeout(timeout)
 	responseSettings, err := r.client.Admin.PatchKubermaticSettings(params, r.bearerToken)
@@ -1298,6 +1298,17 @@ func (r *runner) ListDC() ([]*models.Datacenter, error) {
 	}
 
 	return list.GetPayload(), nil
+}
+
+func (r *runner) Logout() error {
+	params := &users.LogoutCurrentUserParams{}
+	params.WithTimeout(timeout)
+
+	_, err := r.client.Users.LogoutCurrentUser(params, r.bearerToken)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func cleanUpDC(seed, dc string) func(t *testing.T) {

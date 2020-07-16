@@ -1,3 +1,32 @@
+### [v2.14.2]()
+
+
+**Bugfix:**
+
+- Fix Kubermatic operator not to specify unsupported &#39;dynamic-datacenter&#39; flag in CE mode. [#5615](https://github.com/kubermatic/kubermatic/issues/5615) ([irozzo-1A](https://github.com/irozzo-1A))
+- Fix Seed validation for Community Edition. [#5619](https://github.com/kubermatic/kubermatic/issues/5619) ([irozzo-1A](https://github.com/irozzo-1A))
+- Fix Subnetworks for GCP, because the network filtering was wrong. [#5632](https://github.com/kubermatic/kubermatic/pull/5632) ([kgroschoff](https://github.com/kgroschoff))
+- Fix label for nodeport-proxy when deployed with the operator. [#5612](https://github.com/kubermatic/kubermatic/pull/5612) ([youssefazrak](https://github.com/youssefazrak))
+
+
+**Misc:**
+
+- Change default number of replicas for seed and master controller manager to one. [#5620](https://github.com/kubermatic/kubermatic/issues/5620) ([irozzo-1A](https://github.com/irozzo-1A))
+- Remove empty Docker secret for Kubermatic Operator CE Helm chart. [#5618](https://github.com/kubermatic/kubermatic/pull/5618) ([youssefazrak](https://github.com/youssefazrak))
+
+
+
+
+### [v2.14.1]
+
+
+- Added missing Flatcar Linux handling in API [#5368](https://github.com/kubermatic/kubermatic/issues/5368) ([kdomanski](https://github.com/kdomanski))
+- Fixed nodes sometimes not having the correct distribution label applied. [#5437](https://github.com/kubermatic/kubermatic/issues/5437) ([xrstf](https://github.com/xrstf))
+- Fixed missing Kubermatic Prometheus metrics. [#5505](https://github.com/kubermatic/kubermatic/issues/5505) ([xrstf](https://github.com/xrstf))
+
+
+
+
 ### [v2.14.0]
 
 
@@ -113,6 +142,14 @@ Supported Kubernetes versions:
 - Fixed swagger and API client for ssh key creation. [#5069](https://github.com/kubermatic/kubermatic/issues/5069) ([kdomanski](https://github.com/kdomanski))
 - Fixed seed-proxy controller not being triggered. [#5101](https://github.com/kubermatic/kubermatic/issues/5101) ([xrstf](https://github.com/xrstf))
 - Fixed a bug in Kubernetes 1.17 on CoreOS that prevented the Kubelet from starting [#658](https://github.com/kubermatic/machine-controller/issues/658) ([alvaroaleman](https://github.com/alvaroaleman))
+
+
+
+
+### [v2.13.6]()
+
+
+- Fixed a bug preventing editing of existing cluster credential secrets [#5569](https://github.com/kubermatic/kubermatic/issues/5569) ([zreigz](https://github.com/zreigz))
 
 
 

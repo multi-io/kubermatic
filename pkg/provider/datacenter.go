@@ -33,9 +33,14 @@ import (
 )
 
 const (
-	// defaultSeedName is the name of the Seed resource that is used
+	// DefaultSeedName is the name of the Seed resource that is used
 	// in the Community Edition, which is limited to a single seed.
-	defaultSeedName = "kubermatic"
+	DefaultSeedName = "kubermatic"
+)
+
+var (
+	// emptySeedMap is returned when the default seed is not present.
+	emptySeedMap = map[string]*kubermaticv1.Seed{}
 )
 
 // SeedGetter is a function to retrieve a single seed
@@ -78,18 +83,20 @@ func SeedGetterFactory(ctx context.Context, client ctrlruntimeclient.Client, see
 func SeedsGetterFactory(ctx context.Context, client ctrlruntimeclient.Client, namespace string) (SeedsGetter, error) {
 	return func() (map[string]*kubermaticv1.Seed, error) {
 		seed := &kubermaticv1.Seed{}
-		if err := client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: defaultSeedName}, seed); err != nil {
+		if err := client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: DefaultSeedName}, seed); err != nil {
 			if kerrors.IsNotFound(err) {
-				return nil, err
+				// We should not fail if no seed exists and just return an
+				// empty map.
+				return emptySeedMap, nil
 			}
 
-			return nil, fmt.Errorf("failed to get seed %q: %v", defaultSeedName, err)
+			return nil, fmt.Errorf("failed to get seed %q: %v", DefaultSeedName, err)
 		}
 
 		seed.SetDefaults()
 
 		return map[string]*kubermaticv1.Seed{
-			defaultSeedName: seed,
+			DefaultSeedName: seed,
 		}, nil
 	}, nil
 }

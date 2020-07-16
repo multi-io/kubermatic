@@ -46,8 +46,8 @@ const (
 	DefaultIngressClass                           = "nginx"
 	DefaultAPIReplicas                            = 2
 	DefaultUIReplicas                             = 2
-	DefaultSeedControllerMgrReplicas              = 2
-	DefaultMasterControllerMgrReplicas            = 2
+	DefaultSeedControllerMgrReplicas              = 1
+	DefaultMasterControllerMgrReplicas            = 1
 	DefaultAPIServerReplicas                      = 2
 	DefaultExposeStrategy                         = operatorv1alpha1.NodePortStrategy
 	DefaultVPARecommenderDockerRepository         = "gcr.io/google_containers/vpa-recommender"
@@ -195,6 +195,7 @@ var (
 			semver.MustParse("v1.15.9"),
 			semver.MustParse("v1.15.10"),
 			semver.MustParse("v1.15.11"),
+			semver.MustParse("v1.15.12"),
 			// Kubernetes 1.16
 			semver.MustParse("v1.16.2"),
 			semver.MustParse("v1.16.3"),

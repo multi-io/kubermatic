@@ -27,8 +27,6 @@ import (
 	"github.com/kubermatic/kubermatic/pkg/handler/test"
 	"github.com/kubermatic/kubermatic/pkg/handler/test/hack"
 	"k8s.io/apimachinery/pkg/runtime"
-
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestGetGlobalSettings(t *testing.T) {
@@ -44,7 +42,7 @@ func TestGetGlobalSettings(t *testing.T) {
 		// scenario 1
 		{
 			name:                   "scenario 1: user gets settings first time",
-			expectedResponse:       `{"customLinks":[],"cleanupOptions":{"Enabled":false,"Enforced":false},"defaultNodeCount":10,"clusterTypeOptions":1,"displayDemoInfo":false,"displayAPIDocs":false,"displayTermsOfService":false,"enableDashboard":true,"enableOIDCKubeconfig":false}`,
+			expectedResponse:       `{"customLinks":[],"cleanupOptions":{"Enabled":false,"Enforced":false},"defaultNodeCount":10,"clusterTypeOptions":1,"displayDemoInfo":false,"displayAPIDocs":false,"displayTermsOfService":false,"enableDashboard":true,"enableOIDCKubeconfig":false,"userProjectsLimit":0,"restrictProjectCreation":false}`,
 			httpStatus:             http.StatusOK,
 			existingKubermaticObjs: []runtime.Object{genUser("Bob", "bob@acme.com", true)},
 			existingAPIUser:        test.GenDefaultAPIUser(),
@@ -52,10 +50,10 @@ func TestGetGlobalSettings(t *testing.T) {
 		// scenario 2
 		{
 			name:             "scenario 2: user gets existing global settings",
-			expectedResponse: `{"customLinks":[{"label":"label","url":"url:label","icon":"icon","location":"EU"}],"cleanupOptions":{"Enabled":true,"Enforced":true},"defaultNodeCount":5,"clusterTypeOptions":5,"displayDemoInfo":true,"displayAPIDocs":true,"displayTermsOfService":true,"enableDashboard":false,"enableOIDCKubeconfig":false}`,
+			expectedResponse: `{"customLinks":[{"label":"label","url":"url:label","icon":"icon","location":"EU"}],"cleanupOptions":{"Enabled":true,"Enforced":true},"defaultNodeCount":5,"clusterTypeOptions":5,"displayDemoInfo":true,"displayAPIDocs":true,"displayTermsOfService":true,"enableDashboard":false,"enableOIDCKubeconfig":false,"userProjectsLimit":0,"restrictProjectCreation":false}`,
 			httpStatus:       http.StatusOK,
 			existingKubermaticObjs: []runtime.Object{genUser("Bob", "bob@acme.com", true),
-				genDefaultGlobalSettings()},
+				test.GenDefaultGlobalSettings()},
 			existingAPIUser: test.GenDefaultAPIUser(),
 		},
 	}
@@ -108,7 +106,7 @@ func TestUpdateGlobalSettings(t *testing.T) {
 		{
 			name:                   "scenario 2: authorized user updates default settings",
 			body:                   `{"customLinks":[{"label":"label","url":"url:label","icon":"icon","location":"EU"}],"cleanupOptions":{"Enabled":true,"Enforced":true},"defaultNodeCount":100,"clusterTypeOptions":20,"displayDemoInfo":false,"displayAPIDocs":false,"displayTermsOfService":true}`,
-			expectedResponse:       `{"customLinks":[{"label":"label","url":"url:label","icon":"icon","location":"EU"}],"cleanupOptions":{"Enabled":true,"Enforced":true},"defaultNodeCount":100,"clusterTypeOptions":20,"displayDemoInfo":false,"displayAPIDocs":false,"displayTermsOfService":true,"enableDashboard":true,"enableOIDCKubeconfig":false}`,
+			expectedResponse:       `{"customLinks":[{"label":"label","url":"url:label","icon":"icon","location":"EU"}],"cleanupOptions":{"Enabled":true,"Enforced":true},"defaultNodeCount":100,"clusterTypeOptions":20,"displayDemoInfo":false,"displayAPIDocs":false,"displayTermsOfService":true,"enableDashboard":true,"enableOIDCKubeconfig":false,"userProjectsLimit":0,"restrictProjectCreation":false}`,
 			httpStatus:             http.StatusOK,
 			existingKubermaticObjs: []runtime.Object{genUser("Bob", "bob@acme.com", true)},
 			existingAPIUser:        test.GenDefaultAPIUser(),
@@ -116,11 +114,11 @@ func TestUpdateGlobalSettings(t *testing.T) {
 		// scenario 3
 		{
 			name:             "scenario 3: authorized user updates existing global settings",
-			body:             `{"customLinks":[],"cleanupOptions":{"Enabled":true,"Enforced":true},"defaultNodeCount":100,"clusterTypeOptions":20,"displayDemoInfo":false,"displayAPIDocs":false,"displayTermsOfService":true}`,
-			expectedResponse: `{"customLinks":[],"cleanupOptions":{"Enabled":true,"Enforced":true},"defaultNodeCount":100,"clusterTypeOptions":20,"displayDemoInfo":false,"displayAPIDocs":false,"displayTermsOfService":true,"enableDashboard":false,"enableOIDCKubeconfig":false}`,
+			body:             `{"customLinks":[],"cleanupOptions":{"Enabled":true,"Enforced":true},"defaultNodeCount":100,"clusterTypeOptions":20,"displayDemoInfo":false,"displayAPIDocs":false,"displayTermsOfService":true,"userProjectsLimit":10,"restrictProjectCreation":true}`,
+			expectedResponse: `{"customLinks":[],"cleanupOptions":{"Enabled":true,"Enforced":true},"defaultNodeCount":100,"clusterTypeOptions":20,"displayDemoInfo":false,"displayAPIDocs":false,"displayTermsOfService":true,"enableDashboard":false,"enableOIDCKubeconfig":false,"userProjectsLimit":10,"restrictProjectCreation":true}`,
 			httpStatus:       http.StatusOK,
 			existingKubermaticObjs: []runtime.Object{genUser("Bob", "bob@acme.com", true),
-				genDefaultGlobalSettings()},
+				test.GenDefaultGlobalSettings()},
 			existingAPIUser: test.GenDefaultAPIUser(),
 		},
 	}
@@ -153,31 +151,4 @@ func genUser(name, email string, isAdmin bool) *kubermaticv1.User {
 	user := test.GenUser("", name, email)
 	user.Spec.IsAdmin = isAdmin
 	return user
-}
-
-func genDefaultGlobalSettings() *kubermaticv1.KubermaticSetting {
-	return &kubermaticv1.KubermaticSetting{
-		ObjectMeta: v1.ObjectMeta{
-			Name: kubermaticv1.GlobalSettingsName,
-		},
-		Spec: kubermaticv1.SettingSpec{
-			CustomLinks: []kubermaticv1.CustomLink{
-				{
-					Label:    "label",
-					URL:      "url:label",
-					Icon:     "icon",
-					Location: "EU",
-				},
-			},
-			CleanupOptions: kubermaticv1.CleanupOptions{
-				Enabled:  true,
-				Enforced: true,
-			},
-			DefaultNodeCount:      5,
-			ClusterTypeOptions:    5,
-			DisplayDemoInfo:       true,
-			DisplayAPIDocs:        true,
-			DisplayTermsOfService: true,
-		},
-	}
 }
