@@ -274,13 +274,14 @@ Please install the VerticalPodAutoscaler according to the documentation: https:/
 		g.Add(func() error {
 			if options.disableLeaderElection {
 				return runner(leaderCtx)
-			} else {
-				electionName := controllerName
-				if options.workerName != "" {
-					electionName += "-" + options.workerName
-				}
-				return leaderelection.RunAsLeader(leaderCtx, log, config, mgr.GetEventRecorderFor(controllerName), electionName, runner)
 			}
+
+			electionName := controllerName
+			if options.workerName != "" {
+				electionName += "-" + options.workerName
+			}
+
+			return leaderelection.RunAsLeader(leaderCtx, log, config, mgr.GetEventRecorderFor(controllerName), electionName, runner)
 		}, func(err error) {
 			stopLeaderElection()
 		})
