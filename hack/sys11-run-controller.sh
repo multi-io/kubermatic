@@ -23,6 +23,9 @@ fi
 : "${KUBERMATIC_IMAGE:="docker.io/syseleven/kubermatic"}"
 : "${DNATCONTROLLER_IMAGE:="docker.io/syseleven/kubeletdnat-controller"}"
 : "${ETCD_LAUNCHER_IMAGE_BASE:="docker.io/syseleven/etcd-launcher-"}"
+: "${S3_ENDPOINT:="s3.cbk.cloud.syseleven.net"}"
+: "${S3_BUCKET:="metakube-etcd-backup-dev"}"
+: "${S3_SNAPSHOT_DIR:="${INSTALLER_DIR}/snapshots"}"
 : "${KUBERMATIC_EDITION:=ee}"
 
 # $KUBERMATICCOMMIT and $GITTAG must refer to git tag names for which we've built and uploaded kubermatic images
@@ -116,6 +119,11 @@ if [[ "${DEBUG}" == "true" ]]; then
       -worker-count=1 \
       -kubermatic-image=${KUBERMATIC_IMAGE} \
       -dnatcontroller-image=${DNATCONTROLLER_IMAGE} \
+      -backup-s3-endpoint=${S3_ENDPOINT} \
+      -backup-s3-bucket=${S3_BUCKET} \
+      -backup-snapshot-dir=${S3_SNAPSHOT_DIR} \
+      -backup-s3-access-key=${ACCESS_KEY_ID} \
+      -backup-s3-secret-access-key=${SECRET_ACCESS_KEY} \
       -etcd-launcher-image-base=${ETCD_LAUNCHER_IMAGE_BASE} \
       ${DISABLE_LE_OPTION} \
       -v=8 $@
@@ -146,6 +154,11 @@ else
       -worker-count=1 \
       -kubermatic-image=${KUBERMATIC_IMAGE} \
       -dnatcontroller-image=${DNATCONTROLLER_IMAGE} \
+      -backup-s3-endpoint=${S3_ENDPOINT} \
+      -backup-s3-bucket=${S3_BUCKET} \
+      -backup-snapshot-dir=${S3_SNAPSHOT_DIR} \
+      -backup-s3-access-key=${ACCESS_KEY_ID} \
+      -backup-s3-secret-access-key=${SECRET_ACCESS_KEY} \
       -etcd-launcher-image-base=${ETCD_LAUNCHER_IMAGE_BASE} \
       ${DISABLE_LE_OPTION} \
       -v=6 $@
