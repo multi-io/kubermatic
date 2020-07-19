@@ -160,12 +160,9 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, back
 		return nil, err
 	}
 
-	err = r.uploadSnapshot(ctx, log, backup, cluster)
-	if err != nil {
-		return nil, err
-	}
+	defer r.cleanupSnapshot(ctx, log, backup, cluster)
 
-	err = r.cleanupSnapshot(ctx, log, backup, cluster)
+	err = r.uploadSnapshot(ctx, log, backup, cluster)
 	if err != nil {
 		return nil, err
 	}
