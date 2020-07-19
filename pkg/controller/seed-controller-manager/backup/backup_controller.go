@@ -160,7 +160,11 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, back
 		return nil, err
 	}
 
-	defer r.cleanupSnapshot(ctx, log, backup, cluster)
+	defer func() {
+		if err := r.cleanupSnapshot(ctx, log, backup, cluster); err != nil {
+			log.Errorf("Failed to delete snapshot: %v", err)
+		}
+	}()
 
 	err = r.uploadSnapshot(ctx, log, backup, cluster)
 	if err != nil {
@@ -232,7 +236,11 @@ func (r *Reconciler) takeSnapshot(ctx context.Context, log *zap.SugaredLogger, b
 
 	snapshotFileName := fmt.Sprintf("/%s/%s", r.snapshotDir, backupFileName(backup, cluster))
 	partFile := snapshotFileName + ".part"
-	defer os.RemoveAll(partFile)
+	defer func() {
+		if err := os.RemoveAll(partFile); err != nil {
+			log.Errorf("Failed to delete snapshot part file: %v", err)
+		}
+	}()
 
 	var f *os.File
 	f, err = os.OpenFile(partFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
