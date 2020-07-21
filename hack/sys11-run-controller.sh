@@ -16,7 +16,7 @@ KUBERMATIC_ENV=${KUBERMATIC_ENV} KUBERMATIC_CLUSTER=${KUBERMATIC_CLUSTER} make -
 fi
 : "${EXTERNAL_URL:=dev.metakube.de}"
 : "${DEBUG:="false"}"
-: "${KUBERMATICCOMMIT:="$([[ -n "$(git tag --points-at)" ]] && git tag --points-at || git log -1 --format=%H)"}"
+: "${KUBERMATICCOMMIT:="$(git rev-parse HEAD)"}"
 : "${GITTAG:=$(git describe --tags --always)}"
 : "${DYNAMIC_DATACENTERS:="false"}"   # true | false | absent  -- absent meaning pass neither -datacenters= nor -dynamic-datacenters= (2.15+)
 : "${IS_KUBERMATIC_UPSTREAM:="false"}"
@@ -28,10 +28,12 @@ fi
 : "${S3_SNAPSHOT_DIR:="${INSTALLER_DIR}/snapshots"}"
 : "${KUBERMATIC_EDITION:=ee}"
 
-# $KUBERMATICCOMMIT and $GITTAG must refer to git tag names for which we've built and uploaded kubermatic images
-# (because those tags will set as image tag for user cluster apiserver pod sidecar containers, e.g. the
-# docker.io/syseleven/kubeletdnat-controller image)
-# If they don't, e.g. because you're running with locally committed and not yet pushed changes, you must
+# $GITTAG and $KUBERMATICCOMMIT will be compiled into the binary. $GITTAG will only be used for reporting
+# Kubermatic version information via the API; $KUBERMATICCOMMIT will be set as the image tag for
+# rolled out user cluster apiserver pod sidecar containers, e.g. the docker.io/syseleven/kubeletdnat-controller image.
+# So is must refer to a tag name for which we've built and uploaded kubermatic images.
+# The CI will push two images by default, one tagged with $KUBERMATICCOMMIT and one tagged with $GITTAG.
+# If you're running with locally committed and not yet pushed changes, you must
 # override those variables, e.g. KUBERMATICCOMMIT=v2.13.1-sys11-12 GITTAG=v2.13.1-sys11-12 ... ./sys11-run-controller.sh
 
 if [[ "${IS_KUBERMATIC_UPSTREAM}" != "true" ]]; then
