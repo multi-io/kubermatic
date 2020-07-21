@@ -20,9 +20,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
-
-	"github.com/kubermatic/kubermatic/pkg/handler/middleware"
+	"strconv"
 
 	"github.com/go-kit/kit/endpoint"
 	"github.com/prometheus/client_golang/prometheus"
@@ -30,11 +30,13 @@ import (
 	apiv1 "github.com/kubermatic/kubermatic/pkg/api/v1"
 	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
 	handlercommon "github.com/kubermatic/kubermatic/pkg/handler/common"
+	"github.com/kubermatic/kubermatic/pkg/handler/middleware"
 	"github.com/kubermatic/kubermatic/pkg/handler/v1/common"
 	"github.com/kubermatic/kubermatic/pkg/provider"
 	"github.com/kubermatic/kubermatic/pkg/util/errors"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/klog"
 )
 
 func CreateEndpoint(sshKeyProvider provider.SSHKeyProvider, projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, seedsGetter provider.SeedsGetter,
@@ -56,6 +58,188 @@ func CreateEndpoint(sshKeyProvider provider.SSHKeyProvider, projectProvider prov
 	}
 }
 
+// ListEndpoint list clusters for the given project
+func ListEndpoint(projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, seedsGetter provider.SeedsGetter, clusterProviderGetter provider.ClusterProviderGetter, userInfoGetter provider.UserInfoGetter) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (interface{}, error) {
+		req := request.(common.GetProjectRq)
+		allClusters := make([]*apiv1.Cluster, 0)
+
+		seeds, err := seedsGetter()
+		if err != nil {
+			return nil, common.KubernetesErrorToHTTPError(err)
+		}
+
+		for _, seed := range seeds {
+			// if a Seed is bad, do not forward that error to the user, but only log
+			clusterProvider, err := clusterProviderGetter(seed)
+			if err != nil {
+				klog.Errorf("failed to create cluster provider for seed %s: %v", seed.Name, err)
+				continue
+			}
+			apiClusters, err := handlercommon.GetExternalClusters(ctx, userInfoGetter, clusterProvider, projectProvider, privilegedProjectProvider, req.ProjectID)
+			if err != nil {
+				return nil, common.KubernetesErrorToHTTPError(err)
+			}
+			allClusters = append(allClusters, apiClusters...)
+		}
+
+		return allClusters, nil
+	}
+}
+
+func GetEndpoint(projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, userInfoGetter provider.UserInfoGetter) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (interface{}, error) {
+		req := request.(GetClusterReq)
+		return handlercommon.GetEndpoint(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID)
+	}
+}
+
+func DeleteEndpoint(sshKeyProvider provider.SSHKeyProvider, privilegedSSHKeyProvider provider.PrivilegedSSHKeyProvider, projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, userInfoGetter provider.UserInfoGetter) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (interface{}, error) {
+		req := request.(DeleteReq)
+		return handlercommon.DeleteEndpoint(ctx, userInfoGetter, req.ProjectID, req.ClusterID, req.DeleteVolumes, req.DeleteLoadBalancers, sshKeyProvider, privilegedSSHKeyProvider, projectProvider, privilegedProjectProvider)
+	}
+}
+
+func PatchEndpoint(projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, seedsGetter provider.SeedsGetter, userInfoGetter provider.UserInfoGetter) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (interface{}, error) {
+		req := request.(PatchReq)
+		return handlercommon.PatchEndpoint(ctx, userInfoGetter, req.ProjectID, req.ClusterID, req.Patch, seedsGetter, projectProvider, privilegedProjectProvider)
+	}
+}
+
+// PatchReq defines HTTP request for patchCluster endpoint
+// swagger:parameters patchClusterV2
+type PatchReq struct {
+	common.ProjectReq
+	// in: path
+	// required: true
+	ClusterID string `json:"cluster_id"`
+
+	// in: body
+	Patch json.RawMessage
+}
+
+func DecodePatchReq(c context.Context, r *http.Request) (interface{}, error) {
+	var req PatchReq
+
+	projectReq, err := common.DecodeProjectRequest(c, r)
+	if err != nil {
+		return nil, err
+	}
+	req.ProjectReq = projectReq.(common.ProjectReq)
+	clusterID, err := common.DecodeClusterID(c, r)
+	if err != nil {
+		return nil, err
+	}
+	req.ClusterID = clusterID
+
+	if req.Patch, err = ioutil.ReadAll(r.Body); err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// GetSeedCluster returns the SeedCluster object
+func (req PatchReq) GetSeedCluster() apiv1.SeedCluster {
+	return apiv1.SeedCluster{
+		ClusterID: req.ClusterID,
+	}
+}
+
+// DeleteReq defines HTTP request for deleteCluster endpoint
+// swagger:parameters deleteClusterV2
+type DeleteReq struct {
+	common.ProjectReq
+	// in: path
+	// required: true
+	ClusterID string `json:"cluster_id"`
+	// in: header
+	// DeleteVolumes if true all cluster PV's and PVC's will be deleted from cluster
+	DeleteVolumes bool
+	// in: header
+	// DeleteLoadBalancers if true all load balancers will be deleted from cluster
+	DeleteLoadBalancers bool
+}
+
+// GetSeedCluster returns the SeedCluster object
+func (req DeleteReq) GetSeedCluster() apiv1.SeedCluster {
+	return apiv1.SeedCluster{
+		ClusterID: req.ClusterID,
+	}
+}
+
+func DecodeDeleteReq(c context.Context, r *http.Request) (interface{}, error) {
+	var req DeleteReq
+
+	clusterID, err := common.DecodeClusterID(c, r)
+	if err != nil {
+		return nil, err
+	}
+	req.ClusterID = clusterID
+
+	projectReq, err := common.DecodeProjectRequest(c, r)
+	if err != nil {
+		return nil, err
+	}
+	req.ProjectReq = projectReq.(common.ProjectReq)
+
+	headerValue := r.Header.Get("DeleteVolumes")
+	if len(headerValue) > 0 {
+		deleteVolumes, err := strconv.ParseBool(headerValue)
+		if err != nil {
+			return nil, err
+		}
+		req.DeleteVolumes = deleteVolumes
+	}
+
+	headerValue = r.Header.Get("DeleteLoadBalancers")
+	if len(headerValue) > 0 {
+		deleteLB, err := strconv.ParseBool(headerValue)
+		if err != nil {
+			return nil, err
+		}
+		req.DeleteLoadBalancers = deleteLB
+	}
+
+	return req, nil
+}
+
+// GetClusterReq defines HTTP request for getCluster endpoint.
+// swagger:parameters getClusterV2
+type GetClusterReq struct {
+	common.ProjectReq
+	// in: path
+	// required: true
+	ClusterID string `json:"cluster_id"`
+}
+
+func DecodeGetClusterReq(c context.Context, r *http.Request) (interface{}, error) {
+	var req GetClusterReq
+	clusterID, err := common.DecodeClusterID(c, r)
+	if err != nil {
+		return nil, err
+	}
+
+	req.ClusterID = clusterID
+
+	pr, err := common.DecodeProjectRequest(c, r)
+	if err != nil {
+		return nil, err
+	}
+	req.ProjectReq = pr.(common.ProjectReq)
+
+	return req, nil
+}
+
+// GetSeedCluster returns the SeedCluster object
+func (req GetClusterReq) GetSeedCluster() apiv1.SeedCluster {
+	return apiv1.SeedCluster{
+		ClusterID: req.ClusterID,
+	}
+}
+
 // CreateClusterReq defines HTTP request for createCluster
 // swagger:parameters createClusterV2
 type CreateClusterReq struct {
@@ -67,9 +251,11 @@ type CreateClusterReq struct {
 	seedName string
 }
 
-// GetDC returns the name of the datacenter seed in the request
-func (req CreateClusterReq) GetDC() string {
-	return req.seedName
+// GetSeedCluster returns the SeedCluster object
+func (req CreateClusterReq) GetSeedCluster() apiv1.SeedCluster {
+	return apiv1.SeedCluster{
+		SeedName: req.seedName,
+	}
 }
 
 func DecodeCreateReq(c context.Context, r *http.Request) (interface{}, error) {

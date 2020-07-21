@@ -28,8 +28,8 @@ import (
 	compute "google.golang.org/api/compute/v1"
 
 	apiv1 "github.com/kubermatic/kubermatic/pkg/api/v1"
+	handlercommon "github.com/kubermatic/kubermatic/pkg/handler/common"
 	"github.com/kubermatic/kubermatic/pkg/handler/middleware"
-	"github.com/kubermatic/kubermatic/pkg/handler/v1/cluster"
 	"github.com/kubermatic/kubermatic/pkg/handler/v1/common"
 	"github.com/kubermatic/kubermatic/pkg/handler/v1/dc"
 	"github.com/kubermatic/kubermatic/pkg/provider"
@@ -209,7 +209,7 @@ func GCPDiskTypesWithClusterCredentialsEndpoint(projectProvider provider.Project
 		req := request.(GCPTypesNoCredentialReq)
 		clusterProvider := ctx.Value(middleware.ClusterProviderContextKey).(provider.ClusterProvider)
 
-		cluster, err := cluster.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, &provider.ClusterGetOptions{CheckInitStatus: true})
+		cluster, err := handlercommon.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, &provider.ClusterGetOptions{CheckInitStatus: true})
 		if err != nil {
 			return nil, err
 		}
@@ -287,7 +287,7 @@ func GCPSizeWithClusterCredentialsEndpoint(projectProvider provider.ProjectProvi
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(GCPTypesNoCredentialReq)
 		clusterProvider := ctx.Value(middleware.ClusterProviderContextKey).(provider.ClusterProvider)
-		cluster, err := cluster.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, &provider.ClusterGetOptions{CheckInitStatus: true})
+		cluster, err := handlercommon.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, &provider.ClusterGetOptions{CheckInitStatus: true})
 		if err != nil {
 			return nil, err
 		}
@@ -366,7 +366,7 @@ func GCPZoneWithClusterCredentialsEndpoint(projectProvider provider.ProjectProvi
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(common.GetClusterReq)
 		clusterProvider := ctx.Value(middleware.ClusterProviderContextKey).(provider.ClusterProvider)
-		cluster, err := cluster.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, &provider.ClusterGetOptions{CheckInitStatus: true})
+		cluster, err := handlercommon.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, &provider.ClusterGetOptions{CheckInitStatus: true})
 		if err != nil {
 			return nil, err
 		}
@@ -450,7 +450,7 @@ func GCPNetworkWithClusterCredentialsEndpoint(projectProvider provider.ProjectPr
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(common.GetClusterReq)
 		clusterProvider := ctx.Value(middleware.ClusterProviderContextKey).(provider.ClusterProvider)
-		cluster, err := cluster.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, &provider.ClusterGetOptions{CheckInitStatus: true})
+		cluster, err := handlercommon.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, &provider.ClusterGetOptions{CheckInitStatus: true})
 		if err != nil {
 			return nil, err
 		}
@@ -530,7 +530,7 @@ func GCPSubnetworkWithClusterCredentialsEndpoint(projectProvider provider.Projec
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(GCPSubnetworksNoCredentialReq)
 		clusterProvider := ctx.Value(middleware.ClusterProviderContextKey).(provider.ClusterProvider)
-		cluster, err := cluster.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, &provider.ClusterGetOptions{CheckInitStatus: true})
+		cluster, err := handlercommon.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, &provider.ClusterGetOptions{CheckInitStatus: true})
 		if err != nil {
 			return nil, err
 		}
@@ -575,11 +575,13 @@ func listGCPSubnetworks(ctx context.Context, userInfo *provider.UserInfo, datace
 
 	req := computeService.Subnetworks.List(project, datacenter.Spec.GCP.Region)
 	err = req.Pages(ctx, func(page *compute.SubnetworkList) error {
+		subnetworkRegex := regexp.MustCompile(`(projects\/.+)$`)
 		for _, subnetwork := range page.Items {
 			// subnetworks.Network are a url e.g. https://www.googleapis.com/compute/v1/[...]/networks/default"
 			// we just get the path of the network, instead of the url
 			// therefor we can't use regular Filter function and need to check on our own
 			if strings.Contains(subnetwork.Network, networkName) {
+				subnetworkPath := subnetworkRegex.FindString(subnetwork.SelfLink)
 				net := apiv1.GCPSubnetwork{
 					ID:                    subnetwork.Id,
 					Name:                  subnetwork.Name,
@@ -590,6 +592,7 @@ func listGCPSubnetworks(ctx context.Context, userInfo *provider.UserInfo, datace
 					SelfLink:              subnetwork.SelfLink,
 					PrivateIPGoogleAccess: subnetwork.PrivateIpGoogleAccess,
 					Kind:                  subnetwork.Kind,
+					Path:                  subnetworkPath,
 				}
 
 				subnetworks = append(subnetworks, net)

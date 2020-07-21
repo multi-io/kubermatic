@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"net/http"
 
+	apiv1 "github.com/kubermatic/kubermatic/pkg/api/v1"
+
 	"github.com/gorilla/mux"
 )
 
@@ -48,7 +50,7 @@ type ProjectIDGetter interface {
 }
 
 // GetProjectRq defines HTTP request for getProject endpoint
-// swagger:parameters getProject getUsersForProject listClustersForProject listServiceAccounts
+// swagger:parameters getProject getUsersForProject listClustersForProject listServiceAccounts listClustersV2
 type GetProjectRq struct {
 	ProjectReq
 }
@@ -69,9 +71,11 @@ type DCReq struct {
 	DC string `json:"dc"`
 }
 
-// GetDC returns the name of the datacenter in the request
-func (req DCReq) GetDC() string {
-	return req.DC
+// GetSeedCluster returns the SeedCluster object
+func (req DCReq) GetSeedCluster() apiv1.SeedCluster {
+	return apiv1.SeedCluster{
+		SeedName: req.DC,
+	}
 }
 
 func DecodeDcReq(c context.Context, r *http.Request) (interface{}, error) {

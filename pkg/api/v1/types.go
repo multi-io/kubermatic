@@ -281,6 +281,7 @@ type GCPSubnetwork struct {
 	SelfLink              string `json:"selfLink"`
 	PrivateIPGoogleAccess bool   `json:"privateIpGoogleAccess"`
 	Kind                  string `json:"kind"`
+	Path                  string `json:"path"`
 }
 
 // DigitaloceanSizeList represents a object of digitalocean sizes.
@@ -1552,6 +1553,12 @@ type SeedSpec struct {
 
 // swagger:model SeedNamesList
 type SeedNamesList []string
+
+// SeedCluster holds seed name for the cluster
+type SeedCluster struct {
+	SeedName  string
+	ClusterID string
+}
 
 const (
 	// NodeDeletionFinalizer indicates that the nodes still need cleanup

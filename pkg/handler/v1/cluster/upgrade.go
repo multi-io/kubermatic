@@ -47,7 +47,7 @@ func GetUpgradesEndpoint(updateManager common.UpdateManager, projectProvider pro
 		if !ok {
 			return nil, errors.NewWrongRequest(request, common.GetClusterReq{})
 		}
-		cluster, err := GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
+		cluster, err := handlercommon.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -76,7 +76,7 @@ func GetUpgradesEndpoint(updateManager common.UpdateManager, projectProvider pro
 			return nil, err
 		}
 
-		var upgrades []*apiv1.MasterVersion
+		upgrades := make([]*apiv1.MasterVersion, 0)
 		for _, v := range versions {
 			isRestricted := false
 			if clusterType == apiv1.KubernetesClusterType {
@@ -209,7 +209,7 @@ func UpgradeNodeDeploymentsEndpoint(projectProvider provider.ProjectProvider, pr
 		if !ok {
 			return nil, errors.NewWrongRequest(request, common.GetClusterReq{})
 		}
-		cluster, err := GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
+		cluster, err := handlercommon.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
 		if err != nil {
 			return nil, err
 		}
