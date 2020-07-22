@@ -17,6 +17,9 @@ fi
 : "${DEBUG:="false"}"
 : "${TAG_WORKER:="true"}"
 : "${DYNAMIC_DATACENTERS:="false"}"   # true | false | absent  -- absent meaning pass neither -datacenters= nor -dynamic-datacenters= (2.15+)
+: "${KUBERMATIC_EDITION:=ee}"
+
+export KUBERMATIC_EDITION
 
 SERVICE_ACCOUNT_SIGNING_KEY="$(KUBERMATIC_ENV=${KUBERMATIC_ENV} KUBERMATIC_CLUSTER=${KUBERMATIC_CLUSTER} ${INSTALLER_DIR}/bin/run-vault kv get -field=serviceAccountKey secret/metakube-${KUBERMATIC_ENV}/clusters/dbl1/kubermatic/auth)"
 
