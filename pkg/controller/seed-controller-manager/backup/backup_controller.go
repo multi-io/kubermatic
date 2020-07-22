@@ -46,12 +46,22 @@ const (
 	defaultClusterSize = 3
 )
 
+type BackendOperations interface {
+	takeSnapshot(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error
+	uploadSnapshot(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error
+	cleanupSnapshot(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error
+}
+
 // Reconciler stores necessary components that are required to create etcd backups
 type Reconciler struct {
 	log        *zap.SugaredLogger
 	workerName string
 	ctrlruntimeclient.Client
-	recorder          record.EventRecorder
+	BackendOperations
+	recorder record.EventRecorder
+}
+
+type s3BackendOperations struct {
 	snapshotDir       string
 	s3Endpoint        string
 	s3BucketName      string
@@ -76,15 +86,17 @@ func Add(
 	client := mgr.GetClient()
 
 	reconciler := &Reconciler{
-		log:               log,
-		Client:            client,
-		workerName:        workerName,
-		recorder:          mgr.GetEventRecorderFor(ControllerName),
-		snapshotDir:       snapshotDir,
-		s3Endpoint:        s3Endpoint,
-		s3BucketName:      s3BucketName,
-		s3AccessKeyID:     s3AccessKeyID,
-		s3SecretAccessKey: s3SecretAccessKey,
+		log:        log,
+		Client:     client,
+		workerName: workerName,
+		recorder:   mgr.GetEventRecorderFor(ControllerName),
+		BackendOperations: &s3BackendOperations{
+			snapshotDir:       snapshotDir,
+			s3Endpoint:        s3Endpoint,
+			s3BucketName:      s3BucketName,
+			s3AccessKeyID:     s3AccessKeyID,
+			s3SecretAccessKey: s3SecretAccessKey,
+		},
 	}
 
 	ctrlOptions := controller.Options{
@@ -228,13 +240,13 @@ func backupFileName(backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Clust
 	return fmt.Sprintf("%s-%s", cluster.Name, backup.Name)
 }
 
-func (r *Reconciler) takeSnapshot(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
+func (s3ops *s3BackendOperations) takeSnapshot(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
 	client, err := getEtcdClient(cluster)
 	if err != nil {
 		return err
 	}
 
-	snapshotFileName := fmt.Sprintf("/%s/%s", r.snapshotDir, backupFileName(backup, cluster))
+	snapshotFileName := fmt.Sprintf("/%s/%s", s3ops.snapshotDir, backupFileName(backup, cluster))
 	partFile := snapshotFileName + ".part"
 	defer func() {
 		if err := os.RemoveAll(partFile); err != nil {
@@ -311,34 +323,34 @@ func hasChecksum(n int64) bool {
 	return (n % 512) == sha256.Size
 }
 
-func (r *Reconciler) uploadSnapshot(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
+func (s3ops *s3BackendOperations) uploadSnapshot(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
 	// TODO long-lived client, possibly one per worker (since I think it's not thread-safe)
-	client, err := minio.New(r.s3Endpoint, r.s3AccessKeyID, r.s3SecretAccessKey, true)
+	client, err := minio.New(s3ops.s3Endpoint, s3ops.s3AccessKeyID, s3ops.s3SecretAccessKey, true)
 	if err != nil {
 		return err
 	}
 	client.SetAppInfo("kubermatic", "v0.1")
 
-	exists, err := client.BucketExists(r.s3BucketName)
+	exists, err := client.BucketExists(s3ops.s3BucketName)
 	if err != nil {
 		return err
 	}
 	if !exists {
-		log.Debugf("Creating bucket: %v", r.s3BucketName)
-		if err := client.MakeBucket(r.s3BucketName, ""); err != nil {
+		log.Debugf("Creating bucket: %v", s3ops.s3BucketName)
+		if err := client.MakeBucket(s3ops.s3BucketName, ""); err != nil {
 			return err
 		}
 	}
 
 	objectName := backupFileName(backup, cluster)
-	snapshotFileName := fmt.Sprintf("/%s/%s", r.snapshotDir, objectName)
+	snapshotFileName := fmt.Sprintf("/%s/%s", s3ops.snapshotDir, objectName)
 
-	_, err = client.FPutObject(r.s3BucketName, objectName, snapshotFileName, minio.PutObjectOptions{})
+	_, err = client.FPutObject(s3ops.s3BucketName, objectName, snapshotFileName, minio.PutObjectOptions{})
 
 	return err
 }
 
-func (r *Reconciler) cleanupSnapshot(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
-	snapshotFileName := fmt.Sprintf("/%s/%s", r.snapshotDir, backupFileName(backup, cluster))
+func (s3ops *s3BackendOperations) cleanupSnapshot(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
+	snapshotFileName := fmt.Sprintf("/%s/%s", s3ops.snapshotDir, backupFileName(backup, cluster))
 	return os.RemoveAll(snapshotFileName)
 }

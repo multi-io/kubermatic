@@ -78,3 +78,16 @@ type EtcdBackupCondition struct {
 	// +optional
 	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
 }
+
+// HasConditionValue returns true if the EtcdBackup status has the given condition with the given status.
+// It does not verify that the condition has been set by a certain Kubermatic version, it just checks
+// the existence.
+func (bs *EtcdBackupStatus) HasConditionValue(conditionType EtcdBackupConditionType, conditionStatus corev1.ConditionStatus) bool {
+	for _, condition := range bs.Conditions {
+		if condition.Type == conditionType {
+			return condition.Status == conditionStatus
+		}
+	}
+
+	return false
+}
