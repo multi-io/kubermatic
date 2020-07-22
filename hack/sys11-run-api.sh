@@ -41,75 +41,56 @@ else
     DC_OPTION=
 fi
 
-while true; do
-    if [[ "${DEBUG}" == "true" ]]; then
-        GOTOOLFLAGS="-v -gcflags='all=-N -l'" make -C ${SRC_DIR} kubermatic-api
-    else
-        make -C ${SRC_DIR} kubermatic-api
-    fi
+if [[ "${DEBUG}" == "true" ]]; then
+    GOTOOLFLAGS="-v -gcflags='all=-N -l'" make -C ${SRC_DIR} kubermatic-api
+else
+    make -C ${SRC_DIR} kubermatic-api
+fi
 
-    # Please make sure to set -feature-gates=PrometheusEndpoint=true if you want to use that endpoint.
+# Please make sure to set -feature-gates=PrometheusEndpoint=true if you want to use that endpoint.
 
-    # Please make sure to set -feature-gates=OIDCKubeCfgEndpoint=true if you want to use that endpoint.
-    # Note that you would have to pass a few additional flags as well.
+# Please make sure to set -feature-gates=OIDCKubeCfgEndpoint=true if you want to use that endpoint.
+# Note that you would have to pass a few additional flags as well.
 
-    cd ${SRC_DIR}
-    if [[ "${DEBUG}" == "true" ]]; then
-        dlv --listen=:2345 --headless=true --api-version=2 --accept-multiclient exec ./_build/kubermatic-api -- \
-          -kubeconfig=${CONFIG_DIR}/kubeconfig \
-          ${DC_OPTION} \
-          -versions=${RESOURCES_DIR}/versions.yaml \
-          -updates=${RESOURCES_DIR}/updates.yaml \
-          -master-resources=${RESOURCES_DIR} \
-          ${WORKER_OPTION} \
-          -internal-address=127.0.0.1:18085 \
-          -prometheus-url=http://localhost:9090 \
-          -address=127.0.0.1:8080 \
-          -oidc-url=https://keystone-oidc.app.syseleven-dbl1-1.dev.metakube.de \
-          -oidc-authenticator-client-id=metakube-dashboard \
-          -oidc-skip-tls-verify=false \
-          -service-account-signing-key="${SERVICE_ACCOUNT_SIGNING_KEY}" \
-          -accessible-addons dashboard,metakube-ark,metakube-autoscaler,metakube-backups,metakube-helm,metakube-ingress,metakube-monitoring,metakube-weave-scope,metakube-webterminal,metakube-vault \
-          -logtostderr \
-          -v=8 $@ &
+cd ${SRC_DIR}
+if [[ "${DEBUG}" == "true" ]]; then
+    dlv --listen=:2345 --headless=true --api-version=2 --accept-multiclient exec ./_build/kubermatic-api -- \
+      -kubeconfig=${CONFIG_DIR}/kubeconfig \
+      ${DC_OPTION} \
+      -versions=${RESOURCES_DIR}/versions.yaml \
+      -updates=${RESOURCES_DIR}/updates.yaml \
+      -master-resources=${RESOURCES_DIR} \
+      ${WORKER_OPTION} \
+      -internal-address=127.0.0.1:18085 \
+      -prometheus-url=http://localhost:9090 \
+      -address=127.0.0.1:8080 \
+      -oidc-url=https://keystone-oidc.app.syseleven-dbl1-1.dev.metakube.de \
+      -oidc-authenticator-client-id=metakube-dashboard \
+      -oidc-skip-tls-verify=false \
+      -service-account-signing-key="${SERVICE_ACCOUNT_SIGNING_KEY}" \
+      -accessible-addons dashboard,metakube-ark,metakube-autoscaler,metakube-backups,metakube-helm,metakube-ingress,metakube-monitoring,metakube-weave-scope,metakube-webterminal,metakube-vault \
+      -logtostderr \
+      -v=8 $@
 
-        PID=$!
-    else
-        ./_build/kubermatic-api \
-          -kubeconfig=${CONFIG_DIR}/kubeconfig \
-          ${DC_OPTION} \
-          -versions=${RESOURCES_DIR}/versions.yaml \
-          -updates=${RESOURCES_DIR}/updates.yaml \
-          -master-resources=${RESOURCES_DIR} \
-          ${WORKER_OPTION} \
-          -internal-address=127.0.0.1:18085 \
-          -prometheus-url=http://localhost:9090 \
-          -address=127.0.0.1:8080 \
-          -oidc-url=https://keystone-oidc.app.syseleven-dbl1-1.dev.metakube.de \
-          -oidc-authenticator-client-id=metakube-dashboard \
-          -oidc-skip-tls-verify=false \
-          -service-account-signing-key="${SERVICE_ACCOUNT_SIGNING_KEY}" \
-          -accessible-addons dashboard,metakube-ark,metakube-autoscaler,metakube-backups,metakube-helm,metakube-ingress,metakube-monitoring,metakube-weave-scope,metakube-webterminal,metakube-vault \
-          -logtostderr \
-          -v=8 $@ &
+    PID=$!
+else
+    ./_build/kubermatic-api \
+      -kubeconfig=${CONFIG_DIR}/kubeconfig \
+      ${DC_OPTION} \
+      -versions=${RESOURCES_DIR}/versions.yaml \
+      -updates=${RESOURCES_DIR}/updates.yaml \
+      -master-resources=${RESOURCES_DIR} \
+      ${WORKER_OPTION} \
+      -internal-address=127.0.0.1:18085 \
+      -prometheus-url=http://localhost:9090 \
+      -address=127.0.0.1:8080 \
+      -oidc-url=https://keystone-oidc.app.syseleven-dbl1-1.dev.metakube.de \
+      -oidc-authenticator-client-id=metakube-dashboard \
+      -oidc-skip-tls-verify=false \
+      -service-account-signing-key="${SERVICE_ACCOUNT_SIGNING_KEY}" \
+      -accessible-addons dashboard,metakube-ark,metakube-autoscaler,metakube-backups,metakube-helm,metakube-ingress,metakube-monitoring,metakube-weave-scope,metakube-webterminal,metakube-vault \
+      -logtostderr \
+      -v=8 $@
 
-        PID=$!
-    fi
-
-
-
-    if [[ -x "$(command -v inotifywait)" ]]; then
-        inotifywait -r -e modify ${SRC_DIR}
-    elif [[ -x "$(command -v fswatch)" ]]; then
-        fswatch --one-event ${SRC_DIR}
-    else
-        echo "Can not watch changes because neither fswatch (MAC) nor inotifywait found"
-        kill ${PID}
-        exit 1
-    fi
-
-
-    echo "Change in kubermatic detected, recompiling and restarting"
-
-    kill ${PID} || true
-done
+    PID=$!
+fi
