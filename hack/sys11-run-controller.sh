@@ -22,7 +22,7 @@ fi
 : "${IS_KUBERMATIC_UPSTREAM:="false"}"
 : "${KUBERMATIC_IMAGE:="docker.io/syseleven/kubermatic"}"
 : "${DNATCONTROLLER_IMAGE:="docker.io/syseleven/kubeletdnat-controller"}"
-: "${ETCD_LAUNCHER_IMAGE_BASE:="docker.io/syseleven/etcd-launcher-"}"
+: "${ETCD_LAUNCHER_IMAGE:="docker.io/syseleven/etcd-launcher"}"
 : "${S3_ENDPOINT:="s3.cbk.cloud.syseleven.net"}"
 : "${S3_BUCKET:="metakube-etcd-backup-dev"}"
 : "${S3_SNAPSHOT_DIR:="${INSTALLER_DIR}/snapshots"}"
@@ -126,7 +126,7 @@ if [[ "${DEBUG}" == "true" ]]; then
       -backup-snapshot-dir=${S3_SNAPSHOT_DIR} \
       -backup-s3-access-key=${ACCESS_KEY_ID} \
       -backup-s3-secret-access-key=${SECRET_ACCESS_KEY} \
-      -etcd-launcher-image-base=${ETCD_LAUNCHER_IMAGE_BASE} \
+      -etcd-launcher-image=${ETCD_LAUNCHER_IMAGE} \
       ${DISABLE_LE_OPTION} \
       -v=8 $@
 
@@ -161,7 +161,7 @@ else
       -backup-snapshot-dir=${S3_SNAPSHOT_DIR} \
       -backup-s3-access-key=${ACCESS_KEY_ID} \
       -backup-s3-secret-access-key=${SECRET_ACCESS_KEY} \
-      -etcd-launcher-image-base=${ETCD_LAUNCHER_IMAGE_BASE} \
+      -etcd-launcher-image=${ETCD_LAUNCHER_IMAGE} \
       ${DISABLE_LE_OPTION} \
       -v=6 $@
 
