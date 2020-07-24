@@ -19,10 +19,13 @@ package backup
 import (
 	"context"
 	"fmt"
+	kuberneteshelper "github.com/kubermatic/kubermatic/pkg/kubernetes"
 	"github.com/minio/minio-go/pkg/set"
 	"go.uber.org/zap"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"strings"
 	"testing"
 
 	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
@@ -39,6 +42,7 @@ import (
 type mockBackendOperations struct {
 	localSnapshots    set.StringSet
 	uploadedSnapshots set.StringSet
+	returnError       error
 }
 
 func newMockBackendOperations() *mockBackendOperations {
@@ -49,11 +53,17 @@ func newMockBackendOperations() *mockBackendOperations {
 }
 
 func (ops *mockBackendOperations) takeSnapshot(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
+	if ops.returnError != nil {
+		return ops.returnError
+	}
 	ops.localSnapshots.Add(backup.GetName())
 	return nil
 }
 
 func (ops *mockBackendOperations) uploadSnapshot(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
+	if ops.returnError != nil {
+		return ops.returnError
+	}
 	if !ops.localSnapshots.Contains(backup.GetName()) {
 		return fmt.Errorf("cannot upload non-existing local backup: %v", backup.GetName())
 	}
@@ -62,10 +72,21 @@ func (ops *mockBackendOperations) uploadSnapshot(ctx context.Context, log *zap.S
 }
 
 func (ops *mockBackendOperations) cleanupSnapshot(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
+	if ops.returnError != nil {
+		return ops.returnError
+	}
 	if !ops.localSnapshots.Contains(backup.GetName()) {
 		return fmt.Errorf("cannot clean up non-existing local backup: %v", backup.GetName())
 	}
 	ops.localSnapshots.Remove(backup.GetName())
+	return nil
+}
+
+func (ops *mockBackendOperations) deleteUploadedSnapshot(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
+	if ops.returnError != nil {
+		return ops.returnError
+	}
+	ops.uploadedSnapshots.Remove(backup.GetName())
 	return nil
 }
 
@@ -109,6 +130,7 @@ func TestController_SimpleBackup(t *testing.T) {
 		log:               kubermaticlog.New(true, kubermaticlog.FormatConsole).Sugar(),
 		Client:            ctrlruntimefakeclient.NewFakeClientWithScheme(scheme.Scheme, cluster, backup),
 		BackendOperations: mockBackOps,
+		recorder:          record.NewFakeRecorder(10),
 	}
 
 	if _, err := reconciler.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{Namespace: backup.Namespace, Name: backup.Name}}); err != nil {
@@ -131,6 +153,10 @@ func TestController_SimpleBackup(t *testing.T) {
 	if !readbackBackup.Status.HasConditionValue(kubermaticv1.EtcdBackupCreated, corev1.ConditionTrue) {
 		t.Fatalf("backup not marked as completed")
 	}
+
+	if !kuberneteshelper.HasFinalizer(readbackBackup, BackupDeletionFinalizer) {
+		t.Fatalf("backup does not have finalizer %s", BackupDeletionFinalizer)
+	}
 }
 
 func TestController_CompletedBackupIsNotProcessed(t *testing.T) {
@@ -145,6 +171,7 @@ func TestController_CompletedBackupIsNotProcessed(t *testing.T) {
 		log:               kubermaticlog.New(true, kubermaticlog.FormatConsole).Sugar(),
 		Client:            ctrlruntimefakeclient.NewFakeClientWithScheme(scheme.Scheme, cluster, backup),
 		BackendOperations: mockBackOps,
+		recorder:          record.NewFakeRecorder(10),
 	}
 
 	if _, err := reconciler.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{Namespace: backup.Namespace, Name: backup.Name}}); err != nil {
@@ -158,4 +185,102 @@ func TestController_CompletedBackupIsNotProcessed(t *testing.T) {
 	if !mockBackOps.localSnapshots.IsEmpty() {
 		t.Fatalf("Expected no local snapshots, got %v", mockBackOps.uploadedSnapshots)
 	}
+}
+
+func TestController_cleanupBackup(t *testing.T) {
+	cluster := genTestCluster()
+
+	const backupName = "testbackup"
+	backup := genBackup(cluster, backupName)
+	setBackupCondition(backup, kubermaticv1.EtcdBackupCreated, corev1.ConditionTrue)
+	kuberneteshelper.AddFinalizer(backup, BackupDeletionFinalizer)
+
+	mockBackOps := newMockBackendOperations()
+	reconciler := &Reconciler{
+		log:               kubermaticlog.New(true, kubermaticlog.FormatConsole).Sugar(),
+		Client:            ctrlruntimefakeclient.NewFakeClientWithScheme(scheme.Scheme, cluster, backup),
+		BackendOperations: mockBackOps,
+		recorder:          record.NewFakeRecorder(10),
+	}
+
+	mockBackOps.uploadedSnapshots.Add(backup.Name)
+
+	if err := reconciler.cleanupBackup(context.Background(), reconciler.log, backup, cluster); err != nil {
+		t.Fatalf("Error during cleanupBackup call: %v", err)
+	}
+
+	if !mockBackOps.uploadedSnapshots.IsEmpty() {
+		t.Fatalf("Expected no uploaded snapshots, got %v", mockBackOps.uploadedSnapshots)
+	}
+
+	readbackBackup := &kubermaticv1.EtcdBackup{}
+	if err := reconciler.Get(context.Background(), client.ObjectKey{Namespace: backup.GetNamespace(), Name: backup.GetName()}, readbackBackup); err != nil {
+		t.Fatalf("Error reading back completed backup: %v", err)
+	}
+
+	if len(backup.Finalizers) != 0 {
+		t.Fatalf("Expected no remaining backup finalizers after cleanup call, got: %v", backup.Finalizers)
+	}
+}
+
+func TestController_BackupError(t *testing.T) {
+	cluster := genTestCluster()
+
+	const backupName = "testbackup"
+	backup := genBackup(cluster, backupName)
+
+	const errorMessage = "simulated error"
+
+	mockBackOps := newMockBackendOperations()
+	mockBackOps.returnError = fmt.Errorf(errorMessage)
+
+	eventRecorder := record.NewFakeRecorder(10)
+	reconciler := &Reconciler{
+		log:               kubermaticlog.New(true, kubermaticlog.FormatConsole).Sugar(),
+		Client:            ctrlruntimefakeclient.NewFakeClientWithScheme(scheme.Scheme, cluster, backup),
+		BackendOperations: mockBackOps,
+		recorder:          eventRecorder,
+	}
+
+	_, err := reconciler.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{Namespace: backup.Namespace, Name: backup.Name}})
+
+	if !mockBackOps.localSnapshots.IsEmpty() {
+		t.Fatalf("expected no local snapshots, got: %v", mockBackOps.localSnapshots)
+	}
+
+	if !mockBackOps.uploadedSnapshots.IsEmpty() {
+		t.Fatalf("expected no uploaded snapshots, got: %v", mockBackOps.uploadedSnapshots)
+	}
+
+	if err == nil {
+		t.Fatal("Reconcile error expected")
+	}
+
+	if err.Error() != errorMessage {
+		t.Fatalf("Expected error '%v' but got %v", errorMessage, err)
+	}
+
+	events := collectEvents(eventRecorder.Events)
+	if len(events) != 2 {
+		t.Fatalf("Expected 2 events to be generated, got instead: %v", events)
+	}
+	for _, e := range events {
+		if !strings.Contains(e, errorMessage) {
+			t.Fatalf("Expected only events containing '%s' to be generated, got instead: %v", errorMessage, events)
+		}
+	}
+}
+
+func collectEvents(source <-chan string) []string {
+	done := false
+	events := make([]string, 0)
+	for !done {
+		select {
+		case event := <-source:
+			events = append(events, event)
+		default:
+			done = true
+		}
+	}
+	return events
 }

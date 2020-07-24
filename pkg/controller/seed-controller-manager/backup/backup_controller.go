@@ -22,6 +22,7 @@ import (
 	"fmt"
 	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
 	kubermaticv1helper "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1/helper"
+	kuberneteshelper "github.com/kubermatic/kubermatic/pkg/kubernetes"
 	"github.com/minio/minio-go"
 	"go.etcd.io/etcd/clientv3"
 	"go.uber.org/zap"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"os"
+	"reflect"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -44,12 +46,16 @@ import (
 const (
 	ControllerName     = "kubermatic_backup_controller"
 	defaultClusterSize = 3
+
+	// BackupDeletionFinalizer indicates that the backup still needs to be deleted in the backend
+	BackupDeletionFinalizer = "kubermatic.io/delete-etcd-backup"
 )
 
 type BackendOperations interface {
 	takeSnapshot(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error
 	uploadSnapshot(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error
 	cleanupSnapshot(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error
+	deleteUploadedSnapshot(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error
 }
 
 // Reconciler stores necessary components that are required to create etcd backups
@@ -161,15 +167,23 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, back
 		return &reconcile.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
+	if backup.DeletionTimestamp != nil {
+		log.Debugf("Cleaning up backup: %v/%v", backup.Namespace, backup.Name)
+		return nil, r.cleanupBackup(ctx, log, backup, cluster)
+	}
+
 	if backupCreated(backup) {
 		return nil, nil
 	}
 
-	log.Debugf("Reconciling backup: meta=%v/%v spec.name=%v", backup.Namespace, backup.Name, backup.Spec.Name)
+	log.Debugf("Reconciling backup: %v/%v", backup.Namespace, backup.Name)
+	return nil, r.createBackup(ctx, log, backup, cluster)
+}
 
+func (r *Reconciler) createBackup(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
 	err := r.takeSnapshot(ctx, log, backup, cluster)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	defer func() {
@@ -180,14 +194,41 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, back
 
 	err = r.uploadSnapshot(ctx, log, backup, cluster)
 	if err != nil {
-		return nil, err
+		return err
 	}
+
+	r.updateBackup(ctx, backup, func(backup *kubermaticv1.EtcdBackup) {
+		kuberneteshelper.AddFinalizer(backup, BackupDeletionFinalizer)
+	})
 
 	if err = r.setAndPersistBackupCondition(ctx, backup, kubermaticv1.EtcdBackupCreated, corev1.ConditionTrue); err != nil {
-		return nil, fmt.Errorf("failed to set add EtcdBackupCreated Condition: %v", err)
+		return fmt.Errorf("failed to set add EtcdBackupCreated Condition: %v", err)
 	}
 
-	return nil, nil
+	return nil
+}
+
+func (r *Reconciler) cleanupBackup(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
+	if !kuberneteshelper.HasFinalizer(backup, BackupDeletionFinalizer) {
+		return nil
+	}
+
+	if err := r.deleteUploadedSnapshot(ctx, log, backup, cluster); err != nil {
+		return err
+	}
+
+	return r.updateBackup(ctx, backup, func(backup *kubermaticv1.EtcdBackup) {
+		kuberneteshelper.RemoveFinalizer(backup, BackupDeletionFinalizer)
+	})
+}
+
+func (r *Reconciler) updateBackup(ctx context.Context, backup *kubermaticv1.EtcdBackup, modify func(*kubermaticv1.EtcdBackup)) error {
+	oldBackup := backup.DeepCopy()
+	modify(backup)
+	if reflect.DeepEqual(oldBackup, backup) {
+		return nil
+	}
+	return r.Client.Patch(ctx, backup, ctrlruntimeclient.MergeFrom(oldBackup))
 }
 
 func (r *Reconciler) setAndPersistBackupCondition(ctx context.Context, backup *kubermaticv1.EtcdBackup, condType kubermaticv1.EtcdBackupConditionType, status corev1.ConditionStatus) error {
@@ -195,9 +236,10 @@ func (r *Reconciler) setAndPersistBackupCondition(ctx context.Context, backup *k
 	if cond != nil && cond.Status == status {
 		return nil
 	}
-	oldBackup := backup.DeepCopy()
-	setBackupCondition(backup, condType, status)
-	return r.Client.Patch(ctx, backup, ctrlruntimeclient.MergeFrom(oldBackup))
+
+	return r.updateBackup(ctx, backup, func(backup *kubermaticv1.EtcdBackup) {
+		setBackupCondition(backup, condType, status)
+	})
 }
 
 func backupCreated(backup *kubermaticv1.EtcdBackup) bool {
@@ -323,13 +365,21 @@ func hasChecksum(n int64) bool {
 	return (n % 512) == sha256.Size
 }
 
-func (s3ops *s3BackendOperations) uploadSnapshot(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
+func (s3ops *s3BackendOperations) getS3Client() (*minio.Client, error) {
 	// TODO long-lived client, possibly one per worker (since I think it's not thread-safe)
 	client, err := minio.New(s3ops.s3Endpoint, s3ops.s3AccessKeyID, s3ops.s3SecretAccessKey, true)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	client.SetAppInfo("kubermatic", "v0.1")
+	return client, nil
+}
+
+func (s3ops *s3BackendOperations) uploadSnapshot(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
+	client, err := s3ops.getS3Client()
+	if err != nil {
+		return err
+	}
 
 	exists, err := client.BucketExists(s3ops.s3BucketName)
 	if err != nil {
@@ -353,4 +403,15 @@ func (s3ops *s3BackendOperations) uploadSnapshot(ctx context.Context, log *zap.S
 func (s3ops *s3BackendOperations) cleanupSnapshot(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
 	snapshotFileName := fmt.Sprintf("/%s/%s", s3ops.snapshotDir, backupFileName(backup, cluster))
 	return os.RemoveAll(snapshotFileName)
+}
+
+func (s3ops *s3BackendOperations) deleteUploadedSnapshot(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
+	client, err := s3ops.getS3Client()
+	if err != nil {
+		return err
+	}
+
+	objectName := backupFileName(backup, cluster)
+
+	return client.RemoveObject(s3ops.s3BucketName, objectName)
 }
