@@ -19,8 +19,10 @@ package backup
 import (
 	"context"
 	"fmt"
+	kuberneteshelper "github.com/kubermatic/kubermatic/pkg/kubernetes"
 	"github.com/minio/minio-go/pkg/set"
 	"go.uber.org/zap"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"testing"
@@ -66,6 +68,11 @@ func (ops *mockBackendOperations) cleanupSnapshot(ctx context.Context, log *zap.
 		return fmt.Errorf("cannot clean up non-existing local backup: %v", backup.GetName())
 	}
 	ops.localSnapshots.Remove(backup.GetName())
+	return nil
+}
+
+func (ops *mockBackendOperations) deleteUploadedSnapshot(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
+	ops.uploadedSnapshots.Remove(backup.GetName())
 	return nil
 }
 
@@ -131,6 +138,10 @@ func TestController_SimpleBackup(t *testing.T) {
 	if !readbackBackup.Status.HasConditionValue(kubermaticv1.EtcdBackupCreated, corev1.ConditionTrue) {
 		t.Fatalf("backup not marked as completed")
 	}
+
+	if !kuberneteshelper.HasFinalizer(readbackBackup, BackupDeletionFinalizer) {
+		t.Fatalf("backup does not have finalizer %s", BackupDeletionFinalizer)
+	}
 }
 
 func TestController_CompletedBackupIsNotProcessed(t *testing.T) {
@@ -157,5 +168,38 @@ func TestController_CompletedBackupIsNotProcessed(t *testing.T) {
 
 	if !mockBackOps.localSnapshots.IsEmpty() {
 		t.Fatalf("Expected no local snapshots, got %v", mockBackOps.uploadedSnapshots)
+	}
+}
+
+func TestController_BackupDeletion(t *testing.T) {
+	cluster := genTestCluster()
+
+	const backupName = "testbackup"
+	backup := genBackup(cluster, backupName)
+	setBackupCondition(backup, kubermaticv1.EtcdBackupCreated, corev1.ConditionTrue)
+	kuberneteshelper.AddFinalizer(backup, BackupDeletionFinalizer)
+
+	mockBackOps := newMockBackendOperations()
+	reconciler := &Reconciler{
+		log:               kubermaticlog.New(true, kubermaticlog.FormatConsole).Sugar(),
+		Client:            ctrlruntimefakeclient.NewFakeClientWithScheme(scheme.Scheme, cluster, backup),
+		BackendOperations: mockBackOps,
+	}
+
+	mockBackOps.uploadedSnapshots.Add(backup.Name)
+
+	reconciler.Delete(context.Background(), backup)
+
+	if _, err := reconciler.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{Namespace: backup.Namespace, Name: backup.Name}}); err != nil {
+		t.Fatalf("Error syncing cluster: %v", err)
+	}
+
+	if !mockBackOps.uploadedSnapshots.IsEmpty() {
+		t.Fatalf("Expected no uploaded snapshots, got %v", mockBackOps.uploadedSnapshots)
+	}
+
+	readbackBackup := &kubermaticv1.EtcdBackup{}
+	if err := reconciler.Get(context.Background(), client.ObjectKey{Namespace: backup.GetNamespace(), Name: backup.GetName()}, readbackBackup); !kerrors.IsNotFound(err) {
+		t.Fatalf("Expected the backup to be deleted, but the GET returned: %v", err)
 	}
 }
