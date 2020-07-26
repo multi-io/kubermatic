@@ -208,9 +208,12 @@ func (r *Reconciler) createBackup(ctx context.Context, log *zap.SugaredLogger, b
 		return fmt.Errorf("error uploading snapshot: %v", err)
 	}
 
-	r.updateBackup(ctx, backup, func(backup *kubermaticv1.EtcdBackup) {
+	err = r.updateBackup(ctx, backup, func(backup *kubermaticv1.EtcdBackup) {
 		kuberneteshelper.AddFinalizer(backup, BackupDeletionFinalizer)
 	})
+	if err != nil {
+		return fmt.Errorf("error updating backup resource: %v", err)
+	}
 
 	return wrapErrorMessage("failed to set add EtcdBackupCreated Condition: %v", r.setAndPersistBackupCondition(ctx, backup, kubermaticv1.EtcdBackupCreated, corev1.ConditionTrue))
 }
@@ -252,14 +255,13 @@ func (r *Reconciler) setAndPersistBackupCondition(ctx context.Context, backup *k
 func (r *Reconciler) computeReconcileAfter(backup *kubermaticv1.EtcdBackup) *reconcile.Result {
 	if backup.Spec.TTL == nil {
 		return nil
-	} else {
-		expiresAt := backup.GetCreationTimestamp().Add(backup.Spec.TTL.Duration)
-		durationToExpiry := expiresAt.Sub(r.clock.Now())
-		if durationToExpiry <= 0 {
-			durationToExpiry = 0
-		}
-		return &reconcile.Result{Requeue: true, RequeueAfter: durationToExpiry}
 	}
+	expiresAt := backup.GetCreationTimestamp().Add(backup.Spec.TTL.Duration)
+	durationToExpiry := expiresAt.Sub(r.clock.Now())
+	if durationToExpiry <= 0 {
+		durationToExpiry = 0
+	}
+	return &reconcile.Result{Requeue: true, RequeueAfter: durationToExpiry}
 }
 
 func backupCreated(backup *kubermaticv1.EtcdBackup) bool {
@@ -439,7 +441,6 @@ func (s3ops *s3BackendOperations) deleteUploadedSnapshot(ctx context.Context, lo
 func wrapErrorMessage(wrapMessage string, err error) error {
 	if err == nil {
 		return nil
-	} else {
-		return fmt.Errorf(wrapMessage, err)
 	}
+	return fmt.Errorf(wrapMessage, err)
 }
