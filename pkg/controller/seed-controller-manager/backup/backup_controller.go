@@ -31,6 +31,7 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/tools/record"
 	"os"
 	"reflect"
@@ -64,6 +65,7 @@ type Reconciler struct {
 	workerName string
 	ctrlruntimeclient.Client
 	BackendOperations
+	clock    clock.Clock
 	recorder record.EventRecorder
 }
 
@@ -103,6 +105,7 @@ func Add(
 			s3AccessKeyID:     s3AccessKeyID,
 			s3SecretAccessKey: s3SecretAccessKey,
 		},
+		clock: &clock.RealClock{},
 	}
 
 	ctrlOptions := controller.Options{
@@ -172,12 +175,20 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, back
 		return nil, wrapErrorMessage("error cleaning up backup: %v", r.cleanupBackup(ctx, log, backup, cluster))
 	}
 
+	if backup.Spec.TTL != nil {
+		expiresAt := backup.GetCreationTimestamp().Add(backup.Spec.TTL.Duration)
+		if r.clock.Now().After(expiresAt) {
+			log.Debug("Expiring backup")
+			return nil, wrapErrorMessage("error expiring backup: %v", r.Delete(ctx, backup))
+		}
+	}
+
 	if backupCreated(backup) {
-		return nil, nil
+		return r.computeReconcileAfter(backup), nil
 	}
 
 	log.Debug("Reconciling backup")
-	return nil, wrapErrorMessage("error reconciling backup: %v", r.createBackup(ctx, log, backup, cluster))
+	return r.computeReconcileAfter(backup), wrapErrorMessage("error reconciling backup: %v", r.createBackup(ctx, log, backup, cluster))
 }
 
 func (r *Reconciler) createBackup(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
@@ -236,6 +247,19 @@ func (r *Reconciler) setAndPersistBackupCondition(ctx context.Context, backup *k
 	return r.updateBackup(ctx, backup, func(backup *kubermaticv1.EtcdBackup) {
 		setBackupCondition(backup, condType, status)
 	})
+}
+
+func (r *Reconciler) computeReconcileAfter(backup *kubermaticv1.EtcdBackup) *reconcile.Result {
+	if backup.Spec.TTL == nil {
+		return nil
+	} else {
+		expiresAt := backup.GetCreationTimestamp().Add(backup.Spec.TTL.Duration)
+		durationToExpiry := expiresAt.Sub(r.clock.Now())
+		if durationToExpiry <= 0 {
+			durationToExpiry = 0
+		}
+		return &reconcile.Result{Requeue: true, RequeueAfter: durationToExpiry}
+	}
 }
 
 func backupCreated(backup *kubermaticv1.EtcdBackup) bool {

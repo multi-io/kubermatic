@@ -7,6 +7,7 @@ package v1
 import (
 	types "github.com/kubermatic/machine-controller/pkg/providerconfig/types"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -1295,7 +1296,7 @@ func (in *EtcdBackup) DeepCopyInto(out *EtcdBackup) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
-	out.Spec = in.Spec
+	in.Spec.DeepCopyInto(&out.Spec)
 	in.Status.DeepCopyInto(&out.Status)
 	return
 }
@@ -1373,6 +1374,11 @@ func (in *EtcdBackupList) DeepCopyObject() runtime.Object {
 func (in *EtcdBackupSpec) DeepCopyInto(out *EtcdBackupSpec) {
 	*out = *in
 	out.Cluster = in.Cluster
+	if in.TTL != nil {
+		in, out := &in.TTL, &out.TTL
+		*out = new(metav1.Duration)
+		**out = **in
+	}
 	return
 }
 

@@ -49,6 +49,10 @@ type EtcdBackupSpec struct {
 	Name string `json:"name"`
 	// Cluster is the reference to the cluster whose etcd will be backed up
 	Cluster corev1.ObjectReference `json:"cluster"`
+	// TTL is an optional time.Duration-parseable string specifying how long
+	// the EtcdBackup should be retained. If not set, the backup will be kept until
+	// deleted explicitly
+	TTL *metav1.Duration `json:"ttl,omitempty"`
 }
 
 // EtcdBackupList is a list of etcd backups

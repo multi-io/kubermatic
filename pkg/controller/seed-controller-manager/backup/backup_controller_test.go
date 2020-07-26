@@ -22,11 +22,14 @@ import (
 	kuberneteshelper "github.com/kubermatic/kubermatic/pkg/kubernetes"
 	"github.com/minio/minio-go/pkg/set"
 	"go.uber.org/zap"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strings"
 	"testing"
+	"time"
 
 	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
 	kubermaticlog "github.com/kubermatic/kubermatic/pkg/log"
@@ -131,6 +134,7 @@ func TestController_SimpleBackup(t *testing.T) {
 		Client:            ctrlruntimefakeclient.NewFakeClientWithScheme(scheme.Scheme, cluster, backup),
 		BackendOperations: mockBackOps,
 		recorder:          record.NewFakeRecorder(10),
+		clock:             &clock.RealClock{},
 	}
 
 	if _, err := reconciler.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{Namespace: backup.Namespace, Name: backup.Name}}); err != nil {
@@ -172,6 +176,7 @@ func TestController_CompletedBackupIsNotProcessed(t *testing.T) {
 		Client:            ctrlruntimefakeclient.NewFakeClientWithScheme(scheme.Scheme, cluster, backup),
 		BackendOperations: mockBackOps,
 		recorder:          record.NewFakeRecorder(10),
+		clock:             &clock.RealClock{},
 	}
 
 	if _, err := reconciler.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{Namespace: backup.Namespace, Name: backup.Name}}); err != nil {
@@ -201,6 +206,7 @@ func TestController_cleanupBackup(t *testing.T) {
 		Client:            ctrlruntimefakeclient.NewFakeClientWithScheme(scheme.Scheme, cluster, backup),
 		BackendOperations: mockBackOps,
 		recorder:          record.NewFakeRecorder(10),
+		clock:             &clock.RealClock{},
 	}
 
 	mockBackOps.uploadedSnapshots.Add(backup.Name)
@@ -240,6 +246,7 @@ func TestController_BackupError(t *testing.T) {
 		Client:            ctrlruntimefakeclient.NewFakeClientWithScheme(scheme.Scheme, cluster, backup),
 		BackendOperations: mockBackOps,
 		recorder:          eventRecorder,
+		clock:             &clock.RealClock{},
 	}
 
 	_, err := reconciler.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{Namespace: backup.Namespace, Name: backup.Name}})
@@ -268,6 +275,64 @@ func TestController_BackupError(t *testing.T) {
 		if !strings.Contains(e, errorMessage) {
 			t.Fatalf("Expected only events containing '%s' to be generated, got instead: %v", errorMessage, events)
 		}
+	}
+}
+
+func TestController_expireBackup(t *testing.T) {
+	cluster := genTestCluster()
+
+	const backupName = "testbackup"
+	backup := genBackup(cluster, backupName)
+	setBackupCondition(backup, kubermaticv1.EtcdBackupCreated, corev1.ConditionTrue)
+	kuberneteshelper.AddFinalizer(backup, BackupDeletionFinalizer)
+	backup.Spec.TTL = &metav1.Duration{Duration: 10 * time.Minute}
+
+	clock := clock.NewFakeClock(time.Unix(100, 0))
+	backup.SetCreationTimestamp(metav1.Time{Time: clock.Now()})
+
+	reconciler := &Reconciler{
+		log:               kubermaticlog.New(true, kubermaticlog.FormatConsole).Sugar(),
+		Client:            ctrlruntimefakeclient.NewFakeClientWithScheme(scheme.Scheme, cluster, backup),
+		BackendOperations: newMockBackendOperations(),
+		recorder:          record.NewFakeRecorder(10),
+		clock:             clock,
+	}
+
+	readbackBackup := &kubermaticv1.EtcdBackup{}
+	if err := reconciler.Get(context.Background(), client.ObjectKey{Namespace: backup.GetNamespace(), Name: backup.GetName()}, readbackBackup); err != nil {
+		t.Fatalf("Expected to find backup, got an error: %v", err)
+	}
+
+	// sleep less than the TTL, check that backup is still there after reconciliation
+
+	preSleep := 1 * time.Minute
+	clock.Sleep(preSleep)
+
+	result, err := reconciler.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{Namespace: backup.Namespace, Name: backup.Name}})
+	if err != nil {
+		t.Fatalf("Error syncing cluster: %v", err)
+	}
+
+	if result.RequeueAfter != backup.Spec.TTL.Duration-preSleep {
+		t.Fatalf("Expected request to requeue after %v, but got %v", backup.Spec.TTL.Duration-preSleep, result.RequeueAfter)
+	}
+
+	readbackBackup = &kubermaticv1.EtcdBackup{}
+	if err := reconciler.Get(context.Background(), client.ObjectKey{Namespace: backup.GetNamespace(), Name: backup.GetName()}, readbackBackup); err != nil {
+		t.Fatalf("Expected to find backup, got an error: %v", err)
+	}
+
+	// sleep beyond the TTL, check that backup will be deleted
+
+	clock.Sleep(backup.Spec.TTL.Duration)
+
+	if _, err := reconciler.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{Namespace: backup.Namespace, Name: backup.Name}}); err != nil {
+		t.Fatalf("Error syncing cluster: %v", err)
+	}
+
+	readbackBackup = &kubermaticv1.EtcdBackup{}
+	if err := reconciler.Get(context.Background(), client.ObjectKey{Namespace: backup.GetNamespace(), Name: backup.GetName()}, readbackBackup); !errors.IsNotFound(err) {
+		t.Fatalf("Expected backup to be deleted, got: backup=%v, err=%v", readbackBackup, err)
 	}
 }
 
