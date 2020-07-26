@@ -256,8 +256,8 @@ func TestController_BackupError(t *testing.T) {
 		t.Fatal("Reconcile error expected")
 	}
 
-	if err.Error() != errorMessage {
-		t.Fatalf("Expected error '%v' but got %v", errorMessage, err)
+	if !strings.Contains(err.Error(), errorMessage) {
+		t.Fatalf("Expected error message containing '%v' but got %v", errorMessage, err)
 	}
 
 	events := collectEvents(eventRecorder.Events)

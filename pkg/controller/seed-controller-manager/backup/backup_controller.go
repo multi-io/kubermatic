@@ -168,22 +168,22 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, back
 	}
 
 	if backup.DeletionTimestamp != nil {
-		log.Debugf("Cleaning up backup: %v/%v", backup.Namespace, backup.Name)
-		return nil, r.cleanupBackup(ctx, log, backup, cluster)
+		log.Debug("Cleaning up backup")
+		return nil, wrapErrorMessage("error cleaning up backup: %v", r.cleanupBackup(ctx, log, backup, cluster))
 	}
 
 	if backupCreated(backup) {
 		return nil, nil
 	}
 
-	log.Debugf("Reconciling backup: %v/%v", backup.Namespace, backup.Name)
-	return nil, r.createBackup(ctx, log, backup, cluster)
+	log.Debug("Reconciling backup")
+	return nil, wrapErrorMessage("error reconciling backup: %v", r.createBackup(ctx, log, backup, cluster))
 }
 
 func (r *Reconciler) createBackup(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
 	err := r.takeSnapshot(ctx, log, backup, cluster)
 	if err != nil {
-		return err
+		return fmt.Errorf("error taking snapshot: %v", err)
 	}
 
 	defer func() {
@@ -194,18 +194,14 @@ func (r *Reconciler) createBackup(ctx context.Context, log *zap.SugaredLogger, b
 
 	err = r.uploadSnapshot(ctx, log, backup, cluster)
 	if err != nil {
-		return err
+		return fmt.Errorf("error uploading snapshot: %v", err)
 	}
 
 	r.updateBackup(ctx, backup, func(backup *kubermaticv1.EtcdBackup) {
 		kuberneteshelper.AddFinalizer(backup, BackupDeletionFinalizer)
 	})
 
-	if err = r.setAndPersistBackupCondition(ctx, backup, kubermaticv1.EtcdBackupCreated, corev1.ConditionTrue); err != nil {
-		return fmt.Errorf("failed to set add EtcdBackupCreated Condition: %v", err)
-	}
-
-	return nil
+	return wrapErrorMessage("failed to set add EtcdBackupCreated Condition: %v", r.setAndPersistBackupCondition(ctx, backup, kubermaticv1.EtcdBackupCreated, corev1.ConditionTrue))
 }
 
 func (r *Reconciler) cleanupBackup(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
@@ -214,12 +210,12 @@ func (r *Reconciler) cleanupBackup(ctx context.Context, log *zap.SugaredLogger, 
 	}
 
 	if err := r.deleteUploadedSnapshot(ctx, log, backup, cluster); err != nil {
-		return err
+		return fmt.Errorf("Error deleting uploaded snapshot: %v", err)
 	}
 
-	return r.updateBackup(ctx, backup, func(backup *kubermaticv1.EtcdBackup) {
+	return wrapErrorMessage("Error removing finalizer: %v", r.updateBackup(ctx, backup, func(backup *kubermaticv1.EtcdBackup) {
 		kuberneteshelper.RemoveFinalizer(backup, BackupDeletionFinalizer)
-	})
+	}))
 }
 
 func (r *Reconciler) updateBackup(ctx context.Context, backup *kubermaticv1.EtcdBackup, modify func(*kubermaticv1.EtcdBackup)) error {
@@ -414,4 +410,12 @@ func (s3ops *s3BackendOperations) deleteUploadedSnapshot(ctx context.Context, lo
 	objectName := backupFileName(backup, cluster)
 
 	return client.RemoveObject(s3ops.s3BucketName, objectName)
+}
+
+func wrapErrorMessage(wrapMessage string, err error) error {
+	if err == nil {
+		return nil
+	} else {
+		return fmt.Errorf(wrapMessage, err)
+	}
 }
