@@ -1,6 +1,8 @@
 /*
 Copyright 2020 The Kubermatic Kubernetes Platform contributors.
 
+Copyright 2017 the Velero contributors. (func parseCronSchedule)
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
@@ -23,7 +25,9 @@ import (
 	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
 	kubermaticv1helper "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1/helper"
 	kuberneteshelper "github.com/kubermatic/kubermatic/pkg/kubernetes"
+	errors2 "github.com/kubermatic/kubermatic/pkg/util/errors"
 	"github.com/minio/minio-go"
+	"github.com/robfig/cron"
 	"go.etcd.io/etcd/clientv3"
 	"go.uber.org/zap"
 	"io"
@@ -175,20 +179,85 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, back
 		return nil, wrapErrorMessage("error cleaning up backup: %v", r.cleanupBackup(ctx, log, backup, cluster))
 	}
 
-	if backup.Spec.TTL != nil {
-		expiresAt := backup.GetCreationTimestamp().Add(backup.Spec.TTL.Duration)
-		if r.clock.Now().After(expiresAt) {
-			log.Debug("Expiring backup")
-			return nil, wrapErrorMessage("error expiring backup: %v", r.Delete(ctx, backup))
+	backupNow, err := r.shouldBackupNow(backup)
+	if err != nil {
+		return nil, fmt.Errorf("can't determine backup schedule: %v", err)
+	}
+
+	if backupNow {
+		err := r.createBackup(ctx, log, backup, cluster)
+		if err != nil {
+			return nil, fmt.Errorf("error creating backup: %v", err)
 		}
 	}
 
-	if backupCreated(backup) {
-		return r.computeReconcileAfter(backup), nil
+	if err := r.deleteExpiredBackups(ctx, log, backup, cluster); err != nil {
+		return nil, fmt.Errorf("error expiring old backups: %v", err)
 	}
 
-	log.Debug("Reconciling backup")
-	return r.computeReconcileAfter(backup), wrapErrorMessage("error reconciling backup: %v", r.createBackup(ctx, log, backup, cluster))
+	reconcile, err := r.computeReconcileAfter(backup)
+	if err != nil {
+		// should not happen at this point because the schedule was already parsed successfully above
+		return nil, fmt.Errorf("error computing reconcile interval: %v", err)
+	}
+
+	return reconcile, nil
+}
+
+func (r *Reconciler) shouldBackupNow(backup *kubermaticv1.EtcdBackup) (bool, error) {
+	if backup.Spec.Schedule == "" {
+		// no schedule set => we need exactly one backup
+		return backup.Status.LastBackupTime == nil, nil
+	}
+
+	schedule, err := parseCronSchedule(backup.Spec.Schedule)
+	if err != nil {
+		return false, err
+	}
+
+	lastBackupTime := backup.Status.LastBackupTime
+	if lastBackupTime == nil {
+		lastBackupTime = &metav1.Time{Time: r.clock.Now()}
+	}
+
+	return r.clock.Now().After(schedule.Next(lastBackupTime.Time)), nil
+}
+
+func (r *Reconciler) computeReconcileAfter(backup *kubermaticv1.EtcdBackup) (*reconcile.Result, error) {
+	if backup.Spec.Schedule == "" {
+		// no schedule set => only one immediate backup, which is already created at this point
+		if backup.Spec.TTL == nil {
+			// no TTL either => all done, no need to reschedule
+			return nil, nil
+		}
+		expiresAt := backup.GetCreationTimestamp().Add(backup.Spec.TTL.Duration)
+		durationToExpiry := expiresAt.Sub(r.clock.Now())
+		if durationToExpiry <= 0 {
+			durationToExpiry = 0
+		}
+		return &reconcile.Result{Requeue: true, RequeueAfter: durationToExpiry}, nil
+	}
+
+	schedule, err := parseCronSchedule(backup.Spec.Schedule)
+	if err != nil {
+		return nil, err
+	}
+
+	lastBackupTime := backup.Status.LastBackupTime
+	if lastBackupTime == nil {
+		lastBackupTime = &metav1.Time{Time: r.clock.Now()}
+	}
+
+	durationToNextBackup := r.clock.Now().Sub(schedule.Next(lastBackupTime.Time))
+	if durationToNextBackup < 0 {
+		durationToNextBackup = 0
+	}
+	return &reconcile.Result{Requeue: true, RequeueAfter: durationToNextBackup}, nil
+}
+
+func (r *Reconciler) deleteExpiredBackups(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
+	// TODO impl
+	return nil
 }
 
 func (r *Reconciler) createBackup(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
@@ -208,17 +277,17 @@ func (r *Reconciler) createBackup(ctx context.Context, log *zap.SugaredLogger, b
 		return fmt.Errorf("error uploading snapshot: %v", err)
 	}
 
-	err = r.updateBackup(ctx, backup, func(backup *kubermaticv1.EtcdBackup) {
-		kuberneteshelper.AddFinalizer(backup, BackupDeletionFinalizer)
-	})
-	if err != nil {
-		return fmt.Errorf("error updating backup resource: %v", err)
-	}
-
-	return wrapErrorMessage("failed to set add EtcdBackupCreated Condition: %v", r.setAndPersistBackupCondition(ctx, backup, kubermaticv1.EtcdBackupCreated, corev1.ConditionTrue))
+	return wrapErrorMessage(
+		"failed to modify EtcdBackup resource: %v",
+		r.updateBackup(ctx, backup, func(backup *kubermaticv1.EtcdBackup) {
+			kuberneteshelper.AddFinalizer(backup, BackupDeletionFinalizer)
+			backup.Status.LastBackupTime = &metav1.Time{Time: r.clock.Now()}
+		}))
 }
 
 func (r *Reconciler) cleanupBackup(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
+	// TODO delete all s3 files with prefix <cluster.Name>-<backup.Name>
+
 	if !kuberneteshelper.HasFinalizer(backup, BackupDeletionFinalizer) {
 		return nil
 	}
@@ -239,37 +308,6 @@ func (r *Reconciler) updateBackup(ctx context.Context, backup *kubermaticv1.Etcd
 		return nil
 	}
 	return r.Client.Patch(ctx, backup, ctrlruntimeclient.MergeFrom(oldBackup))
-}
-
-func (r *Reconciler) setAndPersistBackupCondition(ctx context.Context, backup *kubermaticv1.EtcdBackup, condType kubermaticv1.EtcdBackupConditionType, status corev1.ConditionStatus) error {
-	_, cond := getBackupCondition(backup, condType)
-	if cond != nil && cond.Status == status {
-		return nil
-	}
-
-	return r.updateBackup(ctx, backup, func(backup *kubermaticv1.EtcdBackup) {
-		setBackupCondition(backup, condType, status)
-	})
-}
-
-func (r *Reconciler) computeReconcileAfter(backup *kubermaticv1.EtcdBackup) *reconcile.Result {
-	if backup.Spec.TTL == nil {
-		return nil
-	}
-	expiresAt := backup.GetCreationTimestamp().Add(backup.Spec.TTL.Duration)
-	durationToExpiry := expiresAt.Sub(r.clock.Now())
-	if durationToExpiry <= 0 {
-		durationToExpiry = 0
-	}
-	return &reconcile.Result{Requeue: true, RequeueAfter: durationToExpiry}
-}
-
-func backupCreated(backup *kubermaticv1.EtcdBackup) bool {
-	_, cond := getBackupCondition(backup, kubermaticv1.EtcdBackupCreated)
-	if cond != nil && cond.Status == corev1.ConditionTrue {
-		return true
-	}
-	return false
 }
 
 func setBackupCondition(backup *kubermaticv1.EtcdBackup, condType kubermaticv1.EtcdBackupConditionType, status corev1.ConditionStatus) {
@@ -436,6 +474,38 @@ func (s3ops *s3BackendOperations) deleteUploadedSnapshot(ctx context.Context, lo
 	objectName := backupFileName(backup, cluster)
 
 	return client.RemoveObject(s3ops.s3BucketName, objectName)
+}
+
+func parseCronSchedule(scheduleString string) (cron.Schedule, error) {
+	var validationErrors []error
+	var schedule cron.Schedule
+
+	// cron.Parse panics if schedule is empty
+	if len(scheduleString) == 0 {
+		return nil, fmt.Errorf("Schedule must be a non-empty valid Cron expression")
+	}
+
+	// adding a recover() around cron.Parse because it panics on empty string and is possible
+	// that it panics under other scenarios as well.
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				validationErrors = append(validationErrors, fmt.Errorf("(panic) invalid schedule: %v", r))
+			}
+		}()
+
+		if res, err := cron.ParseStandard(scheduleString); err != nil {
+			validationErrors = append(validationErrors, fmt.Errorf("invalid schedule: %v", err))
+		} else {
+			schedule = res
+		}
+	}()
+
+	if len(validationErrors) > 0 {
+		return nil, errors2.NewAggregate(validationErrors)
+	}
+
+	return schedule, nil
 }
 
 func wrapErrorMessage(wrapMessage string, err error) error {

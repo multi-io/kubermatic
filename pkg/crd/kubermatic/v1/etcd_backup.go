@@ -46,13 +46,19 @@ type EtcdBackup struct {
 // EtcdBackupSpec specifies details of an etcd backup
 type EtcdBackupSpec struct {
 	// Name defines the name of the backup
+	// The name of the backup file in S3 will be <cluster>-<backup name>
+	// If a schedule is set (see below), -<timestamp> will be appended.
 	Name string `json:"name"`
 	// Cluster is the reference to the cluster whose etcd will be backed up
 	Cluster corev1.ObjectReference `json:"cluster"`
 	// TTL is an optional time.Duration-parseable string specifying how long
-	// the EtcdBackup should be retained. If not set, the backup will be kept until
+	// an uploaded backup should be retained. If not set, the upload will be kept until
 	// deleted explicitly
 	TTL *metav1.Duration `json:"ttl,omitempty"`
+	// Schedule is a cron expression defining when to perform
+	// the backup. If not set, the backup is performed exactly
+	// once, immediately.
+	Schedule string `json:"schedule,omitempty"`
 }
 
 // EtcdBackupList is a list of etcd backups
@@ -65,7 +71,8 @@ type EtcdBackupList struct {
 }
 
 type EtcdBackupStatus struct {
-	Conditions []EtcdBackupCondition `json:"conditions,omitempty"`
+	Conditions     []EtcdBackupCondition `json:"conditions,omitempty"`
+	LastBackupTime *metav1.Time          `json:"lastBackupTime,omitempty"`
 }
 
 type EtcdBackupConditionType string
