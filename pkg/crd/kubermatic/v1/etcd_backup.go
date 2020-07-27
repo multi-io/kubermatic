@@ -28,7 +28,8 @@ const (
 	// EtcdBackupKindName represents "Kind" defined in Kubernetes
 	EtcdBackupKindName = "EtcdBackup"
 
-	EtcdBackupCreated EtcdBackupConditionType = "EtcdBackupCreatedSuccessfully"
+	DefaultKeptBackupsCount = 20
+	MaxKeptBackupsCount     = 20
 )
 
 //+genclient
@@ -51,14 +52,13 @@ type EtcdBackupSpec struct {
 	Name string `json:"name"`
 	// Cluster is the reference to the cluster whose etcd will be backed up
 	Cluster corev1.ObjectReference `json:"cluster"`
-	// TTL is an optional time.Duration-parseable string specifying how long
-	// an uploaded backup should be retained. If not set, the upload will be kept until
-	// deleted explicitly
-	TTL *metav1.Duration `json:"ttl,omitempty"`
 	// Schedule is a cron expression defining when to perform
 	// the backup. If not set, the backup is performed exactly
 	// once, immediately.
 	Schedule string `json:"schedule,omitempty"`
+	// Keep is the number of backups to keep around before deleting the oldest one
+	// If not set, defaults to DefaultKeptBackupsCount. Only used if Schedule is set.
+	Keep *int `json:"keep,omitempty"`
 }
 
 // EtcdBackupList is a list of etcd backups
@@ -71,34 +71,19 @@ type EtcdBackupList struct {
 }
 
 type EtcdBackupStatus struct {
-	Conditions     []EtcdBackupCondition `json:"conditions,omitempty"`
-	LastBackupTime *metav1.Time          `json:"lastBackupTime,omitempty"`
+	LastBackupTime *metav1.Time `json:"lastBackupTime,omitempty"`
+	LastBackups    []string     `json:"lastBackups,omitempty"`
 }
 
-type EtcdBackupConditionType string
-
-type EtcdBackupCondition struct {
-	// Type of addon condition.
-	Type EtcdBackupConditionType `json:"type"`
-	// Status of the condition, one of True, False, Unknown.
-	Status corev1.ConditionStatus `json:"status"`
-	// Last time we got an update on a given condition.
-	// +optional
-	LastHeartbeatTime metav1.Time `json:"lastHeartbeatTime,omitempty"`
-	// Last time the condition transit from one status to another.
-	// +optional
-	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
-}
-
-// HasConditionValue returns true if the EtcdBackup status has the given condition with the given status.
-// It does not verify that the condition has been set by a certain Kubermatic version, it just checks
-// the existence.
-func (bs *EtcdBackupStatus) HasConditionValue(conditionType EtcdBackupConditionType, conditionStatus corev1.ConditionStatus) bool {
-	for _, condition := range bs.Conditions {
-		if condition.Type == conditionType {
-			return condition.Status == conditionStatus
-		}
+func (b *EtcdBackup) GetKeptBackupsCount() int {
+	if b.Spec.Keep == nil {
+		return DefaultKeptBackupsCount
 	}
-
-	return false
+	if *b.Spec.Keep <= 0 {
+		return 1
+	}
+	if *b.Spec.Keep > MaxKeptBackupsCount {
+		return MaxKeptBackupsCount
+	}
+	return *b.Spec.Keep
 }

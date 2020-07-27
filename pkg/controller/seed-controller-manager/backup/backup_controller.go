@@ -52,15 +52,15 @@ const (
 	ControllerName     = "kubermatic_backup_controller"
 	defaultClusterSize = 3
 
-	// BackupDeletionFinalizer indicates that the backup still needs to be deleted in the backend
-	BackupDeletionFinalizer = "kubermatic.io/delete-etcd-backup"
+	// DeleteAllBackupsFinalizer indicates that the backups still need to be deleted in the backend
+	DeleteAllBackupsFinalizer = "kubermatic.io/delete-all-backups"
 )
 
 type BackendOperations interface {
 	takeSnapshot(ctx context.Context, log *zap.SugaredLogger, fileName string, cluster *kubermaticv1.Cluster) error
 	uploadSnapshot(ctx context.Context, log *zap.SugaredLogger, fileName string) error
 	cleanupSnapshot(ctx context.Context, log *zap.SugaredLogger, fileName string) error
-	deleteUploadedSnapshots(ctx context.Context, log *zap.SugaredLogger, fileNamePrefix string) error
+	deleteUploadedSnapshot(ctx context.Context, log *zap.SugaredLogger, fileName string) error
 }
 
 // Reconciler stores necessary components that are required to create etcd backups
@@ -176,7 +176,7 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, back
 
 	if backup.DeletionTimestamp != nil {
 		log.Debug("Cleaning up all backups")
-		return nil, wrapErrorMessage("error cleaning up all backups: %v", r.cleanupBackup(ctx, log, backup, cluster))
+		return nil, wrapErrorMessage("error cleaning up all backups: %v", r.deleteAllBackups(ctx, log, backup))
 	}
 
 	backupName, err := r.currentlyPendingBackupName(backup, cluster)
@@ -191,7 +191,7 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, back
 		}
 	}
 
-	if err := r.deleteExpiredBackups(ctx, log, backup, cluster); err != nil {
+	if err := r.deleteBackupsUpToRemaining(ctx, log, backup, backup.GetKeptBackupsCount()); err != nil {
 		return nil, fmt.Errorf("error expiring old backups: %v", err)
 	}
 
@@ -236,17 +236,8 @@ func (r *Reconciler) currentlyPendingBackupName(backup *kubermaticv1.EtcdBackup,
 
 func (r *Reconciler) computeReconcileAfter(backup *kubermaticv1.EtcdBackup) (*reconcile.Result, error) {
 	if backup.Spec.Schedule == "" {
-		// no schedule set => only one immediate backup, which is already created at this point
-		if backup.Spec.TTL == nil {
-			// no TTL either => all done, no need to reschedule
-			return nil, nil
-		}
-		expiresAt := backup.GetCreationTimestamp().Add(backup.Spec.TTL.Duration)
-		durationToExpiry := expiresAt.Sub(r.clock.Now())
-		if durationToExpiry <= 0 {
-			durationToExpiry = 0
-		}
-		return &reconcile.Result{Requeue: true, RequeueAfter: durationToExpiry}, nil
+		// no schedule set => only one immediate backup, which is already created at this point => all done, no need to reschedule
+		return nil, nil
 	}
 
 	schedule, err := parseCronSchedule(backup.Spec.Schedule)
@@ -266,14 +257,7 @@ func (r *Reconciler) computeReconcileAfter(backup *kubermaticv1.EtcdBackup) (*re
 	return &reconcile.Result{Requeue: true, RequeueAfter: durationToNextBackup}, nil
 }
 
-func (r *Reconciler) deleteExpiredBackups(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
-	// TODO impl
-	return nil
-}
-
 func (r *Reconciler) createBackup(ctx context.Context, log *zap.SugaredLogger, fileName string, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
-	// TODO
-
 	err := r.takeSnapshot(ctx, log, fileName, cluster)
 	if err != nil {
 		return fmt.Errorf("error taking snapshot: %v", err)
@@ -293,22 +277,41 @@ func (r *Reconciler) createBackup(ctx context.Context, log *zap.SugaredLogger, f
 	return wrapErrorMessage(
 		"failed to modify EtcdBackup resource: %v",
 		r.updateBackup(ctx, backup, func(backup *kubermaticv1.EtcdBackup) {
-			kuberneteshelper.AddFinalizer(backup, BackupDeletionFinalizer)
+			kuberneteshelper.AddFinalizer(backup, DeleteAllBackupsFinalizer)
 			backup.Status.LastBackupTime = &metav1.Time{Time: r.clock.Now()}
+			backup.Status.LastBackups = append(backup.Status.LastBackups, fileName)
 		}))
 }
 
-func (r *Reconciler) cleanupBackup(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
-	if !kuberneteshelper.HasFinalizer(backup, BackupDeletionFinalizer) {
+func (r *Reconciler) deleteBackupsUpToRemaining(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, remaining int) error {
+	for len(backup.Status.LastBackups) > remaining {
+		toDelete := backup.Status.LastBackups[0]
+		if err := r.deleteUploadedSnapshot(ctx, log, toDelete); err != nil {
+			// TODO ignore not-found errors
+			return fmt.Errorf("error deleting uploaded snapshot: %v", err)
+		}
+		err := r.updateBackup(ctx, backup, func(backup *kubermaticv1.EtcdBackup) {
+			backup.Status.LastBackups = backup.Status.LastBackups[1:]
+		})
+		if err != nil {
+			return fmt.Errorf("failed to update EtcdBackup after deleting backup %v: %v", toDelete, err)
+		}
+	}
+	return nil
+}
+
+func (r *Reconciler) deleteAllBackups(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup) error {
+	if !kuberneteshelper.HasFinalizer(backup, DeleteAllBackupsFinalizer) {
 		return nil
 	}
 
-	if err := r.deleteUploadedSnapshots(ctx, log, backupFileNamePrefix(backup.Name, cluster.Name)); err != nil {
-		return fmt.Errorf("Error deleting uploaded snapshot: %v", err)
+	err := r.deleteBackupsUpToRemaining(ctx, log, backup, 0)
+	if err != nil {
+		return err
 	}
 
-	return wrapErrorMessage("Error removing finalizer: %v", r.updateBackup(ctx, backup, func(backup *kubermaticv1.EtcdBackup) {
-		kuberneteshelper.RemoveFinalizer(backup, BackupDeletionFinalizer)
+	return wrapErrorMessage("error removing finalizer: %v", r.updateBackup(ctx, backup, func(backup *kubermaticv1.EtcdBackup) {
+		kuberneteshelper.RemoveFinalizer(backup, DeleteAllBackupsFinalizer)
 	}))
 }
 
@@ -319,34 +322,6 @@ func (r *Reconciler) updateBackup(ctx context.Context, backup *kubermaticv1.Etcd
 		return nil
 	}
 	return r.Client.Patch(ctx, backup, ctrlruntimeclient.MergeFrom(oldBackup))
-}
-
-func setBackupCondition(backup *kubermaticv1.EtcdBackup, condType kubermaticv1.EtcdBackupConditionType, status corev1.ConditionStatus) {
-	idx, cond := getBackupCondition(backup, condType)
-	if cond == nil {
-		cond = &kubermaticv1.EtcdBackupCondition{}
-		cond.Type = condType
-		cond.Status = status
-		cond.LastHeartbeatTime = metav1.Now()
-		cond.LastTransitionTime = metav1.Now()
-		backup.Status.Conditions = append(backup.Status.Conditions, *cond)
-		return
-	}
-	if cond.Status != status {
-		cond.LastTransitionTime = metav1.Now()
-		cond.Status = status
-	}
-	cond.LastHeartbeatTime = metav1.Now()
-	backup.Status.Conditions[idx] = *cond
-}
-
-func getBackupCondition(backup *kubermaticv1.EtcdBackup, condType kubermaticv1.EtcdBackupConditionType) (int, *kubermaticv1.EtcdBackupCondition) {
-	for i, c := range backup.Status.Conditions {
-		if c.Type == condType {
-			return i, &c
-		}
-	}
-	return -1, nil
 }
 
 func backupFileNamePrefix(backupName, clusterName string) string {
@@ -475,14 +450,13 @@ func (s3ops *s3BackendOperations) cleanupSnapshot(ctx context.Context, log *zap.
 	return os.RemoveAll(snapshotFileName)
 }
 
-func (s3ops *s3BackendOperations) deleteUploadedSnapshots(ctx context.Context, log *zap.SugaredLogger, fileNamePrefix string) error {
+func (s3ops *s3BackendOperations) deleteUploadedSnapshot(ctx context.Context, log *zap.SugaredLogger, fileName string) error {
 	client, err := s3ops.getS3Client()
 	if err != nil {
 		return err
 	}
 
-	// TODO impl
-	return client.RemoveObject(s3ops.s3BucketName, fileNamePrefix)
+	return client.RemoveObject(s3ops.s3BucketName, fileName)
 }
 
 func parseCronSchedule(scheduleString string) (cron.Schedule, error) {

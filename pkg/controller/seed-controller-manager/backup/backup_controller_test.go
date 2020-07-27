@@ -158,8 +158,8 @@ func TestController_SimpleBackup(t *testing.T) {
 		t.Fatalf("backup not marked as completed")
 	}
 
-	if !kuberneteshelper.HasFinalizer(readbackBackup, BackupDeletionFinalizer) {
-		t.Fatalf("backup does not have finalizer %s", BackupDeletionFinalizer)
+	if !kuberneteshelper.HasFinalizer(readbackBackup, DeleteAllBackupsFinalizer) {
+		t.Fatalf("backup does not have finalizer %s", DeleteAllBackupsFinalizer)
 	}
 }
 
@@ -198,7 +198,7 @@ func TestController_cleanupBackup(t *testing.T) {
 	const backupName = "testbackup"
 	backup := genBackup(cluster, backupName)
 	setBackupCondition(backup, kubermaticv1.EtcdBackupCreated, corev1.ConditionTrue)
-	kuberneteshelper.AddFinalizer(backup, BackupDeletionFinalizer)
+	kuberneteshelper.AddFinalizer(backup, DeleteAllBackupsFinalizer)
 
 	mockBackOps := newMockBackendOperations()
 	reconciler := &Reconciler{
@@ -211,8 +211,8 @@ func TestController_cleanupBackup(t *testing.T) {
 
 	mockBackOps.uploadedSnapshots.Add(backup.Name)
 
-	if err := reconciler.cleanupBackup(context.Background(), reconciler.log, backup, cluster); err != nil {
-		t.Fatalf("Error during cleanupBackup call: %v", err)
+	if err := reconciler.deleteAllBackups(context.Background(), reconciler.log, backup, cluster); err != nil {
+		t.Fatalf("Error during deleteAllBackups call: %v", err)
 	}
 
 	if !mockBackOps.uploadedSnapshots.IsEmpty() {
@@ -284,7 +284,7 @@ func TestController_expireBackup(t *testing.T) {
 	const backupName = "testbackup"
 	backup := genBackup(cluster, backupName)
 	setBackupCondition(backup, kubermaticv1.EtcdBackupCreated, corev1.ConditionTrue)
-	kuberneteshelper.AddFinalizer(backup, BackupDeletionFinalizer)
+	kuberneteshelper.AddFinalizer(backup, DeleteAllBackupsFinalizer)
 	backup.Spec.TTL = &metav1.Duration{Duration: 10 * time.Minute}
 
 	clock := clock.NewFakeClock(time.Unix(100, 0))
