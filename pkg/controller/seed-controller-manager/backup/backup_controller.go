@@ -175,16 +175,16 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, back
 	}
 
 	if backup.DeletionTimestamp != nil {
-		log.Debug("Cleaning up backup")
-		return nil, wrapErrorMessage("error cleaning up backup: %v", r.cleanupBackup(ctx, log, backup, cluster))
+		log.Debug("Cleaning up all backups")
+		return nil, wrapErrorMessage("error cleaning up all backups: %v", r.cleanupBackup(ctx, log, backup, cluster))
 	}
 
-	backupNow, err := r.shouldBackupNow(backup)
+	backupName, err := r.currentlyPendingBackupName(backup, cluster)
 	if err != nil {
 		return nil, fmt.Errorf("can't determine backup schedule: %v", err)
 	}
 
-	if backupNow {
+	if backupName != "" {
 		err := r.createBackup(ctx, log, backup, cluster)
 		if err != nil {
 			return nil, fmt.Errorf("error creating backup: %v", err)
@@ -204,15 +204,22 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, back
 	return reconcile, nil
 }
 
-func (r *Reconciler) shouldBackupNow(backup *kubermaticv1.EtcdBackup) (bool, error) {
+// return name of backup to be done right now, or "" if no backup needs to be done right now
+func (r *Reconciler) currentlyPendingBackupName(backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) (string, error) {
+	prefix := fmt.Sprintf("%s-%s", cluster.Name, backup.Name)
+
 	if backup.Spec.Schedule == "" {
-		// no schedule set => we need exactly one backup
-		return backup.Status.LastBackupTime == nil, nil
+		// no schedule set => we need exactly one backup (if none was created yet)
+		if backup.Status.LastBackupTime == nil {
+			return prefix, nil
+		} else {
+			return "", nil
+		}
 	}
 
 	schedule, err := parseCronSchedule(backup.Spec.Schedule)
 	if err != nil {
-		return false, err
+		return "", err
 	}
 
 	lastBackupTime := backup.Status.LastBackupTime
@@ -220,7 +227,11 @@ func (r *Reconciler) shouldBackupNow(backup *kubermaticv1.EtcdBackup) (bool, err
 		lastBackupTime = &metav1.Time{Time: r.clock.Now()}
 	}
 
-	return r.clock.Now().After(schedule.Next(lastBackupTime.Time)), nil
+	if r.clock.Now().After(schedule.Next(lastBackupTime.Time)) {
+		return fmt.Sprintf("%s-%s", prefix, r.clock.Now().Format("2006-01-02T15:04:05")), nil
+	}
+
+	return "", nil
 }
 
 func (r *Reconciler) computeReconcileAfter(backup *kubermaticv1.EtcdBackup) (*reconcile.Result, error) {
@@ -261,6 +272,8 @@ func (r *Reconciler) deleteExpiredBackups(ctx context.Context, log *zap.SugaredL
 }
 
 func (r *Reconciler) createBackup(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
+	// TODO
+
 	err := r.takeSnapshot(ctx, log, backup, cluster)
 	if err != nil {
 		return fmt.Errorf("error taking snapshot: %v", err)
