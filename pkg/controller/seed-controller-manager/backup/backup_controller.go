@@ -57,10 +57,10 @@ const (
 )
 
 type BackendOperations interface {
-	takeSnapshot(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error
-	uploadSnapshot(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error
-	cleanupSnapshot(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error
-	deleteUploadedSnapshot(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error
+	takeSnapshot(ctx context.Context, log *zap.SugaredLogger, fileName string, cluster *kubermaticv1.Cluster) error
+	uploadSnapshot(ctx context.Context, log *zap.SugaredLogger, fileName string) error
+	cleanupSnapshot(ctx context.Context, log *zap.SugaredLogger, fileName string) error
+	deleteUploadedSnapshots(ctx context.Context, log *zap.SugaredLogger, fileNamePrefix string) error
 }
 
 // Reconciler stores necessary components that are required to create etcd backups
@@ -185,7 +185,7 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, back
 	}
 
 	if backupName != "" {
-		err := r.createBackup(ctx, log, backup, cluster)
+		err := r.createBackup(ctx, log, backupName, backup, cluster)
 		if err != nil {
 			return nil, fmt.Errorf("error creating backup: %v", err)
 		}
@@ -206,7 +206,7 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, back
 
 // return name of backup to be done right now, or "" if no backup needs to be done right now
 func (r *Reconciler) currentlyPendingBackupName(backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) (string, error) {
-	prefix := fmt.Sprintf("%s-%s", cluster.Name, backup.Name)
+	prefix := backupFileNamePrefix(backup.Name, cluster.Name)
 
 	if backup.Spec.Schedule == "" {
 		// no schedule set => we need exactly one backup (if none was created yet)
@@ -271,21 +271,21 @@ func (r *Reconciler) deleteExpiredBackups(ctx context.Context, log *zap.SugaredL
 	return nil
 }
 
-func (r *Reconciler) createBackup(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
+func (r *Reconciler) createBackup(ctx context.Context, log *zap.SugaredLogger, fileName string, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
 	// TODO
 
-	err := r.takeSnapshot(ctx, log, backup, cluster)
+	err := r.takeSnapshot(ctx, log, fileName, cluster)
 	if err != nil {
 		return fmt.Errorf("error taking snapshot: %v", err)
 	}
 
 	defer func() {
-		if err := r.cleanupSnapshot(ctx, log, backup, cluster); err != nil {
+		if err := r.cleanupSnapshot(ctx, log, fileName); err != nil {
 			log.Errorf("Failed to delete snapshot: %v", err)
 		}
 	}()
 
-	err = r.uploadSnapshot(ctx, log, backup, cluster)
+	err = r.uploadSnapshot(ctx, log, fileName)
 	if err != nil {
 		return fmt.Errorf("error uploading snapshot: %v", err)
 	}
@@ -299,13 +299,11 @@ func (r *Reconciler) createBackup(ctx context.Context, log *zap.SugaredLogger, b
 }
 
 func (r *Reconciler) cleanupBackup(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
-	// TODO delete all s3 files with prefix <cluster.Name>-<backup.Name>
-
 	if !kuberneteshelper.HasFinalizer(backup, BackupDeletionFinalizer) {
 		return nil
 	}
 
-	if err := r.deleteUploadedSnapshot(ctx, log, backup, cluster); err != nil {
+	if err := r.deleteUploadedSnapshots(ctx, log, backupFileNamePrefix(backup.Name, cluster.Name)); err != nil {
 		return fmt.Errorf("Error deleting uploaded snapshot: %v", err)
 	}
 
@@ -351,17 +349,17 @@ func getBackupCondition(backup *kubermaticv1.EtcdBackup, condType kubermaticv1.E
 	return -1, nil
 }
 
-func backupFileName(backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) string {
-	return fmt.Sprintf("%s-%s", cluster.Name, backup.Name)
+func backupFileNamePrefix(backupName, clusterName string) string {
+	return fmt.Sprintf("%s-%s", clusterName, backupName)
 }
 
-func (s3ops *s3BackendOperations) takeSnapshot(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
+func (s3ops *s3BackendOperations) takeSnapshot(ctx context.Context, log *zap.SugaredLogger, fileName string, cluster *kubermaticv1.Cluster) error {
 	client, err := getEtcdClient(cluster)
 	if err != nil {
 		return err
 	}
 
-	snapshotFileName := fmt.Sprintf("/%s/%s", s3ops.snapshotDir, backupFileName(backup, cluster))
+	snapshotFileName := fmt.Sprintf("/%s/%s", s3ops.snapshotDir, fileName)
 	partFile := snapshotFileName + ".part"
 	defer func() {
 		if err := os.RemoveAll(partFile); err != nil {
@@ -448,7 +446,7 @@ func (s3ops *s3BackendOperations) getS3Client() (*minio.Client, error) {
 	return client, nil
 }
 
-func (s3ops *s3BackendOperations) uploadSnapshot(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
+func (s3ops *s3BackendOperations) uploadSnapshot(ctx context.Context, log *zap.SugaredLogger, fileName string) error {
 	client, err := s3ops.getS3Client()
 	if err != nil {
 		return err
@@ -465,28 +463,26 @@ func (s3ops *s3BackendOperations) uploadSnapshot(ctx context.Context, log *zap.S
 		}
 	}
 
-	objectName := backupFileName(backup, cluster)
-	snapshotFileName := fmt.Sprintf("/%s/%s", s3ops.snapshotDir, objectName)
+	snapshotFileName := fmt.Sprintf("/%s/%s", s3ops.snapshotDir, fileName)
 
-	_, err = client.FPutObject(s3ops.s3BucketName, objectName, snapshotFileName, minio.PutObjectOptions{})
+	_, err = client.FPutObject(s3ops.s3BucketName, fileName, snapshotFileName, minio.PutObjectOptions{})
 
 	return err
 }
 
-func (s3ops *s3BackendOperations) cleanupSnapshot(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
-	snapshotFileName := fmt.Sprintf("/%s/%s", s3ops.snapshotDir, backupFileName(backup, cluster))
+func (s3ops *s3BackendOperations) cleanupSnapshot(ctx context.Context, log *zap.SugaredLogger, fileName string) error {
+	snapshotFileName := fmt.Sprintf("/%s/%s", s3ops.snapshotDir, fileName)
 	return os.RemoveAll(snapshotFileName)
 }
 
-func (s3ops *s3BackendOperations) deleteUploadedSnapshot(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
+func (s3ops *s3BackendOperations) deleteUploadedSnapshots(ctx context.Context, log *zap.SugaredLogger, fileNamePrefix string) error {
 	client, err := s3ops.getS3Client()
 	if err != nil {
 		return err
 	}
 
-	objectName := backupFileName(backup, cluster)
-
-	return client.RemoveObject(s3ops.s3BucketName, objectName)
+	// TODO impl
+	return client.RemoveObject(s3ops.s3BucketName, fileNamePrefix)
 }
 
 func parseCronSchedule(scheduleString string) (cron.Schedule, error) {
