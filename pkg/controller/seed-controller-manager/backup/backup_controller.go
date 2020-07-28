@@ -274,7 +274,7 @@ func (r *Reconciler) deleteBackupsUpToRemaining(ctx context.Context, log *zap.Su
 		toDelete := backup.Status.CurrentBackups[0]
 		if err := r.deleteUploadedSnapshot(ctx, log, toDelete); err != nil {
 			// TODO ignore not-found errors
-			return fmt.Errorf("error deleting uploaded snapshot: %v", err)
+			return fmt.Errorf("error deleting uploaded snapshot %v: %v", toDelete, err)
 		}
 		err := r.updateBackup(ctx, backup, func(backup *kubermaticv1.EtcdBackup) {
 			backup.Status.CurrentBackups = backup.Status.CurrentBackups[1:]
