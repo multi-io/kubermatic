@@ -23,9 +23,9 @@ import (
 	kuberneteshelper "github.com/kubermatic/kubermatic/pkg/kubernetes"
 	kubermaticlog "github.com/kubermatic/kubermatic/pkg/log"
 	"github.com/kubermatic/kubermatic/pkg/semver"
-	"github.com/minio/minio-go/pkg/set"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
 	"reflect"
@@ -41,15 +41,15 @@ import (
 )
 
 type mockBackendOperations struct {
-	localSnapshots    set.StringSet
-	uploadedSnapshots set.StringSet
+	localSnapshots    sets.String
+	uploadedSnapshots sets.String
 	returnError       error
 }
 
 func newMockBackendOperations() *mockBackendOperations {
 	return &mockBackendOperations{
-		localSnapshots:    set.NewStringSet(),
-		uploadedSnapshots: set.NewStringSet(),
+		localSnapshots:    sets.NewString(),
+		uploadedSnapshots: sets.NewString(),
 	}
 }
 
@@ -57,7 +57,7 @@ func (ops *mockBackendOperations) takeSnapshot(ctx context.Context, log *zap.Sug
 	if ops.returnError != nil {
 		return ops.returnError
 	}
-	ops.localSnapshots.Add(fileName)
+	ops.localSnapshots.Insert(fileName)
 	return nil
 }
 
@@ -65,10 +65,10 @@ func (ops *mockBackendOperations) uploadSnapshot(ctx context.Context, log *zap.S
 	if ops.returnError != nil {
 		return ops.returnError
 	}
-	if !ops.localSnapshots.Contains(fileName) {
+	if !ops.localSnapshots.Has(fileName) {
 		return fmt.Errorf("cannot upload non-existing local backup: %v", fileName)
 	}
-	ops.uploadedSnapshots.Add(fileName)
+	ops.uploadedSnapshots.Insert(fileName)
 	return nil
 }
 
@@ -76,10 +76,10 @@ func (ops *mockBackendOperations) cleanupSnapshot(ctx context.Context, log *zap.
 	if ops.returnError != nil {
 		return ops.returnError
 	}
-	if !ops.localSnapshots.Contains(fileName) {
+	if !ops.localSnapshots.Has(fileName) {
 		return fmt.Errorf("cannot clean up non-existing local backup: %v", fileName)
 	}
-	ops.localSnapshots.Remove(fileName)
+	ops.localSnapshots.Delete(fileName)
 	return nil
 }
 
@@ -87,7 +87,7 @@ func (ops *mockBackendOperations) deleteUploadedSnapshot(ctx context.Context, lo
 	if ops.returnError != nil {
 		return ops.returnError
 	}
-	ops.uploadedSnapshots.Remove(fileName)
+	ops.uploadedSnapshots.Delete(fileName)
 	return nil
 }
 
@@ -138,11 +138,11 @@ func TestController_NonScheduled_SimpleBackup(t *testing.T) {
 		t.Fatalf("Error syncing cluster: %v", err)
 	}
 
-	if !mockBackOps.uploadedSnapshots.Contains(backupName) {
+	if !mockBackOps.uploadedSnapshots.Has(backupName) {
 		t.Fatalf("backup %v wasn't uploaded", backupName)
 	}
 
-	if !mockBackOps.localSnapshots.IsEmpty() {
+	if mockBackOps.localSnapshots.Len() != 0 {
 		t.Fatalf("local snapshots weren't cleaned up, remaining: %v", mockBackOps.localSnapshots)
 	}
 
@@ -152,7 +152,11 @@ func TestController_NonScheduled_SimpleBackup(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(readbackBackup.Status.CurrentBackups, []string{backupName}) {
-		t.Fatalf("backup not marked as completed")
+		t.Fatalf("backup created backup not added to .Status.CurrentBackups")
+	}
+
+	if readbackBackup.Status.LastBackupTime == nil {
+		t.Fatalf("no .Status.LastBackupTime recorded")
 	}
 
 	if !kuberneteshelper.HasFinalizer(readbackBackup, DeleteAllBackupsFinalizer) {
@@ -180,11 +184,11 @@ func TestController_NonScheduled_CompletedBackupIsNotProcessed(t *testing.T) {
 		t.Fatalf("Error syncing cluster: %v", err)
 	}
 
-	if !mockBackOps.uploadedSnapshots.IsEmpty() {
+	if mockBackOps.uploadedSnapshots.Len() != 0 {
 		t.Fatalf("Expected no uploaded snapshots, got %v", mockBackOps.uploadedSnapshots)
 	}
 
-	if !mockBackOps.localSnapshots.IsEmpty() {
+	if mockBackOps.localSnapshots.Len() != 0 {
 		t.Fatalf("Expected no local snapshots, got %v", mockBackOps.uploadedSnapshots)
 	}
 }
@@ -207,14 +211,14 @@ func TestController_NonScheduled_cleanupBackup(t *testing.T) {
 	}
 
 	for _, backupFileName := range existingBackups {
-		mockBackOps.uploadedSnapshots.Add(backupFileName)
+		mockBackOps.uploadedSnapshots.Insert(backupFileName)
 	}
 
 	if err := reconciler.deleteAllBackups(context.Background(), reconciler.log, backup); err != nil {
 		t.Fatalf("Error during deleteAllBackups call: %v", err)
 	}
 
-	if !mockBackOps.uploadedSnapshots.IsEmpty() {
+	if mockBackOps.uploadedSnapshots.Len() != 0 {
 		t.Fatalf("Expected no uploaded snapshots, got %v", mockBackOps.uploadedSnapshots)
 	}
 
@@ -253,11 +257,11 @@ func TestController_BackupError(t *testing.T) {
 
 	_, err := reconciler.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{Namespace: backup.Namespace, Name: backup.Name}})
 
-	if !mockBackOps.localSnapshots.IsEmpty() {
+	if mockBackOps.localSnapshots.Len() != 0 {
 		t.Fatalf("expected no local snapshots, got: %v", mockBackOps.localSnapshots)
 	}
 
-	if !mockBackOps.uploadedSnapshots.IsEmpty() {
+	if mockBackOps.uploadedSnapshots.Len() != 0 {
 		t.Fatalf("expected no uploaded snapshots, got: %v", mockBackOps.uploadedSnapshots)
 	}
 
@@ -278,6 +282,102 @@ func TestController_BackupError(t *testing.T) {
 			t.Fatalf("Expected only events containing '%s' to be generated, got instead: %v", errorMessage, events)
 		}
 	}
+}
+
+func TestController_Scheduled(t *testing.T) {
+	cluster := genTestCluster()
+
+	backup := genBackup(cluster, "testbackup")
+
+	clock := clock.NewFakeClock(time.Unix(0, 0))
+	backup.SetCreationTimestamp(metav1.Time{Time: clock.Now()})
+	// back up every 10 minutes
+	backup.Spec.Schedule = "*/10 * * * *"
+	backup.Spec.Keep = intPtr(2)
+
+	mockBackOps := newMockBackendOperations()
+	reconciler := &Reconciler{
+		log:               kubermaticlog.New(true, kubermaticlog.FormatConsole).Sugar(),
+		Client:            ctrlruntimefakeclient.NewFakeClientWithScheme(scheme.Scheme, cluster, backup),
+		BackendOperations: mockBackOps,
+		recorder:          record.NewFakeRecorder(10),
+		clock:             clock,
+	}
+
+	// sleep to before the first 10 minute backup, check that no backup is created
+
+	preSleep := 1 * time.Minute
+	clock.Sleep(preSleep)
+
+	result, err := reconciler.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{Namespace: backup.Namespace, Name: backup.Name}})
+	if err != nil {
+		t.Fatalf("Error syncing cluster: %v", err)
+	}
+
+	if result.RequeueAfter != 10*time.Minute-preSleep {
+		t.Fatalf("Expected request to requeue after %v, but got %v", 10*time.Minute-preSleep, result.RequeueAfter)
+	}
+
+	if mockBackOps.uploadedSnapshots.Len() != 0 {
+		t.Fatalf("no uploaded snapshots expected, got: %v", mockBackOps.uploadedSnapshots)
+	}
+
+	// sleep beyond the first backup time, check that a backup is created
+
+	clock.Sleep(10 * time.Minute)
+
+	result, err = reconciler.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{Namespace: backup.Namespace, Name: backup.Name}})
+	if err != nil {
+		t.Fatalf("Error syncing cluster: %v", err)
+	}
+
+	firstBackupName := backupName(backup, cluster, clock.Now())
+
+	expectedBackups := sets.NewString()
+	expectedBackups.Insert(firstBackupName)
+
+	if !(mockBackOps.uploadedSnapshots.Len() == expectedBackups.Len() && mockBackOps.uploadedSnapshots.HasAll(expectedBackups.List()...)) {
+		t.Fatalf("uploaded snapshots expected: %v, got: %v", expectedBackups, mockBackOps.uploadedSnapshots)
+	}
+
+	// sleep beyond the second backup time, check that a backup is created
+
+	clock.Sleep(10 * time.Minute)
+
+	result, err = reconciler.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{Namespace: backup.Namespace, Name: backup.Name}})
+	if err != nil {
+		t.Fatalf("Error syncing cluster: %v", err)
+	}
+
+	expectedBackups.Insert(backupName(backup, cluster, clock.Now()))
+
+	if !(mockBackOps.uploadedSnapshots.Len() == expectedBackups.Len() && mockBackOps.uploadedSnapshots.HasAll(expectedBackups.List()...)) {
+		t.Fatalf("uploaded snapshots expected: %v, got: %v", expectedBackups, mockBackOps.uploadedSnapshots)
+	}
+
+	// sleep beyond the third backup time, check that a backup is created and the first one is deleted
+
+	clock.Sleep(10 * time.Minute)
+
+	result, err = reconciler.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{Namespace: backup.Namespace, Name: backup.Name}})
+	if err != nil {
+		t.Fatalf("Error syncing cluster: %v", err)
+	}
+
+	expectedBackups.Insert(backupName(backup, cluster, clock.Now()))
+	expectedBackups.Delete(firstBackupName)
+
+	if !(mockBackOps.uploadedSnapshots.Len() == expectedBackups.Len() && mockBackOps.uploadedSnapshots.HasAll(expectedBackups.List()...)) {
+		t.Fatalf("uploaded snapshots expected: %v, got: %v", expectedBackups, mockBackOps.uploadedSnapshots)
+	}
+}
+
+func backupName(backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster, time time.Time) string {
+	return fmt.Sprintf("%s-%s-%s", cluster.GetName(), backup.GetName(), time.Format("2006-01-02T15:04:05"))
+}
+
+func intPtr(i int) *int {
+	return &i
 }
 
 func collectEvents(source <-chan string) []string {

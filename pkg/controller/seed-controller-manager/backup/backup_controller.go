@@ -224,7 +224,7 @@ func (r *Reconciler) currentlyPendingBackupName(backup *kubermaticv1.EtcdBackup,
 
 	lastBackupTime := backup.Status.LastBackupTime
 	if lastBackupTime == nil {
-		lastBackupTime = &metav1.Time{Time: r.clock.Now()}
+		lastBackupTime = &metav1.Time{Time: backup.CreationTimestamp.Time}
 	}
 
 	if r.clock.Now().After(schedule.Next(lastBackupTime.Time)) {
@@ -250,7 +250,7 @@ func (r *Reconciler) computeReconcileAfter(backup *kubermaticv1.EtcdBackup) (*re
 		lastBackupTime = &metav1.Time{Time: r.clock.Now()}
 	}
 
-	durationToNextBackup := r.clock.Now().Sub(schedule.Next(lastBackupTime.Time))
+	durationToNextBackup := schedule.Next(lastBackupTime.Time).Sub(r.clock.Now())
 	if durationToNextBackup < 0 {
 		durationToNextBackup = 0
 	}
