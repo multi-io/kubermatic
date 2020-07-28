@@ -20,13 +20,12 @@ package backup
 
 import (
 	"context"
-	"crypto/sha256"
 	"fmt"
 	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
 	"github.com/minio/minio-go"
 	"go.etcd.io/etcd/clientv3"
+	"go.etcd.io/etcd/clientv3/snapshot"
 	"go.uber.org/zap"
-	"io"
 	"os"
 	"time"
 )
@@ -40,58 +39,20 @@ type s3BackendOperations struct {
 }
 
 func (s3ops *s3BackendOperations) takeSnapshot(ctx context.Context, log *zap.SugaredLogger, fileName string, cluster *kubermaticv1.Cluster) error {
-	client, err := getEtcdClient(cluster)
-	if err != nil {
-		return err
-	}
+	sp := snapshot.NewV3(log.Desugar())
 
 	snapshotFileName := fmt.Sprintf("/%s/%s", s3ops.snapshotDir, fileName)
-	partFile := snapshotFileName + ".part"
-	defer func() {
-		if err := os.RemoveAll(partFile); err != nil {
-			log.Errorf("Failed to delete snapshot part file: %v", err)
-		}
-	}()
 
-	var f *os.File
-	f, err = os.OpenFile(partFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
-	if err != nil {
-		return fmt.Errorf("could not open %s (%v)", partFile, err)
-	}
-	log.Info("created temporary db file", zap.String("path", partFile))
-
-	var rd io.ReadCloser
 	deadlinedCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	rd, err = client.Snapshot(deadlinedCtx)
-	if err != nil {
+	if err := sp.Save(deadlinedCtx, *getEtcdConfig(cluster), snapshotFileName); err != nil {
 		return err
 	}
-	log.Info("fetching snapshot")
-	var size int64
-	size, err = io.Copy(f, rd)
-	if err != nil {
-		return err
-	}
-	if !hasChecksum(size) {
-		return fmt.Errorf("sha256 checksum not found [bytes: %d]", size)
-	}
-	if err = f.Sync(); err != nil {
-		return err
-	}
-	if err = f.Close(); err != nil {
-		return err
-	}
-	log.Info("fetched snapshot")
 
-	if err = os.Rename(partFile, snapshotFileName); err != nil {
-		return fmt.Errorf("could not rename %s to %s (%v)", partFile, snapshotFileName, err)
-	}
-	log.Info("saved", zap.String("path", snapshotFileName))
 	return nil
 }
 
-func getEtcdClient(cluster *kubermaticv1.Cluster) (*clientv3.Client, error) {
+func getEtcdConfig(cluster *kubermaticv1.Cluster) *clientv3.Config {
 	clusterSize := cluster.Spec.ComponentsOverride.Etcd.ClusterSize
 	if clusterSize == 0 {
 		clusterSize = defaultClusterSize
@@ -100,30 +61,13 @@ func getEtcdClient(cluster *kubermaticv1.Cluster) (*clientv3.Client, error) {
 	for i := 0; i < clusterSize; i++ {
 		endpoints = append(endpoints, fmt.Sprintf("etcd-%d.etcd.%s.svc.cluster.local:2380", i, cluster.Status.NamespaceName))
 	}
-	var err error
-	for i := 0; i < 5; i++ {
-		cli, err := clientv3.New(clientv3.Config{
-			Endpoints:   endpoints,
-			DialTimeout: 2 * time.Second,
-		})
-		if err == nil && cli != nil {
-			return cli, nil
-		}
-		time.Sleep(5 * time.Second)
+	return &clientv3.Config{
+		Endpoints:   endpoints,
+		DialTimeout: 2 * time.Second,
 	}
-	return nil, fmt.Errorf("failed to establish client connection: %v", err)
-}
-
-// hasChecksum returns "true" if the file size "n"
-// has appended sha256 hash digest.
-func hasChecksum(n int64) bool {
-	// 512 is chosen because it's a minimum disk sector size
-	// smaller than (and multiplies to) OS page size in most systems
-	return (n % 512) == sha256.Size
 }
 
 func (s3ops *s3BackendOperations) getS3Client() (*minio.Client, error) {
-	// TODO long-lived client, possibly one per worker (since I think it's not thread-safe)
 	client, err := minio.New(s3ops.s3Endpoint, s3ops.s3AccessKeyID, s3ops.s3SecretAccessKey, true)
 	if err != nil {
 		return nil, err
