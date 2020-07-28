@@ -134,9 +134,7 @@ func TestController_NonScheduled_SimpleBackup(t *testing.T) {
 		clock:             &clock.RealClock{},
 	}
 
-	if _, err := reconciler.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{Namespace: backup.Namespace, Name: backup.Name}}); err != nil {
-		t.Fatalf("Error syncing cluster: %v", err)
-	}
+	backup, _ = mustReconcile(t, reconciler, backup)
 
 	if !mockBackOps.uploadedSnapshots.Has(backupName) {
 		t.Fatalf("backup %v wasn't uploaded", backupName)
@@ -146,20 +144,15 @@ func TestController_NonScheduled_SimpleBackup(t *testing.T) {
 		t.Fatalf("local snapshots weren't cleaned up, remaining: %v", mockBackOps.localSnapshots)
 	}
 
-	readbackBackup := &kubermaticv1.EtcdBackup{}
-	if err := reconciler.Get(context.Background(), client.ObjectKey{Namespace: backup.GetNamespace(), Name: backup.GetName()}, readbackBackup); err != nil {
-		t.Fatalf("Error reading back completed backup: %v", err)
-	}
-
-	if !reflect.DeepEqual(readbackBackup.Status.CurrentBackups, []string{backupName}) {
+	if !reflect.DeepEqual(backup.Status.CurrentBackups, []string{backupName}) {
 		t.Fatalf("backup created backup not added to .Status.CurrentBackups")
 	}
 
-	if readbackBackup.Status.LastBackupTime == nil {
+	if backup.Status.LastBackupTime == nil {
 		t.Fatalf("no .Status.LastBackupTime recorded")
 	}
 
-	if !kuberneteshelper.HasFinalizer(readbackBackup, DeleteAllBackupsFinalizer) {
+	if !kuberneteshelper.HasFinalizer(backup, DeleteAllBackupsFinalizer) {
 		t.Fatalf("backup does not have finalizer %s", DeleteAllBackupsFinalizer)
 	}
 }
@@ -180,9 +173,7 @@ func TestController_NonScheduled_CompletedBackupIsNotProcessed(t *testing.T) {
 		clock:             &clock.RealClock{},
 	}
 
-	if _, err := reconciler.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{Namespace: backup.Namespace, Name: backup.Name}}); err != nil {
-		t.Fatalf("Error syncing cluster: %v", err)
-	}
+	_, _ = mustReconcile(t, reconciler, backup)
 
 	if mockBackOps.uploadedSnapshots.Len() != 0 {
 		t.Fatalf("Expected no uploaded snapshots, got %v", mockBackOps.uploadedSnapshots)
@@ -291,7 +282,7 @@ func TestController_Scheduled(t *testing.T) {
 
 	clock := clock.NewFakeClock(time.Unix(0, 0))
 	backup.SetCreationTimestamp(metav1.Time{Time: clock.Now()})
-	// back up every 10 minutes
+	// back up every 10 minutes, keep 2 backups
 	backup.Spec.Schedule = "*/10 * * * *"
 	backup.Spec.Keep = intPtr(2)
 
@@ -309,10 +300,7 @@ func TestController_Scheduled(t *testing.T) {
 	preSleep := 1 * time.Minute
 	clock.Sleep(preSleep)
 
-	result, err := reconciler.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{Namespace: backup.Namespace, Name: backup.Name}})
-	if err != nil {
-		t.Fatalf("Error syncing cluster: %v", err)
-	}
+	backup, result := mustReconcile(t, reconciler, backup)
 
 	if result.RequeueAfter != 10*time.Minute-preSleep {
 		t.Fatalf("Expected request to requeue after %v, but got %v", 10*time.Minute-preSleep, result.RequeueAfter)
@@ -326,17 +314,16 @@ func TestController_Scheduled(t *testing.T) {
 
 	clock.Sleep(10 * time.Minute)
 
-	result, err = reconciler.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{Namespace: backup.Namespace, Name: backup.Name}})
-	if err != nil {
-		t.Fatalf("Error syncing cluster: %v", err)
+	backup, _ = mustReconcile(t, reconciler, backup)
+
+	expectedBackups := []string{}
+
+	expectedBackups = append(expectedBackups, backupName(backup, cluster, clock.Now()))
+
+	if !reflect.DeepEqual(backup.Status.CurrentBackups, expectedBackups) {
+		t.Fatalf(".status.currentBackups expected: %v, got: %v", expectedBackups, backup.Status.CurrentBackups)
 	}
-
-	firstBackupName := backupName(backup, cluster, clock.Now())
-
-	expectedBackups := sets.NewString()
-	expectedBackups.Insert(firstBackupName)
-
-	if !(mockBackOps.uploadedSnapshots.Len() == expectedBackups.Len() && mockBackOps.uploadedSnapshots.HasAll(expectedBackups.List()...)) {
+	if !stringSetContainsExactly(mockBackOps.uploadedSnapshots, expectedBackups...) {
 		t.Fatalf("uploaded snapshots expected: %v, got: %v", expectedBackups, mockBackOps.uploadedSnapshots)
 	}
 
@@ -344,14 +331,14 @@ func TestController_Scheduled(t *testing.T) {
 
 	clock.Sleep(10 * time.Minute)
 
-	result, err = reconciler.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{Namespace: backup.Namespace, Name: backup.Name}})
-	if err != nil {
-		t.Fatalf("Error syncing cluster: %v", err)
+	backup, _ = mustReconcile(t, reconciler, backup)
+
+	expectedBackups = append(expectedBackups, backupName(backup, cluster, clock.Now()))
+
+	if !reflect.DeepEqual(backup.Status.CurrentBackups, expectedBackups) {
+		t.Fatalf(".status.currentBackups expected: %v, got: %v", expectedBackups, backup.Status.CurrentBackups)
 	}
-
-	expectedBackups.Insert(backupName(backup, cluster, clock.Now()))
-
-	if !(mockBackOps.uploadedSnapshots.Len() == expectedBackups.Len() && mockBackOps.uploadedSnapshots.HasAll(expectedBackups.List()...)) {
+	if !stringSetContainsExactly(mockBackOps.uploadedSnapshots, expectedBackups...) {
 		t.Fatalf("uploaded snapshots expected: %v, got: %v", expectedBackups, mockBackOps.uploadedSnapshots)
 	}
 
@@ -359,17 +346,32 @@ func TestController_Scheduled(t *testing.T) {
 
 	clock.Sleep(10 * time.Minute)
 
-	result, err = reconciler.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{Namespace: backup.Namespace, Name: backup.Name}})
-	if err != nil {
+	backup, _ = mustReconcile(t, reconciler, backup)
+
+	expectedBackups = append(expectedBackups, backupName(backup, cluster, clock.Now()))
+	expectedBackups = expectedBackups[1:]
+
+	if !reflect.DeepEqual(backup.Status.CurrentBackups, expectedBackups) {
+		t.Fatalf(".status.currentBackups expected: %v, got: %v", expectedBackups, backup.Status.CurrentBackups)
+	}
+	if !stringSetContainsExactly(mockBackOps.uploadedSnapshots, expectedBackups...) {
+		t.Fatalf("uploaded snapshots expected: %v, got: %v", expectedBackups, mockBackOps.uploadedSnapshots)
+	}
+}
+
+func mustReconcile(t *testing.T, reconciler *Reconciler, backup *kubermaticv1.EtcdBackup) (*kubermaticv1.EtcdBackup, reconcile.Result) {
+	var result reconcile.Result
+	var err error
+	if result, err = reconciler.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{Namespace: backup.Namespace, Name: backup.Name}}); err != nil {
 		t.Fatalf("Error syncing cluster: %v", err)
 	}
 
-	expectedBackups.Insert(backupName(backup, cluster, clock.Now()))
-	expectedBackups.Delete(firstBackupName)
-
-	if !(mockBackOps.uploadedSnapshots.Len() == expectedBackups.Len() && mockBackOps.uploadedSnapshots.HasAll(expectedBackups.List()...)) {
-		t.Fatalf("uploaded snapshots expected: %v, got: %v", expectedBackups, mockBackOps.uploadedSnapshots)
+	readbackBackup := &kubermaticv1.EtcdBackup{}
+	if err := reconciler.Get(context.Background(), client.ObjectKey{Namespace: backup.GetNamespace(), Name: backup.GetName()}, readbackBackup); err != nil {
+		t.Fatalf("Error reading back reconciled backup: %v", err)
 	}
+
+	return readbackBackup, result
 }
 
 func backupName(backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster, time time.Time) string {
@@ -378,6 +380,10 @@ func backupName(backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster, 
 
 func intPtr(i int) *int {
 	return &i
+}
+
+func stringSetContainsExactly(set sets.String, elements ...string) bool {
+	return set.Len() == len(elements) && set.HasAll(elements...)
 }
 
 func collectEvents(source <-chan string) []string {
