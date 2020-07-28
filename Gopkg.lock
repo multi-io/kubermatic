@@ -2343,7 +2343,6 @@
     "github.com/kubermatic/machine-controller/pkg/userdata/sles",
     "github.com/kubermatic/machine-controller/pkg/userdata/ubuntu",
     "github.com/minio/minio-go",
-    "github.com/minio/minio-go/pkg/set",
     "github.com/oklog/run",
     "github.com/onsi/ginkgo/reporters",
     "github.com/packethost/packngo",
