@@ -1380,8 +1380,8 @@ func (in *EtcdBackupStatus) DeepCopyInto(out *EtcdBackupStatus) {
 		in, out := &in.LastBackupTime, &out.LastBackupTime
 		*out = (*in).DeepCopy()
 	}
-	if in.LastBackups != nil {
-		in, out := &in.LastBackups, &out.LastBackups
+	if in.CurrentBackups != nil {
+		in, out := &in.CurrentBackups, &out.CurrentBackups
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}

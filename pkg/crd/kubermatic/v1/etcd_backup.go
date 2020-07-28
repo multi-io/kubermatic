@@ -72,7 +72,7 @@ type EtcdBackupList struct {
 
 type EtcdBackupStatus struct {
 	LastBackupTime *metav1.Time `json:"lastBackupTime,omitempty"`
-	LastBackups    []string     `json:"lastBackups,omitempty"`
+	CurrentBackups []string     `json:"lastBackups,omitempty"`
 }
 
 func (b *EtcdBackup) GetKeptBackupsCount() int {

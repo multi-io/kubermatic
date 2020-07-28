@@ -279,19 +279,19 @@ func (r *Reconciler) createBackup(ctx context.Context, log *zap.SugaredLogger, f
 		r.updateBackup(ctx, backup, func(backup *kubermaticv1.EtcdBackup) {
 			kuberneteshelper.AddFinalizer(backup, DeleteAllBackupsFinalizer)
 			backup.Status.LastBackupTime = &metav1.Time{Time: r.clock.Now()}
-			backup.Status.LastBackups = append(backup.Status.LastBackups, fileName)
+			backup.Status.CurrentBackups = append(backup.Status.CurrentBackups, fileName)
 		}))
 }
 
 func (r *Reconciler) deleteBackupsUpToRemaining(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, remaining int) error {
-	for len(backup.Status.LastBackups) > remaining {
-		toDelete := backup.Status.LastBackups[0]
+	for len(backup.Status.CurrentBackups) > remaining {
+		toDelete := backup.Status.CurrentBackups[0]
 		if err := r.deleteUploadedSnapshot(ctx, log, toDelete); err != nil {
 			// TODO ignore not-found errors
 			return fmt.Errorf("error deleting uploaded snapshot: %v", err)
 		}
 		err := r.updateBackup(ctx, backup, func(backup *kubermaticv1.EtcdBackup) {
-			backup.Status.LastBackups = backup.Status.LastBackups[1:]
+			backup.Status.CurrentBackups = backup.Status.CurrentBackups[1:]
 		})
 		if err != nil {
 			return fmt.Errorf("failed to update EtcdBackup after deleting backup %v: %v", toDelete, err)

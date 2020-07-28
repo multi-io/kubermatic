@@ -150,7 +150,7 @@ func TestController_NonScheduled_SimpleBackup(t *testing.T) {
 		t.Fatalf("Error reading back completed backup: %v", err)
 	}
 
-	if !reflect.DeepEqual(readbackBackup.Status.LastBackups, []string{backupName}) {
+	if !reflect.DeepEqual(readbackBackup.Status.CurrentBackups, []string{backupName}) {
 		t.Fatalf("backup not marked as completed")
 	}
 
@@ -163,7 +163,7 @@ func TestController_NonScheduled_CompletedBackupIsNotProcessed(t *testing.T) {
 	cluster := genTestCluster()
 
 	backup := genBackup(cluster, "testbackup")
-	backup.Status.LastBackups = []string{"testbackup"}
+	backup.Status.CurrentBackups = []string{"testbackup"}
 	backup.Status.LastBackupTime = &metav1.Time{Time: time.Now()}
 
 	mockBackOps := newMockBackendOperations()
@@ -193,7 +193,7 @@ func TestController_cleanupBackup(t *testing.T) {
 
 	backup := genBackup(cluster, "testbackup")
 	existingBackups := []string{"testcluster-backup1","testcluster-backup2","testcluster-backup3"}
-	backup.Status.LastBackups = existingBackups
+	backup.Status.CurrentBackups = existingBackups
 	kuberneteshelper.AddFinalizer(backup, DeleteAllBackupsFinalizer)
 
 	mockBackOps := newMockBackendOperations()
