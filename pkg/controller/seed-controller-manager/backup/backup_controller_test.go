@@ -72,7 +72,7 @@ func (ops *mockBackendOperations) uploadSnapshot(ctx context.Context, log *zap.S
 	return nil
 }
 
-func (ops *mockBackendOperations) cleanupSnapshot(ctx context.Context, log *zap.SugaredLogger, fileName string) error {
+func (ops *mockBackendOperations) deleteSnapshot(ctx context.Context, log *zap.SugaredLogger, fileName string) error {
 	if ops.returnError != nil {
 		return ops.returnError
 	}

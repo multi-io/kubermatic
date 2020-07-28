@@ -20,24 +20,19 @@ package backup
 
 import (
 	"context"
-	"crypto/sha256"
 	"fmt"
 	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
 	kubermaticv1helper "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1/helper"
 	kuberneteshelper "github.com/kubermatic/kubermatic/pkg/kubernetes"
 	errors2 "github.com/kubermatic/kubermatic/pkg/util/errors"
-	"github.com/minio/minio-go"
 	"github.com/robfig/cron"
-	"go.etcd.io/etcd/clientv3"
 	"go.uber.org/zap"
-	"io"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/tools/record"
-	"os"
 	"reflect"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -59,7 +54,7 @@ const (
 type BackendOperations interface {
 	takeSnapshot(ctx context.Context, log *zap.SugaredLogger, fileName string, cluster *kubermaticv1.Cluster) error
 	uploadSnapshot(ctx context.Context, log *zap.SugaredLogger, fileName string) error
-	cleanupSnapshot(ctx context.Context, log *zap.SugaredLogger, fileName string) error
+	deleteSnapshot(ctx context.Context, log *zap.SugaredLogger, fileName string) error
 	deleteUploadedSnapshot(ctx context.Context, log *zap.SugaredLogger, fileName string) error
 }
 
@@ -71,14 +66,6 @@ type Reconciler struct {
 	BackendOperations
 	clock    clock.Clock
 	recorder record.EventRecorder
-}
-
-type s3BackendOperations struct {
-	snapshotDir       string
-	s3Endpoint        string
-	s3BucketName      string
-	s3AccessKeyID     string
-	s3SecretAccessKey string
 }
 
 // Add creates a new Backup controller that is responsible for
@@ -264,7 +251,7 @@ func (r *Reconciler) createBackup(ctx context.Context, log *zap.SugaredLogger, f
 	}
 
 	defer func() {
-		if err := r.cleanupSnapshot(ctx, log, fileName); err != nil {
+		if err := r.deleteSnapshot(ctx, log, fileName); err != nil {
 			log.Errorf("Failed to delete snapshot: %v", err)
 		}
 	}()
@@ -326,137 +313,6 @@ func (r *Reconciler) updateBackup(ctx context.Context, backup *kubermaticv1.Etcd
 
 func backupFileNamePrefix(backupName, clusterName string) string {
 	return fmt.Sprintf("%s-%s", clusterName, backupName)
-}
-
-func (s3ops *s3BackendOperations) takeSnapshot(ctx context.Context, log *zap.SugaredLogger, fileName string, cluster *kubermaticv1.Cluster) error {
-	client, err := getEtcdClient(cluster)
-	if err != nil {
-		return err
-	}
-
-	snapshotFileName := fmt.Sprintf("/%s/%s", s3ops.snapshotDir, fileName)
-	partFile := snapshotFileName + ".part"
-	defer func() {
-		if err := os.RemoveAll(partFile); err != nil {
-			log.Errorf("Failed to delete snapshot part file: %v", err)
-		}
-	}()
-
-	var f *os.File
-	f, err = os.OpenFile(partFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
-	if err != nil {
-		return fmt.Errorf("could not open %s (%v)", partFile, err)
-	}
-	log.Info("created temporary db file", zap.String("path", partFile))
-
-	var rd io.ReadCloser
-	deadlinedCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-	rd, err = client.Snapshot(deadlinedCtx)
-	if err != nil {
-		return err
-	}
-	log.Info("fetching snapshot")
-	var size int64
-	size, err = io.Copy(f, rd)
-	if err != nil {
-		return err
-	}
-	if !hasChecksum(size) {
-		return fmt.Errorf("sha256 checksum not found [bytes: %d]", size)
-	}
-	if err = f.Sync(); err != nil {
-		return err
-	}
-	if err = f.Close(); err != nil {
-		return err
-	}
-	log.Info("fetched snapshot")
-
-	if err = os.Rename(partFile, snapshotFileName); err != nil {
-		return fmt.Errorf("could not rename %s to %s (%v)", partFile, snapshotFileName, err)
-	}
-	log.Info("saved", zap.String("path", snapshotFileName))
-	return nil
-}
-
-func getEtcdClient(cluster *kubermaticv1.Cluster) (*clientv3.Client, error) {
-	clusterSize := cluster.Spec.ComponentsOverride.Etcd.ClusterSize
-	if clusterSize == 0 {
-		clusterSize = defaultClusterSize
-	}
-	endpoints := []string{}
-	for i := 0; i < clusterSize; i++ {
-		endpoints = append(endpoints, fmt.Sprintf("etcd-%d.etcd.%s.svc.cluster.local:2380", i, cluster.Status.NamespaceName))
-	}
-	var err error
-	for i := 0; i < 5; i++ {
-		cli, err := clientv3.New(clientv3.Config{
-			Endpoints:   endpoints,
-			DialTimeout: 2 * time.Second,
-		})
-		if err == nil && cli != nil {
-			return cli, nil
-		}
-		time.Sleep(5 * time.Second)
-	}
-	return nil, fmt.Errorf("failed to establish client connection: %v", err)
-}
-
-// hasChecksum returns "true" if the file size "n"
-// has appended sha256 hash digest.
-func hasChecksum(n int64) bool {
-	// 512 is chosen because it's a minimum disk sector size
-	// smaller than (and multiplies to) OS page size in most systems
-	return (n % 512) == sha256.Size
-}
-
-func (s3ops *s3BackendOperations) getS3Client() (*minio.Client, error) {
-	// TODO long-lived client, possibly one per worker (since I think it's not thread-safe)
-	client, err := minio.New(s3ops.s3Endpoint, s3ops.s3AccessKeyID, s3ops.s3SecretAccessKey, true)
-	if err != nil {
-		return nil, err
-	}
-	client.SetAppInfo("kubermatic", "v0.1")
-	return client, nil
-}
-
-func (s3ops *s3BackendOperations) uploadSnapshot(ctx context.Context, log *zap.SugaredLogger, fileName string) error {
-	client, err := s3ops.getS3Client()
-	if err != nil {
-		return err
-	}
-
-	exists, err := client.BucketExists(s3ops.s3BucketName)
-	if err != nil {
-		return err
-	}
-	if !exists {
-		log.Debugf("Creating bucket: %v", s3ops.s3BucketName)
-		if err := client.MakeBucket(s3ops.s3BucketName, ""); err != nil {
-			return err
-		}
-	}
-
-	snapshotFileName := fmt.Sprintf("/%s/%s", s3ops.snapshotDir, fileName)
-
-	_, err = client.FPutObject(s3ops.s3BucketName, fileName, snapshotFileName, minio.PutObjectOptions{})
-
-	return err
-}
-
-func (s3ops *s3BackendOperations) cleanupSnapshot(ctx context.Context, log *zap.SugaredLogger, fileName string) error {
-	snapshotFileName := fmt.Sprintf("/%s/%s", s3ops.snapshotDir, fileName)
-	return os.RemoveAll(snapshotFileName)
-}
-
-func (s3ops *s3BackendOperations) deleteUploadedSnapshot(ctx context.Context, log *zap.SugaredLogger, fileName string) error {
-	client, err := s3ops.getS3Client()
-	if err != nil {
-		return err
-	}
-
-	return client.RemoveObject(s3ops.s3BucketName, fileName)
 }
 
 func parseCronSchedule(scheduleString string) (cron.Schedule, error) {
