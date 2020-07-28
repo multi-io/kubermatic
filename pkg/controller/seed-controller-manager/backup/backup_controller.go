@@ -199,9 +199,8 @@ func (r *Reconciler) currentlyPendingBackupName(backup *kubermaticv1.EtcdBackup,
 		// no schedule set => we need exactly one backup (if none was created yet)
 		if backup.Status.LastBackupTime == nil {
 			return prefix, nil
-		} else {
-			return "", nil
 		}
+		return "", nil
 	}
 
 	schedule, err := parseCronSchedule(backup.Spec.Schedule)
