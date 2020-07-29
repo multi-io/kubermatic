@@ -44,6 +44,11 @@ func (s3ops *s3BackendOperations) takeSnapshot(ctx context.Context, log *zap.Sug
 	if err != nil {
 		return err
 	}
+	defer func() {
+		if err := client.Close(); err != nil {
+			log.Errorf("Failed to close etcd client: %v", err)
+		}
+	}()
 
 	snapshotFileName := fmt.Sprintf("/%s/%s", s3ops.snapshotDir, fileName)
 	partFile := snapshotFileName + ".part"
@@ -58,7 +63,7 @@ func (s3ops *s3BackendOperations) takeSnapshot(ctx context.Context, log *zap.Sug
 	if err != nil {
 		return fmt.Errorf("could not open %s (%v)", partFile, err)
 	}
-	log.Info("created temporary db file", zap.String("path", partFile))
+	log.Debugf("created temporary db file: %v", partFile)
 
 	var rd io.ReadCloser
 	deadlinedCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
@@ -67,7 +72,7 @@ func (s3ops *s3BackendOperations) takeSnapshot(ctx context.Context, log *zap.Sug
 	if err != nil {
 		return err
 	}
-	log.Info("fetching snapshot")
+	log.Debugf("fetching snapshot")
 	var size int64
 	size, err = io.Copy(f, rd)
 	if err != nil {
@@ -82,12 +87,12 @@ func (s3ops *s3BackendOperations) takeSnapshot(ctx context.Context, log *zap.Sug
 	if err = f.Close(); err != nil {
 		return err
 	}
-	log.Info("fetched snapshot")
+	log.Debugf("fetched snapshot")
 
 	if err = os.Rename(partFile, snapshotFileName); err != nil {
 		return fmt.Errorf("could not rename %s to %s (%v)", partFile, snapshotFileName, err)
 	}
-	log.Info("saved", zap.String("path", snapshotFileName))
+	log.Debugf("saved %v", snapshotFileName)
 	return nil
 }
 
@@ -123,7 +128,6 @@ func hasChecksum(n int64) bool {
 }
 
 func (s3ops *s3BackendOperations) getS3Client() (*minio.Client, error) {
-	// TODO long-lived client, possibly one per worker (since I think it's not thread-safe)
 	client, err := minio.New(s3ops.s3Endpoint, s3ops.s3AccessKeyID, s3ops.s3SecretAccessKey, true)
 	if err != nil {
 		return nil, err
