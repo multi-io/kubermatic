@@ -156,7 +156,7 @@ func StatefulSetCreator(data etcdStatefulSetCreatorData, enableDataCorruptionChe
 							Value: data.Cluster().Name,
 						},
 						{
-							Name:  "ETCD_CLUSTER_SIZE",
+							Name:  "ETCD_REPLICAS",
 							Value: strconv.Itoa(replicas),
 						},
 						{
@@ -352,23 +352,22 @@ func ImageTag(c *kubermaticv1.Cluster) string {
 }
 
 func computeReplicas(data etcdStatefulSetCreatorData, set *appsv1.StatefulSet) int {
-	etcdClusterSize := data.Cluster().Spec.ComponentsOverride.Etcd.ClusterSize
+	etcdReplicas := kubermaticv1.DefaultEtcdReplicas
 	// handle existing clusters that don't have a configured size
-	if etcdClusterSize < kubermaticv1.DefaultEtcdClusterSize {
-		etcdClusterSize = kubermaticv1.DefaultEtcdClusterSize
+	if r := data.Cluster().Spec.ComponentsOverride.Etcd.Replicas; r != nil && *r > kubermaticv1.DefaultEtcdReplicas {
+		etcdReplicas = int(*r)
 	}
 	if set.Spec.Replicas == nil { // new replicaset
-		return etcdClusterSize
+		return etcdReplicas
 	}
 	replicas := int(*set.Spec.Replicas)
 	// at required size. do nothing
-	if etcdClusterSize == replicas {
+	if etcdReplicas == replicas {
 		return replicas
 	}
 	isEtcdHealthy := data.Cluster().Status.ExtendedHealth.Etcd == kubermaticv1.HealthStatusUp
 	if isEtcdHealthy { // no scaling until we are healthy
-
-		if etcdClusterSize > replicas {
+		if etcdReplicas > replicas {
 			return replicas + 1
 		}
 		return replicas - 1
@@ -378,7 +377,7 @@ func computeReplicas(data etcdStatefulSetCreatorData, set *appsv1.StatefulSet) i
 
 func getLauncherArgs(enableCorruptionCheck bool) []string {
 	command := []string{"-namespace", "$(NAMESPACE)",
-		"-etcd-cluster-size", "$(ETCD_CLUSTER_SIZE)",
+		"-etcd-replicas", "$(ETCD_REPLICAS)",
 		"-pod-name", "$(POD_NAME)",
 		"-pod-ip", "$(POD_IP)",
 		"-api-version", "$(ETCDCTL_API)",

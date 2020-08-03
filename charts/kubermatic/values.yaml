@@ -48,11 +48,18 @@ kubermatic:
   # base64 encoded presets.yaml. Predefined presets for all supported providers.
   presets: ""
 
-  # The default number of replicas for controlplane components. Can be overriden on
-  # a per-cluster basis by setting .Spec.ComponentsOverride.$COMPONENT.Replicas
-  apiserverDefaultReplicas: "2"
-  controllerManagerDefaultReplicas: "1"
-  schedulerDefaultReplicas: "1"
+  # The default cluster components settings.
+  # Can be overriden on a per-cluster basis by setting .Spec.ComponentsOverride.
+  defaultComponentsOverrides:
+    apiserver:
+      replicas: 2
+    controllerManager:
+      replicas: 1
+    scheduler:
+      replicas: 1
+    etcd:
+      replicas: 3
+
   maxParallelReconcile: "10"
 
   # Whether to disable reconciling for the apiserver endpoints

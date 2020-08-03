@@ -324,8 +324,8 @@ const (
 	// ClusterLabelKey defines the label key for the cluster name
 	ClusterLabelKey = "cluster"
 
-	// EtcdClusterSize defines the size of the etcd to use
-	EtcdClusterSize = 3
+	// EtcdReplicas defines the size of the etcd to use
+	EtcdReplicas = 3
 
 	// RegistryGCR defines the kubernetes docker registry at google
 	RegistryGCR = "gcr.io"

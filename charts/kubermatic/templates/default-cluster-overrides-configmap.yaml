@@ -13,15 +13,11 @@
 # limitations under the License.
 
 apiVersion: v1
-name: kubermatic
-version: 2.0.0
-appVersion: '__KUBERMATIC_TAG__'
-description: Kubermatic chart for master and/or seed clusters.
-keywords:
-- kubermatic
-home: https://www.kubermatic.io/
-sources:
-- https://github.com/kubermatic/kubermatic
-maintainers:
-- name: Loodse GmbH
-  email: support@kubermatic.com
+kind: ConfigMap
+metadata:
+  name: default-cluster-overrides
+data:
+  yaml: |
+{{- if .Values.kubermatic.defaultComponentsOverrides }}
+{{ .Values.kubermatic.defaultComponentsOverrides | indent 4 }}
+{{- end }}

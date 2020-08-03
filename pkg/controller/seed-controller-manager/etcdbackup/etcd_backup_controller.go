@@ -21,6 +21,9 @@ package etcdbackup
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"time"
+
 	"github.com/robfig/cron"
 	"go.uber.org/zap"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
@@ -33,19 +36,17 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/tools/record"
-	"reflect"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	"time"
 )
 
 const (
-	ControllerName     = "kubermatic_etcd_backup_controller"
-	defaultClusterSize = 3
+	ControllerName      = "kubermatic_etcd_backup_controller"
+	defaultEtcdReplicas = 3
 
 	// DeleteAllBackupsFinalizer indicates that the backups still need to be deleted in the backend
 	DeleteAllBackupsFinalizer = "kubermatic.io/delete-all-backups"

@@ -173,6 +173,14 @@ func (d *TemplateData) EtcdDiskSize() resource.Quantity {
 	return d.etcdDiskSize
 }
 
+// EtcdReplicas returns number of etcd replicas.
+func (d *TemplateData) EtcdReplicas() int {
+	if v := d.Cluster().Spec.ComponentsOverride.Etcd.Replicas; v != nil {
+		return int(*v)
+	}
+	return kubermaticv1.DefaultEtcdReplicas
+}
+
 func (d *TemplateData) EtcdLauncherImage() string {
 	imageSplit := strings.Split(d.etcdLauncherImage, "/")
 	var registry, imageWithoutRegistry string

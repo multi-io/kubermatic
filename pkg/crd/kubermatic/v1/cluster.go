@@ -20,6 +20,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	providerconfig "github.com/kubermatic/machine-controller/pkg/providerconfig/types"
@@ -52,7 +53,7 @@ const (
 	ProjectIDLabelKey    = "project-id"
 	UpdatedByVPALabelKey = "updated-by-vpa"
 
-	DefaultEtcdClusterSize = 3
+	DefaultEtcdReplicas = 3
 )
 
 // ProtectedClusterLabels is a set of labels that must not be set by users on clusters,
@@ -295,20 +296,20 @@ type AuditLoggingSettings struct {
 
 type ComponentSettings struct {
 	Apiserver         APIServerSettings       `json:"apiserver"`
-	ControllerManager DeploymentSettings      `json:"controllerManager"`
-	Scheduler         DeploymentSettings      `json:"scheduler"`
+	ControllerManager ResourceSettings        `json:"controllerManager"`
+	Scheduler         ResourceSettings        `json:"scheduler"`
 	Etcd              EtcdStatefulSetSettings `json:"etcd"`
 	Prometheus        StatefulSetSettings     `json:"prometheus"`
 }
 
 type APIServerSettings struct {
-	DeploymentSettings `json:",inline"`
+	ResourceSettings `json:",inline"`
 
 	Down                        *bool `json:"down,omitempty"`
 	EndpointReconcilingDisabled *bool `json:"endpointReconcilingDisabled,omitempty"`
 }
 
-type DeploymentSettings struct {
+type ResourceSettings struct {
 	Replicas  *int32                       `json:"replicas,omitempty"`
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
@@ -318,10 +319,10 @@ type StatefulSetSettings struct {
 }
 
 type EtcdStatefulSetSettings struct {
-	ClusterSize  int                          `json:"clusterSize,omitempty"`
-	StorageClass string                       `json:"storageClass,omitempty"`
-	DiskSize     *resource.Quantity           `json:"diskSize,omitempty"`
-	Resources    *corev1.ResourceRequirements `json:"resources,omitempty"`
+	ResourceSettings `json:",inline"`
+
+	StorageClass string             `json:"storageClass,omitempty"`
+	DiskSize     *resource.Quantity `json:"diskSize,omitempty"`
 }
 
 // ClusterNetworkingConfig specifies the different networking

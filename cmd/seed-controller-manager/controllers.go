@@ -17,7 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io/ioutil"
@@ -41,8 +40,8 @@ import (
 	"k8c.io/kubermatic/v2/pkg/version"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/yaml"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/yaml"
 )
 
 // AllControllers stores the list of all controllers that we want to run,
@@ -86,24 +85,34 @@ func createSeedConditionUpToDateController(ctrlCtx *controllerContext) error {
 }
 
 func createClusterComponentDefaulter(ctrlCtx *controllerContext) error {
-	defaultCompontentsOverrides := kubermaticv1.ComponentSettings{
-		Apiserver: kubermaticv1.APIServerSettings{
-			DeploymentSettings:          kubermaticv1.DeploymentSettings{Replicas: utilpointer.Int32Ptr(int32(ctrlCtx.runOptions.apiServerDefaultReplicas))},
-			EndpointReconcilingDisabled: utilpointer.BoolPtr(ctrlCtx.runOptions.apiServerEndpointReconcilingDisabled),
-		},
-		ControllerManager: kubermaticv1.DeploymentSettings{
-			Replicas: utilpointer.Int32Ptr(int32(ctrlCtx.runOptions.controllerManagerDefaultReplicas))},
-		Scheduler: kubermaticv1.DeploymentSettings{
-			Replicas: utilpointer.Int32Ptr(int32(ctrlCtx.runOptions.schedulerDefaultReplicas))},
+	defaultOverrides, err := readDefaultComponentsSettings(ctrlCtx)
+	if err != nil {
+		return err
 	}
+
 	return clustercomponentdefaulter.Add(
 		context.Background(),
 		ctrlCtx.log,
 		ctrlCtx.mgr,
 		ctrlCtx.runOptions.workerCount,
-		defaultCompontentsOverrides,
+		defaultOverrides,
 		ctrlCtx.runOptions.workerName,
 	)
+}
+
+func readDefaultComponentsSettings(ctrlCtx *controllerContext) (kubermaticv1.ComponentSettings, error) {
+	ret := kubermaticv1.ComponentSettings{}
+	cm := &corev1.ConfigMap{}
+	r := ctrlCtx.mgr.GetAPIReader()
+	ns := ctrlCtx.runOptions.namespace
+	n := ctrlCtx.runOptions.clusterComponentsSettings
+	if err := r.Get(ctrlCtx.ctx, types.NamespacedName{Namespace: ns, Name: n}, cm); err != nil {
+		return ret, fmt.Errorf("get components settings configmap: %w", err)
+	}
+	if err := yaml.Unmarshal([]byte(cm.Data["yaml"]), &ret); err != nil {
+		return ret, fmt.Errorf("unmarshal components settings configmap \"data.yaml\" error: %w", err)
+	}
+	return ret, nil
 }
 
 func createCloudController(ctrlCtx *controllerContext) error {
@@ -260,9 +269,7 @@ func getContainerFromFile(path string) (*corev1.Container, error) {
 		return nil, err
 	}
 	container := &corev1.Container{}
-	manifestReader := bytes.NewReader(fileContents)
-	manifestDecoder := yaml.NewYAMLToJSONDecoder(manifestReader)
-	if err := manifestDecoder.Decode(container); err != nil {
+	if err := yaml.Unmarshal(fileContents, container); err != nil {
 		return nil, err
 	}
 

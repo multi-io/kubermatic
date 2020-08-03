@@ -32,9 +32,9 @@ import (
 	kubernetesresources "k8c.io/kubermatic/v2/pkg/resources"
 	"k8c.io/kubermatic/v2/pkg/resources/certificates/triple"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	certutil "k8s.io/client-go/util/cert"
@@ -61,6 +61,11 @@ type openshiftData struct {
 	supportsFailureDomainZoneAntiAffinity bool
 	externalURL                           string
 	seed                                  *kubermaticv1.Seed
+	etcdReplicas                          int
+}
+
+func (od *openshiftData) EtcdReplicas() int {
+	return od.etcdReplicas
 }
 
 func (od *openshiftData) DC() *kubermaticv1.Datacenter {

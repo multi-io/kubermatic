@@ -21,13 +21,14 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"k8c.io/kubermatic/v2/pkg/resources"
 	"log"
 	"os"
 	"os/exec"
 	"path"
 	"strings"
 	"time"
+
+	"k8c.io/kubermatic/v2/pkg/resources"
 
 	"go.etcd.io/etcd/v3/clientv3"
 	"go.etcd.io/etcd/v3/etcdserver/api/v3rpc/rpctypes"
@@ -45,14 +46,14 @@ import (
 )
 
 const (
-	defaultClusterSize       = 3
+	defaultEtcdReplicas      = 3
 	defaultEtcdctlAPIVersion = "3"
 	etcdCommandPath          = "/usr/local/bin/etcd"
 )
 
 type config struct {
 	namespace               string
-	clusterSize             int
+	etcdReplicas            int
 	podName                 string
 	podIP                   string
 	etcdctlAPIVersion       string
@@ -98,7 +99,7 @@ func main() {
 	if err := clusterClient.Get(context.Background(), types.NamespacedName{Name: strings.ReplaceAll(e.config.namespace, "cluster-", ""), Namespace: ""}, &k8cCluster); err != nil {
 		log.Fatalw("failed to get cluster", zap.Error(err))
 	}
-	initialMembers := initialMemberList(e.config.clusterSize, e.config.namespace)
+	initialMembers := initialMemberList(e.config.etcdReplicas, e.config.namespace)
 
 	e.config.initialState = "new"
 	// check if the etcd cluster is initialized succcessfully.
@@ -141,7 +142,7 @@ func main() {
 				continue
 			}
 			// we only need to reconcile if we have more members than we should
-			if len(members) <= e.config.clusterSize {
+			if len(members) <= e.config.etcdReplicas {
 				log.Info("cluster members reconciled..")
 				break
 			}
@@ -199,7 +200,7 @@ func (e *etcdCluster) parseConfigFlags() error {
 	config := &config{}
 
 	flag.StringVar(&config.namespace, "namespace", "", "namespace of the user cluster")
-	flag.IntVar(&config.clusterSize, "etcd-cluster-size", defaultClusterSize, "number of replicas in the etcd cluster")
+	flag.IntVar(&config.etcdReplicas, "etcd-replicas", defaultEtcdReplicas, "number of replicas in the etcd cluster")
 	flag.StringVar(&config.podName, "pod-name", "", "name of this etcd pod")
 	flag.StringVar(&config.podIP, "pod-ip", "", "IP address of this etcd pod")
 	flag.StringVar(&config.etcdctlAPIVersion, "api-version", defaultEtcdctlAPIVersion, "etcdctl API version")
@@ -216,8 +217,8 @@ func (e *etcdCluster) parseConfigFlags() error {
 		return errors.New("-namespace is not set")
 	}
 
-	if config.clusterSize < defaultClusterSize {
-		return fmt.Errorf("-etcd-cluster-size is smaller than %d", defaultClusterSize)
+	if config.etcdReplicas < defaultEtcdReplicas {
+		return fmt.Errorf("-etcd-replicas is smaller than %d", defaultEtcdReplicas)
 	}
 
 	if config.podName == "" {
@@ -262,7 +263,7 @@ func etcdCmd(config *config) []string {
 	cmd := []string{
 		fmt.Sprintf("--name=%s", config.podName),
 		fmt.Sprintf("--data-dir=%s", config.dataDir),
-		fmt.Sprintf("--initial-cluster=%s", strings.Join(initialMemberList(config.clusterSize, config.namespace), ",")),
+		fmt.Sprintf("--initial-cluster=%s", strings.Join(initialMemberList(config.etcdReplicas, config.namespace), ",")),
 		fmt.Sprintf("--initial-cluster-token=%s", config.token),
 		fmt.Sprintf("--initial-cluster-state=%s", config.initialState),
 		fmt.Sprintf("--advertise-client-urls=https://%s.etcd.%s.svc.cluster.local:2379,https://%s:2379", config.podName, config.namespace, config.podIP),
@@ -290,7 +291,7 @@ func (e *etcdCluster) getClient() error {
 	if e.client != nil {
 		return nil
 	}
-	endpoints := clientEndpoints(e.config.clusterSize, e.config.namespace)
+	endpoints := clientEndpoints(e.config.etcdReplicas, e.config.namespace)
 	var err error
 	e.client, err = e.getClientWithEndpoints(endpoints)
 	return err

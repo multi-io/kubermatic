@@ -22,13 +22,14 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"io"
+	"os"
+	"time"
+
 	"github.com/minio/minio-go"
 	"go.etcd.io/etcd/v3/clientv3"
 	"go.uber.org/zap"
-	"io"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
-	"os"
-	"time"
 )
 
 type s3BackendOperations struct {
@@ -97,9 +98,9 @@ func (s3ops *s3BackendOperations) takeSnapshot(ctx context.Context, log *zap.Sug
 }
 
 func getEtcdClient(cluster *kubermaticv1.Cluster) (*clientv3.Client, error) {
-	clusterSize := cluster.Spec.ComponentsOverride.Etcd.ClusterSize
-	if clusterSize == 0 {
-		clusterSize = defaultClusterSize
+	clusterSize := defaultEtcdReplicas
+	if v := cluster.Spec.ComponentsOverride.Etcd.Replicas; v != nil && *v > 0 {
+		clusterSize = int(*v)
 	}
 	endpoints := []string{}
 	for i := 0; i < clusterSize; i++ {
