@@ -62,6 +62,7 @@ require (
 	github.com/stretchr/testify v1.6.1
 	github.com/urfave/cli v1.20.0
 	github.com/vmware/govmomi v0.22.2
+	go.etcd.io/etcd v0.0.0-20191023171146-3cf2f69b5738
 	go.etcd.io/etcd/v3 v3.3.0-rc.0.0.20200728214110-6c81b20ec8de
 	go.uber.org/zap v1.14.1
 	golang.org/x/crypto v0.0.0-20200709230013-948cd5f35899

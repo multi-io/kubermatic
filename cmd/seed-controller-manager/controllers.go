@@ -21,12 +21,10 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	"time"
 
 	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/addon"
 	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/addoninstaller"
 	backupcontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/backup"
-	backupschedulecontroller "github.com/kubermatic/kubermatic/pkg/controller/seed-controller-manager/backupschedule"
 	cloudcontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/cloud"
 	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/clustercomponentdefaulter"
 	kubernetescontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/kubernetes"
@@ -53,7 +51,6 @@ var AllControllers = map[string]controllerCreator{
 	addon.ControllerName:                          createAddonController,
 	addoninstaller.ControllerName:                 createAddonInstallerController,
 	backupcontroller.ControllerName:               createBackupController,
-	backupschedulecontroller.ControllerName:       createBackupScheduleController,
 	monitoring.ControllerName:                     createMonitoringController,
 	cloudcontroller.ControllerName:                createCloudController,
 	openshiftcontroller.ControllerName:            createOpenshiftController,
@@ -190,31 +187,6 @@ func createBackupController(ctrlCtx *controllerContext) error {
 		ctrlCtx.runOptions.backupS3BucketName,
 		ctrlCtx.runOptions.backupS3AccessKeyID,
 		ctrlCtx.runOptions.backupS3SecretAccessKey,
-	)
-}
-
-func createBackupScheduleController(ctrlCtx *controllerContext) error {
-	storeContainer, err := getContainerFromFile(ctrlCtx.runOptions.backupContainerFile)
-	if err != nil {
-		return err
-	}
-	cleanupContainer, err := getContainerFromFile(ctrlCtx.runOptions.cleanupContainerFile)
-	if err != nil {
-		return err
-	}
-	backupInterval, err := time.ParseDuration(ctrlCtx.runOptions.backupInterval)
-	if err != nil {
-		return fmt.Errorf("failed to parse %s as duration: %v", ctrlCtx.runOptions.backupInterval, err)
-	}
-	return backupschedulecontroller.Add(
-		ctrlCtx.log,
-		ctrlCtx.mgr,
-		ctrlCtx.runOptions.workerCount,
-		ctrlCtx.runOptions.workerName,
-		*storeContainer,
-		*cleanupContainer,
-		backupInterval,
-		ctrlCtx.runOptions.backupContainerImage,
 	)
 }
 
