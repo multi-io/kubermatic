@@ -19,7 +19,7 @@ package rbac
 import (
 	"fmt"
 
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -53,7 +53,7 @@ func (c *resourcesController) syncProjectResource(item *resourceToProcess) error
 	}
 
 	if len(projectName) == 0 {
-		return fmt.Errorf("unable to find owing project for the object name = %s, gvr = %s", item.metaObject.GetName(), item.gvr.String())
+		return fmt.Errorf("unable to find owning project for the object name = %s, gvr = %s", item.metaObject.GetName(), item.gvr.String())
 	}
 
 	if len(item.metaObject.GetNamespace()) == 0 {

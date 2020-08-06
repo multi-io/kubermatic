@@ -29,11 +29,11 @@ import (
 
 	"github.com/go-test/deep"
 
-	apiv1 "github.com/kubermatic/kubermatic/pkg/api/v1"
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/handler/test"
-	"github.com/kubermatic/kubermatic/pkg/handler/test/hack"
 	clusterv1alpha1 "github.com/kubermatic/machine-controller/pkg/apis/cluster/v1alpha1"
+	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/handler/test"
+	"k8c.io/kubermatic/v2/pkg/handler/test/hack"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -1542,8 +1542,8 @@ func TestPatchNodeDeployment(t *testing.T) {
 		// Scenario 4: Downgrade to too old kubelet version
 		{
 			Name:                       "Scenario 4: Downgrade kubelet to too old",
-			Body:                       fmt.Sprintf(`{"spec":{"template":{"versions":{"kubelet":"9.6.0"}}}}`),
-			ExpectedResponse:           fmt.Sprintf(`{"error":{"code":400,"message":"kubelet version 9.6.0 is not compatible with control plane version 9.9.9"}}`),
+			Body:                       `{"spec":{"template":{"versions":{"kubelet":"9.6.0"}}}}`,
+			ExpectedResponse:           `{"error":{"code":400,"message":"kubelet version 9.6.0 is not compatible with control plane version 9.9.9"}}`,
 			cluster:                    "keen-snyder",
 			HTTPStatus:                 http.StatusBadRequest,
 			project:                    test.GenDefaultProject().Name,
@@ -1555,8 +1555,8 @@ func TestPatchNodeDeployment(t *testing.T) {
 		// Scenario 5: Upgrade kubelet to a too new version
 		{
 			Name:                       "Scenario 5: Upgrade kubelet to too new",
-			Body:                       fmt.Sprintf(`{"spec":{"template":{"versions":{"kubelet":"9.10.0"}}}}`),
-			ExpectedResponse:           fmt.Sprintf(`{"error":{"code":400,"message":"kubelet version 9.10.0 is not compatible with control plane version 9.9.9"}}`),
+			Body:                       `{"spec":{"template":{"versions":{"kubelet":"9.10.0"}}}}`,
+			ExpectedResponse:           `{"error":{"code":400,"message":"kubelet version 9.10.0 is not compatible with control plane version 9.9.9"}}`,
 			cluster:                    "keen-snyder",
 			HTTPStatus:                 http.StatusBadRequest,
 			project:                    test.GenDefaultProject().Name,

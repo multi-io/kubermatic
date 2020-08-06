@@ -21,8 +21,8 @@ import (
 	"net/http"
 	"strings"
 
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/util/errors"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/util/errors"
 )
 
 // Needed because the cloud providers are initialized once during startup and get all
@@ -50,7 +50,7 @@ iterateOverSeeds:
 		requiredEmailDomain := datacenter.Spec.RequiredEmailDomain
 		requiredEmailDomains := datacenter.Spec.RequiredEmailDomains
 
-		if requiredEmailDomain == "" && len(requiredEmailDomains) == 0 {
+		if skipFilterByDomain(userInfo, datacenter) {
 			// find datacenter for "all" without RequiredEmailDomain(s) field
 			foundSeeds = append(foundSeeds, seed)
 			foundDatacenters = append(foundDatacenters, datacenter)
@@ -87,4 +87,17 @@ iterateOverSeeds:
 	}
 
 	return foundSeeds[0], &foundDatacenters[0], nil
+}
+
+func skipFilterByDomain(userInfo *UserInfo, datacenter kubermaticv1.Datacenter) bool {
+	requiredEmailDomain := datacenter.Spec.RequiredEmailDomain
+	requiredEmailDomains := datacenter.Spec.RequiredEmailDomains
+
+	if userInfo.IsAdmin {
+		return true
+	}
+	if requiredEmailDomain == "" && len(requiredEmailDomains) == 0 {
+		return true
+	}
+	return false
 }

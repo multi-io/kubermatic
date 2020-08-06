@@ -24,10 +24,10 @@ import (
 
 	"go.uber.org/zap"
 
-	cmdutil "github.com/kubermatic/kubermatic/cmd/util"
-	"github.com/kubermatic/kubermatic/pkg/controller/kubeletdnat"
-	kubermaticlog "github.com/kubermatic/kubermatic/pkg/log"
-	"github.com/kubermatic/kubermatic/pkg/pprof"
+	cmdutil "k8c.io/kubermatic/v2/cmd/util"
+	"k8c.io/kubermatic/v2/pkg/controller/kubeletdnat"
+	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
+	"k8c.io/kubermatic/v2/pkg/pprof"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -35,7 +35,7 @@ import (
 	"k8s.io/klog"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
+	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 )
 
 func main() {

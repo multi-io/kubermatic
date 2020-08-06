@@ -24,31 +24,29 @@ import (
 	"github.com/go-logr/zapr"
 	"go.uber.org/zap"
 
-	"github.com/kubermatic/kubermatic/pkg/controller/operator/common"
-	masterctrl "github.com/kubermatic/kubermatic/pkg/controller/operator/master"
-	seedctrl "github.com/kubermatic/kubermatic/pkg/controller/operator/seed"
-	seedcontrollerlifecycle "github.com/kubermatic/kubermatic/pkg/controller/shared/seed-controller-lifecycle"
-	operatorv1alpha1 "github.com/kubermatic/kubermatic/pkg/crd/operator/v1alpha1"
-	kubermaticlog "github.com/kubermatic/kubermatic/pkg/log"
-	"github.com/kubermatic/kubermatic/pkg/pprof"
-	"github.com/kubermatic/kubermatic/pkg/provider"
-	"github.com/kubermatic/kubermatic/pkg/signals"
+	"k8c.io/kubermatic/v2/pkg/controller/operator/common"
+	masterctrl "k8c.io/kubermatic/v2/pkg/controller/operator/master"
+	seedctrl "k8c.io/kubermatic/v2/pkg/controller/operator/seed"
+	seedcontrollerlifecycle "k8c.io/kubermatic/v2/pkg/controller/shared/seed-controller-lifecycle"
+	operatorv1alpha1 "k8c.io/kubermatic/v2/pkg/crd/operator/v1alpha1"
+	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
+	"k8c.io/kubermatic/v2/pkg/pprof"
+	"k8c.io/kubermatic/v2/pkg/provider"
+	"k8c.io/kubermatic/v2/pkg/signals"
 
 	certmanagerv1alpha2 "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1alpha2"
-	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
+	ctrl "sigs.k8s.io/controller-runtime"
+	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	ctrllog "sigs.k8s.io/controller-runtime/pkg/runtime/log"
-	// Do not import "sigs.k8s.io/controller-runtime/pkg" to prevent
-	// duplicate kubeconfig flags being defined.
 )
 
 type controllerRunOptions struct {
-	kubeconfig   string
-	namespace    string
-	internalAddr string
-	workerCount  int
-	workerName   string
+	namespace            string
+	internalAddr         string
+	workerCount          int
+	workerName           string
+	enableLeaderElection bool
 }
 
 func main() {
@@ -62,11 +60,13 @@ func main() {
 	logOpts.AddFlags(flag.CommandLine)
 
 	opt := &controllerRunOptions{}
-	flag.StringVar(&opt.kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if outside of cluster.")
 	flag.StringVar(&opt.namespace, "namespace", "", "The namespace the operator runs in, uses to determine where to look for KubermaticConfigurations.")
 	flag.IntVar(&opt.workerCount, "worker-count", 4, "Number of workers which process reconcilings in parallel.")
 	flag.StringVar(&opt.internalAddr, "internal-address", "127.0.0.1:8085", "The address on which the /metrics endpoint will be served")
 	flag.StringVar(&opt.workerName, "worker-name", "", "The name of the worker that will only processes resources with label=worker-name.")
+	flag.BoolVar(&opt.enableLeaderElection, "enable-leader-election", false,
+		"Enable leader election for controller manager. "+
+			"Enabling this will ensure there is only one active controller manager.")
 	flag.Parse()
 
 	rawLog := kubermaticlog.New(logOpts.Debug, logOpts.Format).Named(opt.workerName)
@@ -90,12 +90,11 @@ func main() {
 	v := common.NewDefaultVersions()
 	log.With("kubermatic", v.Kubermatic, "ui", v.UI).Infof("Moin, moin, I'm the Kubermatic %s Operator and these are the versions I work with.", v.KubermaticEdition)
 
-	config, err := clientcmd.BuildConfigFromFlags("", opt.kubeconfig)
-	if err != nil {
-		log.Fatalw("Failed to build config", zap.Error(err))
-	}
-
-	mgr, err := manager.New(config, manager.Options{MetricsBindAddress: opt.internalAddr})
+	mgr, err := manager.New(ctrl.GetConfigOrDie(), manager.Options{
+		MetricsBindAddress: opt.internalAddr,
+		LeaderElection:     opt.enableLeaderElection,
+		LeaderElectionID:   "operator.kubermatic.io",
+	})
 	if err != nil {
 		log.Fatalw("Failed to create Controller Manager instance: %v", err)
 	}

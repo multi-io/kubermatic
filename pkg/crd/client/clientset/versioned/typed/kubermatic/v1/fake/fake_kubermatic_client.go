@@ -3,7 +3,7 @@
 package fake
 
 import (
-	v1 "github.com/kubermatic/kubermatic/pkg/crd/client/clientset/versioned/typed/kubermatic/v1"
+	v1 "k8c.io/kubermatic/v2/pkg/crd/client/clientset/versioned/typed/kubermatic/v1"
 	rest "k8s.io/client-go/rest"
 	testing "k8s.io/client-go/testing"
 )
@@ -22,6 +22,10 @@ func (c *FakeKubermaticV1) AddonConfigs() v1.AddonConfigInterface {
 
 func (c *FakeKubermaticV1) Clusters() v1.ClusterInterface {
 	return &FakeClusters{c}
+}
+
+func (c *FakeKubermaticV1) ExternalClusters() v1.ExternalClusterInterface {
+	return &FakeExternalClusters{c}
 }
 
 func (c *FakeKubermaticV1) EtcdBackups(namespace string) v1.EtcdBackupInterface {

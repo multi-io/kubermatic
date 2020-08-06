@@ -26,10 +26,10 @@ import (
 
 	"github.com/vmware/govmomi/simulator"
 
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/handler/test"
-	"github.com/kubermatic/kubermatic/pkg/handler/test/hack"
-	"github.com/kubermatic/kubermatic/pkg/provider"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/handler/test"
+	"k8c.io/kubermatic/v2/pkg/handler/test/hack"
+	"k8c.io/kubermatic/v2/pkg/provider"
 )
 
 const vSphereDatacenterName = "moon-1"
@@ -125,12 +125,12 @@ func (v *vSphereMock) buildVSphereDatacenter() provider.SeedsGetter {
 							Country:  "Moon States",
 							Spec: kubermaticv1.DatacenterSpec{
 								VSphere: &kubermaticv1.DatacenterSpecVSphere{
-									Endpoint:      v.server.Server.URL,
-									AllowInsecure: true,
-									Datastore:     "LocalDS_0",
-									Datacenter:    "ha-datacenter",
-									Cluster:       "localhost.localdomain",
-									RootPath:      "/ha-datacenter/vm/",
+									Endpoint:         v.server.Server.URL,
+									AllowInsecure:    true,
+									DefaultDatastore: "LocalDS_0",
+									Datacenter:       "ha-datacenter",
+									Cluster:          "localhost.localdomain",
+									RootPath:         "/ha-datacenter/vm/",
 								},
 							},
 						},

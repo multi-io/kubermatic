@@ -20,9 +20,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kubermatic/kubermatic/pkg/controller/master-controller-manager/rbac/test"
-	fakeInformerProvider "github.com/kubermatic/kubermatic/pkg/controller/master-controller-manager/rbac/test/fake"
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/controller/master-controller-manager/rbac/test"
+	fakeInformerProvider "k8c.io/kubermatic/v2/pkg/controller/master-controller-manager/rbac/test/fake"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 
 	k8scorev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -508,6 +508,183 @@ func TestSyncProjectResourcesClusterWide(t *testing.T) {
 					Address: kubermaticv1.ClusterAddress{},
 					Status: kubermaticv1.ClusterStatus{
 						NamespaceName: "cluster-abcd",
+					},
+				},
+			},
+		},
+
+		// scenario 5
+		{
+			name:            "scenario 5: a proper set of RBAC Role/Binding is generated for an external cluster",
+			expectedActions: []string{"create", "create", "create", "create", "create", "create"},
+
+			dependantToSync: &resourceToProcess{
+				gvr: schema.GroupVersionResource{
+					Group:    kubermaticv1.SchemeGroupVersion.Group,
+					Version:  kubermaticv1.SchemeGroupVersion.Version,
+					Resource: kubermaticv1.ExternalClusterResourceName,
+				},
+				kind: kubermaticv1.ExternalClusterKind,
+				metaObject: &kubermaticv1.ExternalCluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "abcd",
+						UID:  types.UID("abcdID"),
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: kubermaticv1.SchemeGroupVersion.String(),
+								Kind:       kubermaticv1.ProjectKindName,
+								Name:       "thunderball",
+								UID:        "thunderballID",
+							},
+						},
+					},
+					Spec: kubermaticv1.ExternalClusterSpec{},
+				},
+			},
+
+			expectedClusterRoles: []*rbacv1.ClusterRole{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "kubermatic:externalcluster-abcd:owners-thunderball",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: kubermaticv1.SchemeGroupVersion.String(),
+								Kind:       kubermaticv1.ExternalClusterKind,
+								Name:       "abcd",
+								UID:        "abcdID", // set manually
+							},
+						},
+					},
+					Rules: []rbacv1.PolicyRule{
+						{
+							APIGroups:     []string{kubermaticv1.SchemeGroupVersion.Group},
+							Resources:     []string{kubermaticv1.ExternalClusterResourceName},
+							ResourceNames: []string{"abcd"},
+							Verbs:         []string{"get", "update", "delete"},
+						},
+					},
+				},
+
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "kubermatic:externalcluster-abcd:editors-thunderball",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: kubermaticv1.SchemeGroupVersion.String(),
+								Kind:       kubermaticv1.ExternalClusterKind,
+								Name:       "abcd",
+								UID:        "abcdID", // set manually
+							},
+						},
+					},
+					Rules: []rbacv1.PolicyRule{
+						{
+							APIGroups:     []string{kubermaticv1.SchemeGroupVersion.Group},
+							Resources:     []string{kubermaticv1.ExternalClusterResourceName},
+							ResourceNames: []string{"abcd"},
+							Verbs:         []string{"get", "update", "delete"},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "kubermatic:externalcluster-abcd:viewers-thunderball",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: kubermaticv1.SchemeGroupVersion.String(),
+								Kind:       kubermaticv1.ExternalClusterKind,
+								Name:       "abcd",
+								UID:        "abcdID", // set manually
+							},
+						},
+					},
+					Rules: []rbacv1.PolicyRule{
+						{
+							APIGroups:     []string{kubermaticv1.SchemeGroupVersion.Group},
+							Resources:     []string{kubermaticv1.ExternalClusterResourceName},
+							ResourceNames: []string{"abcd"},
+							Verbs:         []string{"get"},
+						},
+					},
+				},
+			},
+
+			expectedClusterRoleBindings: []*rbacv1.ClusterRoleBinding{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "kubermatic:externalcluster-abcd:owners-thunderball",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: kubermaticv1.SchemeGroupVersion.String(),
+								Kind:       kubermaticv1.ExternalClusterKind,
+								Name:       "abcd",
+								UID:        "abcdID", // set manually
+							},
+						},
+					},
+					Subjects: []rbacv1.Subject{
+						{
+							APIGroup: rbacv1.GroupName,
+							Kind:     "Group",
+							Name:     "owners-thunderball",
+						},
+					},
+					RoleRef: rbacv1.RoleRef{
+						APIGroup: rbacv1.GroupName,
+						Kind:     "ClusterRole",
+						Name:     "kubermatic:externalcluster-abcd:owners-thunderball",
+					},
+				},
+
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "kubermatic:externalcluster-abcd:editors-thunderball",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: kubermaticv1.SchemeGroupVersion.String(),
+								Kind:       kubermaticv1.ExternalClusterKind,
+								Name:       "abcd",
+								UID:        "abcdID", // set manually
+							},
+						},
+					},
+					Subjects: []rbacv1.Subject{
+						{
+							APIGroup: rbacv1.GroupName,
+							Kind:     "Group",
+							Name:     "editors-thunderball",
+						},
+					},
+					RoleRef: rbacv1.RoleRef{
+						APIGroup: rbacv1.GroupName,
+						Kind:     "ClusterRole",
+						Name:     "kubermatic:externalcluster-abcd:editors-thunderball",
+					},
+				},
+
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "kubermatic:externalcluster-abcd:viewers-thunderball",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: kubermaticv1.SchemeGroupVersion.String(),
+								Kind:       kubermaticv1.ExternalClusterKind,
+								Name:       "abcd",
+								UID:        "abcdID", // set manually
+							},
+						},
+					},
+					Subjects: []rbacv1.Subject{
+						{
+							APIGroup: rbacv1.GroupName,
+							Kind:     "Group",
+							Name:     "viewers-thunderball",
+						},
+					},
+					RoleRef: rbacv1.RoleRef{
+						APIGroup: rbacv1.GroupName,
+						Kind:     "ClusterRole",
+						Name:     "kubermatic:externalcluster-abcd:viewers-thunderball",
 					},
 				},
 			},

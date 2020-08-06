@@ -22,8 +22,8 @@ import (
 	"context"
 	"flag"
 
-	eeapi "github.com/kubermatic/kubermatic/pkg/ee/cmd/kubermatic-api"
-	"github.com/kubermatic/kubermatic/pkg/provider"
+	eeapi "k8c.io/kubermatic/v2/pkg/ee/cmd/kubermatic-api"
+	"k8c.io/kubermatic/v2/pkg/provider"
 
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -37,5 +37,5 @@ func seedsGetterFactory(ctx context.Context, client ctrlruntimeclient.Client, op
 }
 
 func seedKubeconfigGetterFactory(ctx context.Context, client ctrlruntimeclient.Client, opt serverRunOptions) (provider.SeedKubeconfigGetter, error) {
-	return eeapi.SeedKubeconfigGetterFactory(ctx, client, opt.kubeconfig)
+	return eeapi.SeedKubeconfigGetterFactory(ctx, client)
 }

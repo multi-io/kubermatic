@@ -23,14 +23,14 @@ import (
 
 	"github.com/Masterminds/sprig"
 
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/resources"
-	"github.com/kubermatic/kubermatic/pkg/resources/apiserver"
-	"github.com/kubermatic/kubermatic/pkg/resources/cloudconfig"
-	"github.com/kubermatic/kubermatic/pkg/resources/controllermanager"
-	"github.com/kubermatic/kubermatic/pkg/resources/reconciling"
-	"github.com/kubermatic/kubermatic/pkg/resources/vpnsidecar"
 	providerconfig "github.com/kubermatic/machine-controller/pkg/providerconfig/types"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/resources"
+	"k8c.io/kubermatic/v2/pkg/resources/apiserver"
+	"k8c.io/kubermatic/v2/pkg/resources/cloudconfig"
+	"k8c.io/kubermatic/v2/pkg/resources/controllermanager"
+	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
+	"k8c.io/kubermatic/v2/pkg/resources/vpnsidecar"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -339,7 +339,7 @@ func kubeControllerManagerArgs(openshiftConfigPath, kubeconfigPath, caCertPath, 
 		fmt.Sprintf("--authorization-kubeconfig=%s", kubeconfigPath),
 		fmt.Sprintf("--client-ca-file=%s", caCertPath),
 		fmt.Sprintf("--requestheader-client-ca-file=%s", aggregatorCACertPath),
-		fmt.Sprint("-v=2"),
+		"-v=2",
 		// Used for metrics only, we can use a self-signed cert for now
 		//fmt.Sprintf("--tls-cert-file=%s", servingCert),
 		//fmt.Sprintf("--tls-private-key=%s", servingKey)

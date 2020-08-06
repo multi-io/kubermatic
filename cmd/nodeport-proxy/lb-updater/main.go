@@ -26,9 +26,9 @@ import (
 	"github.com/go-test/deep"
 	"go.uber.org/zap"
 
-	cmdutil "github.com/kubermatic/kubermatic/cmd/util"
-	controllerutil "github.com/kubermatic/kubermatic/pkg/controller/util"
-	kubermaticlog "github.com/kubermatic/kubermatic/pkg/log"
+	cmdutil "k8c.io/kubermatic/v2/cmd/util"
+	controllerutil "k8c.io/kubermatic/v2/pkg/controller/util"
+	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -38,8 +38,8 @@ import (
 	ctrlruntimeconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 

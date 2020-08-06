@@ -24,10 +24,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kubermatic/kubermatic/pkg/controller/master-controller-manager/rbac/test"
-	fakeInformerProvider "github.com/kubermatic/kubermatic/pkg/controller/master-controller-manager/rbac/test/fake"
-	kubermaticfakeclientset "github.com/kubermatic/kubermatic/pkg/crd/client/clientset/versioned/fake"
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/controller/master-controller-manager/rbac/test"
+	fakeInformerProvider "k8c.io/kubermatic/v2/pkg/controller/master-controller-manager/rbac/test/fake"
+	kubermaticfakeclientset "k8c.io/kubermatic/v2/pkg/crd/client/clientset/versioned/fake"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 
 	k8scorev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -461,6 +461,64 @@ func TestEnsureProjectClusterRBACRoleBindingForResources(t *testing.T) {
 					},
 				},
 			},
+		},
+
+		// scenario 3
+		{
+			name:                     "Scenario 3: Proper set of RBAC Bindings for project's ExternalCluster created on master",
+			projectToSync:            "thunderball",
+			expectedActionsForMaster: []string{"create", "create"},
+			projectResourcesToSync: []projectResource{
+				{
+					gvr: schema.GroupVersionResource{
+						Group:    kubermaticv1.GroupName,
+						Version:  kubermaticv1.GroupVersion,
+						Resource: kubermaticv1.ExternalClusterResourceName,
+					},
+					kind: kubermaticv1.ExternalClusterKind,
+				},
+			},
+			expectedClusterRoleBindingsForMaster: []*rbacv1.ClusterRoleBinding{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:            "kubermatic:externalclusters:owners",
+						ResourceVersion: "1",
+					},
+					Subjects: []rbacv1.Subject{
+						{
+							APIGroup: rbacv1.GroupName,
+							Kind:     "Group",
+							Name:     "owners-thunderball",
+						},
+					},
+					RoleRef: rbacv1.RoleRef{
+						APIGroup: rbacv1.GroupName,
+						Kind:     "ClusterRole",
+						Name:     "kubermatic:externalclusters:owners",
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:            "kubermatic:externalclusters:editors",
+						ResourceVersion: "1",
+					},
+					Subjects: []rbacv1.Subject{
+						{
+							APIGroup: rbacv1.GroupName,
+							Kind:     "Group",
+							Name:     "editors-thunderball",
+						},
+					},
+					RoleRef: rbacv1.RoleRef{
+						APIGroup: rbacv1.GroupName,
+						Kind:     "ClusterRole",
+						Name:     "kubermatic:externalclusters:editors",
+					},
+				},
+			},
+			seedClusters:                        2,
+			expectedActionsForSeeds:             []string{"create", "create"},
+			expectedClusterRoleBindingsForSeeds: []*rbacv1.ClusterRoleBinding{},
 		},
 	}
 	for _, test := range tests {
@@ -1161,6 +1219,55 @@ func TestEnsureProjectClusterRBACRoleForResources(t *testing.T) {
 						{
 							APIGroups: []string{kubermaticv1.SchemeGroupVersion.Group},
 							Resources: []string{"userprojectbindings"},
+							Verbs:     []string{"create"},
+						},
+					},
+				},
+			},
+		},
+
+		// scenario 3
+		{
+			name:                     "Scenario 3: Proper set of RBAC Roles for ExternalCluster resource are created on \"master\" and seed clusters",
+			expectedActionsForMaster: []string{"create"},
+			// UserProjectBinding is a resource that is only on master cluster
+			expectedActionsForSeeds: []string{},
+			seedClusters:            2,
+			projectResourcesToSync: []projectResource{
+				{
+					gvr: schema.GroupVersionResource{
+						Group:    kubermaticv1.GroupName,
+						Version:  kubermaticv1.GroupVersion,
+						Resource: kubermaticv1.ExternalClusterResourceName,
+					},
+					kind: kubermaticv1.ExternalClusterKind,
+				},
+			},
+
+			expectedClusterRolesForMaster: []*rbacv1.ClusterRole{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:            "kubermatic:externalclusters:owners",
+						ResourceVersion: "1",
+					},
+					Rules: []rbacv1.PolicyRule{
+						{
+							APIGroups: []string{kubermaticv1.SchemeGroupVersion.Group},
+							Resources: []string{"externalclusters"},
+							Verbs:     []string{"create"},
+						},
+					},
+				},
+
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:            "kubermatic:externalclusters:editors",
+						ResourceVersion: "1",
+					},
+					Rules: []rbacv1.PolicyRule{
+						{
+							APIGroups: []string{kubermaticv1.SchemeGroupVersion.Group},
+							Resources: []string{"externalclusters"},
 							Verbs:     []string{"create"},
 						},
 					},

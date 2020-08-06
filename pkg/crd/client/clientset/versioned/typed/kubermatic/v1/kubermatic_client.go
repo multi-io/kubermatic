@@ -3,8 +3,8 @@
 package v1
 
 import (
-	"github.com/kubermatic/kubermatic/pkg/crd/client/clientset/versioned/scheme"
-	v1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/crd/client/clientset/versioned/scheme"
+	v1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	rest "k8s.io/client-go/rest"
 )
 
@@ -13,6 +13,7 @@ type KubermaticV1Interface interface {
 	AddonsGetter
 	AddonConfigsGetter
 	ClustersGetter
+	ExternalClustersGetter
 	EtcdBackupsGetter
 	KubermaticSettingsGetter
 	ProjectsGetter
@@ -36,6 +37,10 @@ func (c *KubermaticV1Client) AddonConfigs() AddonConfigInterface {
 
 func (c *KubermaticV1Client) Clusters() ClusterInterface {
 	return newClusters(c)
+}
+
+func (c *KubermaticV1Client) ExternalClusters() ExternalClusterInterface {
+	return newExternalClusters(c)
 }
 
 func (c *KubermaticV1Client) EtcdBackups(namespace string) EtcdBackupInterface {

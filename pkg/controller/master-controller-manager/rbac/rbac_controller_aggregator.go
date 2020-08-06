@@ -23,10 +23,10 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 
-	kubermaticclientset "github.com/kubermatic/kubermatic/pkg/crd/client/clientset/versioned"
-	"github.com/kubermatic/kubermatic/pkg/crd/client/informers/externalversions"
+	kubermaticclientset "k8c.io/kubermatic/v2/pkg/crd/client/clientset/versioned"
+	"k8c.io/kubermatic/v2/pkg/crd/client/informers/externalversions"
 	k8scorev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -161,7 +161,7 @@ func New(metrics *Metrics, mgr manager.Manager, seedManagerMap map[string]manage
 			kind:      "Secret",
 			namespace: "kubermatic",
 			shouldEnqueue: func(obj metav1.Object) bool {
-				// do not reconcile secrets without "sa-token" and "credential" prefix
+				// do not reconcile secrets without "sa-token", "credential" and "kubeconfig-external-cluster" prefix
 				return shouldEnqueueSecret(obj.GetName())
 			},
 		},
@@ -177,6 +177,15 @@ func New(metrics *Metrics, mgr manager.Manager, seedManagerMap map[string]manage
 				// do not reconcile resources without "serviceaccount" prefix
 				return strings.HasPrefix(obj.GetName(), "serviceaccount")
 			},
+		},
+
+		{
+			gvr: schema.GroupVersionResource{
+				Group:    kubermaticv1.GroupName,
+				Version:  kubermaticv1.GroupVersion,
+				Resource: kubermaticv1.ExternalClusterResourceName,
+			},
+			kind: kubermaticv1.ExternalClusterKind,
 		},
 	}
 
@@ -222,7 +231,7 @@ func (a *ControllerAggregator) Start(stopCh <-chan struct{}) error {
 }
 
 func shouldEnqueueSecret(name string) bool {
-	supportedPrefixes := []string{"sa-token", "credential"}
+	supportedPrefixes := []string{"sa-token", "credential", "kubeconfig-external-cluster"}
 	for _, prefix := range supportedPrefixes {
 		if strings.HasPrefix(name, prefix) {
 			return true
