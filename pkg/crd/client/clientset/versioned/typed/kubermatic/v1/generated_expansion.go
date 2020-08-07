@@ -10,6 +10,8 @@ type ClusterExpansion interface{}
 
 type ConstraintTemplateExpansion interface{}
 
+type EtcdBackupExpansion interface{}
+
 type ExternalClusterExpansion interface{}
 
 type KubermaticSettingExpansion interface{}

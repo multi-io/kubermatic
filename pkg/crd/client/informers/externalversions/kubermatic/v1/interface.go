@@ -16,6 +16,8 @@ type Interface interface {
 	Clusters() ClusterInformer
 	// ConstraintTemplates returns a ConstraintTemplateInformer.
 	ConstraintTemplates() ConstraintTemplateInformer
+	// EtcdBackups returns a EtcdBackupInformer.
+	EtcdBackups() EtcdBackupInformer
 	// ExternalClusters returns a ExternalClusterInformer.
 	ExternalClusters() ExternalClusterInformer
 	// KubermaticSettings returns a KubermaticSettingInformer.
@@ -59,6 +61,11 @@ func (v *version) Clusters() ClusterInformer {
 // ConstraintTemplates returns a ConstraintTemplateInformer.
 func (v *version) ConstraintTemplates() ConstraintTemplateInformer {
 	return &constraintTemplateInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// EtcdBackups returns a EtcdBackupInformer.
+func (v *version) EtcdBackups() EtcdBackupInformer {
+	return &etcdBackupInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // ExternalClusters returns a ExternalClusterInformer.

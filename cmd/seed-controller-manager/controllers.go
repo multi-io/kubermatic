@@ -28,6 +28,7 @@ import (
 	backupcontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/backup"
 	cloudcontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/cloud"
 	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/clustercomponentdefaulter"
+	etcdbackupcontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/etcdbackup"
 	kubernetescontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/kubernetes"
 	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/monitoring"
 	openshiftcontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/openshift"
@@ -52,6 +53,7 @@ var AllControllers = map[string]controllerCreator{
 	updatecontroller.ControllerName:               createUpdateController,
 	addon.ControllerName:                          createAddonController,
 	addoninstaller.ControllerName:                 createAddonInstallerController,
+	etcdbackupcontroller.ControllerName:           createEtcdBackupController,
 	backupcontroller.ControllerName:               createBackupController,
 	monitoring.ControllerName:                     createMonitoringController,
 	cloudcontroller.ControllerName:                createCloudController,
@@ -176,6 +178,20 @@ func createKubernetesController(ctrlCtx *controllerContext) error {
 			EtcdDataCorruptionChecks:     ctrlCtx.runOptions.featureGates.Enabled(features.EtcdDataCorruptionChecks),
 			KubernetesOIDCAuthentication: ctrlCtx.runOptions.featureGates.Enabled(features.OpenIDAuthPlugin),
 		},
+	)
+}
+
+func createEtcdBackupController(ctrlCtx *controllerContext) error {
+	return etcdbackupcontroller.Add(
+		ctrlCtx.mgr,
+		ctrlCtx.log,
+		ctrlCtx.runOptions.workerCount,
+		ctrlCtx.runOptions.workerName,
+		ctrlCtx.runOptions.backupSnapshotDir,
+		ctrlCtx.runOptions.backupS3Endpoint,
+		ctrlCtx.runOptions.backupS3BucketName,
+		ctrlCtx.runOptions.backupS3AccessKeyID,
+		ctrlCtx.runOptions.backupS3SecretAccessKey,
 	)
 }
 

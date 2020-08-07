@@ -22,6 +22,14 @@ type ClusterListerExpansion interface{}
 // ConstraintTemplateLister.
 type ConstraintTemplateListerExpansion interface{}
 
+// EtcdBackupListerExpansion allows custom methods to be added to
+// EtcdBackupLister.
+type EtcdBackupListerExpansion interface{}
+
+// EtcdBackupNamespaceListerExpansion allows custom methods to be added to
+// EtcdBackupNamespaceLister.
+type EtcdBackupNamespaceListerExpansion interface{}
+
 // ExternalClusterListerExpansion allows custom methods to be added to
 // ExternalClusterLister.
 type ExternalClusterListerExpansion interface{}

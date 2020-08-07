@@ -28,6 +28,10 @@ func (c *FakeKubermaticV1) ConstraintTemplates() v1.ConstraintTemplateInterface 
 	return &FakeConstraintTemplates{c}
 }
 
+func (c *FakeKubermaticV1) EtcdBackups(namespace string) v1.EtcdBackupInterface {
+	return &FakeEtcdBackups{c, namespace}
+}
+
 func (c *FakeKubermaticV1) ExternalClusters() v1.ExternalClusterInterface {
 	return &FakeExternalClusters{c}
 }
