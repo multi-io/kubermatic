@@ -4,7 +4,9 @@ set -o errexit
 set -o pipefail
 set -x
 
-: "${SRC_DIR:=$(go env GOPATH)/src/github.com/kubermatic/kubermatic}"
+cd "$(dirname $0)"
+
+: "${SRC_DIR:=$(cd ..; pwd)}"
 : "${KUBERMATIC_WORKERNAME:=${KUBERMATIC_WORKERNAME:-${USERNAME}}}"
 : "${INSTALLER_DIR:="$(go env GOPATH)/src/gitlab.syseleven.de/kubernetes/kubermatic-installer"}"
 : "${KUBERMATIC_ENV:=dev}"
@@ -73,9 +75,17 @@ else
 fi
 
 if [[ "${DISABLE_LEADER_ELECTION}" == "true" ]]; then
-    DISABLE_LE_OPTION="-disable-leader-election"
+    DISABLE_LE_OPTION="-enable-leader-election=false"
+    LE_NAMESPACE_OPTION=
 else
     DISABLE_LE_OPTION=
+    if [[ "${TAG_WORKER}" == "false" ]]; then
+        LE_NAMESPACE_OPTION=
+    else
+        LE_NAMESPACE="le-seed-$(tr -cd '[:alnum:]' <<< ${KUBERMATIC_WORKERNAME} | tr '[:upper:]' '[:lower:]')"
+        kubectl create ns "$LE_NAMESPACE" || true
+        LE_NAMESPACE_OPTION="-leader-election-namespace=$LE_NAMESPACE"
+    fi
 fi
 
 if [[ "${DYNAMIC_DATACENTERS}" == "false" ]]; then
@@ -128,6 +138,7 @@ if [[ "${DEBUG}" == "true" ]]; then
       -backup-s3-secret-access-key=${SECRET_ACCESS_KEY} \
       -etcd-launcher-image=${ETCD_LAUNCHER_IMAGE} \
       ${DISABLE_LE_OPTION} \
+      ${LE_NAMESPACE_OPTION} \
       -v=8 $@
 
 else
@@ -163,6 +174,7 @@ else
       -backup-s3-secret-access-key=${SECRET_ACCESS_KEY} \
       -etcd-launcher-image=${ETCD_LAUNCHER_IMAGE} \
       ${DISABLE_LE_OPTION} \
+      ${LE_NAMESPACE_OPTION} \
       -v=6 $@
 
       # TODO
