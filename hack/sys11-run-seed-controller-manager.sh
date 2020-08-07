@@ -4,8 +4,10 @@
 # set -o pipefail
 # set -x
 
-: "${SRC_DIR:=$(go env GOPATH)/src/k8c.io/kubermatic}"
-: "${KUBERMATIC_WORKERNAME:=${KUBERMATIC_WORKERNAME:-$(uname -n)}}"
+cd "$(dirname $0)"
+
+: "${SRC_DIR:=$(cd ..; pwd)}"
+: "${KUBERMATIC_WORKERNAME:=${KUBERMATIC_WORKERNAME:-${USERNAME}}}"
 : "${INSTALLER_DIR:="$(go env GOPATH)/src/gitlab.syseleven.de/kubernetes/kubermatic-installer"}"
 : "${KUBERMATIC_ENV:=dev}"
 : "${KUBERMATIC_CLUSTER:=dbl1}"
@@ -49,6 +51,34 @@ kubectl --kubeconfig $seedKubeconfig config use-context $KUBERMATIC_CLUSTER
 
 defaultAddons=$(cat "${INSTALLER_DIR}/kubermatic/values.yaml" | yq '.kubermatic.controller.addons.kubernetes.defaultAddons | join(",")' -r)
 
+if [[ "${TAG_WORKER}" == "false" ]]; then
+    WORKER_OPTION=
+else
+    WORKER_OPTION="-worker-name=$(tr -cd '[:alnum:]' <<< ${KUBERMATIC_WORKERNAME} | tr '[:upper:]' '[:lower:]')"
+fi
+
+if [[ "${DISABLE_LEADER_ELECTION}" == "false" ]]; then
+    DISABLE_LE_OPTION=
+    if [[ "${TAG_WORKER}" == "false" ]]; then
+        LE_NAMESPACE_OPTION=
+    else
+        LE_NAMESPACE="le-seed-$(tr -cd '[:alnum:]' <<< ${KUBERMATIC_WORKERNAME} | tr '[:upper:]' '[:lower:]')"
+        kubectl create ns "$LE_NAMESPACE" || true
+        LE_NAMESPACE_OPTION="-leader-election-namespace=$LE_NAMESPACE"
+    fi
+else
+    DISABLE_LE_OPTION="-enable-leader-election=false"
+    LE_NAMESPACE_OPTION=
+fi
+
+if [[ "${DYNAMIC_DATACENTERS}" == "false" ]]; then
+    DC_OPTION="-datacenters=${CONFIG_DIR}/datacenters.yaml"
+elif [[ "${DYNAMIC_DATACENTERS}" == "true" ]]; then
+    DC_OPTION="-dynamic-datacenters=true"
+else
+    DC_OPTION=
+fi
+
 # TODO extract hack/sys11-store-container.yaml / hack/sys11-cleanup-container.yaml from the installer
 
 if [[ "${DEBUG}" == "true" ]]; then
@@ -90,6 +120,7 @@ if [[ "${DEBUG}" == "true" ]]; then
       -etcd-launcher-image=syseleven/etcd-launcher \
       -enable-leader-election=false \
       ${DISABLE_LE_OPTION} \
+      ${LE_NAMESPACE_OPTION} \
       -v=8 $@
 
     PID=$!
@@ -125,7 +156,8 @@ else
       -etcd-launcher-image=syseleven/etcd-launcher \
       -enable-leader-election=false \
       ${DISABLE_LE_OPTION} \
-      -v=4 $@
+      ${LE_NAMESPACE_OPTION} \
+      -v=6 $@
 
       # TODO
       #-in-cluster-prometheus-rules-file="$inClusterPrometheusRulesFile" \
