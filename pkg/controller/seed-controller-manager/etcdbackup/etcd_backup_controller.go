@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package backup
+package etcdbackup
 
 import (
 	"context"
@@ -44,7 +44,7 @@ import (
 )
 
 const (
-	ControllerName     = "kubermatic_backup_controller"
+	ControllerName     = "kubermatic_etcd_backup_controller"
 	defaultClusterSize = 3
 
 	// DeleteAllBackupsFinalizer indicates that the backups still need to be deleted in the backend
