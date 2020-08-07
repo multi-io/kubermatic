@@ -22,11 +22,11 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
-	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"github.com/minio/minio-go"
-	"go.etcd.io/etcd/clientv3"
+	"go.etcd.io/etcd/v3/clientv3"
 	"go.uber.org/zap"
 	"io"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"os"
 	"time"
 )
