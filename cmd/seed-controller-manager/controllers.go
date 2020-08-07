@@ -21,9 +21,11 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"time"
 
 	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/addon"
 	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/addoninstaller"
+	backupcontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/backup"
 	cloudcontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/cloud"
 	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/clustercomponentdefaulter"
 	etcdbackupcontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/etcdbackup"
@@ -51,6 +53,7 @@ var AllControllers = map[string]controllerCreator{
 	addon.ControllerName:                          createAddonController,
 	addoninstaller.ControllerName:                 createAddonInstallerController,
 	etcdbackupcontroller.ControllerName:           createEtcdBackupController,
+	backupcontroller.ControllerName:               createBackupController,
 	monitoring.ControllerName:                     createMonitoringController,
 	cloudcontroller.ControllerName:                createCloudController,
 	openshiftcontroller.ControllerName:            createOpenshiftController,
@@ -187,6 +190,31 @@ func createEtcdBackupController(ctrlCtx *controllerContext) error {
 		ctrlCtx.runOptions.backupS3BucketName,
 		ctrlCtx.runOptions.backupS3AccessKeyID,
 		ctrlCtx.runOptions.backupS3SecretAccessKey,
+	)
+}
+
+func createBackupController(ctrlCtx *controllerContext) error {
+	storeContainer, err := getContainerFromFile(ctrlCtx.runOptions.backupContainerFile)
+	if err != nil {
+		return err
+	}
+	cleanupContainer, err := getContainerFromFile(ctrlCtx.runOptions.cleanupContainerFile)
+	if err != nil {
+		return err
+	}
+	backupInterval, err := time.ParseDuration(ctrlCtx.runOptions.backupInterval)
+	if err != nil {
+		return fmt.Errorf("failed to parse %s as duration: %v", ctrlCtx.runOptions.backupInterval, err)
+	}
+	return backupcontroller.Add(
+		ctrlCtx.log,
+		ctrlCtx.mgr,
+		ctrlCtx.runOptions.workerCount,
+		ctrlCtx.runOptions.workerName,
+		*storeContainer,
+		*cleanupContainer,
+		backupInterval,
+		ctrlCtx.runOptions.backupContainerImage,
 	)
 }
 

@@ -33,7 +33,7 @@ type caGetter func() (*triple.KeyPair, error)
 func GetClientCertificateCreator(name, commonName string, organizations []string, dataCertKey, dataKeyKey string, getCA caGetter) reconciling.NamedSecretCreatorGetter {
 	return func() (string, reconciling.SecretCreator) {
 		return name, func(se *corev1.Secret) (*corev1.Secret, error) {
-			// TODO: Remove this after the backupschedule controller has been adapter to the new reconciling behaviour
+			// TODO: Remove this after the backup controller has been adapter to the new reconciling behaviour
 			if se == nil {
 				se = &corev1.Secret{}
 			}
