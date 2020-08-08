@@ -14,22 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package etcd
 
 import (
-	"fmt"
-	"time"
+	"k8c.io/kubermatic/v2/pkg/controller/master-controller-manager/rbac"
+	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 
-	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	corev1 "k8s.io/api/core/v1"
 )
 
-const (
-	UserClusterAPIServerServiceSuffixLength = 6
-
-	// Amount of time to wait until at least one pod is running
-	DefaultPodPortForwardWaitTimeout = 60 * time.Second
-)
-
-func GenerateName(base, buildID string) string {
-	return fmt.Sprintf("%s-%s-%s", base, buildID, utilrand.String(UserClusterAPIServerServiceSuffixLength))
+// ServiceAccountCreator returns a func to create/update the ServiceAccount used by etcd launcher.
+func ServiceAccountCreator() (string, reconciling.ServiceAccountCreator) {
+	return rbac.EtcdLauncherServiceAccountName, func(sa *corev1.ServiceAccount) (*corev1.ServiceAccount, error) {
+		return sa, nil
+	}
 }
