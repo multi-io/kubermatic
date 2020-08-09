@@ -81,6 +81,9 @@ func DeploymentCreator(data *resources.TemplateData, enableOIDCAuthentication bo
 			if data.Cluster().Spec.ComponentsOverride.Apiserver.Replicas != nil {
 				dep.Spec.Replicas = data.Cluster().Spec.ComponentsOverride.Apiserver.Replicas
 			}
+			if data.Cluster().Spec.ComponentsOverride.Apiserver.Down != nil && *data.Cluster().Spec.ComponentsOverride.Apiserver.Down {
+				dep.Spec.Replicas = resources.Int32(0)
+			}
 
 			dep.Spec.Selector = &metav1.LabelSelector{
 				MatchLabels: resources.BaseAppLabels(name, nil),

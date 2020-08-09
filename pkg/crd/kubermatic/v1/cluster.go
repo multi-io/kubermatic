@@ -303,6 +303,7 @@ type ComponentSettings struct {
 type APIServerSettings struct {
 	DeploymentSettings `json:",inline"`
 
+	Down                        *bool `json:"down,omitempty"`
 	EndpointReconcilingDisabled *bool `json:"endpointReconcilingDisabled,omitempty"`
 }
 
