@@ -29,6 +29,7 @@ import (
 	cloudcontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/cloud"
 	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/clustercomponentdefaulter"
 	etcdbackupcontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/etcdbackup"
+	etcdrestorecontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/etcdrestore"
 	kubernetescontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/kubernetes"
 	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/monitoring"
 	openshiftcontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/openshift"
@@ -55,6 +56,7 @@ var AllControllers = map[string]controllerCreator{
 	addoninstaller.ControllerName:                 createAddonInstallerController,
 	etcdbackupcontroller.ControllerName:           createEtcdBackupController,
 	backupcontroller.ControllerName:               createBackupController,
+	etcdrestorecontroller.ControllerName:          createEtcdRestoreController,
 	monitoring.ControllerName:                     createMonitoringController,
 	cloudcontroller.ControllerName:                createCloudController,
 	openshiftcontroller.ControllerName:            createOpenshiftController,
@@ -159,6 +161,10 @@ func createKubernetesController(ctrlCtx *controllerContext) error {
 		ctrlCtx.runOptions.nodePortRange,
 		ctrlCtx.runOptions.nodeAccessNetwork,
 		ctrlCtx.runOptions.etcdDiskSize,
+		ctrlCtx.runOptions.backupS3Endpoint,
+		ctrlCtx.runOptions.backupS3BucketName,
+		ctrlCtx.runOptions.backupS3AccessKeyID,
+		ctrlCtx.runOptions.backupS3SecretAccessKey,
 		ctrlCtx.runOptions.monitoringScrapeAnnotationPrefix,
 		ctrlCtx.runOptions.inClusterPrometheusRulesFile,
 		ctrlCtx.runOptions.inClusterPrometheusDisableDefaultRules,
@@ -217,6 +223,19 @@ func createBackupController(ctrlCtx *controllerContext) error {
 		*cleanupContainer,
 		backupInterval,
 		ctrlCtx.runOptions.backupContainerImage,
+	)
+}
+
+func createEtcdRestoreController(ctrlCtx *controllerContext) error {
+	return etcdrestorecontroller.Add(
+		ctrlCtx.mgr,
+		ctrlCtx.log,
+		ctrlCtx.runOptions.workerCount,
+		ctrlCtx.runOptions.workerName,
+		ctrlCtx.runOptions.backupSnapshotDir,
+		ctrlCtx.runOptions.backupS3Endpoint,
+		ctrlCtx.runOptions.backupS3BucketName,
+		ctrlCtx.runOptions.backupS3AccessKeyID,
 	)
 }
 

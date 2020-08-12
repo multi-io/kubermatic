@@ -20,6 +20,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	providerconfig "github.com/kubermatic/machine-controller/pkg/providerconfig/types"
 
@@ -160,6 +161,7 @@ const (
 	ClusterConditionAddonControllerReconcilingSuccess          ClusterConditionType = "AddonControllerReconciledSuccessfully"
 	ClusterConditionAddonInstallerControllerReconcilingSuccess ClusterConditionType = "AddonInstallerControllerReconciledSuccessfully"
 	ClusterConditionBackupControllerReconcilingSuccess         ClusterConditionType = "BackupControllerReconciledSuccessfully"
+	ClusterConditionEtcdRestoreControllerReconcilingSuccess    ClusterConditionType = "EtcdRestoreControllerReconciledSuccessfully"
 	ClusterConditionBackupScheduleControllerReconcilingSuccess ClusterConditionType = "BackupScheduleControllerReconciledSuccessfully"
 	ClusterConditionCloudControllerReconcilingSuccess          ClusterConditionType = "CloudControllerReconcilledSuccessfully"
 	ClusterConditionComponentDefaulterReconcilingSuccess       ClusterConditionType = "ComponentDefaulterReconciledSuccessfully"
@@ -182,6 +184,7 @@ var AllClusterConditionTypes = []ClusterConditionType{
 	ClusterConditionClusterControllerReconcilingSuccess,
 	ClusterConditionAddonControllerReconcilingSuccess,
 	ClusterConditionBackupControllerReconcilingSuccess,
+	ClusterConditionEtcdRestoreControllerReconcilingSuccess,
 	ClusterConditionBackupScheduleControllerReconcilingSuccess,
 	ClusterConditionCloudControllerReconcilingSuccess,
 	ClusterConditionComponentDefaulterReconcilingSuccess,
@@ -308,8 +311,9 @@ type APIServerSettings struct {
 }
 
 type DeploymentSettings struct {
-	Replicas  *int32                       `json:"replicas,omitempty"`
-	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+	Replicas    *int32                       `json:"replicas,omitempty"`
+	Resources   *corev1.ResourceRequirements `json:"resources,omitempty"`
+	Tolerations []corev1.Toleration          `json:"tolerations,omitempty"`
 }
 
 type StatefulSetSettings struct {
@@ -317,8 +321,11 @@ type StatefulSetSettings struct {
 }
 
 type EtcdStatefulSetSettings struct {
-	ClusterSize int                          `json:"clusterSize,omitempty"`
-	Resources   *corev1.ResourceRequirements `json:"resources,omitempty"`
+	ClusterSize  int                          `json:"clusterSize,omitempty"`
+	StorageClass string                       `json:"storageClass,omitempty"`
+	DiskSize     *resource.Quantity           `json:"diskSize,omitempty"`
+	Resources    *corev1.ResourceRequirements `json:"resources,omitempty"`
+	Tolerations  []corev1.Toleration          `json:"tolerations,omitempty"`
 }
 
 // ClusterNetworkingConfig specifies the different networking

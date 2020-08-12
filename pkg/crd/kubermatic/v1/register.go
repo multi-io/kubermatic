@@ -57,6 +57,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ClusterList{},
 		&EtcdBackup{},
 		&EtcdBackupList{},
+		&EtcdRestore{},
+		&EtcdRestoreList{},
 		&User{},
 		&UserList{},
 		&Project{},

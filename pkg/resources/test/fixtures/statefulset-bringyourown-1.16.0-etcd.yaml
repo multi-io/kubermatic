@@ -84,6 +84,9 @@ spec:
           value: /etc/etcd/pki/client/apiserver-etcd-client.crt
         - name: ETCDCTL_KEY
           value: /etc/etcd/pki/client/apiserver-etcd-client.key
+        envFrom:
+        - secretRef:
+            name: backup-s3-settings
         image: gcr.io/etcd-development/etcd:v3.3.18
         imagePullPolicy: IfNotPresent
         livenessProbe:
@@ -136,6 +139,12 @@ spec:
           readOnly: true
         - mountPath: /opt/bin/
           name: launcher
+        - mountPath: /etc/ssl/certs
+          name: ca-certs
+          readOnly: true
+        - mountPath: /usr/share/ca-certificates
+          name: usr-share-ca-certificates
+          readOnly: true
       imagePullSecrets:
       - name: dockercfg
       initContainers:
@@ -166,6 +175,14 @@ spec:
           secretName: apiserver-etcd-client-certificate
       - emptyDir: {}
         name: launcher
+      - hostPath:
+          path: /etc/ssl/certs
+          type: DirectoryOrCreate
+        name: ca-certs
+      - hostPath:
+          path: /usr/share/ca-certificates
+          type: DirectoryOrCreate
+        name: usr-share-ca-certificates
   updateStrategy:
     type: RollingUpdate
   volumeClaimTemplates:

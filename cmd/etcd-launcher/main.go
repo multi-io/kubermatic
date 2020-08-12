@@ -21,11 +21,14 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/minio/minio-go"
+	"go.etcd.io/etcd/v3/clientv3/snapshot"
 	"log"
 	"net/url"
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -55,15 +58,19 @@ const (
 )
 
 type config struct {
-	namespace             string
-	clusterSize           int
-	podName               string
-	podIP                 string
-	etcdctlAPIVersion     string
-	dataDir               string
-	token                 string
-	enableCorruptionCheck bool
-	initialState          string
+	namespace               string
+	clusterSize             int
+	podName                 string
+	podIP                   string
+	etcdctlAPIVersion       string
+	dataDir                 string
+	token                   string
+	enableCorruptionCheck   bool
+	initialState            string
+	backupS3Endpoint        string
+	backupS3BucketName      string
+	backupS3AccessKeyID     string
+	backupS3SecretAccessKey string
 }
 
 type etcdCluster struct {
@@ -98,10 +105,14 @@ func main() {
 	}
 	initialMembers := initialMemberList(e.config.clusterSize, e.config.namespace)
 
-	e.config.initialState = initialStateNew
 	// check if the etcd cluster is initialized succcessfully.
 	if k8cCluster.Status.HasConditionValue(kubermaticv1.ClusterConditionEtcdClusterInitialized, corev1.ConditionTrue) {
 		e.config.initialState = initialStateExisting
+	} else {
+		e.config.initialState = initialStateNew
+		if err := e.restoreDatadirFromBackupIfNeeded(context.Background(), &k8cCluster, clusterClient, log); err != nil {
+			log.Fatalw("failed to restore datadir from backup", zap.Error(err))
+		}
 	}
 
 	log.Info("initializing etcd..")
@@ -250,6 +261,11 @@ func (e *etcdCluster) parseConfigFlags() error {
 	flag.BoolVar(&config.enableCorruptionCheck, "enable-corruption-check", false, "enable etcd experimental corruption check")
 	flag.Parse()
 
+	config.backupS3Endpoint = os.Getenv(resources.EtcdBackupS3EndpointSecretKey)
+	config.backupS3BucketName = os.Getenv(resources.EtcdBackupS3BucketNameSecretKey)
+	config.backupS3AccessKeyID = os.Getenv(resources.EtcdBackupS3AccessKeyIDSecretKey)
+	config.backupS3SecretAccessKey = os.Getenv(resources.EtcdBackupS3SecretAccessKeySecretKey)
+
 	if config.namespace == "" {
 		return errors.New("-namespace is not set")
 	}
@@ -272,6 +288,22 @@ func (e *etcdCluster) parseConfigFlags() error {
 
 	if config.token == "" {
 		return errors.New("-token is not set")
+	}
+
+	if config.backupS3Endpoint == "" {
+		config.backupS3Endpoint = "s3.amazonaws.com"
+	}
+
+	if config.backupS3BucketName == "" {
+		return errors.New("s3 bucket name is not set")
+	}
+
+	if config.backupS3AccessKeyID == "" {
+		return errors.New("s3 access key ID is not set")
+	}
+
+	if config.backupS3SecretAccessKey == "" {
+		return errors.New("s3 secret access key is not set")
 	}
 
 	config.dataDir = fmt.Sprintf("/var/run/etcd/pod_%s/", config.podName)
@@ -475,4 +507,65 @@ func (e *etcdCluster) removeDeadMembers(log *zap.SugaredLogger) error {
 		}
 	}
 	return nil
+}
+
+func (e *etcdCluster) restoreDatadirFromBackupIfNeeded(ctx context.Context, k8cCluster *kubermaticv1.Cluster, client ctrlruntimeclient.Client, log *zap.SugaredLogger) error {
+	restoreList := &kubermaticv1.EtcdRestoreList{}
+	if err := client.List(ctx, restoreList, &ctrlruntimeclient.ListOptions{Namespace: k8cCluster.Status.NamespaceName}); err != nil {
+		return fmt.Errorf("failed to list EtcdRestores: %w", err)
+	}
+
+	var activeRestore *kubermaticv1.EtcdRestore
+	for _, restore := range restoreList.Items {
+		if restore.Status.Phase == kubermaticv1.EtcdRestorePhaseStsRebuilding {
+			if activeRestore != nil {
+				return fmt.Errorf("found more than one restore in state %v, refusing to restore anything", kubermaticv1.EtcdRestorePhaseStsRebuilding)
+			}
+			activeRestore = restore.DeepCopy()
+		}
+	}
+	if activeRestore == nil {
+		// no active restores for this cluster
+		return nil
+	}
+
+	log.Infow("restoring datadir from backup", "backup-name", activeRestore.Spec.BackupName)
+
+	s3Client, err := e.getS3Client()
+	if err != nil {
+		return fmt.Errorf("failed to get s3 client: %w", err)
+	}
+
+	objectName := fmt.Sprintf("%s-%s", k8cCluster.GetName(), activeRestore.Spec.BackupName)
+	downloadedSnapshotFile := fmt.Sprintf("/tmp/%s", objectName)
+
+	if err := s3Client.FGetObject(e.config.backupS3BucketName, objectName, downloadedSnapshotFile, minio.GetObjectOptions{}); err != nil {
+		return fmt.Errorf("failed to download backup (%s/%s): %w", e.config.backupS3BucketName, objectName, err)
+	}
+
+	if err := os.RemoveAll(e.config.dataDir); err != nil {
+		return fmt.Errorf("error deleting data directory before restore (%s): %w", e.config.dataDir, err)
+	}
+
+	sp := snapshot.NewV3(log.Desugar())
+
+	return sp.Restore(snapshot.RestoreConfig{
+		SnapshotPath:        downloadedSnapshotFile,
+		Name:                e.config.podName,
+		OutputDataDir:       e.config.dataDir,
+		OutputWALDir:        filepath.Join(e.config.dataDir, "member", "wal"),
+		PeerURLs:            []string{fmt.Sprintf("https://%s.etcd.%s.svc.cluster.local:2380", e.config.podName, e.config.namespace)},
+		InitialCluster:      strings.Join(initialMemberList(e.config.clusterSize, e.config.namespace), ","),
+		InitialClusterToken: e.config.token,
+		SkipHashCheck:       false,
+	})
+}
+
+func (e *etcdCluster) getS3Client() (*minio.Client, error) {
+	client, err := minio.New(e.config.backupS3Endpoint, e.config.backupS3AccessKeyID, e.config.backupS3SecretAccessKey, true)
+	if err != nil {
+		return nil, err
+	}
+	client.SetAppInfo("kubermatic", "v0.1")
+	return client, nil
 }

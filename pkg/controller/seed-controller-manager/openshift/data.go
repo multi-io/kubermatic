@@ -51,6 +51,10 @@ type openshiftData struct {
 	nodeAccessNetwork                     string
 	oidc                                  OIDCConfig
 	etcdDiskSize                          resource.Quantity
+	backupS3Endpoint                      string
+	backupS3BucketName                    string
+	backupS3AccessKeyID                   string
+	backupS3SecretAccessKey               string
 	etcdLauncherImage                     string
 	kubermaticImage                       string
 	dnatControllerImage                   string
@@ -236,6 +240,22 @@ func (od *openshiftData) GetDexCA() ([]*x509.Certificate, error) {
 
 func (od *openshiftData) EtcdDiskSize() resource.Quantity {
 	return od.etcdDiskSize
+}
+
+func (od *openshiftData) BackupS3Endpoint() string {
+	return od.backupS3Endpoint
+}
+
+func (od *openshiftData) BackupS3BucketName() string {
+	return od.backupS3BucketName
+}
+
+func (od *openshiftData) BackupS3AccessKeyID() string {
+	return od.backupS3AccessKeyID
+}
+
+func (od *openshiftData) BackupS3SecretAccessKey() string {
+	return od.backupS3SecretAccessKey
 }
 
 func (od *openshiftData) EtcdLauncherImage() string {

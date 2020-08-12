@@ -117,6 +117,13 @@ func StatefulSetCreator(data etcdStatefulSetCreatorData, enableDataCorruptionChe
 					Image:           data.ImageRegistry(resources.RegistryGCR) + "/etcd-development/etcd:" + ImageTag(data.Cluster()),
 					ImagePullPolicy: corev1.PullIfNotPresent,
 					Command:         []string{"/opt/bin/etcd-launcher"}, Args: getLauncherArgs(enableDataCorruptionChecks),
+					EnvFrom: []corev1.EnvFromSource{
+						{
+							SecretRef: &corev1.SecretEnvSource{
+								LocalObjectReference: corev1.LocalObjectReference{Name: resources.EtcdBackupS3SettingsSecretName},
+							},
+						},
+					},
 					Env: []corev1.EnvVar{
 						{
 							Name: "POD_NAME",
@@ -241,6 +248,11 @@ func StatefulSetCreator(data etcdStatefulSetCreatorData, enableDataCorruptionChe
 					},
 				},
 			}
+
+			set.Spec.Template.Spec.Containers[0].VolumeMounts = append(set.Spec.Template.Spec.Containers[0].VolumeMounts, resources.GetHostCACertVolumeMounts()...)
+
+			set.Spec.Template.Spec.Tolerations = data.Cluster().Spec.ComponentsOverride.Etcd.Tolerations
+
 			err = resources.SetResourceRequirements(set.Spec.Template.Spec.Containers, defaultResourceRequirements, resources.GetOverrides(data.Cluster().Spec.ComponentsOverride), set.Annotations)
 			if err != nil {
 				return nil, fmt.Errorf("failed to set resource requirements: %v", err)
@@ -255,10 +267,17 @@ func StatefulSetCreator(data etcdStatefulSetCreatorData, enableDataCorruptionChe
 
 			set.Spec.Template.Spec.Volumes = volumes
 
-			// Make sure, we don't change size of existing pvc's
-			// Phase needs to be taken from an existing
-			diskSize := data.EtcdDiskSize()
+			// Make sure we don't change volume claim template of existing sts
 			if len(set.Spec.VolumeClaimTemplates) == 0 {
+				storageClass := data.Cluster().Spec.ComponentsOverride.Etcd.StorageClass
+				if storageClass == "" {
+					storageClass = "kubermatic-fast"
+				}
+				diskSize := data.Cluster().Spec.ComponentsOverride.Etcd.DiskSize
+				if diskSize == nil {
+					d := data.EtcdDiskSize()
+					diskSize = &d
+				}
 				set.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -266,10 +285,10 @@ func StatefulSetCreator(data etcdStatefulSetCreatorData, enableDataCorruptionChe
 							OwnerReferences: []metav1.OwnerReference{data.GetClusterRef()},
 						},
 						Spec: corev1.PersistentVolumeClaimSpec{
-							StorageClassName: resources.String("kubermatic-fast"),
+							StorageClassName: resources.String(storageClass),
 							AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 							Resources: corev1.ResourceRequirements{
-								Requests: corev1.ResourceList{corev1.ResourceStorage: diskSize},
+								Requests: corev1.ResourceList{corev1.ResourceStorage: *diskSize},
 							},
 						},
 					},
@@ -282,7 +301,7 @@ func StatefulSetCreator(data etcdStatefulSetCreatorData, enableDataCorruptionChe
 }
 
 func getVolumes() []corev1.Volume {
-	return []corev1.Volume{
+	return append([]corev1.Volume{
 		{
 			Name: resources.EtcdTLSCertificateSecretName,
 			VolumeSource: corev1.VolumeSource{
@@ -319,7 +338,7 @@ func getVolumes() []corev1.Volume {
 				EmptyDir: &corev1.EmptyDirVolumeSource{},
 			},
 		},
-	}
+	}, resources.GetHostCACertVolumes()...)
 }
 
 func getBasePodLabels(cluster *kubermaticv1.Cluster) map[string]string {
