@@ -84,6 +84,9 @@ spec:
           value: /etc/etcd/pki/client/apiserver-etcd-client.crt
         - name: ETCDCTL_KEY
           value: /etc/etcd/pki/client/apiserver-etcd-client.key
+        envFrom:
+        - secretRef:
+            name: backup-s3-settings
         image: gcr.io/etcd-development/etcd:v3.4.3
         imagePullPolicy: IfNotPresent
         livenessProbe:

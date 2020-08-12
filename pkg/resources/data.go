@@ -47,6 +47,10 @@ type TemplateData struct {
 	nodePortRange                                    string
 	nodeAccessNetwork                                string
 	etcdDiskSize                                     resource.Quantity
+	backupS3Endpoint                                 string
+	backupS3BucketName                               string
+	backupS3AccessKeyID                              string
+	backupS3SecretAccessKey                          string
 	monitoringScrapeAnnotationPrefix                 string
 	inClusterPrometheusRulesFile                     string
 	inClusterPrometheusDisableDefaultRules           bool
@@ -73,6 +77,10 @@ func NewTemplateData(
 	nodePortRange string,
 	nodeAccessNetwork string,
 	etcdDiskSize resource.Quantity,
+	backupS3Endpoint string,
+	backupS3BucketName string,
+	backupS3AccessKeyID string,
+	backupS3SecretAccessKey string,
 	monitoringScrapeAnnotationPrefix string,
 	inClusterPrometheusRulesFile string,
 	inClusterPrometheusDisableDefaultRules bool,
@@ -96,6 +104,10 @@ func NewTemplateData(
 		nodePortRange:                          nodePortRange,
 		nodeAccessNetwork:                      nodeAccessNetwork,
 		etcdDiskSize:                           etcdDiskSize,
+		backupS3Endpoint:                       backupS3Endpoint,
+		backupS3BucketName:                     backupS3BucketName,
+		backupS3AccessKeyID:                    backupS3AccessKeyID,
+		backupS3SecretAccessKey:                backupS3SecretAccessKey,
 		monitoringScrapeAnnotationPrefix:       monitoringScrapeAnnotationPrefix,
 		inClusterPrometheusRulesFile:           inClusterPrometheusRulesFile,
 		inClusterPrometheusDisableDefaultRules: inClusterPrometheusDisableDefaultRules,
@@ -172,6 +184,26 @@ func (d *TemplateData) EtcdLauncherImage() string {
 		imageWithoutRegistry = strings.Join(imageSplit[1:], "/")
 	}
 	return d.ImageRegistry(registry) + "/" + imageWithoutRegistry
+}
+
+// BackupS3Endpoint returns the S3 endpoint to use for downloading backups to restore from
+func (d *TemplateData) BackupS3Endpoint() string {
+	return d.backupS3Endpoint
+}
+
+// BackupS3Endpoint returns the S3 bucket name to use for downloading backups to restore from
+func (d *TemplateData) BackupS3BucketName() string {
+	return d.backupS3BucketName
+}
+
+// BackupS3Endpoint returns the S3 access key ID to use for downloading backups to restore from
+func (d *TemplateData) BackupS3AccessKeyID() string {
+	return d.backupS3AccessKeyID
+}
+
+// BackupS3Endpoint returns the S3 secret access key to use for downloading backups to restore from
+func (d *TemplateData) BackupS3SecretAccessKey() string {
+	return d.backupS3SecretAccessKey
 }
 
 // MonitoringScrapeAnnotationPrefix returns the scrape annotation prefix

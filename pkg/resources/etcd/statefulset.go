@@ -116,6 +116,13 @@ func StatefulSetCreator(data etcdStatefulSetCreatorData, enableDataCorruptionChe
 					Image:           data.ImageRegistry(resources.RegistryGCR) + "/etcd-development/etcd:" + ImageTag(data.Cluster()),
 					ImagePullPolicy: corev1.PullIfNotPresent,
 					Command:         []string{"/opt/bin/etcd-launcher"}, Args: getLauncherArgs(enableDataCorruptionChecks),
+					EnvFrom: []corev1.EnvFromSource{
+						{
+							SecretRef: &corev1.SecretEnvSource{
+								LocalObjectReference: corev1.LocalObjectReference{Name: resources.EtcdBackupS3SettingsSecretName},
+							},
+						},
+					},
 					Env: []corev1.EnvVar{
 						{
 							Name: "POD_NAME",

@@ -96,6 +96,10 @@ type Reconciler struct {
 	overwriteRegistry        string
 	nodeAccessNetwork        string
 	etcdDiskSize             resource.Quantity
+	backupS3Endpoint         string
+	backupS3BucketName       string
+	backupS3AccessKeyID      string
+	backupS3SecretAccessKey  string
 	dockerPullConfigJSON     []byte
 	workerName               string
 	externalURL              string
@@ -382,6 +386,7 @@ func (r *Reconciler) getAllSecretCreators(ctx context.Context, osData *openshift
 		resources.ImagePullSecretCreator(r.dockerPullConfigJSON),
 		apiserver.FrontProxyClientCertificateCreator(osData),
 		etcd.TLSCertificateCreator(osData),
+		etcd.BackupS3SettingsSecretCreator(osData),
 		apiserver.EtcdClientCertificateCreator(osData),
 		apiserver.TLSServingCertificateCreator(osData),
 		apiserver.KubeletClientCertificateCreator(osData),

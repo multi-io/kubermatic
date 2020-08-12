@@ -21,6 +21,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"k8c.io/kubermatic/v2/pkg/resources"
 	"log"
 	"os"
 	"os/exec"
@@ -50,15 +51,19 @@ const (
 )
 
 type config struct {
-	namespace             string
-	clusterSize           int
-	podName               string
-	podIP                 string
-	etcdctlAPIVersion     string
-	dataDir               string
-	token                 string
-	enableCorruptionCheck bool
-	initialState          string
+	namespace               string
+	clusterSize             int
+	podName                 string
+	podIP                   string
+	etcdctlAPIVersion       string
+	dataDir                 string
+	token                   string
+	enableCorruptionCheck   bool
+	initialState            string
+	backupS3Endpoint        string
+	backupS3BucketName      string
+	backupS3AccessKeyID     string
+	backupS3SecretAccessKey string
 }
 
 type etcdCluster struct {
@@ -202,6 +207,11 @@ func (e *etcdCluster) parseConfigFlags() error {
 	flag.BoolVar(&config.enableCorruptionCheck, "enable-corruption-check", false, "enable etcd experimental corruption check")
 	flag.Parse()
 
+	config.backupS3Endpoint = os.Getenv(resources.EtcdBackupS3EndpointSecretKey)
+	config.backupS3BucketName = os.Getenv(resources.EtcdBackupS3BucketNameSecretKey)
+	config.backupS3AccessKeyID = os.Getenv(resources.EtcdBackupS3AccessKeyIDSecretKey)
+	config.backupS3SecretAccessKey = os.Getenv(resources.EtcdBackupS3SecretAccessKeySecretKey)
+
 	if config.namespace == "" {
 		return errors.New("-namespace is not set")
 	}
@@ -224,6 +234,22 @@ func (e *etcdCluster) parseConfigFlags() error {
 
 	if config.token == "" {
 		return errors.New("-token is not set")
+	}
+
+	if config.backupS3Endpoint == "" {
+		config.backupS3Endpoint = "s3.amazonaws.com"
+	}
+
+	if config.backupS3BucketName == "" {
+		return errors.New("s3 bucket name is not set")
+	}
+
+	if config.backupS3AccessKeyID == "" {
+		return errors.New("s3 access key ID is not set")
+	}
+
+	if config.backupS3SecretAccessKey == "" {
+		return errors.New("s3 secret access key is not set")
 	}
 
 	config.dataDir = fmt.Sprintf("/var/run/etcd/pod_%s/", config.podName)
