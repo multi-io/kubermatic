@@ -20,6 +20,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	providerconfig "github.com/kubermatic/machine-controller/pkg/providerconfig/types"
 
@@ -317,8 +318,10 @@ type StatefulSetSettings struct {
 }
 
 type EtcdStatefulSetSettings struct {
-	ClusterSize int                          `json:"clusterSize,omitempty"`
-	Resources   *corev1.ResourceRequirements `json:"resources,omitempty"`
+	ClusterSize  int                          `json:"clusterSize,omitempty"`
+	StorageClass string                       `json:"storageClass,omitempty"`
+	DiskSize     *resource.Quantity           `json:"diskSize,omitempty"`
+	Resources    *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 // ClusterNetworkingConfig specifies the different networking

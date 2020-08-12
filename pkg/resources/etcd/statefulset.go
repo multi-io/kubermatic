@@ -261,10 +261,17 @@ func StatefulSetCreator(data etcdStatefulSetCreatorData, enableDataCorruptionChe
 
 			set.Spec.Template.Spec.Volumes = volumes
 
-			// Make sure, we don't change size of existing pvc's
-			// Phase needs to be taken from an existing
-			diskSize := data.EtcdDiskSize()
+			// Make sure we don't change volume claim template of existing sts
 			if len(set.Spec.VolumeClaimTemplates) == 0 {
+				storageClass := data.Cluster().Spec.ComponentsOverride.Etcd.StorageClass
+				if storageClass == "" {
+					storageClass = "kubermatic-fast"
+				}
+				diskSize := data.Cluster().Spec.ComponentsOverride.Etcd.DiskSize
+				if diskSize == nil {
+					d := data.EtcdDiskSize()
+					diskSize = &d
+				}
 				set.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -272,10 +279,10 @@ func StatefulSetCreator(data etcdStatefulSetCreatorData, enableDataCorruptionChe
 							OwnerReferences: []metav1.OwnerReference{data.GetClusterRef()},
 						},
 						Spec: corev1.PersistentVolumeClaimSpec{
-							StorageClassName: resources.String("kubermatic-fast"),
+							StorageClassName: resources.String(storageClass),
 							AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 							Resources: corev1.ResourceRequirements{
-								Requests: corev1.ResourceList{corev1.ResourceStorage: diskSize},
+								Requests: corev1.ResourceList{corev1.ResourceStorage: *diskSize},
 							},
 						},
 					},
