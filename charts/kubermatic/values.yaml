@@ -120,6 +120,11 @@ kubermatic:
           repository: "quay.io/kubermatic/openshift-addons"
           tag: "__KUBERMATIC_TAG__"
           pullPolicy: "IfNotPresent"
+    etcdBackups:
+      s3Endpoint: s3.amazonaws.com
+      s3Bucket:
+      s3AccessKeyId:
+      s3SecretAccessKey:
     # Specify a custom docker registry which will be used for all images (user cluster control plane + addons)
     overwriteRegistry: ""
     resources:

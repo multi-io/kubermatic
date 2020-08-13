@@ -95,6 +95,11 @@ spec:
         {{- else }}
         - -openshift-addons-list={{ join "," .Values.kubermatic.controller.addons.openshift.defaultAddons }}
         {{- end }}
+        - -backup-snapshot-dir=/backup-snapshots
+        - -backup-s3-endpoint={{ .Values.kubermatic.controller.etcdBackups.s3Endpoint }}
+        - -backup-s3-bucket={{ .Values.kubermatic.controller.etcdBackups.s3Bucket }}
+        - -backup-s3-access-key={{ .Values.kubermatic.controller.etcdBackups.s3AccessKeyId }}
+        - -backup-s3-secret-access-key={{ .Values.kubermatic.controller.etcdBackups.s3SecretAccessKey }}
         - -overwrite-registry={{ .Values.kubermatic.controller.overwriteRegistry }}
         - -backup-container=/opt/backup/store-container.yaml
         - -cleanup-container=/opt/backup/cleanup-container.yaml
@@ -176,6 +181,9 @@ spec:
           mountPath: "/opt/datacenter/"
           readOnly: true
         {{- end }}
+        - name: backup-snapshots
+          mountPath: "/backup-snapshots/"
+          readOnly: false
         - name: addons
           mountPath: "/opt/addons/"
           readOnly: true
@@ -216,6 +224,8 @@ spec:
           secretName: datacenters
       {{- end }}
       - name: addons
+        emptyDir: {}
+      - name: backup-snapshots
         emptyDir: {}
       - name: backup-container
         configMap:
