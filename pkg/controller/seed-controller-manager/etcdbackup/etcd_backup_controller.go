@@ -21,9 +21,6 @@ package etcdbackup
 import (
 	"context"
 	"fmt"
-	"reflect"
-	"time"
-
 	"github.com/robfig/cron"
 	"go.uber.org/zap"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
@@ -36,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/tools/record"
+	"reflect"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -157,11 +155,6 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 }
 
 func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) (*reconcile.Result, error) {
-	if cluster.Status.ExtendedHealth.Apiserver != kubermaticv1.HealthStatusUp {
-		log.Debug("API server is not running, trying again in 10 seconds")
-		return &reconcile.Result{RequeueAfter: 10 * time.Second}, nil
-	}
-
 	if backup.DeletionTimestamp != nil {
 		log.Debug("Cleaning up all backups")
 		return nil, wrapErrorMessage("error cleaning up all backups: %v", r.deleteAllBackups(ctx, log, backup))
