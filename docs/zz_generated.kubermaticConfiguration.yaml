@@ -353,6 +353,8 @@ spec:
         dockerRepository: quay.io/kubermatic/openshift-addons
     # APIServerReplicas configures the replica count for the API-Server deployment inside user clusters.
     apiserverReplicas: 2
+    # DefaultClusterOverridesConfigMap is the name of the configmap with default components override settings.
+    defaultClusterOverridesConfigMap: ""
     # DisableAPIServerEndpointReconciling can be used to toggle the `--endpoint-reconciler-type` flag for
     # the Kubernetes API server.
     disableApiserverEndpointReconciling: false
