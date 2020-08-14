@@ -59,7 +59,7 @@ var AllControllers = map[string]controllerCreator{
 	clustercomponentdefaulter.ControllerName:      createClusterComponentDefaulter,
 	seedresourcesuptodatecondition.ControllerName: createSeedConditionUpToDateController,
 	rancher.ControllerName:                        createRancherController,
-	pvwatcher.ControllerName:                      createPvWatcherController,
+        pvwatcher.ControllerName:                      createPvWatcherController,
 }
 
 type controllerCreator func(*controllerContext) error
