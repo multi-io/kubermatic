@@ -21,7 +21,7 @@ REPO=$(DOCKER_REPO)/kubermatic$(shell [ "$(KUBERMATIC_EDITION)" != "ce" ] && ech
 CMD=$(filter-out OWNERS nodeport-proxy kubeletdnat-controller, $(notdir $(wildcard ./cmd/*)))
 GOBUILDFLAGS?=-v
 GOOS?=$(shell go env GOOS)
-GITTAG=$(shell git describe --tags --always)
+GITTAG?=$(shell git describe --tags --always)
 TAGS?=$(GITTAG)
 DOCKERTAGS=$(TAGS) latestbuild
 DOCKER_BUILD_FLAG += $(foreach tag, $(DOCKERTAGS), -t $(REPO):$(tag))
@@ -33,7 +33,7 @@ LDFLAGS += -extldflags '-static' \
   -X k8c.io/kubermatic/v2/pkg/resources.KUBERMATICGITTAG=$(GITTAG) \
   -X k8c.io/kubermatic/v2/pkg/controller/operator/common.KUBERMATICDOCKERTAG=$(KUBERMATICDOCKERTAG) \
   -X k8c.io/kubermatic/v2/pkg/controller/operator/common.UIDOCKERTAG=$(UIDOCKERTAG)
-LDFLAGS_EXTRA=-w
+LDFLAGS_EXTRA?=-w
 BUILD_DEST?=_build
 GOTOOLFLAGS?=$(GOBUILDFLAGS) -ldflags '$(LDFLAGS_EXTRA) $(LDFLAGS)' $(GOTOOLFLAGS_EXTRA)
 
