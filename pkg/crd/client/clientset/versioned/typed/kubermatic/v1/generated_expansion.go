@@ -10,6 +10,8 @@ type ClusterExpansion interface{}
 
 type EtcdBackupExpansion interface{}
 
+type EtcdRestoreExpansion interface{}
+
 type ExternalClusterExpansion interface{}
 
 type KubermaticSettingExpansion interface{}

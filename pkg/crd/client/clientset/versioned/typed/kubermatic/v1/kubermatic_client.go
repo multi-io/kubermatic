@@ -14,6 +14,7 @@ type KubermaticV1Interface interface {
 	AddonConfigsGetter
 	ClustersGetter
 	EtcdBackupsGetter
+	EtcdRestoresGetter
 	ExternalClustersGetter
 	KubermaticSettingsGetter
 	ProjectsGetter
@@ -41,6 +42,10 @@ func (c *KubermaticV1Client) Clusters() ClusterInterface {
 
 func (c *KubermaticV1Client) EtcdBackups(namespace string) EtcdBackupInterface {
 	return newEtcdBackups(c, namespace)
+}
+
+func (c *KubermaticV1Client) EtcdRestores(namespace string) EtcdRestoreInterface {
+	return newEtcdRestores(c, namespace)
 }
 
 func (c *KubermaticV1Client) ExternalClusters() ExternalClusterInterface {

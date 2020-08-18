@@ -26,6 +26,14 @@ type EtcdBackupListerExpansion interface{}
 // EtcdBackupNamespaceLister.
 type EtcdBackupNamespaceListerExpansion interface{}
 
+// EtcdRestoreListerExpansion allows custom methods to be added to
+// EtcdRestoreLister.
+type EtcdRestoreListerExpansion interface{}
+
+// EtcdRestoreNamespaceListerExpansion allows custom methods to be added to
+// EtcdRestoreNamespaceLister.
+type EtcdRestoreNamespaceListerExpansion interface{}
+
 // ExternalClusterListerExpansion allows custom methods to be added to
 // ExternalClusterLister.
 type ExternalClusterListerExpansion interface{}
