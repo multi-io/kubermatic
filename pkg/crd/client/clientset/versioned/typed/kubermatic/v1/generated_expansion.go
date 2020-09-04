@@ -10,7 +10,7 @@ type ClusterExpansion interface{}
 
 type ConstraintTemplateExpansion interface{}
 
-type EtcdBackupExpansion interface{}
+type EtcdBackupConfigExpansion interface{}
 
 type EtcdRestoreExpansion interface{}
 

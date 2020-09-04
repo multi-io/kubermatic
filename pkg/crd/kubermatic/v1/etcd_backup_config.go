@@ -22,11 +22,11 @@ import (
 )
 
 const (
-	// EtcdBackupResourceName represents "Resource" defined in Kubernetes
-	EtcdBackupResourceName = "etcdbackup"
+	// EtcdBackupConfigResourceName represents "Resource" defined in Kubernetes
+	EtcdBackupConfigResourceName = "etcdbackupconfig"
 
-	// EtcdBackupKindName represents "Kind" defined in Kubernetes
-	EtcdBackupKindName = "EtcdBackup"
+	// EtcdBackupConfigKindName represents "Kind" defined in Kubernetes
+	EtcdBackupConfigKindName = "EtcdBackupConfig"
 
 	DefaultKeptBackupsCount = 20
 	MaxKeptBackupsCount     = 20
@@ -34,18 +34,18 @@ const (
 
 //+genclient
 
-// EtcdBackup specifies a add-on
+// EtcdBackupConfig specifies a add-on
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-type EtcdBackup struct {
+type EtcdBackupConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   EtcdBackupSpec   `json:"spec"`
-	Status EtcdBackupStatus `json:"status,omitempty"`
+	Spec   EtcdBackupConfigSpec   `json:"spec"`
+	Status EtcdBackupConfigStatus `json:"status,omitempty"`
 }
 
-// EtcdBackupSpec specifies details of an etcd backup
-type EtcdBackupSpec struct {
+// EtcdBackupConfigSpec specifies details of an etcd backup
+type EtcdBackupConfigSpec struct {
 	// Name defines the name of the backup
 	// The name of the backup file in S3 will be <cluster>-<backup name>
 	// If a schedule is set (see below), -<timestamp> will be appended.
@@ -61,21 +61,21 @@ type EtcdBackupSpec struct {
 	Keep *int `json:"keep,omitempty"`
 }
 
-// EtcdBackupList is a list of etcd backups
+// EtcdBackupConfigList is a list of etcd backup configs
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-type EtcdBackupList struct {
+type EtcdBackupConfigList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 
-	Items []EtcdBackup `json:"items"`
+	Items []EtcdBackupConfig `json:"items"`
 }
 
-type EtcdBackupStatus struct {
+type EtcdBackupConfigStatus struct {
 	LastBackupTime *metav1.Time `json:"lastBackupTime,omitempty"`
 	CurrentBackups []string     `json:"lastBackups,omitempty"`
 }
 
-func (b *EtcdBackup) GetKeptBackupsCount() int {
+func (b *EtcdBackupConfig) GetKeptBackupsCount() int {
 	if b.Spec.Keep == nil {
 		return DefaultKeptBackupsCount
 	}

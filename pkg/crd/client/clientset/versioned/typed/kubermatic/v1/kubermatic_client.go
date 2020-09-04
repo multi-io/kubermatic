@@ -14,7 +14,7 @@ type KubermaticV1Interface interface {
 	AddonConfigsGetter
 	ClustersGetter
 	ConstraintTemplatesGetter
-	EtcdBackupsGetter
+	EtcdBackupConfigsGetter
 	EtcdRestoresGetter
 	ExternalClustersGetter
 	KubermaticSettingsGetter
@@ -45,8 +45,8 @@ func (c *KubermaticV1Client) ConstraintTemplates() ConstraintTemplateInterface {
 	return newConstraintTemplates(c)
 }
 
-func (c *KubermaticV1Client) EtcdBackups(namespace string) EtcdBackupInterface {
-	return newEtcdBackups(c, namespace)
+func (c *KubermaticV1Client) EtcdBackupConfigs(namespace string) EtcdBackupConfigInterface {
+	return newEtcdBackupConfigs(c, namespace)
 }
 
 func (c *KubermaticV1Client) EtcdRestores(namespace string) EtcdRestoreInterface {

@@ -107,7 +107,7 @@ func Add(
 		return err
 	}
 
-	return c.Watch(&source.Kind{Type: &kubermaticv1.EtcdBackup{}}, &handler.EnqueueRequestForObject{})
+	return c.Watch(&source.Kind{Type: &kubermaticv1.EtcdBackupConfig{}}, &handler.EnqueueRequestForObject{})
 }
 
 func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
@@ -116,8 +116,8 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	log := r.log.With("request", request)
 	log.Debug("Processing")
 
-	backup := &kubermaticv1.EtcdBackup{}
-	if err := r.Get(ctx, request.NamespacedName, backup); err != nil {
+	backupConfig := &kubermaticv1.EtcdBackupConfig{}
+	if err := r.Get(ctx, request.NamespacedName, backupConfig); err != nil {
 		if kerrors.IsNotFound(err) {
 			return reconcile.Result{}, nil
 		}
@@ -125,11 +125,11 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	}
 
 	cluster := &kubermaticv1.Cluster{}
-	if err := r.Get(ctx, types.NamespacedName{Name: backup.Spec.Cluster.Name}, cluster); err != nil {
+	if err := r.Get(ctx, types.NamespacedName{Name: backupConfig.Spec.Cluster.Name}, cluster); err != nil {
 		return reconcile.Result{}, err
 	}
 
-	log = r.log.With("cluster", cluster.Name, "backup", backup.Name)
+	log = r.log.With("cluster", cluster.Name, "backupConfig", backupConfig.Name)
 
 	// Add a wrapping here so we can emit an event on error
 	result, err := kubermaticv1helper.ClusterReconcileWrapper(
@@ -139,14 +139,14 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 		cluster,
 		kubermaticv1.ClusterConditionBackupControllerReconcilingSuccess,
 		func() (*reconcile.Result, error) {
-			return r.reconcile(ctx, log, backup, cluster)
+			return r.reconcile(ctx, log, backupConfig, cluster)
 		},
 	)
 	if err != nil {
 		log.Errorw("Reconciling failed", zap.Error(err))
-		r.recorder.Event(backup, corev1.EventTypeWarning, "ReconcilingError", err.Error())
+		r.recorder.Event(backupConfig, corev1.EventTypeWarning, "ReconcilingError", err.Error())
 		r.recorder.Eventf(cluster, corev1.EventTypeWarning, "ReconcilingError",
-			"failed to reconcile etcd backup %q: %v", backup.Name, err)
+			"failed to reconcile etcd backup config %q: %v", backupConfig.Name, err)
 	}
 	if result == nil {
 		result = &reconcile.Result{}
@@ -154,29 +154,29 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	return *result, err
 }
 
-func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) (*reconcile.Result, error) {
-	if backup.DeletionTimestamp != nil {
+func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, backupConfig *kubermaticv1.EtcdBackupConfig, cluster *kubermaticv1.Cluster) (*reconcile.Result, error) {
+	if backupConfig.DeletionTimestamp != nil {
 		log.Debug("Cleaning up all backups")
-		return nil, wrapErrorMessage("error cleaning up all backups: %v", r.deleteAllBackups(ctx, log, backup))
+		return nil, wrapErrorMessage("error cleaning up all backups: %v", r.deleteAllBackups(ctx, log, backupConfig))
 	}
 
-	backupName, err := r.currentlyPendingBackupName(backup, cluster)
+	backupName, err := r.currentlyPendingBackupName(backupConfig, cluster)
 	if err != nil {
 		return nil, fmt.Errorf("can't determine backup schedule: %v", err)
 	}
 
 	if backupName != "" {
-		err := r.createBackup(ctx, log, backupName, backup, cluster)
+		err := r.createBackup(ctx, log, backupName, backupConfig, cluster)
 		if err != nil {
 			return nil, fmt.Errorf("error creating backup: %v", err)
 		}
 	}
 
-	if err := r.deleteBackupsUpToRemaining(ctx, log, backup, backup.GetKeptBackupsCount()); err != nil {
+	if err := r.deleteBackupsUpToRemaining(ctx, log, backupConfig, backupConfig.GetKeptBackupsCount()); err != nil {
 		return nil, fmt.Errorf("error expiring old backups: %v", err)
 	}
 
-	reconcile, err := r.computeReconcileAfter(backup)
+	reconcile, err := r.computeReconcileAfter(backupConfig)
 	if err != nil {
 		// should not happen at this point because the schedule was already parsed successfully above
 		return nil, fmt.Errorf("error computing reconcile interval: %v", err)
@@ -186,25 +186,25 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, back
 }
 
 // return name of backup to be done right now, or "" if no backup needs to be done right now
-func (r *Reconciler) currentlyPendingBackupName(backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) (string, error) {
-	prefix := backupFileNamePrefix(backup.Name, cluster.Name)
+func (r *Reconciler) currentlyPendingBackupName(backupConfig *kubermaticv1.EtcdBackupConfig, cluster *kubermaticv1.Cluster) (string, error) {
+	prefix := backupFileNamePrefix(backupConfig.Name, cluster.Name)
 
-	if backup.Spec.Schedule == "" {
+	if backupConfig.Spec.Schedule == "" {
 		// no schedule set => we need exactly one backup (if none was created yet)
-		if backup.Status.LastBackupTime == nil {
+		if backupConfig.Status.LastBackupTime == nil {
 			return prefix, nil
 		}
 		return "", nil
 	}
 
-	schedule, err := parseCronSchedule(backup.Spec.Schedule)
+	schedule, err := parseCronSchedule(backupConfig.Spec.Schedule)
 	if err != nil {
 		return "", err
 	}
 
-	lastBackupTime := backup.Status.LastBackupTime
+	lastBackupTime := backupConfig.Status.LastBackupTime
 	if lastBackupTime == nil {
-		lastBackupTime = &metav1.Time{Time: backup.CreationTimestamp.Time}
+		lastBackupTime = &metav1.Time{Time: backupConfig.CreationTimestamp.Time}
 	}
 
 	if r.clock.Now().After(schedule.Next(lastBackupTime.Time)) {
@@ -214,18 +214,18 @@ func (r *Reconciler) currentlyPendingBackupName(backup *kubermaticv1.EtcdBackup,
 	return "", nil
 }
 
-func (r *Reconciler) computeReconcileAfter(backup *kubermaticv1.EtcdBackup) (*reconcile.Result, error) {
-	if backup.Spec.Schedule == "" {
+func (r *Reconciler) computeReconcileAfter(backupConfig *kubermaticv1.EtcdBackupConfig) (*reconcile.Result, error) {
+	if backupConfig.Spec.Schedule == "" {
 		// no schedule set => only one immediate backup, which is already created at this point => all done, no need to reschedule
 		return nil, nil
 	}
 
-	schedule, err := parseCronSchedule(backup.Spec.Schedule)
+	schedule, err := parseCronSchedule(backupConfig.Spec.Schedule)
 	if err != nil {
 		return nil, err
 	}
 
-	lastBackupTime := backup.Status.LastBackupTime
+	lastBackupTime := backupConfig.Status.LastBackupTime
 	if lastBackupTime == nil {
 		lastBackupTime = &metav1.Time{Time: r.clock.Now()}
 	}
@@ -237,7 +237,7 @@ func (r *Reconciler) computeReconcileAfter(backup *kubermaticv1.EtcdBackup) (*re
 	return &reconcile.Result{Requeue: true, RequeueAfter: durationToNextBackup}, nil
 }
 
-func (r *Reconciler) createBackup(ctx context.Context, log *zap.SugaredLogger, fileName string, backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster) error {
+func (r *Reconciler) createBackup(ctx context.Context, log *zap.SugaredLogger, fileName string, backupConfig *kubermaticv1.EtcdBackupConfig, cluster *kubermaticv1.Cluster) error {
 	err := r.takeSnapshot(ctx, log, fileName, cluster)
 	if err != nil {
 		return fmt.Errorf("error taking snapshot: %v", err)
@@ -255,57 +255,57 @@ func (r *Reconciler) createBackup(ctx context.Context, log *zap.SugaredLogger, f
 	}
 
 	return wrapErrorMessage(
-		"failed to modify EtcdBackup resource: %v",
-		r.updateBackup(ctx, backup, func(backup *kubermaticv1.EtcdBackup) {
+		"failed to modify EtcdBackupConfig resource: %v",
+		r.updateBackupConfig(ctx, backupConfig, func(backup *kubermaticv1.EtcdBackupConfig) {
 			kuberneteshelper.AddFinalizer(backup, DeleteAllBackupsFinalizer)
 			backup.Status.LastBackupTime = &metav1.Time{Time: r.clock.Now()}
 			backup.Status.CurrentBackups = append(backup.Status.CurrentBackups, fileName)
 		}))
 }
 
-func (r *Reconciler) deleteBackupsUpToRemaining(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup, remaining int) error {
-	for len(backup.Status.CurrentBackups) > remaining {
-		toDelete := backup.Status.CurrentBackups[0]
+func (r *Reconciler) deleteBackupsUpToRemaining(ctx context.Context, log *zap.SugaredLogger, backupConfig *kubermaticv1.EtcdBackupConfig, remaining int) error {
+	for len(backupConfig.Status.CurrentBackups) > remaining {
+		toDelete := backupConfig.Status.CurrentBackups[0]
 		if err := r.deleteUploadedSnapshot(ctx, log, toDelete); err != nil {
 			// TODO ignore not-found errors
 			return fmt.Errorf("error deleting uploaded snapshot %v: %v", toDelete, err)
 		}
-		err := r.updateBackup(ctx, backup, func(backup *kubermaticv1.EtcdBackup) {
+		err := r.updateBackupConfig(ctx, backupConfig, func(backup *kubermaticv1.EtcdBackupConfig) {
 			backup.Status.CurrentBackups = backup.Status.CurrentBackups[1:]
 		})
 		if err != nil {
-			return fmt.Errorf("failed to update EtcdBackup after deleting backup %v: %v", toDelete, err)
+			return fmt.Errorf("failed to update EtcdBackupConfig after deleting backupConfig %v: %v", toDelete, err)
 		}
 	}
 	return nil
 }
 
-func (r *Reconciler) deleteAllBackups(ctx context.Context, log *zap.SugaredLogger, backup *kubermaticv1.EtcdBackup) error {
-	if !kuberneteshelper.HasFinalizer(backup, DeleteAllBackupsFinalizer) {
+func (r *Reconciler) deleteAllBackups(ctx context.Context, log *zap.SugaredLogger, backupConfig *kubermaticv1.EtcdBackupConfig) error {
+	if !kuberneteshelper.HasFinalizer(backupConfig, DeleteAllBackupsFinalizer) {
 		return nil
 	}
 
-	err := r.deleteBackupsUpToRemaining(ctx, log, backup, 0)
+	err := r.deleteBackupsUpToRemaining(ctx, log, backupConfig, 0)
 	if err != nil {
 		return err
 	}
 
-	return wrapErrorMessage("error removing finalizer: %v", r.updateBackup(ctx, backup, func(backup *kubermaticv1.EtcdBackup) {
+	return wrapErrorMessage("error removing finalizer: %v", r.updateBackupConfig(ctx, backupConfig, func(backup *kubermaticv1.EtcdBackupConfig) {
 		kuberneteshelper.RemoveFinalizer(backup, DeleteAllBackupsFinalizer)
 	}))
 }
 
-func (r *Reconciler) updateBackup(ctx context.Context, backup *kubermaticv1.EtcdBackup, modify func(*kubermaticv1.EtcdBackup)) error {
-	oldBackup := backup.DeepCopy()
-	modify(backup)
-	if reflect.DeepEqual(oldBackup, backup) {
+func (r *Reconciler) updateBackupConfig(ctx context.Context, backupConfig *kubermaticv1.EtcdBackupConfig, modify func(*kubermaticv1.EtcdBackupConfig)) error {
+	oldBackup := backupConfig.DeepCopy()
+	modify(backupConfig)
+	if reflect.DeepEqual(oldBackup, backupConfig) {
 		return nil
 	}
-	return r.Client.Patch(ctx, backup, ctrlruntimeclient.MergeFrom(oldBackup))
+	return r.Client.Patch(ctx, backupConfig, ctrlruntimeclient.MergeFrom(oldBackup))
 }
 
-func backupFileNamePrefix(backupName, clusterName string) string {
-	return fmt.Sprintf("%s-%s", clusterName, backupName)
+func backupFileNamePrefix(backupConfigName, clusterName string) string {
+	return fmt.Sprintf("%s-%s", clusterName, backupConfigName)
 }
 
 func parseCronSchedule(scheduleString string) (cron.Schedule, error) {

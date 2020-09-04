@@ -109,13 +109,13 @@ func genTestCluster() *kubermaticv1.Cluster {
 	}
 }
 
-func genBackup(cluster *kubermaticv1.Cluster, name string) *kubermaticv1.EtcdBackup {
-	return &kubermaticv1.EtcdBackup{
+func genBackupConfig(cluster *kubermaticv1.Cluster, name string) *kubermaticv1.EtcdBackupConfig {
+	return &kubermaticv1.EtcdBackupConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: cluster.Status.NamespaceName,
 		},
-		Spec: kubermaticv1.EtcdBackupSpec{
+		Spec: kubermaticv1.EtcdBackupConfigSpec{
 			Name: name,
 			Cluster: corev1.ObjectReference{
 				Kind: kubermaticv1.ClusterKindName,
@@ -127,58 +127,58 @@ func genBackup(cluster *kubermaticv1.Cluster, name string) *kubermaticv1.EtcdBac
 
 func TestController_NonScheduled_SimpleBackup(t *testing.T) {
 	cluster := genTestCluster()
-	backup := genBackup(cluster, "testbackup")
-	backupName := fmt.Sprintf("%s-%s", cluster.GetName(), backup.GetName())
+	backupConfig := genBackupConfig(cluster, "testbackup")
+	backupName := fmt.Sprintf("%s-%s", cluster.GetName(), backupConfig.GetName())
 
 	mockBackOps := newMockBackendOperations()
 	reconciler := &Reconciler{
 		log:               kubermaticlog.New(true, kubermaticlog.FormatConsole).Sugar(),
-		Client:            ctrlruntimefakeclient.NewFakeClientWithScheme(scheme.Scheme, cluster, backup),
+		Client:            ctrlruntimefakeclient.NewFakeClientWithScheme(scheme.Scheme, cluster, backupConfig),
 		BackendOperations: mockBackOps,
 		recorder:          record.NewFakeRecorder(10),
 		clock:             &clock.RealClock{},
 	}
 
-	backup, _ = mustReconcile(t, reconciler, backup)
+	backupConfig, _ = mustReconcile(t, reconciler, backupConfig)
 
 	if !mockBackOps.uploadedSnapshots.Has(backupName) {
-		t.Fatalf("backup %v wasn't uploaded", backupName)
+		t.Fatalf("backupConfig %v wasn't uploaded", backupName)
 	}
 
 	if mockBackOps.localSnapshots.Len() != 0 {
 		t.Fatalf("local snapshots weren't cleaned up, remaining: %v", mockBackOps.localSnapshots)
 	}
 
-	if !reflect.DeepEqual(backup.Status.CurrentBackups, []string{backupName}) {
-		t.Fatalf("backup created backup not added to .Status.CurrentBackups")
+	if !reflect.DeepEqual(backupConfig.Status.CurrentBackups, []string{backupName}) {
+		t.Fatalf("created backup not added to .Status.CurrentBackups")
 	}
 
-	if backup.Status.LastBackupTime == nil {
+	if backupConfig.Status.LastBackupTime == nil {
 		t.Fatalf("no .Status.LastBackupTime recorded")
 	}
 
-	if !kuberneteshelper.HasFinalizer(backup, DeleteAllBackupsFinalizer) {
-		t.Fatalf("backup does not have finalizer %s", DeleteAllBackupsFinalizer)
+	if !kuberneteshelper.HasFinalizer(backupConfig, DeleteAllBackupsFinalizer) {
+		t.Fatalf("backupConfig does not have finalizer %s", DeleteAllBackupsFinalizer)
 	}
 }
 
 func TestController_NonScheduled_CompletedBackupIsNotProcessed(t *testing.T) {
 	cluster := genTestCluster()
 
-	backup := genBackup(cluster, "testbackup")
-	backup.Status.CurrentBackups = []string{"testbackup"}
-	backup.Status.LastBackupTime = &metav1.Time{Time: time.Now()}
+	backupConfig := genBackupConfig(cluster, "testbackup")
+	backupConfig.Status.CurrentBackups = []string{"testbackup"}
+	backupConfig.Status.LastBackupTime = &metav1.Time{Time: time.Now()}
 
 	mockBackOps := newMockBackendOperations()
 	reconciler := &Reconciler{
 		log:               kubermaticlog.New(true, kubermaticlog.FormatConsole).Sugar(),
-		Client:            ctrlruntimefakeclient.NewFakeClientWithScheme(scheme.Scheme, cluster, backup),
+		Client:            ctrlruntimefakeclient.NewFakeClientWithScheme(scheme.Scheme, cluster, backupConfig),
 		BackendOperations: mockBackOps,
 		recorder:          record.NewFakeRecorder(10),
 		clock:             &clock.RealClock{},
 	}
 
-	_, _ = mustReconcile(t, reconciler, backup)
+	_, _ = mustReconcile(t, reconciler, backupConfig)
 
 	if mockBackOps.uploadedSnapshots.Len() != 0 {
 		t.Fatalf("Expected no uploaded snapshots, got %v", mockBackOps.uploadedSnapshots)
@@ -192,15 +192,15 @@ func TestController_NonScheduled_CompletedBackupIsNotProcessed(t *testing.T) {
 func TestController_NonScheduled_cleanupBackup(t *testing.T) {
 	cluster := genTestCluster()
 
-	backup := genBackup(cluster, "testbackup")
+	backupConfig := genBackupConfig(cluster, "testbackup")
 	existingBackups := []string{"testcluster-backup1", "testcluster-backup2", "testcluster-backup3"}
-	backup.Status.CurrentBackups = existingBackups
-	kuberneteshelper.AddFinalizer(backup, DeleteAllBackupsFinalizer)
+	backupConfig.Status.CurrentBackups = existingBackups
+	kuberneteshelper.AddFinalizer(backupConfig, DeleteAllBackupsFinalizer)
 
 	mockBackOps := newMockBackendOperations()
 	reconciler := &Reconciler{
 		log:               kubermaticlog.New(true, kubermaticlog.FormatConsole).Sugar(),
-		Client:            ctrlruntimefakeclient.NewFakeClientWithScheme(scheme.Scheme, cluster, backup),
+		Client:            ctrlruntimefakeclient.NewFakeClientWithScheme(scheme.Scheme, cluster, backupConfig),
 		BackendOperations: mockBackOps,
 		recorder:          record.NewFakeRecorder(10),
 		clock:             &clock.RealClock{},
@@ -210,7 +210,7 @@ func TestController_NonScheduled_cleanupBackup(t *testing.T) {
 		mockBackOps.uploadedSnapshots.Insert(backupFileName)
 	}
 
-	if err := reconciler.deleteAllBackups(context.Background(), reconciler.log, backup); err != nil {
+	if err := reconciler.deleteAllBackups(context.Background(), reconciler.log, backupConfig); err != nil {
 		t.Fatalf("Error during deleteAllBackups call: %v", err)
 	}
 
@@ -218,24 +218,24 @@ func TestController_NonScheduled_cleanupBackup(t *testing.T) {
 		t.Fatalf("Expected no uploaded snapshots, got %v", mockBackOps.uploadedSnapshots)
 	}
 
-	readbackBackup := &kubermaticv1.EtcdBackup{}
-	if err := reconciler.Get(context.Background(), client.ObjectKey{Namespace: backup.GetNamespace(), Name: backup.GetName()}, readbackBackup); err != nil {
-		t.Fatalf("Error reading back completed backup: %v", err)
+	readbackBackup := &kubermaticv1.EtcdBackupConfig{}
+	if err := reconciler.Get(context.Background(), client.ObjectKey{Namespace: backupConfig.GetNamespace(), Name: backupConfig.GetName()}, readbackBackup); err != nil {
+		t.Fatalf("Error reading back completed backupConfig: %v", err)
 	}
 
-	if len(backup.Status.CurrentBackups) != 0 {
-		t.Fatalf("Expected no remaining backups after cleanup call, got: %v", backup.Status.CurrentBackups)
+	if len(backupConfig.Status.CurrentBackups) != 0 {
+		t.Fatalf("Expected no remaining backups after cleanup call, got: %v", backupConfig.Status.CurrentBackups)
 	}
 
-	if len(backup.Finalizers) != 0 {
-		t.Fatalf("Expected no remaining backup finalizers after cleanup call, got: %v", backup.Finalizers)
+	if len(backupConfig.Finalizers) != 0 {
+		t.Fatalf("Expected no remaining backupConfig finalizers after cleanup call, got: %v", backupConfig.Finalizers)
 	}
 }
 
 func TestController_BackupError(t *testing.T) {
 	cluster := genTestCluster()
 
-	backup := genBackup(cluster, "testbackup")
+	backupConfig := genBackupConfig(cluster, "testbackup")
 
 	const errorMessage = "simulated error"
 
@@ -245,13 +245,13 @@ func TestController_BackupError(t *testing.T) {
 	eventRecorder := record.NewFakeRecorder(10)
 	reconciler := &Reconciler{
 		log:               kubermaticlog.New(true, kubermaticlog.FormatConsole).Sugar(),
-		Client:            ctrlruntimefakeclient.NewFakeClientWithScheme(scheme.Scheme, cluster, backup),
+		Client:            ctrlruntimefakeclient.NewFakeClientWithScheme(scheme.Scheme, cluster, backupConfig),
 		BackendOperations: mockBackOps,
 		recorder:          eventRecorder,
 		clock:             &clock.RealClock{},
 	}
 
-	_, err := reconciler.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{Namespace: backup.Namespace, Name: backup.Name}})
+	_, err := reconciler.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{Namespace: backupConfig.Namespace, Name: backupConfig.Name}})
 
 	if mockBackOps.localSnapshots.Len() != 0 {
 		t.Fatalf("expected no local snapshots, got: %v", mockBackOps.localSnapshots)
@@ -283,29 +283,29 @@ func TestController_BackupError(t *testing.T) {
 func TestController_Scheduled(t *testing.T) {
 	cluster := genTestCluster()
 
-	backup := genBackup(cluster, "testbackup")
+	backupConfig := genBackupConfig(cluster, "testbackup")
 
 	clock := clock.NewFakeClock(time.Unix(0, 0))
-	backup.SetCreationTimestamp(metav1.Time{Time: clock.Now()})
+	backupConfig.SetCreationTimestamp(metav1.Time{Time: clock.Now()})
 	// back up every 10 minutes, keep 2 backups
-	backup.Spec.Schedule = "*/10 * * * *"
-	backup.Spec.Keep = intPtr(2)
+	backupConfig.Spec.Schedule = "*/10 * * * *"
+	backupConfig.Spec.Keep = intPtr(2)
 
 	mockBackOps := newMockBackendOperations()
 	reconciler := &Reconciler{
 		log:               kubermaticlog.New(true, kubermaticlog.FormatConsole).Sugar(),
-		Client:            ctrlruntimefakeclient.NewFakeClientWithScheme(scheme.Scheme, cluster, backup),
+		Client:            ctrlruntimefakeclient.NewFakeClientWithScheme(scheme.Scheme, cluster, backupConfig),
 		BackendOperations: mockBackOps,
 		recorder:          record.NewFakeRecorder(10),
 		clock:             clock,
 	}
 
-	// sleep to before the first 10 minute backup, check that no backup is created
+	// sleep to before the first 10 minute backupConfig, check that no backupConfig is created
 
 	preSleep := 1 * time.Minute
 	clock.Sleep(preSleep)
 
-	backup, result := mustReconcile(t, reconciler, backup)
+	backupConfig, result := mustReconcile(t, reconciler, backupConfig)
 
 	if result.RequeueAfter != 10*time.Minute-preSleep {
 		t.Fatalf("Expected request to requeue after %v, but got %v", 10*time.Minute-preSleep, result.RequeueAfter)
@@ -315,72 +315,72 @@ func TestController_Scheduled(t *testing.T) {
 		t.Fatalf("no uploaded snapshots expected, got: %v", mockBackOps.uploadedSnapshots)
 	}
 
-	// sleep beyond the first backup time, check that a backup is created
+	// sleep beyond the first backupConfig time, check that a backupConfig is created
 
 	clock.Sleep(10 * time.Minute)
 
-	backup, _ = mustReconcile(t, reconciler, backup)
+	backupConfig, _ = mustReconcile(t, reconciler, backupConfig)
 
 	expectedBackups := []string{}
 
-	expectedBackups = append(expectedBackups, backupName(backup, cluster, clock.Now()))
+	expectedBackups = append(expectedBackups, backupName(backupConfig, cluster, clock.Now()))
 
-	if !reflect.DeepEqual(backup.Status.CurrentBackups, expectedBackups) {
-		t.Fatalf(".status.currentBackups expected: %v, got: %v", expectedBackups, backup.Status.CurrentBackups)
+	if !reflect.DeepEqual(backupConfig.Status.CurrentBackups, expectedBackups) {
+		t.Fatalf(".status.currentBackups expected: %v, got: %v", expectedBackups, backupConfig.Status.CurrentBackups)
 	}
 	if !stringSetContainsExactly(mockBackOps.uploadedSnapshots, expectedBackups...) {
 		t.Fatalf("uploaded snapshots expected: %v, got: %v", expectedBackups, mockBackOps.uploadedSnapshots)
 	}
 
-	// sleep beyond the second backup time, check that a backup is created
+	// sleep beyond the second backupConfig time, check that a backupConfig is created
 
 	clock.Sleep(10 * time.Minute)
 
-	backup, _ = mustReconcile(t, reconciler, backup)
+	backupConfig, _ = mustReconcile(t, reconciler, backupConfig)
 
-	expectedBackups = append(expectedBackups, backupName(backup, cluster, clock.Now()))
+	expectedBackups = append(expectedBackups, backupName(backupConfig, cluster, clock.Now()))
 
-	if !reflect.DeepEqual(backup.Status.CurrentBackups, expectedBackups) {
-		t.Fatalf(".status.currentBackups expected: %v, got: %v", expectedBackups, backup.Status.CurrentBackups)
+	if !reflect.DeepEqual(backupConfig.Status.CurrentBackups, expectedBackups) {
+		t.Fatalf(".status.currentBackups expected: %v, got: %v", expectedBackups, backupConfig.Status.CurrentBackups)
 	}
 	if !stringSetContainsExactly(mockBackOps.uploadedSnapshots, expectedBackups...) {
 		t.Fatalf("uploaded snapshots expected: %v, got: %v", expectedBackups, mockBackOps.uploadedSnapshots)
 	}
 
-	// sleep beyond the third backup time, check that a backup is created and the first one is deleted
+	// sleep beyond the third backupConfig time, check that a backupConfig is created and the first one is deleted
 
 	clock.Sleep(10 * time.Minute)
 
-	backup, _ = mustReconcile(t, reconciler, backup)
+	backupConfig, _ = mustReconcile(t, reconciler, backupConfig)
 
-	expectedBackups = append(expectedBackups, backupName(backup, cluster, clock.Now()))
+	expectedBackups = append(expectedBackups, backupName(backupConfig, cluster, clock.Now()))
 	expectedBackups = expectedBackups[1:]
 
-	if !reflect.DeepEqual(backup.Status.CurrentBackups, expectedBackups) {
-		t.Fatalf(".status.currentBackups expected: %v, got: %v", expectedBackups, backup.Status.CurrentBackups)
+	if !reflect.DeepEqual(backupConfig.Status.CurrentBackups, expectedBackups) {
+		t.Fatalf(".status.currentBackups expected: %v, got: %v", expectedBackups, backupConfig.Status.CurrentBackups)
 	}
 	if !stringSetContainsExactly(mockBackOps.uploadedSnapshots, expectedBackups...) {
 		t.Fatalf("uploaded snapshots expected: %v, got: %v", expectedBackups, mockBackOps.uploadedSnapshots)
 	}
 }
 
-func mustReconcile(t *testing.T, reconciler *Reconciler, backup *kubermaticv1.EtcdBackup) (*kubermaticv1.EtcdBackup, reconcile.Result) {
+func mustReconcile(t *testing.T, reconciler *Reconciler, backupConfig *kubermaticv1.EtcdBackupConfig) (*kubermaticv1.EtcdBackupConfig, reconcile.Result) {
 	var result reconcile.Result
 	var err error
-	if result, err = reconciler.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{Namespace: backup.Namespace, Name: backup.Name}}); err != nil {
+	if result, err = reconciler.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{Namespace: backupConfig.Namespace, Name: backupConfig.Name}}); err != nil {
 		t.Fatalf("Error syncing cluster: %v", err)
 	}
 
-	readbackBackup := &kubermaticv1.EtcdBackup{}
-	if err := reconciler.Get(context.Background(), client.ObjectKey{Namespace: backup.GetNamespace(), Name: backup.GetName()}, readbackBackup); err != nil {
-		t.Fatalf("Error reading back reconciled backup: %v", err)
+	readbackBackupConfig := &kubermaticv1.EtcdBackupConfig{}
+	if err := reconciler.Get(context.Background(), client.ObjectKey{Namespace: backupConfig.GetNamespace(), Name: backupConfig.GetName()}, readbackBackupConfig); err != nil {
+		t.Fatalf("Error reading back reconciled backupConfig: %v", err)
 	}
 
-	return readbackBackup, result
+	return readbackBackupConfig, result
 }
 
-func backupName(backup *kubermaticv1.EtcdBackup, cluster *kubermaticv1.Cluster, time time.Time) string {
-	return fmt.Sprintf("%s-%s-%s", cluster.GetName(), backup.GetName(), time.Format("2006-01-02T15:04:05"))
+func backupName(backupConfig *kubermaticv1.EtcdBackupConfig, cluster *kubermaticv1.Cluster, time time.Time) string {
+	return fmt.Sprintf("%s-%s-%s", cluster.GetName(), backupConfig.GetName(), time.Format("2006-01-02T15:04:05"))
 }
 
 func intPtr(i int) *int {
