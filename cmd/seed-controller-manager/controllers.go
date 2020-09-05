@@ -188,16 +188,25 @@ func createKubernetesController(ctrlCtx *controllerContext) error {
 }
 
 func createEtcdBackupController(ctrlCtx *controllerContext) error {
+	storeContainer, err := getContainerFromFile(ctrlCtx.runOptions.backupContainerFile)
+	if err != nil {
+		return err
+	}
+	var deleteContainer *corev1.Container
+	if ctrlCtx.runOptions.backupDeleteContainerFile != "" {
+		deleteContainer, err = getContainerFromFile(ctrlCtx.runOptions.backupDeleteContainerFile)
+		if err != nil {
+			return err
+		}
+	}
 	return etcdbackupcontroller.Add(
 		ctrlCtx.mgr,
 		ctrlCtx.log,
 		ctrlCtx.runOptions.workerCount,
 		ctrlCtx.runOptions.workerName,
-		ctrlCtx.runOptions.backupSnapshotDir,
-		ctrlCtx.runOptions.backupS3Endpoint,
-		ctrlCtx.runOptions.backupS3BucketName,
-		ctrlCtx.runOptions.backupS3AccessKeyID,
-		ctrlCtx.runOptions.backupS3SecretAccessKey,
+		storeContainer,
+		deleteContainer,
+		ctrlCtx.runOptions.backupContainerImage,
 	)
 }
 

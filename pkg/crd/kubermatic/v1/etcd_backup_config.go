@@ -30,6 +30,15 @@ const (
 
 	DefaultKeptBackupsCount = 20
 	MaxKeptBackupsCount     = 20
+
+	// BackupStatusPhase value indicating that the corresponding job has started
+	BackupStatusPhaseRunning = "Running"
+
+	// BackupStatusPhase value indicating that the corresponding job has completed successfully
+	BackupStatusPhaseCompleted = "Completed"
+
+	// BackupStatusPhase value indicating that the corresponding job has completed with an error
+	BackupStatusPhaseFailed = "Failed"
 )
 
 //+genclient
@@ -71,19 +80,36 @@ type EtcdBackupConfigList struct {
 }
 
 type EtcdBackupConfigStatus struct {
-	LastBackupTime *metav1.Time `json:"lastBackupTime,omitempty"`
-	CurrentBackups []string     `json:"lastBackups,omitempty"`
+	CurrentBackups []BackupStatus `json:"lastBackups,omitempty"`
 }
 
-func (b *EtcdBackupConfig) GetKeptBackupsCount() int {
-	if b.Spec.Keep == nil {
+type BackupStatusPhase string
+
+type BackupStatus struct {
+	// ScheduledTime will always be set when the BackupStatus is created, so it'll never be nil
+	ScheduledTime      *metav1.Time      `json:"scheduledTime,omitempty"`
+	BackupName         string            `json:"backupName,omitempty"`
+	JobName            string            `json:"jobName,omitempty"`
+	BackupStartTime    *metav1.Time      `json:"backupStartTime,omitempty"`
+	BackupFinishedTime *metav1.Time      `json:"backupFinishedTime,omitempty"`
+	BackupPhase        BackupStatusPhase `json:"backupPhase,omitempty"`
+	BackupMessage      string            `json:"backupMessage,omitempty"`
+	DeleteJobName      string            `json:"deleteJobName,omitempty"`
+	DeleteStartTime    *metav1.Time      `json:"deleteStartTime,omitempty"`
+	DeleteFinishedTime *metav1.Time      `json:"deleteFinishedTime,omitempty"`
+	DeletePhase        BackupStatusPhase `json:"deletePhase,omitempty"`
+	DeleteMessage      string            `json:"deleteMessage,omitempty"`
+}
+
+func (bc *EtcdBackupConfig) GetKeptBackupsCount() int {
+	if bc.Spec.Keep == nil {
 		return DefaultKeptBackupsCount
 	}
-	if *b.Spec.Keep <= 0 {
+	if *bc.Spec.Keep <= 0 {
 		return 1
 	}
-	if *b.Spec.Keep > MaxKeptBackupsCount {
+	if *bc.Spec.Keep > MaxKeptBackupsCount {
 		return MaxKeptBackupsCount
 	}
-	return *b.Spec.Keep
+	return *bc.Spec.Keep
 }

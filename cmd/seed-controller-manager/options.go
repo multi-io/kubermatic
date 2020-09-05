@@ -69,6 +69,7 @@ type controllerRunOptions struct {
 	backupS3SecretAccessKey                          string
 	backupSnapshotDir                                string
 	backupContainerFile                              string
+	backupDeleteContainerFile                        string
 	cleanupContainerFile                             string
 	backupContainerImage                             string
 	backupInterval                                   string
@@ -134,6 +135,7 @@ func newControllerRunOptions() (controllerRunOptions, error) {
 	flag.StringVar(&c.backupS3SecretAccessKey, "backup-s3-secret-access-key", "", "[Required] S3 backup store secret access key")
 	flag.StringVar(&c.backupSnapshotDir, "backup-snapshot-dir", "/backup-snapshots", "local directory to temporarily store backup snapshots in")
 	flag.StringVar(&c.backupContainerFile, "backup-container", "", fmt.Sprintf("[Required] Filepath of a backup container yaml. It must mount a volume named %s from which it reads the etcd backups", backupcontroller.SharedVolumeName))
+	flag.StringVar(&c.backupDeleteContainerFile, "backup-delete-container", "", fmt.Sprintf("Filepath of a backup deletion container yaml. It receives the name of the backup to delete in an env variable ($BACKUP_TO_DELETE). If not specified, the backup container must handle deletion."))
 	flag.StringVar(&c.cleanupContainerFile, "cleanup-container", "", "[Required] Filepath of a cleanup container yaml. The container will be used to cleanup the backup directory for a cluster after it got deleted.")
 	flag.StringVar(&c.backupContainerImage, "backup-container-init-image", backupcontroller.DefaultBackupContainerImage, "Docker image to use for the init container in the backup job, must be an etcd v3 image. Only set this if your cluster can not use the public quay.io registry")
 	flag.StringVar(&c.backupInterval, "backup-interval", backupcontroller.DefaultBackupInterval, "Interval in which the etcd gets backed up")
