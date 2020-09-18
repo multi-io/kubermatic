@@ -2,6 +2,10 @@
 
 set -e
 
+if [[ -n "$SRC_DIR" ]]; then
+  cd "$SRC_DIR/hack"
+fi
+
 repo="$1"
 
 if [[ -z "$repo" ]]; then
@@ -19,7 +23,7 @@ if [[ -n "$DEBUG" ]]; then
   export LDFLAGS_EXTRA=" "   # must not be empty string or it would no longer be defined in the docker run script
 fi
 
-cd "$(dirname $0)/.."
+cd ..
 
 echo "building $repo $gittag $kubermaticcommit"
 

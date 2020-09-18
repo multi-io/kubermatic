@@ -7,6 +7,8 @@
 cd "$(dirname $0)"
 
 : "${SRC_DIR:=$(cd ..; pwd)}"
+cd ${SRC_DIR}
+: "${SYS11_HACK_DIR:=$(${SRC_DIR}/hack)}"
 : "${KUBERMATIC_WORKERNAME:=${KUBERMATIC_WORKERNAME:-${USERNAME}}}"
 : "${INSTALLER_DIR:="$(go env GOPATH)/src/gitlab.syseleven.de/kubernetes/kubermatic-installer"}"
 : "${KUBERMATIC_ENV:=dev}"
@@ -90,7 +92,6 @@ else
     make KUBERMATICCOMMIT=$KUBERMATICCOMMIT GITTAG=$GITTAG seed-controller-manager
 fi
 
-cd ${SRC_DIR}
 if [[ "${DEBUG}" == "true" ]]; then
     dlv --listen=:2345 --headless=true --api-version=2 --accept-multiclient exec ./_build/seed-controller-manager -- \
       -dynamic-datacenters=true \
@@ -126,7 +127,6 @@ if [[ "${DEBUG}" == "true" ]]; then
       ${LE_NAMESPACE_OPTION} \
       -v=8 $@
 
-    PID=$!
 else
     ./_build/seed-controller-manager \
       -dynamic-datacenters=true \
