@@ -412,6 +412,22 @@ const (
 	EtcdTLSCertSecretKey = "etcd-tls.crt"
 	// EtcdTLSKeySecretKey etcd-tls.key
 	EtcdTLSKeySecretKey = "etcd-tls.key"
+
+	// EtcdRestoreS3CredentialsSecret names the secret expected in seed kube-system that must contain S3 credentials for etcd backup restores,
+	// as well as the secret that will be created in the cluster-xxx namespace and mounted by the etcd launcher, containing the S3
+	// credentials as well as the bucket and endpoint names
+	EtcdRestoreS3CredentialsSecret     = "s3-credentials"
+	EtcdRestoreS3AccessKeyIdKey        = "ACCESS_KEY_ID"
+	EtcdRestoreS3SecretKeyAccessKeyKey = "SECRET_ACCESS_KEY"
+
+	// EtcdRestoreS3SettingsConfigMap names the configmap expected in seed kube-system that must contain S3 bucket and endpoint names.
+	// Will be copied along with the credentials to the secret named EtcdRestoreS3CredentialsSecret in the cluster-xxx namespace, to be
+	// mounted by the etcd launcher
+	EtcdRestoreS3SettingsConfigMap = "s3-settings"
+	EtcdRestoreS3BucketNameKey     = "BUCKET_NAME"
+	EtcdRestoreS3EndpointKey       = "ENDPOINT"
+	EtcdRestoreDefaultS3SEndpoint  = "s3.amazonaws.com"
+
 	// EtcdBackupS3EndpointSecretKey "BACKUP_S3_ENDPOINT"
 	EtcdBackupS3EndpointSecretKey = "BACKUP_S3_ENDPOINT"
 	// EtcdBackupS3BucketNameSecretKey "BACKUP_S3_BUCKET_NAME"
@@ -561,6 +577,12 @@ func GetClusterExternalIP(cluster *kubermaticv1.Cluster) (*net.IP, error) {
 func GetClusterRef(cluster *kubermaticv1.Cluster) metav1.OwnerReference {
 	gv := kubermaticv1.SchemeGroupVersion
 	return *metav1.NewControllerRef(cluster, gv.WithKind("Cluster"))
+}
+
+// GetEtcdRestoreRef returns a metav1.OwnerReference for the given EtcdRestore
+func GetEtcdRestoreRef(restore *kubermaticv1.EtcdRestore) metav1.OwnerReference {
+	gv := kubermaticv1.SchemeGroupVersion
+	return *metav1.NewControllerRef(restore, gv.WithKind(kubermaticv1.EtcdRestoreKindName))
 }
 
 // Int32 returns a pointer to the int32 value passed in.

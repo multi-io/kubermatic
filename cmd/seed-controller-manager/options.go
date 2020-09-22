@@ -63,11 +63,6 @@ type controllerRunOptions struct {
 	openshiftAddonsPath                              string
 	kubernetesAddons                                 kubermaticv1.AddonList
 	openshiftAddons                                  kubermaticv1.AddonList
-	backupS3Endpoint                                 string
-	backupS3BucketName                               string
-	backupS3AccessKeyID                              string
-	backupS3SecretAccessKey                          string
-	backupSnapshotDir                                string
 	backupContainerFile                              string
 	backupDeleteContainerFile                        string
 	cleanupContainerFile                             string
@@ -129,11 +124,6 @@ func newControllerRunOptions() (controllerRunOptions, error) {
 	flag.StringVar(&defaultKubernetesAddonsFile, "kubernetes-addons-file", "", "File that contains a list of default kubernetes addons. Mutually exclusive with `--kubernetes-addons-list`")
 	flag.StringVar(&defaultOpenshiftAddonList, "openshift-addons-list", "", "Comma separated list of addons to install into every openshift user cluster. Mutually exclusive with `--openshift-addons-file`")
 	flag.StringVar(&defaultOpenshiftAddonsFile, "openshift-addons-file", "", "File that contains a list of default openshift addons. Mutually exclusive with `--openshift-addons-list`")
-	flag.StringVar(&c.backupS3Endpoint, "backup-s3-endpoint", "s3.amazonaws.com", "S3 API endpoint for storing backups")
-	flag.StringVar(&c.backupS3BucketName, "backup-s3-bucket", "", "[Required] S3 bucket name to store backups")
-	flag.StringVar(&c.backupS3AccessKeyID, "backup-s3-access-key", "", "[Required] S3 backup store access key ID")
-	flag.StringVar(&c.backupS3SecretAccessKey, "backup-s3-secret-access-key", "", "[Required] S3 backup store secret access key")
-	flag.StringVar(&c.backupSnapshotDir, "backup-snapshot-dir", "/backup-snapshots", "local directory to temporarily store backup snapshots in")
 	flag.StringVar(&c.backupContainerFile, "backup-container", "", fmt.Sprintf("[Required] Filepath of a backup container yaml. It must mount a volume named %s from which it reads the etcd backups", backupcontroller.SharedVolumeName))
 	flag.StringVar(&c.backupDeleteContainerFile, "backup-delete-container", "", fmt.Sprintf("Filepath of a backup deletion container yaml. It receives the name of the backup to delete in an env variable ($BACKUP_TO_DELETE). If not specified, the backup container must handle deletion."))
 	flag.StringVar(&c.cleanupContainerFile, "cleanup-container", "", "[Required] Filepath of a cleanup container yaml. The container will be used to cleanup the backup directory for a cluster after it got deleted.")

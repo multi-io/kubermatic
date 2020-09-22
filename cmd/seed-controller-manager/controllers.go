@@ -241,10 +241,6 @@ func createEtcdRestoreController(ctrlCtx *controllerContext) error {
 		ctrlCtx.log,
 		ctrlCtx.runOptions.workerCount,
 		ctrlCtx.runOptions.workerName,
-		ctrlCtx.runOptions.backupSnapshotDir,
-		ctrlCtx.runOptions.backupS3Endpoint,
-		ctrlCtx.runOptions.backupS3BucketName,
-		ctrlCtx.runOptions.backupS3AccessKeyID,
 	)
 }
 

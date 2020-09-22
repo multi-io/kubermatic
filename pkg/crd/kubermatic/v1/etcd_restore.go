@@ -63,6 +63,9 @@ type EtcdRestoreSpec struct {
 	Cluster corev1.ObjectReference `json:"cluster"`
 	// BackupName is the name of the backup to restore from
 	BackupName string `json:"backupName"`
+	// BackupDownloadCredentialsSecret is the name of a secret in the cluster-xxx namespace containing
+	// credentials needed to download the backup
+	BackupDownloadCredentialsSecret string `json:"backupDownloadCredentialsSecret,omitempty"`
 }
 
 // EtcdRestoreList is a list of etcd restores
