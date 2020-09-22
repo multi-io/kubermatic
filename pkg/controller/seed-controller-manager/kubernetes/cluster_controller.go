@@ -88,10 +88,6 @@ type Reconciler struct {
 	monitoringScrapeAnnotationPrefix                 string
 	dockerPullConfigJSON                             []byte
 	nodeLocalDNSCacheEnabled                         bool
-	backupS3Endpoint                                 string
-	backupS3BucketName                               string
-	backupS3AccessKeyID                              string
-	backupS3SecretAccessKey                          string
 	kubermaticImage                                  string
 	etcdLauncherImage                                string
 	dnatControllerImage                              string
@@ -117,10 +113,6 @@ func Add(
 	nodePortRange string,
 	nodeAccessNetwork string,
 	etcdDiskSize resource.Quantity,
-	backupS3Endpoint string,
-	backupS3BucketName string,
-	backupS3AccessKeyID string,
-	backupS3SecretAccessKey string,
 	monitoringScrapeAnnotationPrefix string,
 	inClusterPrometheusRulesFile string,
 	inClusterPrometheusDisableDefaultRules bool,
@@ -157,10 +149,6 @@ func Add(
 		monitoringScrapeAnnotationPrefix:                 monitoringScrapeAnnotationPrefix,
 		dockerPullConfigJSON:                             dockerPullConfigJSON,
 		nodeLocalDNSCacheEnabled:                         nodeLocalDNSCacheEnabled,
-		backupS3Endpoint:                                 backupS3Endpoint,
-		backupS3BucketName:                               backupS3BucketName,
-		backupS3AccessKeyID:                              backupS3AccessKeyID,
-		backupS3SecretAccessKey:                          backupS3SecretAccessKey,
 		kubermaticImage:                                  kubermaticImage,
 		etcdLauncherImage:                                etcdLauncherImage,
 		dnatControllerImage:                              dnatControllerImage,

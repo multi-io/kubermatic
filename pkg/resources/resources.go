@@ -186,8 +186,6 @@ const (
 	CloudConfigSecretName = "cloud-config"
 	//EtcdTLSCertificateSecretName is the name for the secret containing the etcd tls certificate used for transport security
 	EtcdTLSCertificateSecretName = "etcd-tls-certificate"
-	//EtcdBackupS3SettingsSecretName is the name of the secret containing S3 access settings and credentials for downloading backups from S3
-	EtcdBackupS3SettingsSecretName = "backup-s3-settings"
 	//ApiserverEtcdClientCertificateSecretName is the name for the secret containing the client certificate used by the apiserver for authenticating against etcd
 	ApiserverEtcdClientCertificateSecretName = "apiserver-etcd-client-certificate"
 	//ApiserverFrontProxyClientCertificateSecretName is the name for the secret containing the apiserver's client certificate for proxy auth
@@ -427,15 +425,6 @@ const (
 	EtcdRestoreS3BucketNameKey     = "BUCKET_NAME"
 	EtcdRestoreS3EndpointKey       = "ENDPOINT"
 	EtcdRestoreDefaultS3SEndpoint  = "s3.amazonaws.com"
-
-	// EtcdBackupS3EndpointSecretKey "BACKUP_S3_ENDPOINT"
-	EtcdBackupS3EndpointSecretKey = "BACKUP_S3_ENDPOINT"
-	// EtcdBackupS3BucketNameSecretKey "BACKUP_S3_BUCKET_NAME"
-	EtcdBackupS3BucketNameSecretKey = "BACKUP_S3_BUCKET_NAME"
-	// EtcdBackupS3AccessKeyIDSecretKey "BACKUP_S3_ACCESS_KEY_ID"
-	EtcdBackupS3AccessKeyIDSecretKey = "BACKUP_S3_ACCESS_KEY_ID"
-	// EtcdBackupS3SecretAccessKeySecretKey "BACKUP_S3_SECRET_ACCESS_KEY"
-	EtcdBackupS3SecretAccessKeySecretKey = "BACKUP_S3_SECRET_ACCESS_KEY"
 
 	// KubeconfigDefaultContextKey is the context key used for all kubeconfigs
 	KubeconfigDefaultContextKey = "default"
