@@ -58,19 +58,15 @@ const (
 )
 
 type config struct {
-	namespace               string
-	clusterSize             int
-	podName                 string
-	podIP                   string
-	etcdctlAPIVersion       string
-	dataDir                 string
-	token                   string
-	enableCorruptionCheck   bool
-	initialState            string
-	backupS3Endpoint        string
-	backupS3BucketName      string
-	backupS3AccessKeyID     string
-	backupS3SecretAccessKey string
+	namespace             string
+	clusterSize           int
+	podName               string
+	podIP                 string
+	etcdctlAPIVersion     string
+	dataDir               string
+	token                 string
+	enableCorruptionCheck bool
+	initialState          string
 }
 
 type etcdCluster struct {
@@ -261,11 +257,6 @@ func (e *etcdCluster) parseConfigFlags() error {
 	flag.BoolVar(&config.enableCorruptionCheck, "enable-corruption-check", false, "enable etcd experimental corruption check")
 	flag.Parse()
 
-	config.backupS3Endpoint = os.Getenv(resources.EtcdBackupS3EndpointSecretKey)
-	config.backupS3BucketName = os.Getenv(resources.EtcdBackupS3BucketNameSecretKey)
-	config.backupS3AccessKeyID = os.Getenv(resources.EtcdBackupS3AccessKeyIDSecretKey)
-	config.backupS3SecretAccessKey = os.Getenv(resources.EtcdBackupS3SecretAccessKeySecretKey)
-
 	if config.namespace == "" {
 		return errors.New("-namespace is not set")
 	}
@@ -288,22 +279,6 @@ func (e *etcdCluster) parseConfigFlags() error {
 
 	if config.token == "" {
 		return errors.New("-token is not set")
-	}
-
-	if config.backupS3Endpoint == "" {
-		config.backupS3Endpoint = "s3.amazonaws.com"
-	}
-
-	if config.backupS3BucketName == "" {
-		return errors.New("s3 bucket name is not set")
-	}
-
-	if config.backupS3AccessKeyID == "" {
-		return errors.New("s3 access key ID is not set")
-	}
-
-	if config.backupS3SecretAccessKey == "" {
-		return errors.New("s3 secret access key is not set")
 	}
 
 	config.dataDir = fmt.Sprintf("/var/run/etcd/pod_%s/", config.podName)
@@ -531,7 +506,7 @@ func (e *etcdCluster) restoreDatadirFromBackupIfNeeded(ctx context.Context, k8cC
 
 	log.Infow("restoring datadir from backup", "backup-name", activeRestore.Spec.BackupName)
 
-	s3Client, err := e.getS3Client()
+	s3Client, bucketName, err := resources.GetEtcdRestoreS3Client(ctx, activeRestore, false, client, k8cCluster)
 	if err != nil {
 		return fmt.Errorf("failed to get s3 client: %w", err)
 	}
@@ -539,8 +514,8 @@ func (e *etcdCluster) restoreDatadirFromBackupIfNeeded(ctx context.Context, k8cC
 	objectName := fmt.Sprintf("%s-%s", k8cCluster.GetName(), activeRestore.Spec.BackupName)
 	downloadedSnapshotFile := fmt.Sprintf("/tmp/%s", objectName)
 
-	if err := s3Client.FGetObject(e.config.backupS3BucketName, objectName, downloadedSnapshotFile, minio.GetObjectOptions{}); err != nil {
-		return fmt.Errorf("failed to download backup (%s/%s): %w", e.config.backupS3BucketName, objectName, err)
+	if err := s3Client.FGetObject(bucketName, objectName, downloadedSnapshotFile, minio.GetObjectOptions{}); err != nil {
+		return fmt.Errorf("failed to download backup (%s/%s): %w", bucketName, objectName, err)
 	}
 
 	if err := os.RemoveAll(e.config.dataDir); err != nil {
@@ -559,13 +534,4 @@ func (e *etcdCluster) restoreDatadirFromBackupIfNeeded(ctx context.Context, k8cC
 		InitialClusterToken: e.config.token,
 		SkipHashCheck:       false,
 	})
-}
-
-func (e *etcdCluster) getS3Client() (*minio.Client, error) {
-	client, err := minio.New(e.config.backupS3Endpoint, e.config.backupS3AccessKeyID, e.config.backupS3SecretAccessKey, true)
-	if err != nil {
-		return nil, err
-	}
-	client.SetAppInfo("kubermatic", "v0.1")
-	return client, nil
 }

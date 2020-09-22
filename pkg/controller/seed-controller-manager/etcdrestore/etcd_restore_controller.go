@@ -22,20 +22,17 @@ import (
 	"context"
 	"fmt"
 	"github.com/minio/minio-go"
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	kubermaticv1helper "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1/helper"
 	kuberneteshelper "k8c.io/kubermatic/v2/pkg/kubernetes"
 	"k8c.io/kubermatic/v2/pkg/resources"
-	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/tools/record"
 	"reflect"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -155,15 +152,10 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, rest
 		return r.rebuildEtcdStatefulset(ctx, log, restore, cluster)
 	}
 
-	secretData, err := r.ensureBackupDownloadCredentialsSecret(ctx, restore, cluster)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create s3 settings secret")
-	}
-
 	// check that the backup to restore from exists and is accessible
-	s3Client, bucketName, err := r.getS3Client(secretData)
+	s3Client, bucketName, err := resources.GetEtcdRestoreS3Client(ctx, restore, true, r.Client, cluster)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to read s3 settings from kube-sytem secret/configmap")
+		return nil, fmt.Errorf("failed to obtain S3 client: %w", err)
 	}
 
 	objectName := fmt.Sprintf("%s-%s", cluster.GetName(), restore.Spec.BackupName)
@@ -229,93 +221,6 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, rest
 	}
 
 	return r.rebuildEtcdStatefulset(ctx, log, restore, cluster)
-}
-
-func (r *Reconciler) ensureBackupDownloadCredentialsSecret(ctx context.Context, restore *kubermaticv1.EtcdRestore, cluster *kubermaticv1.Cluster) (map[string]string, error) {
-	if restore.Spec.BackupDownloadCredentialsSecret != "" {
-		secret := &corev1.Secret{}
-		if err := r.Get(ctx, types.NamespacedName{Namespace: cluster.Status.NamespaceName, Name: restore.Spec.BackupDownloadCredentialsSecret}, secret); err != nil {
-			return nil, errors.Wrapf(err, "Failed to get BackupDownloadCredentialsSecret credentials secret %v/%v", cluster.Status.NamespaceName, restore.Spec.BackupDownloadCredentialsSecret)
-		}
-
-		secretData := make(map[string]string)
-		for k, v := range secret.Data {
-			secretData[k] = string(v)
-		}
-
-		return secretData, nil
-	}
-
-	// create BackupDownloadCredentialsSecret containing values from kube-system/s3-credentials / kube-system/s3-settings
-
-	credsSecret := &corev1.Secret{}
-	if err := r.Get(ctx, types.NamespacedName{Namespace: metav1.NamespaceSystem, Name: resources.EtcdRestoreS3CredentialsSecret}, credsSecret); err != nil {
-		return nil, errors.Wrapf(err, "Failed to get s3 credentials secret %v/%v", metav1.NamespaceSystem, resources.EtcdRestoreS3CredentialsSecret)
-	}
-	settingsConfigMap := &corev1.ConfigMap{}
-	if err := r.Get(ctx, types.NamespacedName{Namespace: metav1.NamespaceSystem, Name: resources.EtcdRestoreS3SettingsConfigMap}, settingsConfigMap); err != nil {
-		return nil, errors.Wrapf(err, "Failed to get s3 settings configmap %v/%v", metav1.NamespaceSystem, resources.EtcdRestoreS3SettingsConfigMap)
-	}
-
-	secretData := make(map[string]string)
-	for k, v := range credsSecret.Data {
-		secretData[k] = string(v)
-	}
-	for k, v := range settingsConfigMap.Data {
-		secretData[k] = v
-	}
-
-	creator := func(se *corev1.Secret) (*corev1.Secret, error) {
-		if se.Data == nil {
-			se.Data = map[string][]byte{}
-		}
-		for k, v := range secretData {
-			se.Data[k] = []byte(v)
-		}
-		return se, nil
-	}
-
-	wrappedCreator := reconciling.SecretObjectWrapper(creator)
-	wrappedCreator = reconciling.OwnerRefWrapper(resources.GetEtcdRestoreRef(restore))(wrappedCreator)
-
-	secretName := fmt.Sprintf("%s-backupdownload-%s", restore.Name, rand.String(10))
-
-	if err := reconciling.EnsureNamedObject(
-		ctx,
-		types.NamespacedName{Namespace: cluster.Status.NamespaceName, Name: secretName},
-		wrappedCreator, r.Client, &corev1.Secret{}, false); err != nil {
-		return nil, fmt.Errorf("failed to ensure Secret %s/%s: %v", cluster.Status.NamespaceName, secretName, err)
-	}
-
-	if err := r.updateRestore(ctx, restore, func(restore *kubermaticv1.EtcdRestore) {
-		restore.Spec.BackupDownloadCredentialsSecret = secretName
-	}); err != nil {
-		return nil, fmt.Errorf("failed to write ercdrestore.backupDownloadCredentialsSecret: %v", err)
-	}
-
-	return secretData, nil
-}
-
-func (r *Reconciler) getS3Client(secretData map[string]string) (*minio.Client, string, error) {
-	accessKeyId := secretData[resources.EtcdRestoreS3AccessKeyIdKey]
-	secretAccessKey := secretData[resources.EtcdRestoreS3SecretKeyAccessKeyKey]
-	bucketName := secretData[resources.EtcdRestoreS3BucketNameKey]
-	endpoint := secretData[resources.EtcdRestoreS3EndpointKey]
-
-	if bucketName == "" {
-		return nil, "", fmt.Errorf("s3 bucket name not set")
-	}
-	if endpoint == "" {
-		endpoint = resources.EtcdRestoreDefaultS3SEndpoint
-	}
-
-	client, err := minio.New(endpoint, accessKeyId, secretAccessKey, true)
-	if err != nil {
-		return nil, "", errors.Wrap(err, "error creating s3 client")
-	}
-	client.SetAppInfo("kubermatic", "v0.1")
-
-	return client, bucketName, nil
 }
 
 func (r *Reconciler) rebuildEtcdStatefulset(ctx context.Context, log *zap.SugaredLogger, restore *kubermaticv1.EtcdRestore, cluster *kubermaticv1.Cluster) (*reconcile.Result, error) {
