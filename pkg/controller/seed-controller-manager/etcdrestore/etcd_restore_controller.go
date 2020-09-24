@@ -257,19 +257,19 @@ func (r *Reconciler) rebuildEtcdStatefulset(ctx context.Context, log *zap.Sugare
 }
 
 func (r *Reconciler) updateCluster(ctx context.Context, cluster *kubermaticv1.Cluster, modify func(*kubermaticv1.Cluster)) error {
-	oldBackup := cluster.DeepCopy()
+	oldCluster := cluster.DeepCopy()
 	modify(cluster)
-	if reflect.DeepEqual(oldBackup, cluster) {
+	if reflect.DeepEqual(oldCluster, cluster) {
 		return nil
 	}
-	return r.Client.Patch(ctx, cluster, ctrlruntimeclient.MergeFrom(oldBackup))
+	return r.Client.Patch(ctx, cluster, ctrlruntimeclient.MergeFrom(oldCluster))
 }
 
 func (r *Reconciler) updateRestore(ctx context.Context, restore *kubermaticv1.EtcdRestore, modify func(*kubermaticv1.EtcdRestore)) error {
-	oldBackup := restore.DeepCopy()
+	oldRestore := restore.DeepCopy()
 	modify(restore)
-	if reflect.DeepEqual(oldBackup, restore) {
+	if reflect.DeepEqual(oldRestore, restore) {
 		return nil
 	}
-	return r.Client.Patch(ctx, restore, ctrlruntimeclient.MergeFrom(oldBackup))
+	return r.Client.Patch(ctx, restore, ctrlruntimeclient.MergeFrom(oldRestore))
 }
