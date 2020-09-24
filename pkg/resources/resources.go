@@ -1133,7 +1133,6 @@ func GetEtcdRestoreS3Client(ctx context.Context, restore *kubermaticv1.EtcdResto
 			return nil, "", fmt.Errorf("failed to get s3 settings configmap %v/%v: %w", metav1.NamespaceSystem, EtcdRestoreS3SettingsConfigMap, err)
 		}
 
-		secretData := make(map[string]string)
 		for k, v := range credsSecret.Data {
 			secretData[k] = string(v)
 		}
