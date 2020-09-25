@@ -142,11 +142,11 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 }
 
 func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, restore *kubermaticv1.EtcdRestore, cluster *kubermaticv1.Cluster) (*reconcile.Result, error) {
-	log.Infof("performing etcd restore from backup %v", restore.Spec.BackupName)
-
 	if restore.Status.Phase == kubermaticv1.EtcdRestorePhaseCompleted {
 		return nil, nil
 	}
+
+	log.Infof("performing etcd restore from backup %v", restore.Spec.BackupName)
 
 	if restore.Status.Phase == kubermaticv1.EtcdRestorePhaseStsRebuilding {
 		return r.rebuildEtcdStatefulset(ctx, log, restore, cluster)
@@ -177,41 +177,63 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, rest
 		return nil, fmt.Errorf("failed to add finalizer: %v", err)
 	}
 
-	// delete etcd sts
 	sts := &v1.StatefulSet{}
 	err = r.Get(ctx, types.NamespacedName{Namespace: cluster.Status.NamespaceName, Name: resources.EtcdStatefulSetName}, sts)
-	if err == nil {
-		if err := r.Delete(ctx, sts); err != nil && !kerrors.IsNotFound(err) {
-			return nil, fmt.Errorf("failed to delete etcd statefulset: %v", err)
-		}
-	} else if !kerrors.IsNotFound(err) {
+
+	needsStsRebuild := false
+	stsNotFound := false
+	if kerrors.IsNotFound(err) {
+		needsStsRebuild = true
+		stsNotFound = true // need to record this fact as sts is now empty and couldn't be used in r.Delete() call below
+	} else if err != nil {
 		return nil, fmt.Errorf("failed to get etcd statefulset: %v", err)
+	} else {
+		needsStsRebuild = r.needsEtcdStatefulsetRebuild(sts, cluster)
 	}
 
-	// delete PVCs
-	pvcSelector, err := labels.Parse(fmt.Sprintf("%s=%s", resources.AppLabelKey, resources.EtcdStatefulSetName))
-	if err != nil {
-		return nil, fmt.Errorf("software bug: failed to parse etcd pvc selector: %v", err)
-	}
-
-	pvcs := &corev1.PersistentVolumeClaimList{}
-	if err := r.List(ctx, pvcs, &ctrlruntimeclient.ListOptions{Namespace: cluster.Status.NamespaceName, LabelSelector: pvcSelector}); err != nil {
-		return nil, fmt.Errorf("failed to list pvcs (%v): %v", pvcSelector.String(), err)
-	}
-
-	for _, pvc := range pvcs.Items {
-		deletePropagationForeground := metav1.DeletePropagationForeground
-		delOpts := &ctrlruntimeclient.DeleteOptions{
-			PropagationPolicy: &deletePropagationForeground,
+	if needsStsRebuild {
+		if !stsNotFound {
+			// delete etcd sts
+			if err := r.Delete(ctx, sts); err != nil && !kerrors.IsNotFound(err) {
+				return nil, fmt.Errorf("failed to delete etcd statefulset: %v", err)
+			}
 		}
-		if err := r.Delete(ctx, &pvc, delOpts); err != nil {
-			return nil, fmt.Errorf("failed to delete pvc %v: %v", pvc.GetName(), err)
-		}
-	}
 
-	if len(pvcs.Items) > 0 {
-		// some PVCs still present -- wait
-		return &reconcile.Result{RequeueAfter: 30 * time.Second}, nil
+		// delete PVCs
+		pvcSelector, err := labels.Parse(fmt.Sprintf("%s=%s", resources.AppLabelKey, resources.EtcdStatefulSetName))
+		if err != nil {
+			return nil, fmt.Errorf("software bug: failed to parse etcd pvc selector: %v", err)
+		}
+
+		pvcs := &corev1.PersistentVolumeClaimList{}
+		if err := r.List(ctx, pvcs, &ctrlruntimeclient.ListOptions{Namespace: cluster.Status.NamespaceName, LabelSelector: pvcSelector}); err != nil {
+			return nil, fmt.Errorf("failed to list pvcs (%v): %v", pvcSelector.String(), err)
+		}
+
+		for _, pvc := range pvcs.Items {
+			deletePropagationForeground := metav1.DeletePropagationForeground
+			delOpts := &ctrlruntimeclient.DeleteOptions{
+				PropagationPolicy: &deletePropagationForeground,
+			}
+			if err := r.Delete(ctx, &pvc, delOpts); err != nil {
+				return nil, fmt.Errorf("failed to delete pvc %v: %v", pvc.GetName(), err)
+			}
+		}
+
+		if len(pvcs.Items) > 0 {
+			// some PVCs still present -- wait
+			return &reconcile.Result{RequeueAfter: 30 * time.Second}, nil
+		}
+
+	} else {
+		// delete/recreate sts pods.
+		// apparently not safe -- it can happen that data "spills" from still-running old pods to new ones, so
+		// the cluster ends up containing data from before the restore
+		// Also, this should be done at the beginning of rebuildEtcdStatefulset(), not here.
+		if err := r.DeleteAllOf(ctx, &corev1.Pod{}, ctrlruntimeclient.InNamespace(cluster.Status.NamespaceName),
+			ctrlruntimeclient.MatchingLabels{resources.AppLabelKey: resources.EtcdStatefulSetName}); err != nil {
+			return nil, fmt.Errorf("failed to delete etcd pods: %w", err)
+		}
 	}
 
 	if err := r.updateRestore(ctx, restore, func(restore *kubermaticv1.EtcdRestore) {
@@ -221,6 +243,24 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, rest
 	}
 
 	return r.rebuildEtcdStatefulset(ctx, log, restore, cluster)
+}
+
+func (r *Reconciler) needsEtcdStatefulsetRebuild(sts *v1.StatefulSet, cluster *kubermaticv1.Cluster) bool {
+	vcTemplateSpec := sts.Spec.VolumeClaimTemplates[0].Spec
+	etcdOverrides := cluster.Spec.ComponentsOverride.Etcd
+
+	vcTemplateStorageClass := ""
+	if vcTemplateSpec.StorageClassName != nil {
+		vcTemplateStorageClass = *vcTemplateSpec.StorageClassName
+	}
+	if etcdOverrides.StorageClass != vcTemplateStorageClass {
+		return true
+	}
+
+	if etcdOverrides.DiskSize == nil {
+		return false
+	}
+	return *etcdOverrides.DiskSize == vcTemplateSpec.Resources.Requests[corev1.ResourceStorage]
 }
 
 func (r *Reconciler) rebuildEtcdStatefulset(ctx context.Context, log *zap.SugaredLogger, restore *kubermaticv1.EtcdRestore, cluster *kubermaticv1.Cluster) (*reconcile.Result, error) {
