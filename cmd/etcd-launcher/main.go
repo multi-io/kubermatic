@@ -492,9 +492,9 @@ func (e *etcdCluster) restoreDatadirFromBackupIfNeeded(ctx context.Context, k8cC
 
 	var activeRestore *kubermaticv1.EtcdRestore
 	for _, restore := range restoreList.Items {
-		if restore.Status.Phase == kubermaticv1.EtcdRestorePhaseStsRebuilding {
+		if restore.Status.Phase == kubermaticv1.EtcdRestorePhaseRebuildingSTS {
 			if activeRestore != nil {
-				return fmt.Errorf("found more than one restore in state %v, refusing to restore anything", kubermaticv1.EtcdRestorePhaseStsRebuilding)
+				return fmt.Errorf("found more than one restore in state %v, refusing to restore anything", kubermaticv1.EtcdRestorePhaseRebuildingSTS)
 			}
 			activeRestore = restore.DeepCopy()
 		}

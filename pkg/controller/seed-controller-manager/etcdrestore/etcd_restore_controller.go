@@ -148,7 +148,7 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, rest
 
 	log.Infof("performing etcd restore from backup %v", restore.Spec.BackupName)
 
-	if restore.Status.Phase == kubermaticv1.EtcdRestorePhaseStsRebuilding {
+	if restore.Status.Phase == kubermaticv1.EtcdRestorePhaseRebuildingSTS {
 		return r.rebuildEtcdStatefulset(ctx, log, restore, cluster)
 	}
 
@@ -226,9 +226,6 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, rest
 		}
 
 	} else {
-		// scale the sts to 0
-		// it's not reliable to just delete/recreate all etcd pods directly -- when the pods are recreated,
-		// data may "spill" from still running old pods into already created new pods
 		if err := r.DeleteAllOf(ctx, &corev1.Pod{}, ctrlruntimeclient.InNamespace(cluster.Status.NamespaceName),
 			ctrlruntimeclient.MatchingLabels{resources.AppLabelKey: resources.EtcdStatefulSetName}); err != nil {
 			return nil, fmt.Errorf("failed to delete etcd pods: %w", err)
@@ -236,7 +233,7 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, rest
 	}
 
 	if err := r.updateRestore(ctx, restore, func(restore *kubermaticv1.EtcdRestore) {
-		restore.Status.Phase = kubermaticv1.EtcdRestorePhaseStsRebuilding
+		restore.Status.Phase = kubermaticv1.EtcdRestorePhaseRebuildingSTS
 	}); err != nil {
 		return nil, fmt.Errorf("failed to proceed to sts rebuilding phase: %v", err)
 	}
