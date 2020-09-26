@@ -31,8 +31,8 @@ const (
 	// EtcdRestorePhase value indicating that the restore has started
 	EtcdRestorePhaseStarted = "Started"
 
-	// EtcdRestorePhase value indicating that the old Etcd statefulset has been deleted and is now rebuilding
-	EtcdRestorePhaseStsRebuilding = "StsRebuilding"
+	// EtcdRestorePhase value indicating that the Etcd statefulset is now rebuilding
+	EtcdRestorePhaseRebuildingSTS = "RebuildingSTS"
 
 	// EtcdRestorePhase value indicating that the old Etcd statefulset has completed successfully
 	EtcdRestorePhaseCompleted = "Completed"
