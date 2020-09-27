@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/pointer"
 	"reflect"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -226,9 +227,29 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, rest
 		}
 
 	} else {
-		if err := r.DeleteAllOf(ctx, &corev1.Pod{}, ctrlruntimeclient.InNamespace(cluster.Status.NamespaceName),
+		// don't delete the sts, only scale it down and wait until all pods are gone
+		// just deleting and immediately recreating the pods isn't safe -- data may "spill" from still-running old pods to new ones, and
+		// there may be hard to avoid races
+		if *sts.Spec.Replicas > 0 {
+			oldSts := sts.DeepCopy()
+			sts.Spec.Replicas = pointer.Int32Ptr(0)
+			if err := r.Client.Patch(ctx, sts, ctrlruntimeclient.MergeFrom(oldSts)); err != nil {
+				return nil, fmt.Errorf("failed scale etcd sts to 0: %w", err)
+			}
+		}
+
+		pods := &corev1.PodList{}
+		if err := r.Client.List(
+			ctx,
+			pods,
+			ctrlruntimeclient.InNamespace(cluster.Status.NamespaceName),
 			ctrlruntimeclient.MatchingLabels{resources.AppLabelKey: resources.EtcdStatefulSetName}); err != nil {
-			return nil, fmt.Errorf("failed to delete etcd pods: %w", err)
+			return nil, fmt.Errorf("failed list etcd pods: %w", err)
+		}
+
+		if len(pods.Items) > 0 {
+			// some pods still present -- wait
+			return &reconcile.Result{RequeueAfter: 30 * time.Second}, nil
 		}
 	}
 
