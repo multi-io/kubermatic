@@ -228,7 +228,10 @@ func createSecretsForCredentials(cluster *kubermaticv1.Cluster, cleanupContext *
 	if err := kubernetesprovider.CreateOrUpdateCredentialSecretForCluster(cleanupContext.ctx, cleanupContext.client, cluster); err != nil {
 		return err
 	}
-	kuberneteshelper.AddFinalizer(cluster, apiv1.CredentialsSecretsCleanupFinalizer)
+	// SysEleven temp fix because migrations changed in 2.15
+	if cluster.GetDeletionTimestamp() != nil {
+		kuberneteshelper.AddFinalizer(cluster, apiv1.CredentialsSecretsCleanupFinalizer)
+	}
 
 	if err := cleanupContext.client.Update(cleanupContext.ctx, cluster); err != nil {
 		return fmt.Errorf("failed to update cluster %q: %v", cluster.Name, err)
