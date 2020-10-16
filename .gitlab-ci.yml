@@ -5,7 +5,7 @@ stages:
 - release
 
 variables:
-  GO_VERSION: "1.12.9"
+  GO_VERSION: "1.14.9"
   KUBERMATIC_EDITION: ce
 
 before_script:
@@ -78,7 +78,7 @@ lint:
 
 verify-swagger-spec:
   stage: check
-  image: golang:${GO_VERSION}
+  image: golang:1.12.9
   script:
   - cd api
   - ./hack/verify-swagger.sh
@@ -178,6 +178,18 @@ build-dnatcontroller:
     paths:
       - api/cmd/kubeletdnat-controller/_build
 
+build-etcd-launcher:
+  stage: build
+  image: golang:${GO_VERSION}
+  script:
+    - cd api/cmd/etcd-launcher
+    - export KUBERMATIC_EDITION=ee
+    - GOOS=$(go env GOOS) CGO_ENABLED=0 go build -o ./_build/etcd-launcher .
+    - cp -r _build ${CI_PROJECT_DIR}/api/cmd/etcd-launcher/_build
+  artifacts:
+    paths:
+      - api/cmd/etcd-launcher/_build
+
 docker-release-kubermatic:
   stage: release
   image: docker:latest
@@ -204,5 +216,18 @@ docker-release-dnatcontroller:
     - docker push syseleven/kubeletdnat-controller:$CI_COMMIT_TAG
   dependencies:
     - build-dnatcontroller
+  only:
+    - tags
+
+docker-release-etcd-launcher:
+  stage: release
+  image: docker:latest
+  script:
+    - cd api/cmd/etcd-launcher
+    - docker login -u sys11kubermatic -p $DOCKER_PASSWORD
+    - docker build --tag syseleven/etcd-launcher:$CI_COMMIT_TAG .
+    - docker push syseleven/etcd-launcher:$CI_COMMIT_TAG
+  dependencies:
+    - build-etcd-launcher
   only:
     - tags

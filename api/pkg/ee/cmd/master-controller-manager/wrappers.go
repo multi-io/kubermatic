@@ -31,6 +31,7 @@ import (
 
 	"go.uber.org/zap"
 
+	kubermaticv1 "github.com/kubermatic/kubermatic/api/pkg/crd/kubermatic/v1"
 	eemigrations "github.com/kubermatic/kubermatic/api/pkg/ee/crd/migrations/master"
 	eeprovider "github.com/kubermatic/kubermatic/api/pkg/ee/provider"
 	"github.com/kubermatic/kubermatic/api/pkg/provider"
@@ -95,6 +96,7 @@ func SetupSeedValidationWebhook(
 		log,
 		namespace,
 		validator.Validate,
+		kubermaticv1.ComponentSettings{},
 		migrationOptions.SeedMigrationEnabled())
 	if err != nil {
 		return fmt.Errorf("failed to create server: %v", err)

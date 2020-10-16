@@ -4,6 +4,7 @@ import (
 	"context"
 	goerrors "errors"
 	"fmt"
+
 	"github.com/kubermatic/kubermatic/api/pkg/resources"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -95,7 +96,7 @@ func getPrometheusProxyEndpoint(seedsGetter provider.SeedsGetter, userInfoGetter
 
 		masterConfig, err := rest.InClusterConfig()
 		if err != nil {
-			//For running outside of a cluster
+			// For running outside of a cluster
 			masterConfig, err = clientcmd.
 				NewNonInteractiveDeferredLoadingClientConfig(
 					clientcmd.NewDefaultClientConfigLoadingRules(),

@@ -3,10 +3,11 @@ package keycloak
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/kubermatic/kubermatic/api/pkg/util/errors"
 	"io/ioutil"
 	"net/http"
 	"net/url"
+
+	"github.com/kubermatic/kubermatic/api/pkg/util/errors"
 )
 
 type Client struct {
@@ -80,7 +81,7 @@ func (kc *Client) GetClientData(realmName string, clientID string) (*ClientData,
 		return nil, err
 	}
 
-	//// find client's internal (keycloak DB) id
+	// find client's internal (keycloak DB) id
 
 	client := &http.Client{}
 	req, err := http.NewRequest(
@@ -116,7 +117,7 @@ func (kc *Client) GetClientData(realmName string, clientID string) (*ClientData,
 
 	clientInternalID := bodyJSON[0].ID
 
-	//// get client secret
+	// get client secret
 
 	req, err = http.NewRequest(
 		"GET",

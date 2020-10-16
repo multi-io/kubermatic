@@ -151,6 +151,11 @@ func main() {
 				ImportAlias:        "certmanagerv1alpha2",
 				ResourceImportPath: "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1alpha2",
 			},
+			{
+				ResourceName:       "EtcdBackupConfig",
+				ImportAlias:        "kubermaticv1",
+				ResourceImportPath: "github.com/kubermatic/kubermatic/api/pkg/crd/kubermatic/v1",
+			},
 		},
 	}
 

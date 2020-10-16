@@ -114,7 +114,7 @@ func (r *reconciler) reconcile(log *zap.SugaredLogger, nodeName string) error {
 
 func (r *reconciler) updateNode(name string, modify func(*corev1.Node) bool) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
-		//Get latest version
+		// Get latest version
 		node := &corev1.Node{}
 		if err := r.client.Get(r.ctx, types.NamespacedName{Name: name}, node); err != nil {
 			return err

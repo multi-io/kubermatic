@@ -65,6 +65,7 @@ type Features struct {
 	VPA                          bool
 	EtcdDataCorruptionChecks     bool
 	KubernetesOIDCAuthentication bool
+	EtcdLauncher                 bool
 }
 
 // Reconciler is a controller which is responsible for managing clusters
@@ -92,6 +93,7 @@ type Reconciler struct {
 	dockerPullConfigJSON                             []byte
 	nodeLocalDNSCacheEnabled                         bool
 	kubermaticImage                                  string
+	etcdLauncherImage                                string
 	dnatControllerImage                              string
 	concurrentClusterUpdates                         int
 
@@ -132,6 +134,7 @@ func Add(
 	oidcIssuerClientID string,
 	kubermaticImage string,
 	keycloakFacade keycloak.Facade,
+	etcdLauncherImage string,
 	dnatControllerImage string,
 	features Features) error {
 
@@ -156,6 +159,7 @@ func Add(
 		dockerPullConfigJSON:                             dockerPullConfigJSON,
 		nodeLocalDNSCacheEnabled:                         nodeLocalDNSCacheEnabled,
 		kubermaticImage:                                  kubermaticImage,
+		etcdLauncherImage:                                etcdLauncherImage,
 		dnatControllerImage:                              dnatControllerImage,
 		concurrentClusterUpdates:                         concurrentClusterUpdates,
 

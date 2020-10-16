@@ -18,6 +18,22 @@ type AddonConfigListerExpansion interface{}
 // ClusterLister.
 type ClusterListerExpansion interface{}
 
+// EtcdBackupConfigListerExpansion allows custom methods to be added to
+// EtcdBackupConfigLister.
+type EtcdBackupConfigListerExpansion interface{}
+
+// EtcdBackupConfigNamespaceListerExpansion allows custom methods to be added to
+// EtcdBackupConfigNamespaceLister.
+type EtcdBackupConfigNamespaceListerExpansion interface{}
+
+// EtcdRestoreListerExpansion allows custom methods to be added to
+// EtcdRestoreLister.
+type EtcdRestoreListerExpansion interface{}
+
+// EtcdRestoreNamespaceListerExpansion allows custom methods to be added to
+// EtcdRestoreNamespaceLister.
+type EtcdRestoreNamespaceListerExpansion interface{}
+
 // KubermaticSettingListerExpansion allows custom methods to be added to
 // KubermaticSettingLister.
 type KubermaticSettingListerExpansion interface{}

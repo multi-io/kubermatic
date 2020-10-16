@@ -1147,3 +1147,19 @@ func convertSSHKey(key *models.SSHKey) *apiv1.SSHKey {
 		},
 	}
 }
+
+func (r *runner) GetKubeconfig(dc, projectID, clusterID string) (string, error) {
+	params := &project.GetClusterKubeconfigParams{
+		ClusterID: clusterID,
+		DC:        dc,
+		ProjectID: projectID,
+	}
+
+	params.WithTimeout(timeout)
+	conf, err := r.client.Project.GetClusterKubeconfig(params, r.bearerToken)
+	if err != nil {
+		return "", err
+	}
+
+	return string(conf.Payload), nil
+}

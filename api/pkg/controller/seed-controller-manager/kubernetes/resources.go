@@ -93,6 +93,10 @@ func (r *Reconciler) ensureResourcesAreDeployed(ctx context.Context, cluster *ku
 		return err
 	}
 
+	if err := r.ensureEtcdBackupConfigs(ctx, cluster, data); err != nil {
+		return err
+	}
+
 	// Wait until the cloud provider infra is ready before attempting
 	// to render the cloud-config
 	// TODO: Model resource deployment as a DAG so we don't need hacks
@@ -171,6 +175,7 @@ func (r *Reconciler) getClusterTemplateData(ctx context.Context, cluster *kuberm
 		r.oidcIssuerClientID,
 		r.nodeLocalDNSCacheEnabled,
 		r.kubermaticImage,
+		r.etcdLauncherImage,
 		r.dnatControllerImage,
 		supportsFailureDomainZoneAntiAffinity,
 	), nil
@@ -325,6 +330,7 @@ func (r *Reconciler) ensureSecrets(ctx context.Context, c *kubermaticv1.Cluster,
 
 func (r *Reconciler) ensureServiceAccounts(ctx context.Context, c *kubermaticv1.Cluster) error {
 	namedServiceAccountCreatorGetters := []reconciling.NamedServiceAccountCreatorGetter{
+		etcd.ServiceAccountCreator,
 		usercluster.ServiceAccountCreator,
 	}
 	if err := reconciling.ReconcileServiceAccounts(ctx, namedServiceAccountCreatorGetters, c.Status.NamespaceName, r.Client); err != nil {
@@ -384,6 +390,14 @@ func GetStatefulSetCreators(data *resources.TemplateData, enableDataCorruptionCh
 	}
 	if flag := data.Cluster().Spec.Features[kubermaticv1.ClusterFeatureRancherIntegration]; flag {
 		creators = append(creators, rancherserver.StatefulSetCreator(data))
+	}
+	return creators
+}
+
+// GetEtcdBackupConfigCreators returns all EtcdBackupConfigCreators that are currently in use.
+func GetEtcdBackupConfigCreators(data *resources.TemplateData) []reconciling.NamedEtcdBackupConfigCreatorGetter {
+	creators := []reconciling.NamedEtcdBackupConfigCreatorGetter{
+		etcd.BackupConfigCreator(data),
 	}
 	return creators
 }
@@ -449,4 +463,10 @@ func (r *Reconciler) ensureStatefulSets(ctx context.Context, c *kubermaticv1.Clu
 	creators := GetStatefulSetCreators(data, r.features.EtcdDataCorruptionChecks)
 
 	return reconciling.ReconcileStatefulSets(ctx, creators, c.Status.NamespaceName, r.Client, reconciling.OwnerRefWrapper(resources.GetClusterRef(c)))
+}
+
+func (r *Reconciler) ensureEtcdBackupConfigs(ctx context.Context, c *kubermaticv1.Cluster, data *resources.TemplateData) error {
+	creators := GetEtcdBackupConfigCreators(data)
+
+	return reconciling.ReconcileEtcdBackupConfigs(ctx, creators, c.Status.NamespaceName, r.Client, reconciling.OwnerRefWrapper(resources.GetClusterRef(c)))
 }

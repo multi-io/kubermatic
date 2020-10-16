@@ -15,6 +15,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
+// RegisterV1SysEleven registers additional endpoints used by SysEleven.
 func (r Routing) RegisterV1SysEleven(mux *mux.Router) {
 	mux.Methods(http.MethodGet).
 		Path("/projects/{project_id}/dc/{dc}/cluster/{cluster_id}/prometheus/{query_path}").

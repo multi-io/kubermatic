@@ -46,13 +46,13 @@ export PATH=$PATH:/usr/local/go/bin
 export SEED_NAME=prow-build-cluster
 
 if [[ -z ${JOB_NAME} ]]; then
-	echo "This script should only be running in a CI environment."
-	exit 1
+  echo "This script should only be running in a CI environment."
+  exit 1
 fi
 
 if [[ -z ${PROW_JOB_ID} ]]; then
-	echo "Build id env variable has to be set."
-	exit 1
+  echo "Build id env variable has to be set."
+  exit 1
 fi
 
 cd "${GOPATH}/src/github.com/kubermatic/kubermatic"
@@ -346,8 +346,15 @@ if [[ "${KUBERMATIC_SKIP_BUILDING}" = "false" ]]; then
       retry 5 docker login -u "$QUAY_IO_USERNAME" -p "$QUAY_IO_PASSWORD" quay.io
       IMAGE_NAME=quay.io/kubermatic/user-ssh-keys-agent:$KUBERMATIC_VERSION
       time retry 5 docker build -t "${IMAGE_NAME}" .
-      time retry 5 docker push "quay.io/kubermatic/user-ssh-keys-agent:$KUBERMATIC_VERSION"
+      time retry 5 docker push "${IMAGE_NAME}"
     fi
+  )
+  (
+    echodate "Building etcd-launcher image"
+    TEST_NAME="Build etcd-launcher Docker image"
+    IMAGE_NAME="quay.io/kubermatic/etcd-launcher:${KUBERMATIC_VERSION}"
+    time retry 5 docker build -t "${IMAGE_NAME}" -f cmd/etcd-launcher/Dockerfile .
+    time retry 5 kind load docker-image "$IMAGE_NAME" --name ${SEED_NAME}
   )
 
   pushElapsed kubermatic_docker_build_duration_milliseconds $beforeDockerBuild

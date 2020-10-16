@@ -27,12 +27,10 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	cmdv1 "k8s.io/client-go/tools/clientcmd/api/v1"
 )
 
 // LegacyObjectMeta is an object storing common metadata for persistable objects.
-// Deprecated: LegacyObjectMeta is deprecated use ObjectMeta instead.
-type LegacyObjectMeta struct {
+type LegacyObjectMeta struct { // Deprecated: LegacyObjectMeta is deprecated use ObjectMeta instead.
 	Name            string `json:"name"`
 	ResourceVersion string `json:"resourceVersion,omitempty"`
 	UID             string `json:"uid,omitempty"`
@@ -532,7 +530,7 @@ type Project struct {
 // swagger:response Kubeconfig
 type Kubeconfig struct {
 	// in: body
-	Config cmdv1.Config
+	Config []byte
 }
 
 // OpenstackSize is the object representing openstack's sizes.

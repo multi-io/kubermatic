@@ -24,6 +24,14 @@ func (c *FakeKubermaticV1) Clusters() v1.ClusterInterface {
 	return &FakeClusters{c}
 }
 
+func (c *FakeKubermaticV1) EtcdBackupConfigs(namespace string) v1.EtcdBackupConfigInterface {
+	return &FakeEtcdBackupConfigs{c, namespace}
+}
+
+func (c *FakeKubermaticV1) EtcdRestores(namespace string) v1.EtcdRestoreInterface {
+	return &FakeEtcdRestores{c, namespace}
+}
+
 func (c *FakeKubermaticV1) KubermaticSettings() v1.KubermaticSettingInterface {
 	return &FakeKubermaticSettings{c}
 }

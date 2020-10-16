@@ -31,7 +31,7 @@ spec:
       annotations:
         kubermatic/scrape: 'true'
         kubermatic/scrape_port: '8085'
-        checksum/tls: {{ include (print $.Template.BasePath "/seed-validating-webhook.yaml") . | sha256sum }}
+        checksum/tls: {{ include (print $.Template.BasePath "/seed-webhooks.yaml") . | sha256sum }}
         checksum/kubeconfig: {{ include (print $.Template.BasePath "/kubeconfig-secret.yaml") . | sha256sum }}
         fluentbit.io/parser: glog
     spec:

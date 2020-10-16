@@ -9,10 +9,11 @@ import (
 	"time"
 
 	"fmt"
+	"os"
+
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"os"
 
 	"net/http"
 
@@ -58,7 +59,7 @@ type GetResourceUsageCollectorProxyReq struct {
 	fileType string
 }
 
-// metrics collected for each worker node of the cluster
+// NodeRecord represents metrics collected for each worker node of the cluster.
 type NodeRecord struct {
 	ID          string `json:"id"`
 	CPU         int    `json:"cpu"`
@@ -66,8 +67,8 @@ type NodeRecord struct {
 	Memory      int    `json:"memory"`
 }
 
-// Data structure to respresents the metrics collected as part of
-// each UsageDataRecord for a cluster
+// Metrics respresents the metrics collected as part of
+// each UsageDataRecord for a cluster.
 type Metrics struct {
 	Nodes         []NodeRecord     `json:"nodes"`
 	Storage       int              `json:"storage"`
@@ -75,7 +76,7 @@ type Metrics struct {
 	Loadbalancers []map[string]int `json:"loadbalancers"`
 }
 
-// UsageDataRecord represents a usage record from resource-usage-collector API
+// UsageDataRecord represents a usage record from resource-usage-collector API.
 type UsageDataRecord struct {
 	ID              int     `json:"id"`
 	Time            string  `json:"time"`
@@ -133,7 +134,7 @@ func getResourceUsageCollectorProxyEndpoint(seedsGetter provider.SeedsGetter, us
 
 		masterConfig, err := rest.InClusterConfig()
 		if err != nil {
-			//For running outside of a cluster
+			// For running outside of a cluster
 			masterConfig, err = clientcmd.
 				NewNonInteractiveDeferredLoadingClientConfig(
 					clientcmd.NewDefaultClientConfigLoadingRules(),

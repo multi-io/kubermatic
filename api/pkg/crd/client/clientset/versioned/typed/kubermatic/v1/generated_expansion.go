@@ -8,6 +8,10 @@ type AddonConfigExpansion interface{}
 
 type ClusterExpansion interface{}
 
+type EtcdBackupConfigExpansion interface{}
+
+type EtcdRestoreExpansion interface{}
+
 type KubermaticSettingExpansion interface{}
 
 type MachineDeploymentRequestExpansion interface{}

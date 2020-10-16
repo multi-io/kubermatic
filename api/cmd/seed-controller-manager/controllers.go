@@ -18,46 +18,46 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"io/ioutil"
-	"time"
 
 	"github.com/kubermatic/kubermatic/api/pkg/controller/seed-controller-manager/addon"
 	"github.com/kubermatic/kubermatic/api/pkg/controller/seed-controller-manager/addoninstaller"
-	backupcontroller "github.com/kubermatic/kubermatic/api/pkg/controller/seed-controller-manager/backup"
 	cloudcontroller "github.com/kubermatic/kubermatic/api/pkg/controller/seed-controller-manager/cloud"
-	"github.com/kubermatic/kubermatic/api/pkg/controller/seed-controller-manager/clustercomponentdefaulter"
+	etcdbackupcontroller "github.com/kubermatic/kubermatic/api/pkg/controller/seed-controller-manager/etcdbackup"
+	etcdrestorecontroller "github.com/kubermatic/kubermatic/api/pkg/controller/seed-controller-manager/etcdrestore"
 	kubernetescontroller "github.com/kubermatic/kubermatic/api/pkg/controller/seed-controller-manager/kubernetes"
 	"github.com/kubermatic/kubermatic/api/pkg/controller/seed-controller-manager/monitoring"
 	openshiftcontroller "github.com/kubermatic/kubermatic/api/pkg/controller/seed-controller-manager/openshift"
+	"github.com/kubermatic/kubermatic/api/pkg/controller/seed-controller-manager/pvwatcher"
 	"github.com/kubermatic/kubermatic/api/pkg/controller/seed-controller-manager/rancher"
 	"github.com/kubermatic/kubermatic/api/pkg/controller/seed-controller-manager/seedresourcesuptodatecondition"
 	updatecontroller "github.com/kubermatic/kubermatic/api/pkg/controller/seed-controller-manager/update"
-	kubermaticv1 "github.com/kubermatic/kubermatic/api/pkg/crd/kubermatic/v1"
 	"github.com/kubermatic/kubermatic/api/pkg/features"
 	"github.com/kubermatic/kubermatic/api/pkg/version"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
-	utilpointer "k8s.io/utils/pointer"
 )
 
 // AllControllers stores the list of all controllers that we want to run,
 // each entry holds the name of the controller and the corresponding
 // start function that will essentially run the controller
 var AllControllers = map[string]controllerCreator{
-	kubernetescontroller.ControllerName:           createKubernetesController,
-	updatecontroller.ControllerName:               createUpdateController,
-	addon.ControllerName:                          createAddonController,
-	addoninstaller.ControllerName:                 createAddonInstallerController,
-	backupcontroller.ControllerName:               createBackupController,
+	kubernetescontroller.ControllerName: createKubernetesController,
+	updatecontroller.ControllerName:     createUpdateController,
+	addon.ControllerName:                createAddonController,
+	addoninstaller.ControllerName:       createAddonInstallerController,
+	etcdbackupcontroller.ControllerName: createEtcdBackupController,
+	// Sys11: disable old backup controller.
+	// backupcontroller.ControllerName:               createBackupController,
+	etcdrestorecontroller.ControllerName:          createEtcdRestoreController,
 	monitoring.ControllerName:                     createMonitoringController,
 	cloudcontroller.ControllerName:                createCloudController,
 	openshiftcontroller.ControllerName:            createOpenshiftController,
-	clustercomponentdefaulter.ControllerName:      createClusterComponentDefaulter,
 	seedresourcesuptodatecondition.ControllerName: createSeedConditionUpToDateController,
 	rancher.ControllerName:                        createRancherController,
+	pvwatcher.ControllerName:                      createPvWatcherController,
 }
 
 type controllerCreator func(*controllerContext) error
@@ -77,27 +77,6 @@ func createSeedConditionUpToDateController(ctrlCtx *controllerContext) error {
 		ctrlCtx.log,
 		ctrlCtx.mgr,
 		ctrlCtx.runOptions.workerCount,
-		ctrlCtx.runOptions.workerName,
-	)
-}
-
-func createClusterComponentDefaulter(ctrlCtx *controllerContext) error {
-	defaultCompontentsOverrides := kubermaticv1.ComponentSettings{
-		Apiserver: kubermaticv1.APIServerSettings{
-			DeploymentSettings:          kubermaticv1.DeploymentSettings{Replicas: utilpointer.Int32Ptr(int32(ctrlCtx.runOptions.apiServerDefaultReplicas))},
-			EndpointReconcilingDisabled: utilpointer.BoolPtr(ctrlCtx.runOptions.apiServerEndpointReconcilingDisabled),
-		},
-		ControllerManager: kubermaticv1.DeploymentSettings{
-			Replicas: utilpointer.Int32Ptr(int32(ctrlCtx.runOptions.controllerManagerDefaultReplicas))},
-		Scheduler: kubermaticv1.DeploymentSettings{
-			Replicas: utilpointer.Int32Ptr(int32(ctrlCtx.runOptions.schedulerDefaultReplicas))},
-	}
-	return clustercomponentdefaulter.Add(
-		context.Background(),
-		ctrlCtx.log,
-		ctrlCtx.mgr,
-		ctrlCtx.runOptions.workerCount,
-		defaultCompontentsOverrides,
 		ctrlCtx.runOptions.workerName,
 	)
 }
@@ -129,6 +108,7 @@ func createOpenshiftController(ctrlCtx *controllerContext) error {
 		ctrlCtx.dockerPullConfigJSON,
 		ctrlCtx.runOptions.externalURL,
 		ctrlCtx.runOptions.kubermaticImage,
+		ctrlCtx.runOptions.etcdLauncherImage,
 		ctrlCtx.runOptions.dnatControllerImage,
 		openshiftcontroller.Features{
 			EtcdDataCorruptionChecks: ctrlCtx.runOptions.featureGates.Enabled(features.EtcdDataCorruptionChecks),
@@ -168,37 +148,80 @@ func createKubernetesController(ctrlCtx *controllerContext) error {
 		ctrlCtx.runOptions.oidcIssuerClientID,
 		ctrlCtx.runOptions.kubermaticImage,
 		ctrlCtx.keycloakFacade,
+		ctrlCtx.runOptions.etcdLauncherImage,
 		ctrlCtx.runOptions.dnatControllerImage,
 		kubernetescontroller.Features{
 			VPA:                          ctrlCtx.runOptions.featureGates.Enabled(features.VerticalPodAutoscaler),
 			EtcdDataCorruptionChecks:     ctrlCtx.runOptions.featureGates.Enabled(features.EtcdDataCorruptionChecks),
 			KubernetesOIDCAuthentication: ctrlCtx.runOptions.featureGates.Enabled(features.OpenIDAuthPlugin),
+			EtcdLauncher:                 ctrlCtx.runOptions.featureGates.Enabled(features.EtcdLauncher),
 		},
 	)
 }
 
-func createBackupController(ctrlCtx *controllerContext) error {
+func createEtcdBackupController(ctrlCtx *controllerContext) error {
 	storeContainer, err := getContainerFromFile(ctrlCtx.runOptions.backupContainerFile)
 	if err != nil {
 		return err
 	}
-	cleanupContainer, err := getContainerFromFile(ctrlCtx.runOptions.cleanupContainerFile)
-	if err != nil {
-		return err
+	var deleteContainer *corev1.Container
+	if ctrlCtx.runOptions.backupDeleteContainerFile != "" {
+		deleteContainer, err = getContainerFromFile(ctrlCtx.runOptions.backupDeleteContainerFile)
+		if err != nil {
+			return err
+		}
 	}
-	backupInterval, err := time.ParseDuration(ctrlCtx.runOptions.backupInterval)
-	if err != nil {
-		return fmt.Errorf("failed to parse %s as duration: %v", ctrlCtx.runOptions.backupInterval, err)
+	var cleanupContainer *corev1.Container
+	if ctrlCtx.runOptions.cleanupContainerFile != "" {
+		cleanupContainer, err = getContainerFromFile(ctrlCtx.runOptions.cleanupContainerFile)
+		if err != nil {
+			return err
+		}
 	}
-	return backupcontroller.Add(
-		ctrlCtx.log,
+	return etcdbackupcontroller.Add(
 		ctrlCtx.mgr,
+		ctrlCtx.log,
 		ctrlCtx.runOptions.workerCount,
 		ctrlCtx.runOptions.workerName,
-		*storeContainer,
-		*cleanupContainer,
-		backupInterval,
+		storeContainer,
+		deleteContainer,
+		cleanupContainer,
 		ctrlCtx.runOptions.backupContainerImage,
+	)
+}
+
+// Sys11: disable old backup controller.
+// func createBackupController(ctrlCtx *controllerContext) error {
+// 	storeContainer, err := getContainerFromFile(ctrlCtx.runOptions.backupContainerFile)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	cleanupContainer, err := getContainerFromFile(ctrlCtx.runOptions.cleanupContainerFile)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	backupInterval, err := time.ParseDuration(ctrlCtx.runOptions.backupInterval)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to parse %s as duration: %v", ctrlCtx.runOptions.backupInterval, err)
+// 	}
+// 	return backupcontroller.Add(
+// 		ctrlCtx.log,
+// 		ctrlCtx.mgr,
+// 		ctrlCtx.runOptions.workerCount,
+// 		ctrlCtx.runOptions.workerName,
+// 		*storeContainer,
+// 		*cleanupContainer,
+// 		backupInterval,
+// 		ctrlCtx.runOptions.backupContainerImage,
+// 	)
+// }
+//
+func createEtcdRestoreController(ctrlCtx *controllerContext) error {
+	return etcdrestorecontroller.Add(
+		ctrlCtx.mgr,
+		ctrlCtx.log,
+		ctrlCtx.runOptions.workerCount,
+		ctrlCtx.runOptions.workerName,
 	)
 }
 
@@ -307,4 +330,13 @@ func createRancherController(ctrlCtx *controllerContext) error {
 		ctrlCtx.mgr,
 		ctrlCtx.log,
 		ctrlCtx.clientProvider)
+}
+
+func createPvWatcherController(ctrlCtx *controllerContext) error {
+	return pvwatcher.Add(
+		ctrlCtx.log,
+		ctrlCtx.mgr,
+		ctrlCtx.runOptions.workerCount,
+		ctrlCtx.runOptions.workerName)
+
 }

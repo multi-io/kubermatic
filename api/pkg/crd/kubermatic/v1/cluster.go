@@ -21,6 +21,8 @@ import (
 	"errors"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/api/resource"
+
 	providerconfig "github.com/kubermatic/machine-controller/pkg/providerconfig/types"
 
 	"github.com/kubermatic/kubermatic/api/pkg/semver"
@@ -50,6 +52,9 @@ const (
 	WorkerNameLabelKey   = "worker-name"
 	ProjectIDLabelKey    = "project-id"
 	UpdatedByVPALabelKey = "updated-by-vpa"
+
+	DefaultEtcdClusterSize = 3
+	MaxEtcdClusterSize     = 9
 )
 
 // ProtectedClusterLabels is a set of labels that must not be set by users on clusters,
@@ -142,6 +147,10 @@ const (
 	// It will deploy a Rancher Server Managegment plane on the seed cluster and import the user cluster into it.
 	ClusterFeatureRancherIntegration = "rancherIntegration"
 
+	// ClusterFeatureEtcdLauncher enables features related to the experimental etcd-launcher. This includes user-cluster
+	// etcd scaling, automatic volume recovery and new backup/restore contorllers.
+	ClusterFeatureEtcdLauncher = "etcdLauncher"
+
 	// ClusterFeatureOpenstackMultiAZ enables OpenStack multiple availability zones support
 	ClusterFeatureOpenstackMultiAZ = "openstackMultiAZ"
 )
@@ -166,8 +175,9 @@ const (
 	ClusterConditionAddonControllerReconcilingSuccess          ClusterConditionType = "AddonControllerReconciledSuccessfully"
 	ClusterConditionAddonInstallerControllerReconcilingSuccess ClusterConditionType = "AddonInstallerControllerReconciledSuccessfully"
 	ClusterConditionBackupControllerReconcilingSuccess         ClusterConditionType = "BackupControllerReconciledSuccessfully"
+	ClusterConditionEtcdRestoreControllerReconcilingSuccess    ClusterConditionType = "EtcdRestoreControllerReconciledSuccessfully"
+	ClusterConditionBackupScheduleControllerReconcilingSuccess ClusterConditionType = "BackupScheduleControllerReconciledSuccessfully"
 	ClusterConditionCloudControllerReconcilingSuccess          ClusterConditionType = "CloudControllerReconcilledSuccessfully"
-	ClusterConditionComponentDefaulterReconcilingSuccess       ClusterConditionType = "ComponentDefaulterReconciledSuccessfully"
 	ClusterConditionUpdateControllerReconcilingSuccess         ClusterConditionType = "UpdateControllerReconciledSuccessfully"
 	ClusterConditionMonitoringControllerReconcilingSuccess     ClusterConditionType = "MonitoringControllerReconciledSuccessfully"
 	ClusterConditionOpenshiftControllerReconcilingSuccess      ClusterConditionType = "OpenshiftControllerReconciledSuccessfully"
@@ -175,6 +185,8 @@ const (
 
 	ClusterConditionRancherInitialized     ClusterConditionType = "RancherInitializedSuccessfully"
 	ClusterConditionRancherClusterImported ClusterConditionType = "RancherClusterImportedSuccessfully"
+
+	ClusterConditionEtcdClusterInitialized ClusterConditionType = "EtcdClusterInitialized"
 
 	ReasonClusterUpdateSuccessful = "ClusterUpdateSuccessful"
 	ReasonClusterUpdateInProgress = "ClusterUpdateInProgress"
@@ -185,8 +197,9 @@ var AllClusterConditionTypes = []ClusterConditionType{
 	ClusterConditionClusterControllerReconcilingSuccess,
 	ClusterConditionAddonControllerReconcilingSuccess,
 	ClusterConditionBackupControllerReconcilingSuccess,
+	ClusterConditionEtcdRestoreControllerReconcilingSuccess,
+	ClusterConditionBackupScheduleControllerReconcilingSuccess,
 	ClusterConditionCloudControllerReconcilingSuccess,
-	ClusterConditionComponentDefaulterReconcilingSuccess,
 	ClusterConditionUpdateControllerReconcilingSuccess,
 	ClusterConditionMonitoringControllerReconcilingSuccess,
 	ClusterConditionOpenshiftControllerReconcilingSuccess,
@@ -296,11 +309,11 @@ type AuditLoggingSettings struct {
 }
 
 type ComponentSettings struct {
-	Apiserver         APIServerSettings   `json:"apiserver"`
-	ControllerManager DeploymentSettings  `json:"controllerManager"`
-	Scheduler         DeploymentSettings  `json:"scheduler"`
-	Etcd              StatefulSetSettings `json:"etcd"`
-	Prometheus        StatefulSetSettings `json:"prometheus"`
+	Apiserver         APIServerSettings       `json:"apiserver"`
+	ControllerManager DeploymentSettings      `json:"controllerManager"`
+	Scheduler         DeploymentSettings      `json:"scheduler"`
+	Etcd              EtcdStatefulSetSettings `json:"etcd"`
+	Prometheus        StatefulSetSettings     `json:"prometheus"`
 }
 
 type APIServerSettings struct {
@@ -310,12 +323,19 @@ type APIServerSettings struct {
 }
 
 type DeploymentSettings struct {
-	Replicas  *int32                       `json:"replicas,omitempty"`
-	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+	Replicas    *int32                       `json:"replicas,omitempty"`
+	Resources   *corev1.ResourceRequirements `json:"resources,omitempty"`
+	Tolerations []corev1.Toleration          `json:"tolerations,omitempty"`
 }
 
 type StatefulSetSettings struct {
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+type EtcdStatefulSetSettings struct {
+	DeploymentSettings `json:",inline"`
+	StorageClass       string             `json:"storageClass,omitempty"`
+	DiskSize           *resource.Quantity `json:"diskSize,omitempty"`
 }
 
 // ClusterNetworkingConfig specifies the different networking

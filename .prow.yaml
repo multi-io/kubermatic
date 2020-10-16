@@ -145,7 +145,7 @@ presubmits:
     clone_uri: "ssh://git@github.com/kubermatic/kubermatic.git"
     spec:
       containers:
-      - image: golangci/golangci-lint:v1.23.6
+      - image: golangci/golangci-lint:v1.30.0
         command:
         - make
         args:
@@ -429,7 +429,7 @@ presubmits:
       preset-kind-volume-mounts: "true"
     spec:
       containers:
-      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.16
+      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.17
         env:
         - name: KUBERMATIC_EDITION
           value: ee

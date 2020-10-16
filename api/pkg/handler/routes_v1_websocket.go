@@ -65,8 +65,10 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
+// WebsocketWriter is a function signature that can write to websocket.
 type WebsocketWriter func(providers watcher.Providers, ws *websocket.Conn)
 
+// RegisterV1Websocket add websocket endpoint.
 func (r Routing) RegisterV1Websocket(mux *mux.Router) {
 	providers := getProviders(r)
 

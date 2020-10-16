@@ -1,12 +1,9 @@
 /*
 Copyright 2020 The Kubermatic Kubernetes Platform contributors.
-
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
-
     http://www.apache.org/licenses/LICENSE-2.0
-
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -19,6 +16,7 @@ package etcd
 import (
 	"flag"
 	"fmt"
+	"strings"
 	"testing"
 
 	kubermaticv1 "github.com/kubermatic/kubermatic/api/pkg/crd/kubermatic/v1"
@@ -36,41 +34,41 @@ func TestGetEtcdCommand(t *testing.T) {
 		name                  string
 		clusterName           string
 		clusterNamespace      string
-		migrate               bool
 		enableCorruptionCheck bool
+		launcherEnabled       bool
+		expectedArgs          int
 	}{
 		{
-			name:             "no-migration",
-			clusterName:      "lg69pmx8wf",
-			clusterNamespace: "cluster-lg69pmx8wf",
-			migrate:          false,
-		},
-		{
-			name:             "with-migration",
+			name:             "with-launcher",
 			clusterName:      "62m9k9tqlm",
 			clusterNamespace: "cluster-62m9k9tqlm",
-			migrate:          true,
+			launcherEnabled:  true,
+			expectedArgs:     13,
 		},
 		{
 			name:                  "with-corruption-flags",
 			clusterName:           "lg69pmx8wf",
 			clusterNamespace:      "cluster-lg69pmx8wf",
-			migrate:               false,
 			enableCorruptionCheck: true,
+			launcherEnabled:       false,
+			expectedArgs:          3,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			args, err := getEtcdCommand(test.clusterName, test.clusterNamespace, test.migrate, test.enableCorruptionCheck)
+			args, err := getEtcdCommand(test.clusterName, test.clusterNamespace, test.enableCorruptionCheck, test.launcherEnabled)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			if len(args) != 3 {
-				t.Fatalf("got less arguments than expected. got %d expected %d", len(args), 3)
+			if len(args) != test.expectedArgs {
+				t.Fatalf("got less/more arguments than expected. got %d expected %d", len(args), test.expectedArgs)
 			}
-			cmd := args[2]
+			cmd := strings.Join(args, " ")
+			if !test.launcherEnabled {
+				cmd = args[2]
+			}
 
 			testhelper.CompareOutput(t, fmt.Sprintf("etcd-command-%s", test.name), cmd, *update, ".sh")
 		})
@@ -91,21 +89,21 @@ func TestGetImageTag(t *testing.T) {
 				},
 				Spec: kubermaticv1.ClusterSpec{Version: *semver.NewSemverOrDie("4.17.18")},
 			},
-			expectedResult: imageTagV34,
+			expectedResult: etcdImageTagV34,
 		},
 		{
 			name: "Kubernetes 1.16",
 			cluster: &kubermaticv1.Cluster{
 				Spec: kubermaticv1.ClusterSpec{Version: *semver.NewSemverOrDie("1.16.0")},
 			},
-			expectedResult: imageTagV34,
+			expectedResult: etcdImageTagV34,
 		},
 		{
 			name: "Kubernetes 1.17",
 			cluster: &kubermaticv1.Cluster{
 				Spec: kubermaticv1.ClusterSpec{Version: *semver.NewSemverOrDie("1.17.0")},
 			},
-			expectedResult: imageTagV34,
+			expectedResult: etcdImageTagV34,
 		},
 	}
 

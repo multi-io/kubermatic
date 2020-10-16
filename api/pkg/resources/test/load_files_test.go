@@ -597,6 +597,7 @@ func TestLoadFiles(t *testing.T) {
 					"kubermaticIssuer",
 					true,
 					"quay.io/kubermatic/kubermatic",
+					"quay.io/kubermatic/etcd-launcher",
 					"quay.io/kubermatic/kubeletdnat-controller",
 					false)
 
@@ -697,6 +698,21 @@ func TestLoadFiles(t *testing.T) {
 					// Verify that every CronJob has the ImagePullSecret set
 					if len(res.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets) == 0 {
 						t.Errorf("CronJob %s is missing the ImagePullSecret on the PodTemplate", res.Name)
+					}
+
+					checkTestResult(t, fixturePath, res)
+				}
+
+				for _, creatorGetter := range kubernetescontroller.GetEtcdBackupConfigCreators(data) {
+					_, create := creatorGetter()
+					res, err := create(&kubermaticv1.EtcdBackupConfig{})
+					if err != nil {
+						t.Fatalf("failed to create EtcdBackupConfig: %v", err)
+					}
+
+					fixturePath := fmt.Sprintf("etcdbackupconfig-%s-%s-%s", prov, ver.Version.String(), res.Name)
+					if err != nil {
+						t.Fatalf("failed to create EtcdBackupConfig for %s: %v", fixturePath, err)
 					}
 
 					checkTestResult(t, fixturePath, res)

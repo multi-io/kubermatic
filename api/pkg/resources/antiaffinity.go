@@ -21,6 +21,22 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// PhysicalHostIDWeightedPodAffinityTerm returns a simple term to scheduling of same kind pods on the node running on the same physical host.
+func PhysicalHostIDWeightedPodAffinityTerm(app, clusterName string) corev1.WeightedPodAffinityTerm {
+	return corev1.WeightedPodAffinityTerm{
+		Weight: 100,
+		PodAffinityTerm: corev1.PodAffinityTerm{
+			LabelSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					AppLabelKey:     app,
+					ClusterLabelKey: clusterName,
+				},
+			},
+			TopologyKey: TopologyKeyPhysicalHostID,
+		},
+	}
+}
+
 // HostnameAntiAffinity returns a simple Affinity rule to prevent* scheduling of same kind pods on the same node.
 // It contains 2 AntiAffinity terms:
 // High priority: We don't schedule multiple pods of this app & cluster on a single node
