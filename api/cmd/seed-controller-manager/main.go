@@ -25,6 +25,7 @@ import (
 	"os"
 
 	"github.com/kubermatic/kubermatic/api/pkg/keycloak"
+	"github.com/pkg/errors"
 
 	"github.com/go-logr/zapr"
 	"github.com/oklog/run"
@@ -54,6 +55,7 @@ import (
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlruntimelog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -122,7 +124,7 @@ Please install the VerticalPodAutoscaler according to the documentation: https:/
 		}
 	}
 
-	//Register the global error metric. Ensures that runtime.HandleError() increases the error metric
+	// Register the global error metric. Ensures that runtime.HandleError() increases the error metric
 	metrics.RegisterRuntimErrorMetricCounter("kubermatic_controller_manager", prometheus.DefaultRegisterer)
 
 	dockerPullConfigJSON, err := ioutil.ReadFile(options.dockerPullConfigJSONFile)
@@ -187,11 +189,21 @@ Please install the VerticalPodAutoscaler according to the documentation: https:/
 		if err != nil {
 			log.Fatalw("failed to create seed validator webhook server: %v", zap.Error(err))
 		}
+		componentsSettings, err := defaultComponentSettings(
+			int32(options.apiServerDefaultReplicas),
+			int32(options.controllerManagerDefaultReplicas),
+			int32(options.schedulerDefaultReplicas),
+			options.apiServerEndpointReconcilingDisabled,
+			options.defaultComponentSettings)
+		if err != nil {
+			log.Fatalw("construct default components overrides", zap.Error(err))
+		}
 		seedValidationWebhookServer, err := options.seedValidationHook.Server(
 			rootCtx,
 			log,
 			options.namespace,
 			validator.Validate,
+			componentsSettings,
 			false)
 		if err != nil {
 			log.Fatalw("Failed to get seedValidationWebhookServer", zap.Error(err))
@@ -316,4 +328,25 @@ func requireEnv(key string) string {
 		log.Fatalf("Required environment variable not set: %s", key)
 	}
 	return value
+}
+
+// Constructs default components overrides for clusters. Uses settings file if given
+// and cli option values if not (to allow backward compatibility).
+func defaultComponentSettings(apiReplicas, cmReplicas, schedulerReplicas int32, apiDisableEndpointReconcile bool, settingsFile string) (kubermaticv1.ComponentSettings, error) {
+	var ret kubermaticv1.ComponentSettings
+	if settingsFile != "" {
+		content, err := ioutil.ReadFile(settingsFile)
+		if err != nil {
+			return ret, errors.Wrap(err, "read components settings file")
+		}
+		if err := yaml.Unmarshal(content, &ret); err != nil {
+			return ret, errors.Wrap(err, "unmarshal components settings file")
+		}
+		return ret, nil
+	}
+	ret.Apiserver.Replicas = &apiReplicas
+	ret.Apiserver.EndpointReconcilingDisabled = &apiDisableEndpointReconcile
+	ret.ControllerManager.Replicas = &cmReplicas
+	ret.Scheduler.Replicas = &schedulerReplicas
+	return ret, nil
 }

@@ -161,7 +161,7 @@ func getExternalIPv4(log *zap.SugaredLogger, hostname string) (string, error) {
 		return "", fmt.Errorf("no ip addresses found for %s: %v", hostname, err)
 	}
 
-	//Just one ipv4
+	// Just one ipv4
 	if len(ips) > 1 {
 		log.Debugw("Lookup returned multiple ipv4 addresses. Picking the first one after sorting", "hostname", hostname, "foundAddresses", ips, "pickedAddress", ips[0])
 	}

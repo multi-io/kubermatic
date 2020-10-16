@@ -169,8 +169,8 @@ func (sv *Validator) validate(ctx context.Context, subject *kubermaticv1.Seed, s
 	return nil
 }
 
-//EnsureSingleSeedValidator ensures that only the seed with the given Name and
-//Namespace can be created.
+// EnsureSingleSeedValidator ensures that only the seed with the given Name and
+// Namespace can be created.
 type EnsureSingleSeedValidator struct {
 	Name      string
 	Namespace string

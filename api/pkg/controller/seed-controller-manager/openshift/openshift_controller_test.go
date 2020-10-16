@@ -200,7 +200,7 @@ func TestResources(t *testing.T) {
 				t.Fatalf("failed to serialize object %q: %v", metav1object.GetName(), err)
 			}
 
-			testhelper.CompareOutput(t, fmt.Sprintf("%s-%s", strings.Replace(tc.name, " ", "_", -1), metav1object.GetName()), string(serializedObject), *update, ".yaml")
+			testhelper.CompareOutput(t, fmt.Sprintf("%s-%s", strings.ReplaceAll(tc.name, " ", "_"), metav1object.GetName()), string(serializedObject), *update, ".yaml")
 		})
 	}
 

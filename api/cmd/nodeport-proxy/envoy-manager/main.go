@@ -106,12 +106,6 @@ func main() {
 	envoyv2.RegisterRouteDiscoveryServiceServer(grpcServer, srv)
 	envoyv2.RegisterListenerDiscoveryServiceServer(grpcServer, srv)
 
-	go func() {
-		if err := grpcServer.Serve(listener); err != nil {
-			log.Fatal(err)
-		}
-	}()
-
 	config, err := ctrlruntimeconfig.GetConfig()
 	if err != nil {
 		log.Fatal(err)
@@ -121,6 +115,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	go func() {
+		if err := grpcServer.Serve(listener); err != nil {
+			log.Fatal(err)
+		}
+	}()
 
 	r := &reconciler{
 		ctx:                 ctx,

@@ -66,6 +66,7 @@ type controllerRunOptions struct {
 	kubernetesAddons                                 kubermaticv1.AddonList
 	openshiftAddons                                  kubermaticv1.AddonList
 	backupContainerFile                              string
+	backupDeleteContainerFile                        string
 	cleanupContainerFile                             string
 	backupContainerImage                             string
 	backupInterval                                   string
@@ -79,6 +80,7 @@ type controllerRunOptions struct {
 	dockerPullConfigJSONFile                         string
 	kubermaticImage                                  string
 	keycloakCacheExpiry                              time.Duration
+	etcdLauncherImage                                string
 	dnatControllerImage                              string
 	namespace                                        string
 	disableLeaderElection                            bool
@@ -89,6 +91,7 @@ type controllerRunOptions struct {
 	seedValidationHook                               seedvalidation.WebhookOpts
 	concurrentClusterUpdate                          int
 	addonEnforceInterval                             int
+	defaultComponentSettings                         string
 
 	// OIDC configuration
 	oidcCAFile             string
@@ -127,6 +130,7 @@ func newControllerRunOptions() (controllerRunOptions, error) {
 	flag.StringVar(&defaultOpenshiftAddonList, "openshift-addons-list", "", "Comma separated list of addons to install into every openshift user cluster. Mutually exclusive with `--openshift-addons-file`")
 	flag.StringVar(&defaultOpenshiftAddonsFile, "openshift-addons-file", "", "File that contains a list of default openshift addons. Mutually exclusive with `--openshift-addons-list`")
 	flag.StringVar(&c.backupContainerFile, "backup-container", "", fmt.Sprintf("[Required] Filepath of a backup container yaml. It must mount a volume named %s from which it reads the etcd backups", backupcontroller.SharedVolumeName))
+	flag.StringVar(&c.backupDeleteContainerFile, "backup-delete-container", "", "Filepath of a backup deletion container yaml. It receives the name of the backup to delete in an env variable ($BACKUP_TO_DELETE). If not specified, the backup container must handle deletion.")
 	flag.StringVar(&c.cleanupContainerFile, "cleanup-container", "", "[Required] Filepath of a cleanup container yaml. The container will be used to cleanup the backup directory for a cluster after it got deleted.")
 	flag.StringVar(&c.backupContainerImage, "backup-container-init-image", backupcontroller.DefaultBackupContainerImage, "Docker image to use for the init container in the backup job, must be an etcd v3 image. Only set this if your cluster can not use the public quay.io registry")
 	flag.StringVar(&c.backupInterval, "backup-interval", backupcontroller.DefaultBackupInterval, "Interval in which the etcd gets backed up")
@@ -145,6 +149,7 @@ func newControllerRunOptions() (controllerRunOptions, error) {
 	flag.StringVar(&c.oidcIssuerClientSecret, "oidc-issuer-client-secret", "", "OpenID client secret")
 	flag.StringVar(&c.kubermaticImage, "kubermatic-image", resources.DefaultKubermaticImage, "The location from which to pull the Kubermatic image")
 	flag.DurationVar(&c.keycloakCacheExpiry, "keycloak-cache-expiry", 2*time.Hour, "Time duration after which items in the Keycloak client cache expire.")
+	flag.StringVar(&c.etcdLauncherImage, "etcd-launcher-image", resources.DefaultEtcdLauncherImage, "The location from which to pull the etcd launcher image")
 	flag.StringVar(&c.dnatControllerImage, "dnatcontroller-image", resources.DefaultDNATControllerImage, "The location of the dnatcontroller-image")
 	flag.StringVar(&c.namespace, "namespace", "kubermatic", "The namespace kubermatic runs in, uses to determine where to look for datacenter custom resources")
 	flag.BoolVar(&c.disableLeaderElection, "disable-leader-election", false, "A flag indicating whether the controller should skip the leader election. Only enable this for debugging purposes.")
@@ -154,6 +159,7 @@ func newControllerRunOptions() (controllerRunOptions, error) {
 	flag.IntVar(&c.schedulerDefaultReplicas, "scheduler-default-replicas", 1, "The default number of replicas for usercluster schedulers")
 	flag.IntVar(&c.concurrentClusterUpdate, "max-parallel-reconcile", 10, "The default number of resources updates per cluster")
 	flag.IntVar(&c.addonEnforceInterval, "addon-enforce-interval", 5, "Check and ensure default usercluster addons are deployed every interval in minutes. Set to 0 to disable.")
+	flag.StringVar(&c.defaultComponentSettings, "default-component-settings", "", "YAML file with default cluster component settings")
 	c.seedValidationHook.AddFlags(flag.CommandLine)
 	addFlags(flag.CommandLine)
 	flag.Parse()

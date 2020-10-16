@@ -27,6 +27,7 @@ import (
 	"github.com/kubermatic/kubermatic/api/pkg/resources/certificates/servingcerthelper"
 	"github.com/kubermatic/kubermatic/api/pkg/resources/certificates/triple"
 	"github.com/kubermatic/kubermatic/api/pkg/resources/reconciling"
+	"github.com/kubermatic/kubermatic/api/pkg/validation/seed"
 
 	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -197,6 +198,7 @@ func SeedAdmissionWebhookCreator(cfg *operatorv1alpha1.KubermaticConfiguration, 
 				return nil, fmt.Errorf("cannot find Seed Admission CA bundle: %v", err)
 			}
 
+			path := seed.ValidateSeedPath
 			hook.Webhooks = []admissionregistrationv1beta1.ValidatingWebhook{
 				{
 					Name:                    "seeds.kubermatic.io", // this should be a FQDN
@@ -211,6 +213,7 @@ func SeedAdmissionWebhookCreator(cfg *operatorv1alpha1.KubermaticConfiguration, 
 							Name:      seedWebhookServiceName,
 							Namespace: cfg.Namespace,
 							Port:      pointer.Int32Ptr(443),
+							Path:      &path,
 						},
 					},
 					NamespaceSelector: &metav1.LabelSelector{
@@ -229,6 +232,68 @@ func SeedAdmissionWebhookCreator(cfg *operatorv1alpha1.KubermaticConfiguration, 
 							},
 							Operations: []admissionregistrationv1beta1.OperationType{
 								admissionregistrationv1beta1.OperationAll,
+							},
+						},
+					},
+				},
+			}
+
+			return hook, nil
+		}
+	}
+}
+
+func ClustersMutatingAdmissionWebhookName(cfg *operatorv1alpha1.KubermaticConfiguration) string {
+	return fmt.Sprintf("kubermatic-seeds-clusters-default-components-overrides-%s", cfg.Namespace)
+}
+
+func ClustersMutatingAdmissionWebhookCreator(cfg *operatorv1alpha1.KubermaticConfiguration, client ctrlruntimeclient.Client) reconciling.NamedMutatingWebhookConfigurationCreatorGetter {
+	return func() (string, reconciling.MutatingWebhookConfigurationCreator) {
+		return ClustersMutatingAdmissionWebhookName(cfg), func(hook *admissionregistrationv1beta1.MutatingWebhookConfiguration) (*admissionregistrationv1beta1.MutatingWebhookConfiguration, error) {
+			matchPolicy := admissionregistrationv1beta1.Exact
+			failurePolicy := admissionregistrationv1beta1.Fail
+			sideEffects := admissionregistrationv1beta1.SideEffectClassUnknown
+			scope := admissionregistrationv1beta1.AllScopes
+
+			ca, err := seedWebhookCABundle(cfg, client)
+			if err != nil {
+				return nil, fmt.Errorf("cannot find Seed Admission CA bundle: %v", err)
+			}
+
+			path := seed.MutateClustersPath
+			hook.Webhooks = []admissionregistrationv1beta1.MutatingWebhook{
+				{
+					Name:                    "clusters.kubermatic.io", // this should be a FQDN
+					AdmissionReviewVersions: []string{admissionregistrationv1beta1.SchemeGroupVersion.Version},
+					MatchPolicy:             &matchPolicy,
+					FailurePolicy:           &failurePolicy,
+					SideEffects:             &sideEffects,
+					TimeoutSeconds:          pointer.Int32Ptr(30),
+					ClientConfig: admissionregistrationv1beta1.WebhookClientConfig{
+						CABundle: ca,
+						Service: &admissionregistrationv1beta1.ServiceReference{
+							Name:      seedWebhookServiceName,
+							Namespace: cfg.Namespace,
+							Port:      pointer.Int32Ptr(443),
+							Path:      &path,
+						},
+					},
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							NameLabel: cfg.Namespace,
+						},
+					},
+					ObjectSelector: &metav1.LabelSelector{},
+					Rules: []admissionregistrationv1beta1.RuleWithOperations{
+						{
+							Rule: admissionregistrationv1beta1.Rule{
+								APIGroups:   []string{kubermaticv1.GroupName},
+								APIVersions: []string{"*"},
+								Resources:   []string{"clusters"},
+								Scope:       &scope,
+							},
+							Operations: []admissionregistrationv1beta1.OperationType{
+								admissionregistrationv1beta1.Create,
 							},
 						},
 					},

@@ -27,7 +27,7 @@ import (
 	"github.com/kubermatic/kubermatic/api/pkg/handler/v1/admin"
 )
 
-//RegisterV1Admin declares all router paths for the admin users
+// RegisterV1Admin declares all router paths for the admin users
 func (r Routing) RegisterV1Admin(mux *mux.Router) {
 	//
 	// Defines a set of HTTP endpoints for the admin users

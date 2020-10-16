@@ -542,12 +542,20 @@ func (r *Reconciler) reconcileServices(cfg *operatorv1alpha1.KubermaticConfigura
 func (r *Reconciler) reconcileAdmissionWebhooks(cfg *operatorv1alpha1.KubermaticConfiguration, seed *kubermaticv1.Seed, client ctrlruntimeclient.Client, log *zap.SugaredLogger) error {
 	log.Debug("reconciling AdmissionWebhooks")
 
-	creators := []reconciling.NamedValidatingWebhookConfigurationCreatorGetter{
+	mutCreators := []reconciling.NamedMutatingWebhookConfigurationCreatorGetter{
+		common.ClustersMutatingAdmissionWebhookCreator(cfg, client),
+	}
+
+	if err := reconciling.ReconcileMutatingWebhookConfigurations(r.ctx, mutCreators, "", client); err != nil {
+		return fmt.Errorf("failed to reconcile mutation AdmissionWebhooks: %v", err)
+	}
+
+	valCreators := []reconciling.NamedValidatingWebhookConfigurationCreatorGetter{
 		common.SeedAdmissionWebhookCreator(cfg, client),
 	}
 
-	if err := reconciling.ReconcileValidatingWebhookConfigurations(r.ctx, creators, "", client); err != nil {
-		return fmt.Errorf("failed to reconcile AdmissionWebhooks: %v", err)
+	if err := reconciling.ReconcileValidatingWebhookConfigurations(r.ctx, valCreators, "", client); err != nil {
+		return fmt.Errorf("failed to reconcile validation AdmissionWebhooks: %v", err)
 	}
 
 	return nil

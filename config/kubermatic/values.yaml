@@ -39,6 +39,8 @@ kubermatic:
   monitoringScrapeAnnotationPrefix: ""
   # The location from which to pull the Kubermatic docker image
   kubermaticImage: ""
+  # The location from which to pull the etcd launcher docker image
+  etcdLauncherImage: ""
   # The location from which to pull the Kubermatic dnatcontroller image
   dnatcontrollerImage: "quay.io/kubermatic/kubeletdnat-controller"
   # The strategy to expose the cluster with, either "NodePort" which creates a NodePort with a "nodeport-proxy.k8s.io/expose": "true" annotation to expose all
@@ -54,6 +56,19 @@ kubermatic:
   controllerManagerDefaultReplicas: "1"
   schedulerDefaultReplicas: "1"
   maxParallelReconcile: "10"
+
+  # The default cluster components settings.
+  # Can be overriden on a per-cluster basis by setting .Spec.ComponentsOverride.
+  defaultComponentSettings:
+    apiserver:
+      replicas: 2
+      endpointReconcilingDisabled: false
+    controllerManager:
+      replicas: 1
+    scheduler:
+      replicas: 1
+    etcd:
+      replicas: 3
 
   # Whether to disable reconciling for the apiserver endpoints
   apiserverEndpointReconcilingDisabled: false
@@ -266,10 +281,12 @@ kubermatic:
     tolerations: []
 
   # You can override the default containers used for managing user cluster backups
-  # using these two options. If they are left empty, the default containers from
-  # the static/ directory will be used.
+  # using these three options. If they are left empty, the default containers from
+  # the static/ directory will be used for the store and cleanup containers, and
+  # the delete container will be disabled
   # To disable backups, configure containers that just run /bin/true, for example.
   storeContainer: null
+  deleteContainer: null
   cleanupContainer: null
 
   clusterNamespacePrometheus: {}

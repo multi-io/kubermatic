@@ -35,6 +35,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
+// Server endpoints path.
+const (
+	ValidateSeedPath   = "/"
+	MutateClustersPath = "/default-components-settings"
+)
+
 type WebhookOpts struct {
 	ListenAddress string
 	CertFile      string
@@ -55,6 +61,7 @@ func (opts *WebhookOpts) Server(
 	log *zap.SugaredLogger,
 	namespace string,
 	validateFunc ValidateFunc,
+	defaultComponentsOverrides kubermaticv1.ComponentSettings,
 	migrationModeEnabled bool) (*Server, error) {
 
 	if opts.CertFile == "" || opts.KeyFile == "" {
@@ -65,16 +72,18 @@ func (opts *WebhookOpts) Server(
 		Server: &http.Server{
 			Addr: opts.ListenAddress,
 		},
-		log:                  log.Named("seed-webhook-server"),
-		listenAddress:        opts.ListenAddress,
-		certFile:             opts.CertFile,
-		keyFile:              opts.KeyFile,
-		validateFunc:         validateFunc,
-		namespace:            namespace,
-		migrationModeEnabled: migrationModeEnabled,
+		log:                        log.Named("seed-webhook-server"),
+		listenAddress:              opts.ListenAddress,
+		certFile:                   opts.CertFile,
+		keyFile:                    opts.KeyFile,
+		validateFunc:               validateFunc,
+		namespace:                  namespace,
+		migrationModeEnabled:       migrationModeEnabled,
+		defaultComponentsOverrides: defaultComponentsOverrides,
 	}
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", server.handleSeedValidationRequests)
+	mux.HandleFunc(ValidateSeedPath, server.handleSeedValidationRequests)
+	mux.HandleFunc(MutateClustersPath, server.handleClusterDefaultComponentsOverridesMutationRequests)
 	server.Handler = mux
 
 	return server, nil
@@ -82,14 +91,15 @@ func (opts *WebhookOpts) Server(
 
 type Server struct {
 	*http.Server
-	ctx                  context.Context
-	log                  *zap.SugaredLogger
-	listenAddress        string
-	certFile             string
-	keyFile              string
-	validateFunc         ValidateFunc
-	namespace            string
-	migrationModeEnabled bool
+	ctx                        context.Context
+	log                        *zap.SugaredLogger
+	listenAddress              string
+	certFile                   string
+	keyFile                    string
+	validateFunc               ValidateFunc
+	namespace                  string
+	defaultComponentsOverrides kubermaticv1.ComponentSettings
+	migrationModeEnabled       bool
 }
 
 // Server implements LeaderElectionRunnable to indicate that it does not require to run
@@ -106,7 +116,7 @@ func (s *Server) Start(_ <-chan struct{}) error {
 }
 
 func (s *Server) handleSeedValidationRequests(resp http.ResponseWriter, req *http.Request) {
-	admissionRequest, validationErr := s.handle(req)
+	admissionRequest, validationErr := s.handleSeedValidation(req)
 	if validationErr != nil {
 		s.log.Warnw("Seed admission failed", zap.Error(validationErr))
 	}
@@ -139,27 +149,11 @@ func (s *Server) handleSeedValidationRequests(resp http.ResponseWriter, req *htt
 	s.log.Debug("Successfully validated seed")
 }
 
-func (s *Server) handle(req *http.Request) (*admissionv1beta1.AdmissionRequest, error) {
-	body := bytes.NewBuffer([]byte{})
-	if _, err := body.ReadFrom(req.Body); err != nil {
-		return nil, fmt.Errorf("failed to read request body: %v", err)
+func (s *Server) handleSeedValidation(req *http.Request) (*admissionv1beta1.AdmissionRequest, error) {
+	admissionReview, err := s.readRequestAdmissionReview(req)
+	if err != nil {
+		return nil, err
 	}
-
-	admissionReview := &admissionv1beta1.AdmissionReview{}
-	if err := json.Unmarshal(body.Bytes(), admissionReview); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal request body: %v", err)
-	}
-
-	if admissionReview.Request == nil {
-		return nil, errors.New("received malformed admission review: no request defined")
-	}
-
-	s.log.Debugw(
-		"Received admission request",
-		"kind", admissionReview.Request.Kind,
-		"name", admissionReview.Request.Name,
-		"namespace", admissionReview.Request.Namespace,
-		"operation", admissionReview.Request.Operation)
 
 	// Under normal circumstances, the Kubermatic Operator will setup a Webhook
 	// that has a namespace selector (and it will also label the kubermatic ns),
@@ -195,4 +189,116 @@ func (s *Server) handle(req *http.Request) (*admissionv1beta1.AdmissionRequest, 
 	}
 
 	return admissionReview.Request, validationErr
+}
+
+func (s *Server) handleClusterDefaultComponentsOverridesMutationRequests(w http.ResponseWriter, r *http.Request) {
+	admissionReview, err := s.readRequestAdmissionReview(r)
+	if err != nil {
+		s.log.Errorw("Read admission review request", zap.Error(err))
+		http.Error(w, "failed to read admission review request", http.StatusBadRequest)
+		return
+	}
+
+	var cluster kubermaticv1.Cluster
+	if err := json.Unmarshal(admissionReview.Request.Object.Raw, &cluster); err != nil {
+		s.log.Errorw("Unmarshal request object into a cluster", zap.Error(err))
+		http.Error(w, "failed to unmarshal request object into a cluster", http.StatusBadRequest)
+		return
+	}
+
+	overrides := cluster.Spec.ComponentsOverride
+	if overrides.Apiserver.Replicas == nil {
+		overrides.Apiserver.Replicas = s.defaultComponentsOverrides.Apiserver.Replicas
+	}
+	if overrides.Apiserver.Resources == nil {
+		overrides.Apiserver.Resources = s.defaultComponentsOverrides.Apiserver.Resources
+	}
+	if overrides.Apiserver.EndpointReconcilingDisabled == nil {
+		overrides.Apiserver.EndpointReconcilingDisabled = s.defaultComponentsOverrides.Apiserver.EndpointReconcilingDisabled
+	}
+	if overrides.ControllerManager.Replicas == nil {
+		overrides.ControllerManager.Replicas = s.defaultComponentsOverrides.ControllerManager.Replicas
+	}
+	if overrides.ControllerManager.Resources == nil {
+		overrides.ControllerManager.Resources = s.defaultComponentsOverrides.ControllerManager.Resources
+	}
+	if overrides.ControllerManager.Tolerations == nil {
+		overrides.ControllerManager.Tolerations = s.defaultComponentsOverrides.ControllerManager.Tolerations
+	}
+	if overrides.Scheduler.Replicas == nil {
+		overrides.Scheduler.Replicas = s.defaultComponentsOverrides.Scheduler.Replicas
+	}
+	if overrides.Scheduler.Resources == nil {
+		overrides.Scheduler.Resources = s.defaultComponentsOverrides.Scheduler.Resources
+	}
+	if overrides.Scheduler.Tolerations == nil {
+		overrides.Scheduler.Tolerations = s.defaultComponentsOverrides.Scheduler.Tolerations
+	}
+	if overrides.Etcd.Replicas == nil {
+		overrides.Etcd.Replicas = s.defaultComponentsOverrides.Etcd.Replicas
+	}
+	if overrides.Etcd.Resources == nil {
+		overrides.Etcd.Resources = s.defaultComponentsOverrides.Etcd.Resources
+	}
+	if overrides.Etcd.Tolerations == nil {
+		overrides.Etcd.Tolerations = s.defaultComponentsOverrides.Etcd.Tolerations
+	}
+	if overrides.Etcd.DiskSize == nil {
+		overrides.Etcd.DiskSize = s.defaultComponentsOverrides.Etcd.DiskSize
+	}
+	if overrides.Etcd.StorageClass == "" {
+		overrides.Etcd.StorageClass = s.defaultComponentsOverrides.Etcd.StorageClass
+	}
+	if overrides.Prometheus.Resources == nil {
+		overrides.Prometheus.Resources = s.defaultComponentsOverrides.Prometheus.Resources
+	}
+
+	asJSON, err := json.Marshal(overrides)
+	if err != nil {
+		s.log.Errorw("unexpected response marshal error", zap.Error(err))
+		http.Error(w, "unexpected response encoding error", http.StatusInternalServerError)
+		return
+	}
+	pt := admissionv1beta1.PatchTypeJSONPatch
+	patch := fmt.Sprintf(`[{"op": "remove", "path": "/spec/componentsOverride"}, {"op": "add", "path": "/spec/componentsOverride", "value": %s}]`, asJSON)
+	response := &admissionv1beta1.AdmissionReview{
+		Request: admissionReview.Request,
+		Response: &admissionv1beta1.AdmissionResponse{
+			UID:       admissionReview.Request.UID,
+			Allowed:   true,
+			PatchType: &pt,
+			Patch:     []byte(patch),
+		},
+	}
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		s.log.Error("unexpected response write error", zap.Error(err))
+		http.Error(w, "unexpected response write error", http.StatusInternalServerError)
+	}
+
+	s.log.Debug("Successfully mutated cluster")
+}
+
+func (s *Server) readRequestAdmissionReview(req *http.Request) (*admissionv1beta1.AdmissionReview, error) {
+	body := bytes.NewBuffer([]byte{})
+	if _, err := body.ReadFrom(req.Body); err != nil {
+		return nil, fmt.Errorf("failed to read request body: %v", err)
+	}
+
+	admissionReview := &admissionv1beta1.AdmissionReview{}
+	if err := json.Unmarshal(body.Bytes(), admissionReview); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal request body: %v", err)
+	}
+
+	if admissionReview.Request == nil {
+		return nil, errors.New("received malformed admission review: no request defined")
+	}
+
+	s.log.Debugw(
+		"Received admission request",
+		"kind", admissionReview.Request.Kind,
+		"name", admissionReview.Request.Name,
+		"namespace", admissionReview.Request.Namespace,
+		"operation", admissionReview.Request.Operation)
+
+	return admissionReview, nil
 }

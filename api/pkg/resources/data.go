@@ -20,9 +20,10 @@ import (
 	"context"
 	"crypto/x509"
 	"fmt"
-	"github.com/kubermatic/kubermatic/api/pkg/keycloak"
 	"net"
 	"strings"
+
+	"github.com/kubermatic/kubermatic/api/pkg/keycloak"
 
 	kubermaticv1 "github.com/kubermatic/kubermatic/api/pkg/crd/kubermatic/v1"
 	"github.com/kubermatic/kubermatic/api/pkg/provider"
@@ -30,7 +31,6 @@ import (
 	providerconfig "github.com/kubermatic/machine-controller/pkg/providerconfig/types"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -62,6 +62,7 @@ type TemplateData struct {
 	KeycloakFacade                                   keycloak.Facade
 	nodeLocalDNSCacheEnabled                         bool
 	kubermaticImage                                  string
+	etcdLauncherImage                                string
 	dnatControllerImage                              string
 	supportsFailureDomainZoneAntiAffinity            bool
 }
@@ -90,6 +91,7 @@ func NewTemplateData(
 	oidcIssuerClientID string,
 	nodeLocalDNSCacheEnabled bool,
 	kubermaticImage string,
+	etcdLauncherImage string,
 	dnatControllerImage string,
 	supportsFailureDomainZoneAntiAffinity bool) *TemplateData {
 	return &TemplateData{
@@ -115,6 +117,7 @@ func NewTemplateData(
 		KeycloakFacade:                                   keycloakFacade,
 		nodeLocalDNSCacheEnabled:                         nodeLocalDNSCacheEnabled,
 		kubermaticImage:                                  kubermaticImage,
+		etcdLauncherImage:                                etcdLauncherImage,
 		dnatControllerImage:                              dnatControllerImage,
 		supportsFailureDomainZoneAntiAffinity:            supportsFailureDomainZoneAntiAffinity,
 	}
@@ -172,6 +175,19 @@ func (d *TemplateData) EtcdDiskSize() resource.Quantity {
 // MonitoringEnvironmentLabel returns the environment label
 func (d *TemplateData) MonitoringEnvironmentLabel() string {
 	return d.monitoringEnvironmentLabel
+}
+
+func (d *TemplateData) EtcdLauncherImage() string {
+	imageSplit := strings.Split(d.etcdLauncherImage, "/")
+	var registry, imageWithoutRegistry string
+	if len(imageSplit) != 3 {
+		registry = RegistryDocker
+		imageWithoutRegistry = strings.Join(imageSplit, "/")
+	} else {
+		registry = imageSplit[0]
+		imageWithoutRegistry = strings.Join(imageSplit[1:], "/")
+	}
+	return d.ImageRegistry(registry) + "/" + imageWithoutRegistry
 }
 
 // MonitoringScrapeAnnotationPrefix returns the scrape annotation prefix
@@ -274,20 +290,6 @@ func (d *TemplateData) GetPodTemplateLabels(appName string, volumes []corev1.Vol
 	return GetPodTemplateLabels(d.ctx, d.client, appName, d.cluster.Name, d.cluster.Status.NamespaceName, volumes, additionalLabels)
 }
 
-// GetPodTemplateLabels returns a set of labels for a Pod including the revisions of depending secrets and configmaps.
-// This will force pods being restarted as soon as one of the secrets/configmaps get updated.
-func (d *TemplateData) HasEtcdOperatorService() (bool, error) {
-	service := &corev1.Service{}
-	key := types.NamespacedName{Namespace: d.cluster.Status.NamespaceName, Name: "etcd-cluster-client"}
-	if err := d.client.Get(d.ctx, key, service); err != nil {
-		if errors.IsNotFound(err) {
-			return false, nil
-		}
-		return false, err
-	}
-	return true, nil
-}
-
 // GetApiserverExternalNodePort returns the nodeport of the external apiserver service
 func (d *TemplateData) GetOpenVPNServerPort() (int32, error) {
 	service := &corev1.Service{}
@@ -307,7 +309,7 @@ func (d *TemplateData) KubermaticAPIImage() string {
 	apiImageSplit := strings.Split(d.kubermaticImage, "/")
 	var registry, imageWithoutRegistry string
 	if len(apiImageSplit) != 3 {
-		registry = "docker.io"
+		registry = RegistryDocker
 		imageWithoutRegistry = strings.Join(apiImageSplit, "/")
 	} else {
 		registry = apiImageSplit[0]
@@ -320,7 +322,7 @@ func (d *TemplateData) DNATControllerImage() string {
 	dnatControllerImageSplit := strings.Split(d.dnatControllerImage, "/")
 	var registry, imageWithoutRegistry string
 	if len(dnatControllerImageSplit) != 3 {
-		registry = "docker.io"
+		registry = RegistryDocker
 		imageWithoutRegistry = strings.Join(dnatControllerImageSplit, "/")
 	} else {
 		registry = dnatControllerImageSplit[0]
