@@ -265,8 +265,6 @@ func (r *Reconciler) ensureNextBackupIsScheduled(ctx context.Context, backupConf
 
 	var backupToSchedule *kubermaticv1.BackupStatus
 
-	oldBackupConfig := backupConfig.DeepCopy()
-
 	if len(backupConfig.Status.CurrentBackups) > 2*backupConfig.GetKeptBackupsCount() {
 		// keeping track of many backups already, don't schedule new ones.
 		if r.setBackupConfigCondition(
@@ -277,7 +275,7 @@ func (r *Reconciler) ensureNextBackupIsScheduled(ctx context.Context, backupConf
 			"too many active backups already; not scheduling new ones") {
 
 			// condition changed, need to persist and generate an event
-			if err := r.Patch(ctx, backupConfig, ctrlruntimeclient.MergeFrom(oldBackupConfig)); err != nil {
+			if err := r.Update(ctx, backupConfig); err != nil {
 				return nil, errors.Wrap(err, "failed to update backup config")
 			}
 			r.recorder.Event(backupConfig, corev1.EventTypeWarning, "TooManyActiveBackups", "too many active backups already; not scheduling new ones")
@@ -293,7 +291,7 @@ func (r *Reconciler) ensureNextBackupIsScheduled(ctx context.Context, backupConf
 		"") {
 
 		// condition changed, need to persist and generate an event
-		if err := r.Patch(ctx, backupConfig, ctrlruntimeclient.MergeFrom(oldBackupConfig)); err != nil {
+		if err := r.Update(ctx, backupConfig); err != nil {
 			return nil, errors.Wrap(err, "failed to update backup config")
 		}
 		r.recorder.Event(backupConfig, corev1.EventTypeNormal, "NotTooManyActiveBackups", "backup count low enough; scheduling new backups")
@@ -338,7 +336,7 @@ func (r *Reconciler) ensureNextBackupIsScheduled(ctx context.Context, backupConf
 	backupToSchedule.JobName = fmt.Sprintf("%s-backup-%s-create-%s", cluster.Name, backupConfig.Name, r.randStringGenerator())
 	backupToSchedule.DeleteJobName = fmt.Sprintf("%s-backup-%s-delete-%s", cluster.Name, backupConfig.Name, r.randStringGenerator())
 
-	if err := r.Patch(ctx, backupConfig, ctrlruntimeclient.MergeFrom(oldBackupConfig)); err != nil {
+	if err := r.Update(ctx, backupConfig); err != nil {
 		return nil, errors.Wrap(err, "failed to update backup config")
 	}
 
@@ -373,8 +371,6 @@ func (r *Reconciler) setBackupConfigCondition(backupConfig *kubermaticv1.EtcdBac
 // create any backup jobs that can be created, i.e. that don't exist yet while their scheduled time has arrived
 // also update status of backups whose jobs have completed
 func (r *Reconciler) startPendingBackupJobs(ctx context.Context, backupConfig *kubermaticv1.EtcdBackupConfig, cluster *kubermaticv1.Cluster) (*reconcile.Result, error) {
-	oldBackupConfig := backupConfig.DeepCopy()
-
 	var returnReconcile *reconcile.Result
 
 	for i := range backupConfig.Status.CurrentBackups {
@@ -415,7 +411,7 @@ func (r *Reconciler) startPendingBackupJobs(ctx context.Context, backupConfig *k
 		}
 	}
 
-	if err := r.Patch(ctx, backupConfig, ctrlruntimeclient.MergeFrom(oldBackupConfig)); err != nil {
+	if err := r.Update(ctx, backupConfig); err != nil {
 		return nil, errors.Wrap(err, "failed to update backup config")
 	}
 
@@ -444,8 +440,6 @@ func (r *Reconciler) startPendingBackupDeleteJobs(ctx context.Context, backupCon
 	}
 
 	if toDeleteCount > 0 {
-		oldBackupConfig := backupConfig.DeepCopy()
-
 		sort.Slice(completedBackups, func(i, j int) bool {
 			return completedBackups[i].ScheduledTime.Time.Before(completedBackups[j].ScheduledTime.Time)
 		})
@@ -456,7 +450,7 @@ func (r *Reconciler) startPendingBackupDeleteJobs(ctx context.Context, backupCon
 			}
 		}
 
-		if err := r.Patch(ctx, backupConfig, ctrlruntimeclient.MergeFrom(oldBackupConfig)); err != nil {
+		if err := r.Update(ctx, backupConfig); err != nil {
 			return nil, errors.Wrap(err, "failed to update backup config")
 		}
 
@@ -483,8 +477,6 @@ func (r *Reconciler) createDeleteJob(ctx context.Context, backupConfig *kubermat
 
 // update status of all delete jobs that have completed and are still marked as running
 func (r *Reconciler) updateRunningBackupDeleteJobs(ctx context.Context, backupConfig *kubermaticv1.EtcdBackupConfig, cluster *kubermaticv1.Cluster) (*reconcile.Result, error) {
-	oldBackupConfig := backupConfig.DeepCopy()
-
 	var returnReconcile *reconcile.Result
 
 	for i := range backupConfig.Status.CurrentBackups {
@@ -529,7 +521,7 @@ func (r *Reconciler) updateRunningBackupDeleteJobs(ctx context.Context, backupCo
 		}
 	}
 
-	if err := r.Patch(ctx, backupConfig, ctrlruntimeclient.MergeFrom(oldBackupConfig)); err != nil {
+	if err := r.Update(ctx, backupConfig); err != nil {
 		return nil, errors.Wrap(err, "failed to update backup config")
 	}
 
@@ -539,8 +531,6 @@ func (r *Reconciler) updateRunningBackupDeleteJobs(ctx context.Context, backupCo
 // Delete backup and delete jobs that have been finished for a while.
 // For backups where both the backup and delete jobs have been deleted, delete the backup status entry too.
 func (r *Reconciler) deleteFinishedBackupJobs(ctx context.Context, backupConfig *kubermaticv1.EtcdBackupConfig, cluster *kubermaticv1.Cluster) (*reconcile.Result, error) {
-	oldBackupConfig := backupConfig.DeepCopy()
-
 	var returnReconcile *reconcile.Result
 
 	var newBackups []kubermaticv1.BackupStatus
@@ -635,7 +625,7 @@ func (r *Reconciler) deleteFinishedBackupJobs(ctx context.Context, backupConfig 
 
 	backupConfig.Status.CurrentBackups = newBackups
 
-	if err := r.Patch(ctx, backupConfig, ctrlruntimeclient.MergeFrom(oldBackupConfig)); err != nil {
+	if err := r.Update(ctx, backupConfig); err != nil {
 		return nil, errors.Wrap(err, "failed to update backup config")
 	}
 
@@ -646,8 +636,6 @@ func (r *Reconciler) handleFinalization(ctx context.Context, backupConfig *kuber
 	if backupConfig.DeletionTimestamp == nil || len(backupConfig.Status.CurrentBackups) > 0 {
 		return nil, nil
 	}
-
-	oldBackupConfig := backupConfig.DeepCopy()
 
 	canRemoveFinalizer := true
 
@@ -704,7 +692,7 @@ func (r *Reconciler) handleFinalization(ctx context.Context, backupConfig *kuber
 		returnReconcile = nil
 	}
 
-	if err := r.Patch(ctx, backupConfig, ctrlruntimeclient.MergeFrom(oldBackupConfig)); err != nil {
+	if err := r.Update(ctx, backupConfig); err != nil {
 		return nil, errors.Wrap(err, "failed to update backup config")
 	}
 
