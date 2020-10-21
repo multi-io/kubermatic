@@ -293,6 +293,8 @@ func etcdCmd(config *config) []string {
 		fmt.Sprintf("--cert-file=%s", resources.EtcdCertFile),
 		fmt.Sprintf("--key-file=%s", resources.EtcdKetFile),
 		"--auto-compaction-retention=8",
+		"--heartbeat-interval=1000",
+		"--election-timeout=5000",
 	}
 
 	if config.enableCorruptionCheck {

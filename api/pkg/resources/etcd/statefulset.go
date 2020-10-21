@@ -484,5 +484,7 @@ exec /usr/local/bin/etcd \
     --experimental-corrupt-check-time=10m \
 {{- end }}
     --auto-compaction-retention=8
+    --heartbeat-interval=1000
+    --election-timeout=5000
 `
 )
