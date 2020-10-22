@@ -149,7 +149,7 @@ func newControllerRunOptions() (controllerRunOptions, error) {
 	flag.StringVar(&c.oidcIssuerClientSecret, "oidc-issuer-client-secret", "", "OpenID client secret")
 	flag.StringVar(&c.kubermaticImage, "kubermatic-image", resources.DefaultKubermaticImage, "The location from which to pull the Kubermatic image")
 	flag.DurationVar(&c.keycloakCacheExpiry, "keycloak-cache-expiry", 2*time.Hour, "Time duration after which items in the Keycloak client cache expire.")
-	flag.StringVar(&c.etcdLauncherImage, "etcd-launcher-image", resources.DefaultEtcdLauncherImage, "The location from which to pull the etcd launcher image")
+	flag.StringVar(&c.etcdLauncherImage, "etcd-launcher-image", resources.DefaultEtcdLauncherImage, fmt.Sprintf("The location from which to pull the etcd launcher image, if image tag is not specified tag %s is used", resources.KUBERMATICCOMMIT))
 	flag.StringVar(&c.dnatControllerImage, "dnatcontroller-image", resources.DefaultDNATControllerImage, "The location of the dnatcontroller-image")
 	flag.StringVar(&c.namespace, "namespace", "kubermatic", "The namespace kubermatic runs in, uses to determine where to look for datacenter custom resources")
 	flag.BoolVar(&c.disableLeaderElection, "disable-leader-election", false, "A flag indicating whether the controller should skip the leader election. Only enable this for debugging purposes.")
