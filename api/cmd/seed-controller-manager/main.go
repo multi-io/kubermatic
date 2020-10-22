@@ -95,6 +95,10 @@ func main() {
 		log.Fatalw("Failed to create a kubernetes config", zap.Error(err))
 	}
 
+	// Avoid blocking of the controller by increasing the QPS for the kubernetes client
+	config.QPS = float32(options.k8sClientQPS)
+	config.Burst = options.k8sClientBurst
+
 	// Set the logger used by sigs.k8s.io/controller-runtime
 	ctrlruntimelog.Log = ctrlruntimelog.NewDelegatingLogger(zapr.NewLogger(rawLog).WithName("controller_runtime"))
 

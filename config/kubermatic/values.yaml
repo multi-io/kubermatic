@@ -140,6 +140,8 @@ kubermatic:
           pullPolicy: "IfNotPresent"
     # Specify a custom docker registry which will be used for all images (user cluster control plane + addons)
     overwriteRegistry: ""
+    clientQPS: 20
+    clientBurst: 50
     resources:
       requests:
         cpu: 200m
@@ -279,6 +281,8 @@ kubermatic:
     affinity: {}
     nodeSelector: {}
     tolerations: []
+    clientQPS: 20
+    clientBurst: 50
 
   # You can override the default containers used for managing user cluster backups
   # using these three options. If they are left empty, the default containers from

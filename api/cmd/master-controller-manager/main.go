@@ -57,6 +57,8 @@ type controllerRunOptions struct {
 	masterURL          string
 	internalAddr       string
 	seedvalidationHook seedvalidation.WebhookOpts
+	k8sClientQPS       float64
+	k8sClientBurst     int
 
 	workerName string
 }
@@ -90,6 +92,8 @@ func main() {
 	flag.IntVar(&ctrlCtx.workerCount, "worker-count", 4, "Number of workers which process the clusters in parallel.")
 	flag.StringVar(&runOpts.internalAddr, "internal-address", "127.0.0.1:8085", "The address on which the /metrics endpoint will be served.")
 	flag.StringVar(&ctrlCtx.namespace, "namespace", "kubermatic", "The namespace kubermatic runs in, uses to determine where to look for datacenter custom resources.")
+	flag.Float64Var(&runOpts.k8sClientQPS, "k8s-client-qps", 20, "Maximum QPS for the k8s client when talking to seed cluster APIs.")
+	flag.IntVar(&runOpts.k8sClientBurst, "k8s-client-burst", 50, "Maximum burst for k8s client requests when talking to seed cluster APIs.")
 	addFlags(flag.CommandLine)
 	flag.Parse()
 
@@ -150,8 +154,8 @@ func main() {
 	}
 
 	// Avoid blocking of the master controller by increasing the QPS for the kubernetes client
-	cfg.QPS = 20
-	cfg.Burst = 50
+	cfg.QPS = float32(runOpts.k8sClientQPS)
+	cfg.Burst = runOpts.k8sClientBurst
 
 	ctrlCtx.labelSelectorFunc = func(listOpts *metav1.ListOptions) {
 		listOpts.LabelSelector = selector.String()
