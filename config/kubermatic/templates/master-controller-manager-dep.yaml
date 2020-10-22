@@ -55,6 +55,8 @@ spec:
         - -namespace=$(NAMESPACE)
         - -seed-admissionwebhook-cert-file=/opt/seed-webhook-serving-cert/serverCert.pem
         - -seed-admissionwebhook-key-file=/opt/seed-webhook-serving-cert/serverKey.pem
+        - -k8s-client-qps={{ .Values.kubermatic.masterController.clientQPS }}
+        - -k8s-client-burst={{ .Values.kubermatic.masterController.clientBurst }}
         - -logtostderr
         {{- if .Values.kubermatic.masterController.debugLog }}
         - -log-debug=true

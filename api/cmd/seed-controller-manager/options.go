@@ -92,6 +92,8 @@ type controllerRunOptions struct {
 	concurrentClusterUpdate                          int
 	addonEnforceInterval                             int
 	defaultComponentSettings                         string
+	k8sClientQPS                                     float64
+	k8sClientBurst                                   int
 
 	// OIDC configuration
 	oidcCAFile             string
@@ -160,6 +162,8 @@ func newControllerRunOptions() (controllerRunOptions, error) {
 	flag.IntVar(&c.concurrentClusterUpdate, "max-parallel-reconcile", 10, "The default number of resources updates per cluster")
 	flag.IntVar(&c.addonEnforceInterval, "addon-enforce-interval", 5, "Check and ensure default usercluster addons are deployed every interval in minutes. Set to 0 to disable.")
 	flag.StringVar(&c.defaultComponentSettings, "default-component-settings", "", "YAML file with default cluster component settings")
+	flag.Float64Var(&c.k8sClientQPS, "k8s-client-qps", 20, "Maximum QPS for the k8s client when talking to seed cluster APIs.")
+	flag.IntVar(&c.k8sClientBurst, "k8s-client-burst", 50, "Maximum burst for k8s client requests when talking to seed cluster APIs.")
 	c.seedValidationHook.AddFlags(flag.CommandLine)
 	addFlags(flag.CommandLine)
 	flag.Parse()
