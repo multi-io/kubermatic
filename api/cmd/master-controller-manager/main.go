@@ -149,6 +149,10 @@ func main() {
 		}
 	}
 
+	// Avoid blocking of the master controller by increasing the QPS for the kubernetes client
+	cfg.QPS = 20
+	cfg.Burst = 50
+
 	ctrlCtx.labelSelectorFunc = func(listOpts *metav1.ListOptions) {
 		listOpts.LabelSelector = selector.String()
 	}
