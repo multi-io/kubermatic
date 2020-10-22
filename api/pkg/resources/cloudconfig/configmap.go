@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/kubermatic/machine-controller/pkg/ini"
 	"net/url"
 	"time"
 
@@ -34,6 +33,7 @@ import (
 	gce "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/gce/types"
 	openstack "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/openstack/types"
 	vsphere "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/vsphere/types"
+	"github.com/kubermatic/machine-controller/pkg/ini"
 	providerconfig "github.com/kubermatic/machine-controller/pkg/providerconfig/types"
 
 	corev1 "k8s.io/api/core/v1"
@@ -150,7 +150,6 @@ func CloudConfig(
 			},
 			Version: cluster.Spec.Version.String(),
 		}
-		cloudConfig, err = openstack.CloudConfigToString(openstackCloudConfig)
 		if cluster.Spec.Version.Minor() >= 18 {
 			openstackCloudConfig.LoadBalancer = openstack.LoadBalancerOpts{
 				// NetworkID for the ext-net floating-network
@@ -161,6 +160,7 @@ func CloudConfig(
 				MonitorMaxRetries: 5,
 			}
 		}
+		cloudConfig, err = openstack.CloudConfigToString(openstackCloudConfig)
 		if err != nil {
 			return cloudConfig, err
 		}
