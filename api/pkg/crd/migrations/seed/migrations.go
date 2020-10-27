@@ -225,13 +225,14 @@ func migrateClusterUserLabel(cluster *kubermaticv1.Cluster, cleanupContext *clea
 }
 
 func createSecretsForCredentials(cluster *kubermaticv1.Cluster, cleanupContext *cleanupContext) error {
+	if cluster.GetDeletionTimestamp() != nil {
+		return nil
+	}
+
 	if err := kubernetesprovider.CreateOrUpdateCredentialSecretForCluster(cleanupContext.ctx, cleanupContext.client, cluster); err != nil {
 		return err
 	}
-	// SysEleven temp fix because migrations changed in 2.15
-	if cluster.GetDeletionTimestamp() != nil {
-		kuberneteshelper.AddFinalizer(cluster, apiv1.CredentialsSecretsCleanupFinalizer)
-	}
+	kuberneteshelper.AddFinalizer(cluster, apiv1.CredentialsSecretsCleanupFinalizer)
 
 	if err := cleanupContext.client.Update(cleanupContext.ctx, cluster); err != nil {
 		return fmt.Errorf("failed to update cluster %q: %v", cluster.Name, err)
