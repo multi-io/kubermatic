@@ -21,7 +21,7 @@ package etcdbackup
 import (
 	"context"
 	"fmt"
-	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -76,6 +76,10 @@ const (
 	backupToCreateEnvVarKey = "BACKUP_TO_CREATE"
 	// backupToDeleteEnvVarKey defines the environment variable key for the name of the backup to delete
 	backupToDeleteEnvVarKey = "BACKUP_TO_DELETE"
+	// backupScheduleEnvVarKey defines the environment variable key for the backup schedule
+	backupScheduleEnvVarKey = "BACKUP_SCHEDULE"
+	// backupKeepCountEnvVarKey defines the environment variable key for the number of backups to keep
+	backupKeepCountEnvVarKey = "BACKUP_KEEP_COUNT"
 	// backupConfigEnvVarKey defines the environment variable key for the name of the backup configuration resource
 	backupConfigEnvVarKey = "BACKUP_CONFIG"
 
@@ -333,8 +337,8 @@ func (r *Reconciler) ensureNextBackupIsScheduled(ctx context.Context, backupConf
 		backupToSchedule.BackupName = fmt.Sprintf("%s-%s", backupConfig.Name, backupToSchedule.ScheduledTime.Format("2006-01-02t15-04-05"))
 	}
 
-	backupToSchedule.JobName = fmt.Sprintf("%s-backup-%s-create-%s", cluster.Name, backupConfig.Name, r.randStringGenerator())
-	backupToSchedule.DeleteJobName = fmt.Sprintf("%s-backup-%s-delete-%s", cluster.Name, backupConfig.Name, r.randStringGenerator())
+	backupToSchedule.JobName = r.limitNameLength(fmt.Sprintf("%s-backup-%s-create-%s", cluster.Name, backupConfig.Name, r.randStringGenerator()))
+	backupToSchedule.DeleteJobName = r.limitNameLength(fmt.Sprintf("%s-backup-%s-delete-%s", cluster.Name, backupConfig.Name, r.randStringGenerator()))
 
 	if err := r.Update(ctx, backupConfig); err != nil {
 		return nil, errors.Wrap(err, "failed to update backup config")
@@ -342,6 +346,14 @@ func (r *Reconciler) ensureNextBackupIsScheduled(ctx context.Context, backupConf
 
 	durationToScheduledTime := backupToSchedule.ScheduledTime.Sub(r.clock.Now())
 	return &reconcile.Result{Requeue: true, RequeueAfter: durationToScheduledTime}, nil
+}
+
+func (r *Reconciler) limitNameLength(name string) string {
+	if len(name) <= 63 {
+		return name
+	}
+	randomness := r.randStringGenerator()
+	return name[0:63-len(randomness)] + randomness
 }
 
 // set a condition on a backupConfig, return true iff the condition's status was changed
@@ -428,35 +440,36 @@ func (r *Reconciler) startPendingBackupDeleteJobs(ctx context.Context, backupCon
 		return nil, nil
 	}
 
-	// find all backups that have completed or failed but whose delete job haven't started yet
-	var completedBackups []*kubermaticv1.BackupStatus
-	for i := range backupConfig.Status.CurrentBackups {
-		backup := &backupConfig.Status.CurrentBackups[i]
-		if (backup.BackupPhase == kubermaticv1.BackupStatusPhaseCompleted || backup.BackupPhase == kubermaticv1.BackupStatusPhaseFailed) && backup.DeletePhase == "" {
-			completedBackups = append(completedBackups, backup)
-		}
-	}
-
-	toDeleteCount := len(completedBackups) - backupConfig.GetKeptBackupsCount()
+	var backupsToDelete []*kubermaticv1.BackupStatus
+	keepCount := backupConfig.GetKeptBackupsCount()
 	if backupConfig.DeletionTimestamp != nil {
-		toDeleteCount = len(completedBackups)
+		keepCount = 0
 	}
-
-	if toDeleteCount > 0 {
-		sort.Slice(completedBackups, func(i, j int) bool {
-			return completedBackups[i].ScheduledTime.Time.Before(completedBackups[j].ScheduledTime.Time)
-		})
-		for i := 0; i < toDeleteCount; i++ {
-			backup := completedBackups[i]
-			if err := r.createDeleteJob(ctx, backupConfig, cluster, backup); err != nil {
-				return nil, err
+	kept := 0
+	for i := len(backupConfig.Status.CurrentBackups) - 1; i >= 0; i-- {
+		backup := &backupConfig.Status.CurrentBackups[i]
+		if backup.BackupPhase == kubermaticv1.BackupStatusPhaseFailed && backup.DeletePhase == "" {
+			backupsToDelete = append(backupsToDelete, backup)
+		} else if backup.BackupPhase == kubermaticv1.BackupStatusPhaseCompleted {
+			kept++
+			if kept > keepCount && backup.DeletePhase == "" {
+				backupsToDelete = append(backupsToDelete, backup)
 			}
 		}
+	}
 
+	modified := false
+	for _, backup := range backupsToDelete {
+		if err := r.createDeleteJob(ctx, backupConfig, cluster, backup); err != nil {
+			return nil, err
+		}
+		modified = true
+	}
+
+	if modified {
 		if err := r.Update(ctx, backupConfig); err != nil {
 			return nil, errors.Wrap(err, "failed to update backup config")
 		}
-
 		return &reconcile.Result{RequeueAfter: assumedJobRuntime}, nil
 	}
 
@@ -715,6 +728,14 @@ func (r *Reconciler) backupJob(backupConfig *kubermaticv1.EtcdBackupConfig, clus
 			Value: backupStatus.BackupName,
 		},
 		corev1.EnvVar{
+			Name:  backupScheduleEnvVarKey,
+			Value: backupConfig.Spec.Schedule,
+		},
+		corev1.EnvVar{
+			Name:  backupKeepCountEnvVarKey,
+			Value: strconv.Itoa(backupConfig.GetKeptBackupsCount()),
+		},
+		corev1.EnvVar{
 			Name:  backupConfigEnvVarKey,
 			Value: backupConfig.Name,
 		})
@@ -799,6 +820,14 @@ func (r *Reconciler) deleteJob(backupConfig *kubermaticv1.EtcdBackupConfig, clus
 		corev1.EnvVar{
 			Name:  backupToDeleteEnvVarKey,
 			Value: backupStatus.BackupName,
+		},
+		corev1.EnvVar{
+			Name:  backupScheduleEnvVarKey,
+			Value: backupConfig.Spec.Schedule,
+		},
+		corev1.EnvVar{
+			Name:  backupKeepCountEnvVarKey,
+			Value: strconv.Itoa(backupConfig.GetKeptBackupsCount()),
 		},
 		corev1.EnvVar{
 			Name:  backupConfigEnvVarKey,
