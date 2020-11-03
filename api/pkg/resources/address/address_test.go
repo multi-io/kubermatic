@@ -19,6 +19,7 @@ package address
 import (
 	"context"
 	"fmt"
+	"net"
 	"testing"
 
 	kubermaticv1 "github.com/kubermatic/kubermatic/api/pkg/crd/kubermatic/v1"
@@ -46,8 +47,23 @@ const (
 	testDomain = "dns-test.kubermatic.io"
 )
 
+func testLookupFunction(host string) ([]net.IP, error) {
+	switch host {
+	case testDomain:
+		return []net.IP{net.IPv4(192, 168, 1, 1), net.IPv4(192, 168, 1, 2)}, nil
+	case "fake-cluster.europe-west3-c.dev.kubermatic.io":
+		fallthrough
+	case "fake-cluster.alias-europe-west3-c.dev.kubermatic.io":
+		return []net.IP{net.IPv4(34, 89, 181, 151)}, nil
+	default:
+		return []net.IP{}, nil
+	}
+}
+
 func TestGetExternalIPv4(t *testing.T) {
-	ip, err := getExternalIPv4(kubermaticlog.Logger, testDomain)
+	ip, err := NewModifiersBuilder(kubermaticlog.Logger).
+		lookupFunc(testLookupFunction).
+		getExternalIPv4(testDomain)
 	if err != nil {
 		t.Fatalf("failed to get the external IPv4 address for %s: %v", testDomain, err)
 	}
@@ -195,8 +211,13 @@ func TestSyncClusterAddress(t *testing.T) {
 				},
 			}
 
-			modifiers, err := SyncClusterAddress(context.Background(), kubermaticlog.Logger,
-				cluster, client, fakeExternalURL, seed)
+			modifiers, err := NewModifiersBuilder(kubermaticlog.Logger).
+				Client(client).
+				Cluster(cluster).
+				Seed(seed).
+				ExternalURL(fakeExternalURL).
+				lookupFunc(testLookupFunction).
+				Build(context.Background())
 			if err != nil {
 				if tc.errExpected {
 					return
