@@ -24,16 +24,15 @@ spec:
     plural: etcdrestores
     singular: etcdrestore
   scope: Namespaced
-  version: v1
+  additionalPrinterColumns:
+  - JSONPath: .status.phase
+    name: phase
+    type: string
+  - JSONPath: .status.conditions[?(@.type==SchedulingActive)].status
+    name: scheduling
+    type: string
+    priority: 1
   versions:
   - name: v1
     served: true
     storage: true
-    additionalPrinterColumns:
-    - JSONPath: .status.phase
-      name: phase
-      type: string
-    - JSONPath: .status.conditions[?(@.type==SchedulingActive)].status
-      name: scheduling
-      type: string
-      priority: 1

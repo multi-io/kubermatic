@@ -24,12 +24,7 @@ spec:
     plural: etcdbackupconfigs
     singular: etcdbackupconfig
   scope: Namespaced
-  version: v1
-  versions:
-  - name: v1
-    served: true
-    storage: true
-    additionalPrinterColumns:
+  additionalPrinterColumns:
     - JSONPath: .status.lastBackups[-1].backupPhase
       name: lastPhase
       type: string
@@ -50,4 +45,7 @@ spec:
       name: deleteJob
       type: string
       priority: 1
-
+  versions:
+  - name: v1
+    served: true
+    storage: true
