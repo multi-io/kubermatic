@@ -35,6 +35,7 @@ import (
 	sys11nodereadiness "github.com/kubermatic/kubermatic/api/pkg/controller/sys11-node-readiness"
 	clusterrolelabeler "github.com/kubermatic/kubermatic/api/pkg/controller/user-cluster-controller-manager/cluster-role-labeler"
 	containerlinux "github.com/kubermatic/kubermatic/api/pkg/controller/user-cluster-controller-manager/container-linux"
+	"github.com/kubermatic/kubermatic/api/pkg/controller/user-cluster-controller-manager/flatcar"
 	"github.com/kubermatic/kubermatic/api/pkg/controller/user-cluster-controller-manager/ipam"
 	nodelabeler "github.com/kubermatic/kubermatic/api/pkg/controller/user-cluster-controller-manager/node-labeler"
 	"github.com/kubermatic/kubermatic/api/pkg/controller/user-cluster-controller-manager/nodecsrapprover"
@@ -279,6 +280,11 @@ func main() {
 		log.Fatalw("Failed to register the ContainerLinux controller", zap.Error(err))
 	}
 	log.Info("Registered ContainerLinux controller")
+
+	if err := flatcar.Add(mgr, runOp.overwriteRegistry, updateWindow); err != nil {
+		log.Fatalw("Failed to register the Flatcar controller", zap.Error(err))
+	}
+	log.Info("Registered Flatcar controller")
 
 	if err := nodelabeler.Add(ctx, log, mgr, nodeLabels); err != nil {
 		log.Fatalw("Failed to register nodelabel controller", zap.Error(err))
