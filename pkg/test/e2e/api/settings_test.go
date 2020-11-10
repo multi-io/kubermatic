@@ -19,12 +19,17 @@ limitations under the License.
 package api
 
 import (
+	"encoding/json"
+	"fmt"
+	"net/http"
 	"testing"
 
-	apiv1 "github.com/kubermatic/kubermatic/pkg/api/v1"
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
+	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/test/e2e/api/utils/apiclient/client/project"
 
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/util/rand"
 )
 
 func TestGetDefaultGlobalSettings(t *testing.T) {
@@ -33,7 +38,7 @@ func TestGetDefaultGlobalSettings(t *testing.T) {
 		expectedSettings *apiv1.GlobalSettings
 	}{
 		{
-			name: "test, gets default settings",
+			name: "get default settings",
 			expectedSettings: &apiv1.GlobalSettings{
 
 				CustomLinks: []kubermaticv1.CustomLink{},
@@ -41,13 +46,16 @@ func TestGetDefaultGlobalSettings(t *testing.T) {
 					Enabled:  false,
 					Enforced: false,
 				},
-				DefaultNodeCount:      10,
-				ClusterTypeOptions:    kubermaticv1.ClusterTypeKubernetes,
-				DisplayDemoInfo:       false,
-				DisplayAPIDocs:        false,
-				DisplayTermsOfService: false,
-				EnableDashboard:       true,
-				EnableOIDCKubeconfig:  false,
+				DefaultNodeCount:            10,
+				ClusterTypeOptions:          kubermaticv1.ClusterTypeKubernetes,
+				DisplayDemoInfo:             false,
+				DisplayAPIDocs:              false,
+				DisplayTermsOfService:       false,
+				EnableDashboard:             true,
+				EnableOIDCKubeconfig:        false,
+				UserProjectsLimit:           0,
+				RestrictProjectCreation:     false,
+				EnableExternalClusterImport: false,
 			},
 		},
 	}
@@ -57,18 +65,161 @@ func TestGetDefaultGlobalSettings(t *testing.T) {
 
 			masterToken, err := retrieveMasterToken()
 			if err != nil {
-				t.Fatalf("can not get master token due error: %v", err)
+				t.Fatalf("failed to get master token: %v", err)
 			}
 			apiRunner := createRunner(masterToken, t)
 
 			settings, err := apiRunner.GetGlobalSettings()
 			if err != nil {
-				t.Fatalf("can not get global settings: %v", err)
+				t.Fatalf("failed to get global settings: %v", err)
 			}
 			if !equality.Semantic.DeepEqual(tc.expectedSettings, settings) {
-				t.Fatalf("expected: %v, got %v", tc.expectedSettings, settings)
+				t.Fatalf("expected: %v, but got %v", tc.expectedSettings, settings)
+			}
+		})
+	}
+}
+
+func setUserProjectsLimit(t *testing.T, r *runner, limit int) {
+	_, err := r.UpdateGlobalSettings(json.RawMessage(fmt.Sprintf(`{"userProjectsLimit":%d}`, limit)))
+	if err != nil {
+		t.Fatalf("failed to update global settings: %v", err)
+	}
+}
+
+func TestUserProjectsLimit(t *testing.T) {
+	tests := []struct {
+		name          string
+		projectsLimit int
+	}{
+		{
+			name:          "user reached maximum number of projects",
+			projectsLimit: 1,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var masterToken string
+
+			masterToken, err := retrieveMasterToken()
+			if err != nil {
+				t.Fatalf("failed to get master token: %v", err)
+			}
+			apiRunner := createRunner(masterToken, t)
+			// change for admin user
+			adminMasterToken, err := retrieveAdminMasterToken()
+			if err != nil {
+				t.Fatalf("failed to get admin master token: %v", err)
 			}
 
+			adminAPIRunner := createRunner(adminMasterToken, t)
+
+			setUserProjectsLimit(t, adminAPIRunner, tc.projectsLimit)
+			defer setUserProjectsLimit(t, adminAPIRunner, 0)
+
+			for i := 0; i < (tc.projectsLimit + 1); i++ {
+				_, err := apiRunner.CreateProject(rand.String(10))
+				if err != nil && i < tc.projectsLimit {
+					t.Fatalf("failed to create project: %v", err)
+				}
+				if err == nil && i > tc.projectsLimit {
+					t.Fatalf("expected error during cluster creation")
+				}
+			}
+		})
+	}
+}
+
+func TestAdminUserProjectsLimit(t *testing.T) {
+	tests := []struct {
+		name          string
+		projectsLimit int
+	}{
+		{
+			name:          "admin doesn't reach maximum number of projects",
+			projectsLimit: 1,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			adminMasterToken, err := retrieveAdminMasterToken()
+			if err != nil {
+				t.Fatalf("failed to get admin master token: %v", err)
+			}
+
+			adminAPIRunner := createRunner(adminMasterToken, t)
+
+			setUserProjectsLimit(t, adminAPIRunner, tc.projectsLimit)
+			defer setUserProjectsLimit(t, adminAPIRunner, 0)
+
+			for i := 0; i < (tc.projectsLimit + 1); i++ {
+				_, err := adminAPIRunner.CreateProject(rand.String(10))
+				if err != nil {
+					t.Fatalf("failed to create project: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func TestRestrictProjectCreation(t *testing.T) {
+	tests := []struct {
+		name          string
+		projectsLimit int
+	}{
+		{
+			name: "user failed to create any project, admin can create projects",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var masterToken string
+
+			masterToken, err := retrieveMasterToken()
+			if err != nil {
+				t.Fatalf("failed to get master token: %v", err)
+			}
+			apiRunner := createRunner(masterToken, t)
+			// change for admin user
+			adminMasterToken, err := retrieveAdminMasterToken()
+			if err != nil {
+				t.Fatalf("failed to get admin master token: %v", err)
+			}
+
+			adminAPIRunner := createRunner(adminMasterToken, t)
+			_, err = adminAPIRunner.UpdateGlobalSettings(json.RawMessage(`{"restrictProjectCreation":true}`))
+			if err != nil {
+				t.Fatalf("failed to update global settings: %v", err)
+			}
+
+			defer func() {
+				_, err = adminAPIRunner.UpdateGlobalSettings(json.RawMessage(`{"restrictProjectCreation":false}`))
+				if err != nil {
+					t.Fatalf("failed to update global settings: %v", err)
+				}
+			}()
+
+			// regular user can't create projects
+			_, err = apiRunner.CreateProject(rand.String(10))
+			if err == nil {
+				t.Fatal("expected error during cluster creation")
+			}
+			createError, ok := err.(*project.CreateProjectDefault)
+			if !ok {
+				t.Fatalf("create project: expected error, but got %v", err)
+			}
+			if createError.Code() != http.StatusForbidden {
+				t.Fatalf("create project: expected forbidden error, but got %v", createError.Code())
+			}
+
+			// admin can create projects
+			project, err := adminAPIRunner.CreateProject(rand.String(10))
+			if err != nil {
+				t.Fatalf("admin failed to create eproject: %v", err)
+			}
+			if err := adminAPIRunner.DeleteProject(project.ID); err != nil {
+				t.Fatalf("admin failed to delete project: %v", err)
+			}
 		})
 	}
 }

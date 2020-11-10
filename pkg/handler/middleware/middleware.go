@@ -25,14 +25,14 @@ import (
 	"github.com/go-kit/kit/endpoint"
 	transporthttp "github.com/go-kit/kit/transport/http"
 
-	apiv1 "github.com/kubermatic/kubermatic/pkg/api/v1"
-	kubermaticapiv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/handler/auth"
-	"github.com/kubermatic/kubermatic/pkg/handler/v1/common"
-	"github.com/kubermatic/kubermatic/pkg/provider"
-	kubermaticcontext "github.com/kubermatic/kubermatic/pkg/util/context"
-	k8cerrors "github.com/kubermatic/kubermatic/pkg/util/errors"
-	"github.com/kubermatic/kubermatic/pkg/util/hash"
+	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
+	kubermaticapiv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/handler/auth"
+	"k8c.io/kubermatic/v2/pkg/handler/v1/common"
+	"k8c.io/kubermatic/v2/pkg/provider"
+	kubermaticcontext "k8c.io/kubermatic/v2/pkg/util/context"
+	k8cerrors "k8c.io/kubermatic/v2/pkg/util/errors"
+	"k8c.io/kubermatic/v2/pkg/util/hash"
 
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -68,12 +68,13 @@ const (
 	// PrivilegedAddonProviderContextKey key under which the current PrivilegedAddonProvider is kept in the ctx
 	PrivilegedAddonProviderContextKey kubermaticcontext.Key = "privileged-addon-provider"
 
-	UserCRContextKey = kubermaticcontext.UserCRContextKey
+	UserCRContextKey                            = kubermaticcontext.UserCRContextKey
+	SeedsGetterContextKey kubermaticcontext.Key = "seeds-getter"
 )
 
-//DCGetter defines functionality to retrieve a datacenter name
-type dCGetter interface {
-	GetDC() string
+// seedClusterGetter defines functionality to retrieve a seed name
+type seedClusterGetter interface {
+	GetSeedCluster() apiv1.SeedCluster
 }
 
 // SetClusterProvider is a middleware that injects the current ClusterProvider into the ctx
@@ -233,8 +234,9 @@ func TokenVerifier(tokenVerifier auth.TokenVerifier, userProvider provider.UserP
 func Addons(addonProviderGetter provider.AddonProviderGetter, seedsGetter provider.SeedsGetter) endpoint.Middleware {
 	return func(next endpoint.Endpoint) endpoint.Endpoint {
 		return func(ctx context.Context, request interface{}) (response interface{}, err error) {
-			seedName := request.(dCGetter).GetDC()
-			addonProvider, err := getAddonProvider(addonProviderGetter, seedsGetter, seedName)
+			seedCluster := request.(seedClusterGetter).GetSeedCluster()
+
+			addonProvider, err := getAddonProvider(addonProviderGetter, seedsGetter, seedCluster.SeedName)
 			if err != nil {
 				return nil, err
 			}
@@ -248,8 +250,8 @@ func Addons(addonProviderGetter provider.AddonProviderGetter, seedsGetter provid
 func PrivilegedAddons(addonProviderGetter provider.AddonProviderGetter, seedsGetter provider.SeedsGetter) endpoint.Middleware {
 	return func(next endpoint.Endpoint) endpoint.Endpoint {
 		return func(ctx context.Context, request interface{}) (response interface{}, err error) {
-			seedName := request.(dCGetter).GetDC()
-			addonProvider, err := getAddonProvider(addonProviderGetter, seedsGetter, seedName)
+			seedCluster := request.(seedClusterGetter).GetSeedCluster()
+			addonProvider, err := getAddonProvider(addonProviderGetter, seedsGetter, seedCluster.SeedName)
 			if err != nil {
 				return nil, err
 			}
@@ -299,7 +301,7 @@ func createUserInfo(user *kubermaticapiv1.User, projectID string, userProjectMap
 }
 
 func getClusterProvider(ctx context.Context, request interface{}, seedsGetter provider.SeedsGetter, clusterProviderGetter provider.ClusterProviderGetter) (provider.ClusterProvider, context.Context, error) {
-	getter, ok := request.(dCGetter)
+	getter, ok := request.(seedClusterGetter)
 	if !ok {
 		return nil, nil, fmt.Errorf("request is no dcGetter")
 	}
@@ -307,18 +309,50 @@ func getClusterProvider(ctx context.Context, request interface{}, seedsGetter pr
 	if err != nil {
 		return nil, ctx, k8cerrors.New(http.StatusInternalServerError, fmt.Sprintf("failed to list seeds: %v", err))
 	}
-	seed, exists := seeds[getter.GetDC()]
+	if getter.GetSeedCluster().ClusterID != "" {
+		return getClusterProviderByClusterID(ctx, seeds, clusterProviderGetter, getter.GetSeedCluster().ClusterID)
+	}
+
+	seed, exists := seeds[getter.GetSeedCluster().SeedName]
 	if !exists {
-		return nil, ctx, k8cerrors.NewNotFound("datacenter", getter.GetDC())
+		return nil, ctx, k8cerrors.NewNotFound("seed", getter.GetSeedCluster().SeedName)
 	}
 	ctx = context.WithValue(ctx, datacenterContextKey, seed)
 
 	clusterProvider, err := clusterProviderGetter(seed)
 	if err != nil {
-		return nil, ctx, k8cerrors.NewNotFound("cluster-provider", getter.GetDC())
+		return nil, ctx, k8cerrors.NewNotFound("cluster-provider", getter.GetSeedCluster().SeedName)
 	}
 
 	return clusterProvider, ctx, nil
+}
+
+func getClusterProviderByClusterID(ctx context.Context, seeds map[string]*kubermaticapiv1.Seed, clusterProviderGetter provider.ClusterProviderGetter, clusterID string) (provider.ClusterProvider, context.Context, error) {
+	rawAuthenticatesUser := ctx.Value(AuthenticatedUserContextKey)
+	if rawAuthenticatesUser == nil {
+		return nil, ctx, k8cerrors.New(http.StatusInternalServerError, "no user in context found")
+	}
+	authenticatedUser := rawAuthenticatesUser.(apiv1.User)
+	userInfo := &provider.UserInfo{
+		Email:   authenticatedUser.Email,
+		IsAdmin: authenticatedUser.IsAdmin,
+	}
+	for _, seed := range seeds {
+		clusterProvider, err := clusterProviderGetter(seed)
+		if err != nil {
+			return nil, ctx, k8cerrors.NewNotFound("cluster-provider", clusterID)
+		}
+
+		cluster, err := clusterProvider.Get(userInfo, clusterID, nil)
+		if err != nil && !kerrors.IsNotFound(err) {
+			return nil, ctx, err
+
+		}
+		if cluster != nil {
+			return clusterProvider, ctx, nil
+		}
+	}
+	return nil, ctx, k8cerrors.NewNotFound("cluster-provider", clusterID)
 }
 
 func checkBlockedTokens(email, token string, userProvider provider.UserProvider) error {
@@ -339,4 +373,11 @@ func checkBlockedTokens(email, token string, userProvider provider.UserProvider)
 	}
 
 	return nil
+}
+
+// SetSeedsGetter injects the current SeedsGetter into the ctx
+func SetSeedsGetter(seedsGetter provider.SeedsGetter) transporthttp.RequestFunc {
+	return func(ctx context.Context, r *http.Request) context.Context {
+		return context.WithValue(ctx, SeedsGetterContextKey, seedsGetter)
+	}
 }

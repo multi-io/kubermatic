@@ -23,12 +23,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	apiv1 "github.com/kubermatic/kubermatic/pkg/api/v1"
-	kubermaticapiv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/handler/test"
-	"github.com/kubermatic/kubermatic/pkg/provider/kubernetes"
-	"github.com/kubermatic/kubermatic/pkg/resources"
 	providerconfig "github.com/kubermatic/machine-controller/pkg/providerconfig/types"
+	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
+	kubermaticfakeclentset "k8c.io/kubermatic/v2/pkg/crd/client/clientset/versioned/fake"
+	kubermaticapiv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/handler/test"
+	"k8c.io/kubermatic/v2/pkg/provider/kubernetes"
+	"k8c.io/kubermatic/v2/pkg/resources"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -120,9 +121,10 @@ func TestAddUserTokenToBlacklist(t *testing.T) {
 			existingObj := []runtime.Object{}
 			existingObj = append(existingObj, tc.existingObjs...)
 			fakeClient := fakectrlruntimeclient.NewFakeClientWithScheme(scheme.Scheme, existingObj...)
+			kubermaticClient := kubermaticfakeclentset.NewSimpleClientset()
 
 			// act
-			target := kubernetes.NewUserProvider(fakeClient, nil)
+			target := kubernetes.NewUserProvider(fakeClient, nil, kubermaticClient)
 			if err := target.AddUserTokenToBlacklist(tc.existingUser, tc.token, tc.expiry); err != nil {
 				t.Fatal(err)
 			}

@@ -22,11 +22,11 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/kubermatic/kubermatic/pkg/controller/operator/common"
-	"github.com/kubermatic/kubermatic/pkg/controller/operator/master/resources/kubermatic"
-	operatorv1alpha1 "github.com/kubermatic/kubermatic/pkg/crd/operator/v1alpha1"
-	"github.com/kubermatic/kubermatic/pkg/kubernetes"
-	"github.com/kubermatic/kubermatic/pkg/resources/reconciling"
+	"k8c.io/kubermatic/v2/pkg/controller/operator/common"
+	"k8c.io/kubermatic/v2/pkg/controller/operator/master/resources/kubermatic"
+	operatorv1alpha1 "k8c.io/kubermatic/v2/pkg/crd/operator/v1alpha1"
+	"k8c.io/kubermatic/v2/pkg/kubernetes"
+	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 
 	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	corev1 "k8s.io/api/core/v1"
@@ -206,10 +206,13 @@ func (r *Reconciler) reconcileSecrets(config *operatorv1alpha1.KubermaticConfigu
 	logger.Debug("Reconciling Secrets")
 
 	creators := []reconciling.NamedSecretCreatorGetter{
-		common.DockercfgSecretCreator(config),
 		common.SeedWebhookServingCASecretCreator(config),
 		common.SeedWebhookServingCertSecretCreator(config, r.Client),
 		common.ExtraFilesSecretCreator(config),
+	}
+
+	if config.Spec.ImagePullSecret != "" {
+		creators = append(creators, common.DockercfgSecretCreator(config))
 	}
 
 	if config.Spec.Auth.CABundle != "" {
@@ -263,6 +266,11 @@ func (r *Reconciler) reconcileDeployments(config *operatorv1alpha1.KubermaticCon
 	modifiers := []reconciling.ObjectModifier{
 		common.OwnershipModifierFactory(config, r.scheme),
 		common.VolumeRevisionLabelsModifierFactory(r.ctx, r.Client),
+	}
+	// add the image pull secret wrapper only when an image pull secret is
+	// provided
+	if config.Spec.ImagePullSecret != "" {
+		modifiers = append(modifiers, reconciling.ImagePullSecretsWrapper(common.DockercfgSecretName))
 	}
 
 	if err := reconciling.ReconcileDeployments(r.ctx, creators, config.Namespace, r.Client, modifiers...); err != nil {
@@ -326,6 +334,11 @@ func (r *Reconciler) reconcileIngresses(config *operatorv1alpha1.KubermaticConfi
 func (r *Reconciler) reconcileCertificates(config *operatorv1alpha1.KubermaticConfiguration, logger *zap.SugaredLogger) error {
 	if config.Spec.Ingress.Disable {
 		logger.Debug("Skipping Certificate creation because Ingress creation is disabled")
+		return nil
+	}
+
+	if config.Spec.Ingress.CertificateIssuer.Name == "" {
+		logger.Debug("Skipping Certificate creation because no certificateIssuer has been configured")
 		return nil
 	}
 

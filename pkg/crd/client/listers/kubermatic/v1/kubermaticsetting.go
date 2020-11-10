@@ -3,17 +3,20 @@
 package v1
 
 import (
-	v1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
+	v1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 )
 
 // KubermaticSettingLister helps list KubermaticSettings.
+// All objects returned here must be treated as read-only.
 type KubermaticSettingLister interface {
 	// List lists all KubermaticSettings in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.KubermaticSetting, err error)
 	// Get retrieves the KubermaticSetting from the index for a given name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.KubermaticSetting, error)
 	KubermaticSettingListerExpansion
 }

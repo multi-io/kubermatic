@@ -26,6 +26,7 @@ import (
 	"github.com/apparentlymart/go-cidr/cidr"
 	"github.com/gophercloud/gophercloud"
 	goopenstack "github.com/gophercloud/gophercloud/openstack"
+	osavailabilityzones "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/availabilityzones"
 	osservergroups "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/servergroups"
 	osflavors "github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
 	osprojects "github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
@@ -39,8 +40,8 @@ import (
 	osports "github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
 	ossubnets "github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
 	"github.com/gophercloud/gophercloud/pagination"
-	"github.com/kubermatic/kubermatic/pkg/provider"
-	"github.com/kubermatic/kubermatic/pkg/resources"
+	"k8c.io/kubermatic/v2/pkg/provider"
+	"k8c.io/kubermatic/v2/pkg/resources"
 )
 
 const (
@@ -539,4 +540,18 @@ func getAllNetworkPorts(netClient *gophercloud.ServiceClient, networkID string) 
 	}
 
 	return allPorts, nil
+}
+
+func getAvailabilityZones(computeClient *gophercloud.ServiceClient) ([]osavailabilityzones.AvailabilityZone, error) {
+	allPages, err := osavailabilityzones.List(computeClient).AllPages()
+	if err != nil {
+		return nil, err
+	}
+
+	availabilityZones, err := osavailabilityzones.ExtractAvailabilityZones(allPages)
+	if err != nil {
+		return nil, err
+	}
+
+	return availabilityZones, nil
 }

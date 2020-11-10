@@ -26,16 +26,16 @@ import (
 
 	"gopkg.in/yaml.v2"
 
-	"github.com/kubermatic/kubermatic/pkg/controller/operator/common"
-	operatorv1alpha1 "github.com/kubermatic/kubermatic/pkg/crd/operator/v1alpha1"
+	"k8c.io/kubermatic/v2/pkg/controller/operator/common"
+	operatorv1alpha1 "k8c.io/kubermatic/v2/pkg/crd/operator/v1alpha1"
 )
 
 func main() {
-	writeYAML(common.DefaultBackupStoreContainer, "config/kubermatic/static/store-container.yaml")
-	writeYAML(common.DefaultBackupCleanupContainer, "config/kubermatic/static/cleanup-container.yaml")
-	writeYAML(common.DefaultKubernetesAddons, "config/kubermatic/static/master/kubernetes-addons.yaml")
-	writeYAML(common.DefaultOpenshiftAddons, "config/kubermatic/static/master/openshift-addons.yaml")
-	writeJSON(common.DefaultUIConfig, "config/kubermatic/static/master/ui-config.json")
+	writeYAML(common.DefaultBackupStoreContainer, "charts/kubermatic/static/store-container.yaml")
+	writeYAML(common.DefaultBackupCleanupContainer, "charts/kubermatic/static/cleanup-container.yaml")
+	writeYAML(common.DefaultKubernetesAddons, "charts/kubermatic/static/master/kubernetes-addons.yaml")
+	writeYAML(common.DefaultOpenshiftAddons, "charts/kubermatic/static/master/openshift-addons.yaml")
+	writeJSON(common.DefaultUIConfig, "charts/kubermatic/static/master/ui-config.json")
 
 	markup, err := yaml.Marshal(map[string]interface{}{
 		"addons": common.DefaultAccessibleAddons,
@@ -44,7 +44,7 @@ func main() {
 		log.Fatalf("Failed to encode accessible addons as YAML: %v", err)
 	}
 
-	writeYAML(string(markup), "config/kubermatic/static/master/accessible-addons.yaml")
+	writeYAML(string(markup), "charts/kubermatic/static/master/accessible-addons.yaml")
 
 	versionCfg := &operatorv1alpha1.KubermaticVersionsConfiguration{
 		Kubernetes: common.DefaultKubernetesVersioning,
@@ -56,14 +56,14 @@ func main() {
 		log.Fatalf("Failed to encode versions as YAML: %v", err)
 	}
 
-	writeYAML(versionsYAML, "config/kubermatic/static/master/versions.yaml")
+	writeYAML(versionsYAML, "charts/kubermatic/static/master/versions.yaml")
 
 	updatesYAML, err := common.CreateUpdatesYAML(versionCfg)
 	if err != nil {
 		log.Fatalf("Failed to encode updates as YAML: %v", err)
 	}
 
-	writeYAML(updatesYAML, "config/kubermatic/static/master/updates.yaml")
+	writeYAML(updatesYAML, "charts/kubermatic/static/master/updates.yaml")
 }
 
 func writeYAML(container string, filename string) {

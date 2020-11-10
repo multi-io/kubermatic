@@ -1,0 +1,136 @@
+# Copyright 2020 The Kubermatic Kubernetes Platform contributors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+iap:
+  image:
+    repository: quay.io/oauth2-proxy/oauth2-proxy
+    tag: v6.0.0
+    pullPolicy: IfNotPresent
+
+  oidc_issuer_url: https://kubermatic.tld/dex
+  port: 3000
+
+  # replicas per deployment; you can set this explicitly per deployment
+  # to override this
+  replicas: 2
+
+  deployments:
+    # alertmanager:
+    #   name: alertmanager
+    #   replicas: 3
+    #   client_id: alertmanager
+    #   client_secret: xxx
+    #   encryption_key: xxx
+    #   config: ## see https://github.com/oauth2-proxy/oauth2-proxy/blob/master/docs/configuration/configuration.md
+    #     scope: "groups openid email"
+    #     email_domains:
+    #       - '*'
+    #     ## example configuration allowing access only to the mygroup from mygithuborg organization
+    #     github_org: mygithuborg
+    #     github_team: mygroup
+    #     ## do not route health endpoint through the proxy
+    #     skip_auth_regex:
+    #       - '/-/healthy'
+    #   upstream_service: alertmanager.monitoring.svc.cluster.local
+    #   upstream_port: 9093
+    #   ingress:
+    #     host: "alertmanager.kubermatic.tld"
+    #     annotations: {}
+    #
+    # grafana:
+    #   name: grafana
+    #   client_id: grafana
+    #   client_secret: xxx
+    #   encryption_key: xxx
+    #   config: ## see https://github.com/oauth2-proxy/oauth2-proxy/blob/master/docs/configuration/configuration.md
+    #     scope: "groups openid email"
+    #     email_domains:
+    #       - '*'
+    #     ## do not route health endpoint through the proxy
+    #     skip_auth_regex:
+    #       - '/api/health'
+    #     ## auto-register users based on their email address
+    #     ## Grafana is configured to look for the X-Forwarded-Email header
+    #     pass_user_headers: true
+    #   upstream_service: grafana.monitoring.svc.cluster.local
+    #   upstream_port: 3000
+    #   ingress:
+    #     host: "grafana.kubermatic.tld"
+    #     annotations: {}
+    #
+    # kibana:
+    #   name: kibana
+    #   client_id: kibana
+    #   client_secret: xxx
+    #   encryption_key: xxx
+    #   config: ## see https://github.com/oauth2-proxy/oauth2-proxy/blob/master/docs/configuration/configuration.md
+    #     scope: "groups openid email"
+    #     email_domains:
+    #       - '*'
+    #     ## do not route health endpoint through the proxy
+    #     skip_auth_regex:
+    #       - '/ui/favicons/favicon.ico'
+    #   upstream_service: kibana.logging.svc.cluster.local
+    #   upstream_port: 5601
+    #   ingress:
+    #     host: "kibana.kubermatic.tld"
+    #     annotations: {}
+    #
+    # prometheus:
+    #   name: prometheus
+    #   client_id: prometheus
+    #   client_secret: xxx
+    #   encryption_key: xxx
+    #   config: ## see https://github.com/oauth2-proxy/oauth2-proxy/blob/master/docs/configuration/configuration.md
+    #     scope: "groups openid email"
+    #     email_domains:
+    #       - '*'
+    #     ## do not route health endpoint through the proxy
+    #     skip_auth_regex:
+    #       - '/-/healthy'
+    #   upstream_service: prometheus.monitoring.svc.cluster.local
+    #   upstream_port: 9090
+    #   ingress:
+    #     host: "prometheus.kubermatic.tld"
+    #     annotations:
+    #       ingress.kubernetes.io/upstream-hash-by: "ip_hash" ## needed for prometheus federations
+
+  # the cert-manager Issuer (or ClusterIssuer) responsible for managing the certificates
+  certIssuer:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 25Mi
+    limits:
+      cpu: 200m
+      memory: 50Mi
+
+  # You can use Go templating inside affinities and access
+  # the deployment's values directly (e.g. via .name or .client_id).
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app: iap
+              target: '{{ .name }}'
+          topologyKey: kubernetes.io/hostname
+        weight: 10
+
+  nodeSelector: {}
+  tolerations: []

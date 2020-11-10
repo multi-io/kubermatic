@@ -15,6 +15,8 @@ func getComputeClient(username, password, domain, tenant, tenantID, authURL, reg
 
 	computeClient, err := goopenstack.NewComputeV2(authClient, gophercloud.EndpointOpts{Availability: gophercloud.AvailabilityPublic, Region: region})
 	// this is special case for  services that span only one region.
+	//nolint:gosimple
+	//lint:ignore S1020 false positive, we must do the errcheck regardless of if its an ErrEndpointNotFound
 	if _, ok := err.(*gophercloud.ErrEndpointNotFound); ok {
 		computeClient, err = goopenstack.NewComputeV2(authClient, gophercloud.EndpointOpts{})
 		if err != nil {

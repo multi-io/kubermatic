@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/kubermatic/kubermatic/pkg/log"
-	"github.com/kubermatic/kubermatic/pkg/test/e2e/api/utils/dex"
+	"k8c.io/kubermatic/v2/pkg/log"
+	"k8c.io/kubermatic/v2/pkg/test/e2e/api/utils/dex"
 )
 
 // OIDCCredentials takes the login name and password from environment variables and
@@ -51,7 +51,7 @@ func retrieveMasterToken() (string, error) {
 		return "", fmt.Errorf("no Helm values.yaml specified via KUBERMATIC_DEX_VALUES_FILE env variable")
 	}
 
-	logger := log.New(true, log.FormatJSON).Sugar()
+	logger := log.New(false, log.FormatJSON).Sugar()
 
 	client, err := dex.NewClientFromHelmValues(valuesFile, "kubermatic", logger)
 	if err != nil {
@@ -82,7 +82,7 @@ func retrieveAdminMasterToken() (string, error) {
 		return "", fmt.Errorf("no Helm values.yaml specified via KUBERMATIC_DEX_VALUES_FILE env variable")
 	}
 
-	logger := log.New(true, log.FormatJSON).Sugar()
+	logger := log.New(false, log.FormatJSON).Sugar()
 
 	client, err := dex.NewClientFromHelmValues(valuesFile, "kubermatic", logger)
 	if err != nil {

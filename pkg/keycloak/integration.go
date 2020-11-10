@@ -1,6 +1,6 @@
 package keycloak
 
-import kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
+import kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 
 func Sys11AuthToOidcSettings(sys11Settings kubermaticv1.Sys11AuthSettings, keycloakFacade Facade) (*kubermaticv1.OIDCSettings, error) {
 	result := &kubermaticv1.OIDCSettings{}

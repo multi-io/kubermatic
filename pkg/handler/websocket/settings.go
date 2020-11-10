@@ -19,15 +19,16 @@ package websocket
 import (
 	"encoding/json"
 
-	api "github.com/kubermatic/kubermatic/pkg/api/v1"
-	v1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/log"
-	"github.com/kubermatic/kubermatic/pkg/watcher"
+	api "k8c.io/kubermatic/v2/pkg/api/v1"
+	v1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/log"
+	"k8c.io/kubermatic/v2/pkg/watcher"
 
 	"github.com/gorilla/websocket"
 )
 
 func WriteSettings(providers watcher.Providers, ws *websocket.Conn) {
+	// There can be a race here if the settings change between getting the initial data and setting up the subscription
 	initialSettings, err := providers.SettingsProvider.GetGlobalSettings()
 	if err != nil {
 		log.Logger.Debug(err)
@@ -45,7 +46,7 @@ func WriteSettings(providers watcher.Providers, ws *websocket.Conn) {
 		return
 	}
 
-	providers.SettingsWatcher.Subscribe(func(settings interface{}) {
+	unSub := providers.SettingsWatcher.Subscribe(func(settings interface{}) {
 		var response []byte
 		if settings != nil {
 			var externalSettings api.GlobalSettings
@@ -75,5 +76,10 @@ func WriteSettings(providers watcher.Providers, ws *websocket.Conn) {
 			log.Logger.Debug(err)
 			return
 		}
+	})
+
+	ws.SetCloseHandler(func(code int, text string) error {
+		unSub()
+		return writeCloseMessage(ws, code)
 	})
 }

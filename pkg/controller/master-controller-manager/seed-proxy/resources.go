@@ -22,8 +22,8 @@ import (
 	"strings"
 	"text/template"
 
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/resources/reconciling"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -228,7 +228,7 @@ func masterDeploymentCreator(seed *kubermaticv1.Seed, secret *corev1.Secret) rec
 			d.Spec.Template.Spec.Containers = []corev1.Container{
 				{
 					Name:    "proxy",
-					Image:   "quay.io/kubermatic/util:1.3.2",
+					Image:   "quay.io/kubermatic/util:1.4.1",
 					Command: []string{"/bin/bash"},
 					Args:    []string{"-c", strings.TrimSpace(proxyScript)},
 					Env: []corev1.EnvVar{

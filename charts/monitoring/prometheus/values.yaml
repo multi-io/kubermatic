@@ -1,0 +1,300 @@
+# Copyright 2020 The Kubermatic Kubernetes Platform contributors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+prometheus:
+  image:
+    repository: quay.io/prometheus/prometheus
+    tag: v2.20.1
+    pullPolicy: IfNotPresent
+
+  host: ''
+  storageSize: 100Gi
+  storageClass: kubermatic-fast
+
+  tsdb:
+    retentionTime: 15d
+    compressWAL: true
+
+  configReloaderImage:
+    repository: docker.io/jimmidyson/configmap-reload
+    tag: v0.3.0
+    pullPolicy: IfNotPresent
+
+  # If you install Prometheus using a different Helm release name,
+  # you can override the name used for the resources, e.g. to have
+  # multiple Prometheus installed into distinct namespaces but still
+  # have the same Service names, ConfigMap names etc.
+  #nameOverride: prometheus
+
+  backup:
+    enabled: true
+    image:
+      repository: quay.io/kubermatic/util
+      tag: 1.4.1
+    timeout: 60m
+
+  # Specify additional external labels which will be added to all
+  # alerts sent by Prometheus.
+  #externalLabels:
+  #  seed_cluster: default
+
+  # Configure the scraping rules for Prometheus. You can either
+  # add your own scraping configs here or change the path to the
+  # predefined config files that are evaluated when Helm builds
+  # the chart and deploys it. You cannot use this to load files
+  # at runtime from a custom volume because Prometheus does not
+  # support it.
+  scraping:
+    files:
+    - config/scraping/*.yaml
+
+    #configs:
+    #- job_name: myscrapejob
+    #  honor_labels: true
+    #  ...
+
+  # Similarly to the scraping config, you can configure the
+  # target alertmanagers here.
+  alertmanagers:
+    files:
+    - config/alertmanagers/*.yaml
+    #configs:
+    #- scheme: http
+    #  path_prefix: /
+    #  ...
+
+  # The list of rule files to load; if you use the `volumes`
+  # directive below to mount your own ConfigMap or Secret into
+  # Prometheus, you will want to extend this list to laod your
+  # own rule files. You can remove the predefined path to
+  # effectively disable the stock recordings and alerts.
+  ruleFiles:
+  - /etc/prometheus/rules/general-*.yaml
+  - /etc/prometheus/rules/kubermatic-seed-*.yaml
+  # I you are running a non-master cluster, you should comment the
+  # following line to disable master components alerts.
+  - /etc/prometheus/rules/kubermatic-master-*.yaml
+  # If you run in an environment where access to Kubernetes
+  # scheduler and controller-manager is not possible (like GKE),
+  # disable the expression below to not create false alerts
+  # for missing/unhealthy components.
+  - /etc/prometheus/rules/managed-*.yaml
+
+  # Optionally add some more recording/alerting rules; the structure
+  # beneath `rules` is identical to regular rules files as documented
+  # in https://prometheus.io/docs/prometheus/2.7/getting_started/
+  # For larger collections of rules, consider using the custom volume
+  # approach shown further down in the `volumes` section.
+  #rules:
+  #  groups:
+  #    - name: myrules
+  #      rules:
+  #      - alert: DatacenterIsOnFire
+  #        expr: temperature{cpu} > 100
+  #        for: 5m
+
+  # If you prefer to manage your recording/alerting rules in your
+  # own ConfigMaps or Secrets, you can use this section to mount
+  # those into the Prometheus pods. Remember to extend the `ruleFiles`
+  # section above to have your files be loaded into Prometheus.
+  # For each volume, specify either a configMap name or a secretName,
+  # never both.
+  #volumes:
+  #- name: initech-alerting-rules
+  #  mountPath: /initech/alerts
+  #  configMap: initech-alerting-rules-configmap
+  #- name: initech-recording-rules
+  #  mountPath: /initech/recordings
+  #  secretName: initech-recording-rules-secret
+
+  # Thanos can be used to handle long-term storage of metrics by
+  # shipping the data blocks into an object storage like Minio. Note that
+  # this is considered EXPERIMENTAL and can be removed or significantly
+  # altered in future Kubermatic releases.
+  # When enabling Thanos it's advised to disable backups, as blocks
+  # are already backed up, and to lower the retentionTime to something
+  # short like 24 hours.
+  # Enabling Thanos always disables block compaction in Prometheus and
+  # enables the lifecycle and admin API.
+  thanos:
+    enabled: false
+    image:
+      repository: quay.io/thanos/thanos
+      tag: v0.11.0
+
+    store:
+      replicas: 2
+      indexCacheSize: 500MB
+      chunkPoolSize: 2GB
+
+      # Thanos Store downloads blocks from the storage to create its local
+      # cache before enabling the readiness/liveness endpoints, see
+      # https://github.com/thanos-io/thanos/pull/1460
+      # This means that pods can stay un-ready for quite some time, which
+      # can slow down rollouts significantly. By default the probes for
+      # Thanos Store are therefore disabled, but you can re-enable them
+      # by setting probeDelaySeconds to any value >= 0.
+      probeDelaySeconds: -1
+
+      nodeSelector: {}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: thanos-store
+                  app.kubernetes.io/instance: '{{ template "name" . }}'
+              topologyKey: kubernetes.io/hostname
+            weight: 100
+      tolerations: []
+
+    query:
+      replicas: 2
+
+      nodeSelector: {}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: thanos-query
+                  app.kubernetes.io/instance: '{{ template "name" . }}'
+              topologyKey: kubernetes.io/hostname
+            weight: 100
+      tolerations: []
+
+    compact:
+      retention:
+        # Setting any of these to "0d" disables the compaction level.
+        resolutionRaw: 7d
+        resolution5m: 30d
+        resolution1h: 90d
+
+      nodeSelector: {}
+      affinity: {}
+      tolerations: []
+
+    ui:
+      replicas: 2
+      nodeSelector: {}
+      affinity: {}
+      tolerations: []
+
+    # Configure the target object score according to https://thanos.io/storage.md/.
+    # Make sure to manually create the target bucket.
+    objstore:
+      # type:
+      # config:
+
+  # When upgrading the chart from 1.x => 2.0, the naming for volumes
+  # has changed and without a migration your existing Prometheus database
+  # would not be used anymore. Set the enabled flag to true to let an
+  # init container copy the data over. A lockfile is created so that when
+  # the pod for whatever reason restarts the migration is not executed
+  # again.
+  # Once the migration has finished and you set the flag to false again,
+  # you can safely remove the old `prometheus-kubermatic-db-...` PVCs.
+  migration:
+    enabled: false
+    image:
+      repository: quay.io/kubermatic/util
+      tag: 1.4.1
+
+  containers:
+    prometheus:
+      resources:
+        requests:
+          cpu: 1
+          memory: 3Gi
+        limits:
+          cpu: 2
+          memory: 6Gi
+    backup:
+      resources:
+        requests:
+          cpu: 100m
+          memory: 64Mi
+        limits:
+          cpu: 500m
+          memory: 10Gi
+    migration:
+      resources:
+        requests:
+          cpu: 100m
+          memory: 64Mi
+        limits:
+          cpu: 200m
+          memory: 128Mi
+    reloader:
+      resources:
+        requests:
+          cpu: 5m
+          memory: 24Mi
+        limits:
+          cpu: 5m
+          memory: 32Mi
+    thanosSidecar:
+      resources:
+        requests:
+          cpu: 100m
+          memory: 32Mi
+        limits:
+          cpu: 300m
+          memory: 1Gi
+    thanosStore:
+      resources:
+        requests:
+          cpu: 250m
+          memory: 1536Mi
+        limits:
+          cpu: 1
+          memory: 3Gi
+    thanosQuery:
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 1
+          memory: 1Gi
+    thanosCompact:
+      resources:
+        requests:
+          cpu: 500m
+          memory: 2Gi
+        limits:
+          cpu: 2
+          memory: 4Gi
+    thanosUI:
+      resources:
+        requests:
+          cpu: 10m
+          memory: 32Mi
+        limits:
+          cpu: 250m
+          memory: 128Mi
+
+  nodeSelector: {}
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app: '{{ template "name" . }}'
+          topologyKey: kubernetes.io/hostname
+        weight: 100
+  tolerations: []

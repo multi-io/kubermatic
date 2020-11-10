@@ -23,11 +23,11 @@ import (
 	"io/ioutil"
 	"strings"
 
-	"github.com/kubermatic/kubermatic/pkg/features"
-	kubermaticlog "github.com/kubermatic/kubermatic/pkg/log"
-	"github.com/kubermatic/kubermatic/pkg/provider"
-	"github.com/kubermatic/kubermatic/pkg/serviceaccount"
-	"github.com/kubermatic/kubermatic/pkg/watcher"
+	"k8c.io/kubermatic/v2/pkg/features"
+	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
+	"k8c.io/kubermatic/v2/pkg/provider"
+	"k8c.io/kubermatic/v2/pkg/serviceaccount"
+	"k8c.io/kubermatic/v2/pkg/watcher"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -35,7 +35,6 @@ import (
 
 type serverRunOptions struct {
 	listenAddress    string
-	kubeconfig       string
 	internalAddr     string
 	prometheusURL    string
 	masterResources  string
@@ -63,7 +62,7 @@ type serverRunOptions struct {
 	oidcSkipTLSVerify              bool
 	oidcIssuerOfflineAccessAsScope bool
 
-	//service account configuration
+	// service account configuration
 	serviceAccountSigningKey string
 
 	featureGates features.FeatureGate
@@ -82,7 +81,6 @@ func newServerRunOptions() (serverRunOptions, error) {
 	s.log.AddFlags(flag.CommandLine)
 
 	flag.StringVar(&s.listenAddress, "address", ":8080", "The address to listen on")
-	flag.StringVar(&s.kubeconfig, "kubeconfig", "", "Path to the kubeconfig.")
 	flag.StringVar(&s.internalAddr, "internal-address", "127.0.0.1:8085", "The address on which the internal handler should be exposed")
 	flag.StringVar(&s.prometheusURL, "prometheus-url", "http://prometheus.monitoring.svc.local:web", "The URL on which this API can talk to Prometheus")
 	flag.StringVar(&s.masterResources, "master-resources", "", "The path to the master resources (Required).")
@@ -91,7 +89,7 @@ func newServerRunOptions() (serverRunOptions, error) {
 	flag.StringVar(&s.updatesFile, "updates", "updates.yaml", "The updates.yaml file path")
 	flag.StringVar(&s.presetsFile, "presets", "", "The optional file path for a file containing presets")
 	flag.StringVar(&s.swaggerFile, "swagger", "./cmd/kubermatic-api/swagger.json", "The swagger.json file path")
-	flag.StringVar(&rawAccessibleAddons, "accessible-addons", "dashboard,default-storage-class,node-exporter", "Comma-separated list of user cluster addons to expose via the API")
+	flag.StringVar(&rawAccessibleAddons, "accessible-addons", "", "Comma-separated list of user cluster addons to expose via the API")
 	flag.StringVar(&s.oidcURL, "oidc-url", "", "URL of the OpenID token issuer. Example: http://auth.int.kubermatic.io")
 	flag.BoolVar(&s.oidcSkipTLSVerify, "oidc-skip-tls-verify", false, "Skip TLS verification for the token issuer")
 	flag.StringVar(&oidcCAFile, "oidc-ca-file", "", "The path to the certificate for the CA that signed your identity provider’s web certificate.")
@@ -199,4 +197,7 @@ type providers struct {
 	presetProvider                        provider.PresetProvider
 	admissionPluginProvider               provider.AdmissionPluginsProvider
 	settingsWatcher                       watcher.SettingsWatcher
+	userWatcher                           watcher.UserWatcher
+	externalClusterProvider               provider.ExternalClusterProvider
+	privilegedExternalClusterProvider     provider.PrivilegedExternalClusterProvider
 }

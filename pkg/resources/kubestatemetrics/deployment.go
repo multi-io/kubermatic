@@ -19,9 +19,9 @@ package kubestatemetrics
 import (
 	"fmt"
 
-	"github.com/kubermatic/kubermatic/pkg/resources"
-	"github.com/kubermatic/kubermatic/pkg/resources/apiserver"
-	"github.com/kubermatic/kubermatic/pkg/resources/reconciling"
+	"k8c.io/kubermatic/v2/pkg/resources"
+	"k8c.io/kubermatic/v2/pkg/resources/apiserver"
+	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -48,7 +48,7 @@ var (
 
 const (
 	name    = "kube-state-metrics"
-	version = "v1.9.4"
+	version = "v1.9.7"
 )
 
 // DeploymentCreator returns the function to create and update the kube-state-metrics deployment

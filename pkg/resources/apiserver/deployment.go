@@ -20,15 +20,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kubermatic/kubermatic/pkg/keycloak"
-	"k8s.io/klog"
-
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/resources"
-	"github.com/kubermatic/kubermatic/pkg/resources/etcd"
-	"github.com/kubermatic/kubermatic/pkg/resources/etcd/etcdrunning"
-	"github.com/kubermatic/kubermatic/pkg/resources/reconciling"
-	"github.com/kubermatic/kubermatic/pkg/resources/vpnsidecar"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/keycloak"
+	"k8c.io/kubermatic/v2/pkg/resources"
+	"k8c.io/kubermatic/v2/pkg/resources/etcd"
+	"k8c.io/kubermatic/v2/pkg/resources/etcd/etcdrunning"
+	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
+	"k8c.io/kubermatic/v2/pkg/resources/vpnsidecar"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -36,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog"
 )
 
 var (
@@ -274,7 +273,12 @@ func getApiserverFlags(data *resources.TemplateData, etcdEndpoints []string, ena
 	admissionPlugins.Insert(data.Cluster().Spec.AdmissionPlugins...)
 
 	flags := []string{
+		// The advertise address is used as endpoint address for the kubernetes
+		// service in the default namespace of the user cluster.
 		"--advertise-address", data.Cluster().Address.IP,
+		// The secure port is used as target port for the kubernetes service in
+		// the default namespace of the user cluster, we use the NodePort value
+		// for being able to access the apiserver from the usercluster side.
 		"--secure-port", fmt.Sprint(data.Cluster().Address.Port),
 		"--kubernetes-service-node-port", fmt.Sprint(data.Cluster().Address.Port),
 		"--etcd-servers", strings.Join(etcdEndpoints, ","),
@@ -286,7 +290,7 @@ func getApiserverFlags(data *resources.TemplateData, etcdEndpoints []string, ena
 		"--authorization-mode", "Node,RBAC",
 		"--external-hostname", data.Cluster().Address.ExternalName,
 		"--token-auth-file", "/etc/kubernetes/tokens/tokens.csv",
-		"--enable-bootstrap-token-auth", "true",
+		"--enable-bootstrap-token-auth",
 		"--service-account-key-file", "/etc/kubernetes/service-account-key/sa.key",
 		// There are efforts upstream adding support for multiple cidr's. Until that has landed, we'll take the first entry
 		"--service-cluster-ip-range", data.Cluster().Spec.ClusterNetwork.Services.CIDRBlocks[0],

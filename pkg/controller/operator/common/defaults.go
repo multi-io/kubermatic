@@ -26,11 +26,11 @@ import (
 	"github.com/ghodss/yaml"
 	"go.uber.org/zap"
 
-	kubermaticapiv1 "github.com/kubermatic/kubermatic/pkg/api/v1"
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	operatorv1alpha1 "github.com/kubermatic/kubermatic/pkg/crd/operator/v1alpha1"
-	"github.com/kubermatic/kubermatic/pkg/resources"
-	"github.com/kubermatic/kubermatic/pkg/version"
+	kubermaticapiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	operatorv1alpha1 "k8c.io/kubermatic/v2/pkg/crd/operator/v1alpha1"
+	"k8c.io/kubermatic/v2/pkg/resources"
+	"k8c.io/kubermatic/v2/pkg/version"
 
 	certmanagerv1alpha2 "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1alpha2"
 	corev1 "k8s.io/api/core/v1"
@@ -54,6 +54,7 @@ const (
 	DefaultVPAUpdaterDockerRepository             = "gcr.io/google_containers/vpa-updater"
 	DefaultVPAAdmissionControllerDockerRepository = "gcr.io/google_containers/vpa-admission-controller"
 	DefaultEnvoyDockerRepository                  = "docker.io/envoyproxy/envoy-alpine"
+	DefaultMaximumParallelReconciles              = 10
 
 	// DefaultNoProxy is a set of domains/networks that should never be
 	// routed through a proxy. All user-supplied values are appended to
@@ -64,6 +65,7 @@ const (
 var (
 	DefaultAccessibleAddons = []string{
 		"node-exporter",
+		"gatekeeper",
 	}
 
 	DefaultUIResources = corev1.ResourceRequirements{
@@ -185,63 +187,28 @@ var (
 	}
 
 	DefaultKubernetesVersioning = operatorv1alpha1.KubermaticVersioningConfiguration{
-		Default: semver.MustParse("v1.17.9"),
+		Default: semver.MustParse("v1.18.10"),
 		Versions: []*semver.Version{
-			// Kubernetes 1.15
-			semver.MustParse("v1.15.5"),
-			semver.MustParse("v1.15.6"),
-			semver.MustParse("v1.15.7"),
-			semver.MustParse("v1.15.9"),
-			semver.MustParse("v1.15.10"),
-			semver.MustParse("v1.15.11"),
-			// Kubernetes 1.16
-			semver.MustParse("v1.16.13"),
 			// Kubernetes 1.17
 			semver.MustParse("v1.17.9"),
+			semver.MustParse("v1.17.11"),
+			semver.MustParse("v1.17.12"),
+			semver.MustParse("v1.17.13"),
 			// Kubernetes 1.18
 			semver.MustParse("v1.18.6"),
+			semver.MustParse("v1.18.8"),
+			semver.MustParse("v1.18.10"),
+			// Kubernetes 1.19
+			semver.MustParse("v1.19.0"),
+			semver.MustParse("v1.19.2"),
+			semver.MustParse("v1.19.3"),
 		},
 		Updates: []operatorv1alpha1.Update{
-			// ======= 1.14 =======
 			{
-				// Allow to change to any patch version
-				From: "1.14.*",
-				To:   "1.14.*",
-			},
-			{
-				// CVE-2019-11247, CVE-2019-11249, CVE-2019-9512, CVE-2019-9514, CVE-2019-11253
-				From:      "<= 1.14.7, >= 1.14.0",
-				To:        "1.14.8",
+				// Auto-upgrade unsupported clusters
+				From:      "1.15.*",
+				To:        "1.16.*",
 				Automatic: pointer.BoolPtr(true),
-			},
-			{
-				// Allow to next minor release
-				From: "1.14.*",
-				To:   "1.15.*",
-			},
-
-			// ======= 1.15 =======
-			{
-				// Allow to change to any patch version
-				From: "1.15.*",
-				To:   "1.15.*",
-			},
-			{
-				// CVE-2019-11247, CVE-2019-11249, CVE-2019-9512, CVE-2019-9514, CVE-2019-11253
-				From:      "<= 1.15.4, >= 1.15.0",
-				To:        "1.15.5",
-				Automatic: pointer.BoolPtr(true),
-			},
-			{
-				// Released with broken Anago
-				From:      "1.15.8",
-				To:        "1.15.9",
-				Automatic: pointer.BoolPtr(true),
-			},
-			{
-				// Allow to next minor release
-				From: "1.15.*",
-				To:   "1.16.*",
 			},
 
 			// ======= 1.16 =======
@@ -294,6 +261,18 @@ var (
 				To:        "1.18.6",
 				Automatic: pointer.BoolPtr(true),
 			},
+			{
+				// Allow to next minor release
+				From: "1.18.*",
+				To:   "1.19.*",
+			},
+
+			// ======= 1.19 =======
+			{
+				// Allow to change to any patch version
+				From: "1.19.*",
+				To:   "1.19.*",
+			},
 		},
 	}
 
@@ -332,6 +311,11 @@ func DefaultConfiguration(config *operatorv1alpha1.KubermaticConfiguration, logg
 	if copy.Spec.ExposeStrategy == "" {
 		copy.Spec.ExposeStrategy = DefaultExposeStrategy
 		logger.Debugw("Defaulting field", "field", "exposeStrategy", "value", copy.Spec.ExposeStrategy)
+	}
+
+	if copy.Spec.SeedController.MaximumParallelReconciles == 0 {
+		copy.Spec.SeedController.MaximumParallelReconciles = DefaultMaximumParallelReconciles
+		logger.Debugw("Defaulting field", "field", "seedController.maximumParallelReconciles", "value", copy.Spec.SeedController.MaximumParallelReconciles)
 	}
 
 	if copy.Spec.SeedController.BackupStoreContainer == "" {
@@ -710,167 +694,6 @@ const DefaultUIConfig = `
   "share_kubeconfig": false
 }`
 
-const DefaultVersionsYAML = `
-# REMEMBER TO CHANGE BOTH:
-# - DefaultVersionsYAML in api/pkg/controller/operator/common/defaults.go
-# - config/kubermatic/static/master/versions.yaml
-
-versions:
-# Kubernetes 1.15
-- version: "v1.15.5"
-  default: false
-- version: "v1.15.6"
-  default: false
-- version: "v1.15.7"
-  default: false
-- version: "v1.15.9"
-  default: false
-- version: "v1.15.10"
-  default: true
-# Kubernetes 1.16
-- version: "v1.16.2"
-  default: false
-- version: "v1.16.3"
-  default: false
-- version: "v1.16.4"
-  default: false
-- version: "v1.16.6"
-  default: false
-- version: "v1.16.7"
-  default: false
-# Kubernetes 1.17
-- version: "v1.17.0"
-  default: false
-- version: "v1.17.2"
-  default: false
-- version: "v1.17.3"
-  default: false
-# OpenShift 4.1.9
-- version: "v4.1.9"
-  default: false
-  type: "openshift"
-# OpenShift 4.1.18
-- version: "v4.1.18"
-  default: true
-  type: "openshift"
-`
-
-const DefaultUpdatesYAML = `
-### Updates file
-#
-# Contains a list of allowed updated
-#
-# Each update may optionally contain 'automatic: true' in which case the
-# controlplane of all clusters whose version matches the 'from' directive
-# will get updated to the 'to' version. If 'automatic: true' is set, the
-# 'to' version must be a version and not a version range.
-#
-# All 'to' versions must be configured in the 'versions.yaml'.
-#
-# Also, updates may contan 'automaticNodeUpdate: true', in which case
-# Nodes will get updates as well. 'automaticNodeUpdate: true' sets
-# 'automatic: true' as well if not yet the case, because Nodes may not have
-# a newer version than the controlplane.
-#
-# REMEMBER TO CHANGE BOTH:
-# - DefaultUpdatesYAML in api/pkg/controller/operator/common/defaults.go
-# - config/kubermatic/static/master/updates.yaml
-#
-####
-updates:
-# ======= 1.12 =======
-# Allow to next minor release
-- from: 1.12.*
-  to: 1.13.*
-  automatic: false
-
-# ======= 1.13 =======
-# CVE-2019-11247, CVE-2019-11249, CVE-2019-9512, CVE-2019-9514
-- from: <= 1.13.9, >= 1.13.0
-  to: 1.13.10
-  automatic: true
-# Allow to next minor release
-- from: 1.13.*
-  to: 1.14.*
-  automatic: false
-
-# ======= 1.14 =======
-# Allow to change to any patch version
-- from: 1.14.*
-  to: 1.14.*
-  automatic: false
-# CVE-2019-11247, CVE-2019-11249, CVE-2019-9512, CVE-2019-9514, CVE-2019-11253
-- from: <= 1.14.7, >= 1.14.0
-  to: 1.14.8
-  automatic: true
-# Allow to next minor release
-- from: 1.14.*
-  to: 1.15.*
-  automatic: false
-
-# ======= 1.15 =======
-# Allow to change to any patch version
-- from: 1.15.*
-  to: 1.15.*
-  automatic: false
-# CVE-2019-11247, CVE-2019-11249, CVE-2019-9512, CVE-2019-9514, CVE-2019-11253
-- from: <= 1.15.4, >= 1.15.0
-  to: 1.15.5
-  automatic: true
-# Released with broken Anago
-- from: 1.15.8
-  to: 1.15.9
-  automatic: true
-# Allow to next minor release
-- from: 1.15.*
-  to: 1.16.*
-  automatic: false
-
-# ======= 1.16 =======
-# Allow to change to any patch version
-- from: 1.16.*
-  to: 1.16.*
-  automatic: false
-# CVE-2019-11253
-- from: <= 1.16.1, >= 1.16.0
-  to: 1.16.2
-  automatic: true
-# Released with broken Anago
-- from: 1.16.5
-  to: 1.16.6
-  automatic: true
-# Allow to next minor release
-- from: 1.16.*
-  to: 1.17.*
-  automatic: false
-
-# ======= 1.17 =======
-# Allow to change to any patch version
-- from: 1.17.*
-  to: 1.17.*
-  automatic: false
-# Released with broken Anago
-- from: 1.17.1
-  to: 1.17.2
-  automatic: true
-# Allow to next minor release
-- from: 1.16.*
-  to: 1.18.*
-  automatic: false
-
-# ======= Openshift 4.1 =======
-# Allow to change to any patch version
-- from: 4.1.*
-  to: 4.1.*
-  automatic: false
-  type: openshift
-# Allow to next minor release
-- from: 4.1.*
-  to: 2.2.*
-  automatic: false
-  type: openshift
-`
-
 const DefaultKubernetesAddons = `
 apiVersion: v1
 kind: List
@@ -885,12 +708,6 @@ items:
   kind: Addon
   metadata:
     name: csi
-    labels:
-      addons.kubermatic.io/ensure: true
-- apiVersion: kubermatic.k8s.io/v1
-  kind: Addon
-  metadata:
-    name: dns
     labels:
       addons.kubermatic.io/ensure: true
 - apiVersion: kubermatic.k8s.io/v1
@@ -919,12 +736,6 @@ items:
   kind: Addon
   metadata:
     name: default-storage-class
-- apiVersion: kubermatic.k8s.io/v1
-  kind: Addon
-  metadata:
-    name: nodelocal-dns-cache
-    labels:
-      addons.kubermatic.io/ensure: true
 - apiVersion: kubermatic.k8s.io/v1
   kind: Addon
   metadata:

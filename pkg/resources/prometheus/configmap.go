@@ -26,9 +26,9 @@ import (
 	"github.com/Masterminds/sprig"
 	"gopkg.in/yaml.v2"
 
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/resources"
-	"github.com/kubermatic/kubermatic/pkg/resources/reconciling"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/resources"
+	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 
 	corev1 "k8s.io/api/core/v1"
 )
@@ -79,7 +79,7 @@ func ConfigMapCreator(data *resources.TemplateData) reconciling.NamedConfigMapCr
 			// get custom scraping configs and rules
 			customData := &customizationData{
 				Cluster:                  cluster,
-				APIServerHost:            fmt.Sprintf("%s:%d", cluster.Address.InternalName, cluster.Address.Port),
+				APIServerHost:            cluster.Address.InternalName,
 				EtcdTLS:                  etcdTLS,
 				ApiserverTLS:             apiserverTLS,
 				ScrapingAnnotationPrefix: data.MonitoringScrapeAnnotationPrefix(),

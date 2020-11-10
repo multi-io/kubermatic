@@ -25,14 +25,15 @@ import (
 	"github.com/Masterminds/semver"
 	"github.com/go-kit/kit/endpoint"
 
-	apiv1 "github.com/kubermatic/kubermatic/pkg/api/v1"
-	"github.com/kubermatic/kubermatic/pkg/handler/middleware"
-	"github.com/kubermatic/kubermatic/pkg/handler/v1/common"
-	"github.com/kubermatic/kubermatic/pkg/provider"
-	"github.com/kubermatic/kubermatic/pkg/util/errors"
-	"github.com/kubermatic/kubermatic/pkg/validation/nodeupdate"
-	"github.com/kubermatic/kubermatic/pkg/version"
 	clusterv1alpha1 "github.com/kubermatic/machine-controller/pkg/apis/cluster/v1alpha1"
+	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
+	handlercommon "k8c.io/kubermatic/v2/pkg/handler/common"
+	"k8c.io/kubermatic/v2/pkg/handler/middleware"
+	"k8c.io/kubermatic/v2/pkg/handler/v1/common"
+	"k8c.io/kubermatic/v2/pkg/provider"
+	"k8c.io/kubermatic/v2/pkg/util/errors"
+	"k8c.io/kubermatic/v2/pkg/validation/nodeupdate"
+	"k8c.io/kubermatic/v2/pkg/version"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,7 +47,7 @@ func GetUpgradesEndpoint(updateManager common.UpdateManager, projectProvider pro
 		if !ok {
 			return nil, errors.NewWrongRequest(request, common.GetClusterReq{})
 		}
-		cluster, err := GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
+		cluster, err := handlercommon.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -75,7 +76,7 @@ func GetUpgradesEndpoint(updateManager common.UpdateManager, projectProvider pro
 			return nil, err
 		}
 
-		var upgrades []*apiv1.MasterVersion
+		upgrades := make([]*apiv1.MasterVersion, 0)
 		for _, v := range versions {
 			isRestricted := false
 			if clusterType == apiv1.KubernetesClusterType {
@@ -208,7 +209,7 @@ func UpgradeNodeDeploymentsEndpoint(projectProvider provider.ProjectProvider, pr
 		if !ok {
 			return nil, errors.NewWrongRequest(request, common.GetClusterReq{})
 		}
-		cluster, err := GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
+		cluster, err := handlercommon.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -270,7 +271,7 @@ type TypeReq struct {
 }
 
 func (r TypeReq) Validate() error {
-	if clusterTypes.Has(r.Type) {
+	if handlercommon.ClusterTypes.Has(r.Type) {
 		return nil
 	}
 	return fmt.Errorf("invalid cluster type %s", r.Type)

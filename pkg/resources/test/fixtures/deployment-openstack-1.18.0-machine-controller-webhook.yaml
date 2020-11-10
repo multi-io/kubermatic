@@ -1,3 +1,5 @@
+# This file has been generated, DO NOT EDIT.
+
 metadata:
   creationTimestamp: null
   labels:
@@ -21,7 +23,7 @@ spec:
       containers:
       - args:
         - -endpoint
-        - https://apiserver-external.cluster-de-test-01.svc.cluster.local.:30000/healthz
+        - https://apiserver-external.cluster-de-test-01.svc.cluster.local./healthz
         - -insecure
         - -retries
         - "100"

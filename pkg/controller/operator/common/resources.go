@@ -20,14 +20,14 @@ import (
 	"context"
 	"fmt"
 
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	operatorv1alpha1 "github.com/kubermatic/kubermatic/pkg/crd/operator/v1alpha1"
-	"github.com/kubermatic/kubermatic/pkg/resources"
-	"github.com/kubermatic/kubermatic/pkg/resources/certificates"
-	"github.com/kubermatic/kubermatic/pkg/resources/certificates/servingcerthelper"
-	"github.com/kubermatic/kubermatic/pkg/resources/certificates/triple"
-	"github.com/kubermatic/kubermatic/pkg/resources/reconciling"
-	"github.com/kubermatic/kubermatic/pkg/validation/seed"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	operatorv1alpha1 "k8c.io/kubermatic/v2/pkg/crd/operator/v1alpha1"
+	"k8c.io/kubermatic/v2/pkg/resources"
+	"k8c.io/kubermatic/v2/pkg/resources/certificates"
+	"k8c.io/kubermatic/v2/pkg/resources/certificates/servingcerthelper"
+	"k8c.io/kubermatic/v2/pkg/resources/certificates/triple"
+	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
+	"k8c.io/kubermatic/v2/pkg/validation/seed"
 
 	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -75,6 +75,11 @@ const (
 	SeedControllerManagerDeploymentName   = "kubermatic-seed-controller-manager"
 
 	CleanupFinalizer = "operator.kubermatic.io/cleanup"
+
+	// SkipReconcilingAnnotation can be used on Seed resources to make
+	// the operator ignore them and not reconcile the seed components into
+	// the cluster. This should only be used during cluster migrations.
+	SkipReconcilingAnnotation = "operator.kubermatic.io/skip-reconciling"
 )
 
 func NamespaceCreator(cfg *operatorv1alpha1.KubermaticConfiguration) reconciling.NamedNamespaceCreatorGetter {

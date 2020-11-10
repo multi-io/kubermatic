@@ -1,0 +1,179 @@
+# Copyright 2020 The Kubermatic Kubernetes Platform contributors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  labels:
+    app: grafana
+spec:
+  replicas: {{ .Values.grafana.replicas }}
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmaps.yaml") . | sha256sum }}
+    spec:
+      initContainers:
+      {{- if .Values.grafana.provisioning.datasources.paths }}
+      - image: '{{ .Values.grafana.utilImage.repository }}:{{ .Values.grafana.utilImage.tag }}'
+        name: datasource-assembler
+        command: [/bin/bash]
+        args:
+        - -c
+        - |
+          set -euo pipefail
+
+          target=/etc/grafana/provisioning/datasources
+
+          provide_datasources() {
+            local index="$1"
+            local base="$(realpath $2)"
+
+            if [ ! -d "$base" ]; then
+              echo "Error: directory $1 does not exist, check your Helm chart configuration and mounts!"
+              exit 1
+            fi
+
+            for abs in $(find "$base" -maxdepth 1 -name '*.yaml'); do
+              filename="$index-$(basename "$abs")"
+
+              echo "Copying $abs to $filename"
+              cp "$abs" "$target/$filename"
+            done
+          }
+
+          mkdir -p "$target"
+          rm -rf "$target/*"
+
+          {{- range $idx, $path := .Values.grafana.provisioning.datasources.paths }}
+          provide_datasources "$(printf "%02d" {{ $idx }})" "{{ $path }}"
+          {{- end }}
+
+          echo "Datasource provisioning completed successfully."
+
+        volumeMounts:
+        - mountPath: /etc/grafana/provisioning/datasources
+          name: grafana-datasources
+          readOnly: false
+        - mountPath: /etc/grafana/provisioning/default-datasources
+          name: grafana-default-datasources
+          readOnly: true
+        {{- if .Values.grafana.volumes }}
+        {{- range .Values.grafana.volumes }}
+        - mountPath: {{ .mountPath }}
+          name: {{ .name }}
+          readOnly: true
+        {{- end }}
+        {{- end }}
+      {{- end }}
+
+      - image: '{{ $.Values.grafana.pluginImage.repository }}:{{ $.Values.grafana.pluginImage.tag }}'
+        name: plugin-installer
+        command: [/bin/sh]
+        args:
+        - -c
+        - |
+          set -euo pipefail
+          echo "Installing plugins..."
+          cp -r /plugins /var/lib/grafana
+          ls -1 /var/lib/grafana/plugins
+        volumeMounts:
+        - mountPath: /var/lib/grafana
+          name: grafana-storage
+
+      containers:
+      - image: '{{ .Values.grafana.image.repository }}:{{ .Values.grafana.image.tag }}'
+        name: grafana
+        ports:
+        - containerPort: 3000
+          name: http
+        resources:
+{{ toYaml .Values.grafana.resources | indent 10 }}
+        volumeMounts:
+        - mountPath: /var/lib/grafana
+          name: grafana-storage
+          readOnly: false
+        - mountPath: /etc/grafana
+          name: grafana-config
+          readOnly: true
+        - mountPath: /etc/grafana/provisioning/datasources
+          name: grafana-datasources
+          readOnly: false
+        - mountPath: /etc/grafana/provisioning/default-datasources
+          name: grafana-default-datasources
+          readOnly: true
+        - mountPath: /etc/grafana/provisioning/dashboards
+          name: grafana-dashboards
+          readOnly: true
+        - mountPath: /grafana-dashboard-definitions
+          name: grafana-dashboard-definitions
+          readOnly: true
+        {{- if .Values.grafana.volumes }}
+        {{- range .Values.grafana.volumes }}
+        - mountPath: {{ .mountPath }}
+          name: {{ .name }}
+          readOnly: true
+        {{- end }}
+        {{- end }}
+
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+      serviceAccountName: grafana
+      volumes:
+      - emptyDir: {}
+        name: grafana-storage
+      - emptyDir: {}
+        name: grafana-datasources
+      - name: grafana-config
+        secret:
+          secretName: grafana-config
+      - name: grafana-default-datasources
+        configMap:
+          name: grafana-datasources
+      - name: grafana-dashboards
+        configMap:
+          name: grafana-dashboards
+      - name: grafana-dashboard-definitions
+        configMap:
+          name: grafana-dashboard-definitions
+          items:
+          {{- range $file, $content := (.Files.Glob "dashboards/**") }}
+          - key: {{ $file | replace "dashboards/" "" | replace "/" "-" }}
+            path: {{ $file | replace "dashboards/" "" }}
+          {{- end }}
+      {{- if .Values.grafana.volumes }}
+      {{- range .Values.grafana.volumes }}
+      - name: {{ .name }}
+        {{- if .configMap }}
+        configMap:
+          name: {{ .configMap }}
+        {{- else }}
+        secret:
+          secretName: {{ .secretName }}
+        {{- end }}
+      {{- end }}
+      {{- end }}
+      nodeSelector:
+{{ toYaml .Values.grafana.nodeSelector | indent 8 }}
+      affinity:
+{{ toYaml .Values.grafana.affinity | indent 8 }}
+      tolerations:
+{{ toYaml .Values.grafana.tolerations | indent 8 }}

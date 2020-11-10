@@ -3,15 +3,17 @@
 package v1
 
 import (
-	v1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
+	v1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 )
 
 // EtcdRestoreLister helps list EtcdRestores.
+// All objects returned here must be treated as read-only.
 type EtcdRestoreLister interface {
 	// List lists all EtcdRestores in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.EtcdRestore, err error)
 	// EtcdRestores returns an object that can list and get EtcdRestores.
 	EtcdRestores(namespace string) EtcdRestoreNamespaceLister
@@ -42,10 +44,13 @@ func (s *etcdRestoreLister) EtcdRestores(namespace string) EtcdRestoreNamespaceL
 }
 
 // EtcdRestoreNamespaceLister helps list and get EtcdRestores.
+// All objects returned here must be treated as read-only.
 type EtcdRestoreNamespaceLister interface {
 	// List lists all EtcdRestores in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.EtcdRestore, err error)
 	// Get retrieves the EtcdRestore from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.EtcdRestore, error)
 	EtcdRestoreNamespaceListerExpansion
 }

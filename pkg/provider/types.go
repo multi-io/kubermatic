@@ -21,9 +21,10 @@ import (
 	"errors"
 	"fmt"
 
-	apiv1 "github.com/kubermatic/kubermatic/pkg/api/v1"
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
 	providerconfig "github.com/kubermatic/machine-controller/pkg/providerconfig/types"
+	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	ksemver "k8c.io/kubermatic/v2/pkg/semver"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -283,6 +284,7 @@ type UserProvider interface {
 	UserByID(id string) (*kubermaticv1.User, error)
 	AddUserTokenToBlacklist(user *kubermaticv1.User, token string, expiry apiv1.Time) error
 	GetUserBlacklistTokens(user *kubermaticv1.User) ([]string, error)
+	WatchUser() (watch.Interface, error)
 }
 
 // PrivilegedProjectProvider declares the set of method for interacting with kubermatic's project and uses privileged account for it
@@ -628,7 +630,7 @@ type EventRecorderProvider interface {
 // AddonProvider declares the set of methods for interacting with addons
 type AddonProvider interface {
 	// New creates a new addon in the given cluster
-	New(userInfo *UserInfo, cluster *kubermaticv1.Cluster, addonName string, variables *runtime.RawExtension) (*kubermaticv1.Addon, error)
+	New(userInfo *UserInfo, cluster *kubermaticv1.Cluster, addonName string, variables *runtime.RawExtension, labels map[string]string) (*kubermaticv1.Addon, error)
 
 	// List gets all addons that belong to the given cluster
 	// If you want to filter the result please take a look at ClusterListOptions
@@ -656,7 +658,7 @@ type PrivilegedAddonProvider interface {
 	//
 	// Note that this function:
 	// is unsafe in a sense that it uses privileged account to create the resource
-	NewUnsecured(cluster *kubermaticv1.Cluster, addonName string, variables *runtime.RawExtension) (*kubermaticv1.Addon, error)
+	NewUnsecured(cluster *kubermaticv1.Cluster, addonName string, variables *runtime.RawExtension, labels map[string]string) (*kubermaticv1.Addon, error)
 
 	// GetUnsecured returns the given addon
 	//
@@ -709,4 +711,58 @@ type AdmissionPluginsProvider interface {
 	Delete(userInfo *UserInfo, name string) error
 	Update(userInfo *UserInfo, admissionPlugin *kubermaticv1.AdmissionPlugin) (*kubermaticv1.AdmissionPlugin, error)
 	ListPluginNamesFromVersion(fromVersion string) ([]string, error)
+}
+
+// ExternalClusterProvider declares the set of methods for interacting with external cluster
+type ExternalClusterProvider interface {
+	New(userInfo *UserInfo, project *kubermaticv1.Project, cluster *kubermaticv1.ExternalCluster) (*kubermaticv1.ExternalCluster, error)
+
+	Get(userInfo *UserInfo, clusterName string) (*kubermaticv1.ExternalCluster, error)
+
+	Delete(userInfo *UserInfo, cluster *kubermaticv1.ExternalCluster) error
+
+	Update(userInfo *UserInfo, cluster *kubermaticv1.ExternalCluster) (*kubermaticv1.ExternalCluster, error)
+
+	List(project *kubermaticv1.Project) (*kubermaticv1.ExternalClusterList, error)
+
+	GenerateClient(cfg *clientcmdapi.Config) (ctrlruntimeclient.Client, error)
+
+	GetClient(cluster *kubermaticv1.ExternalCluster) (ctrlruntimeclient.Client, error)
+
+	CreateOrUpdateKubeconfigSecretForCluster(ctx context.Context, cluster *kubermaticv1.ExternalCluster, kubeconfig string) error
+
+	GetVersion(cluster *kubermaticv1.ExternalCluster) (*ksemver.Semver, error)
+
+	ListNodes(cluster *kubermaticv1.ExternalCluster) (*corev1.NodeList, error)
+
+	GetNode(cluster *kubermaticv1.ExternalCluster, nodeName string) (*corev1.Node, error)
+
+	IsMetricServerAvailable(cluster *kubermaticv1.ExternalCluster) (bool, error)
+}
+
+// ExternalClusterProvider declares the set of methods for interacting with external cluster
+type PrivilegedExternalClusterProvider interface {
+	// NewUnsecured creates an external cluster
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to create the resources
+	NewUnsecured(project *kubermaticv1.Project, cluster *kubermaticv1.ExternalCluster) (*kubermaticv1.ExternalCluster, error)
+
+	// DeleteUnsecured deletes an external cluster
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to delete the resources
+	DeleteUnsecured(cluster *kubermaticv1.ExternalCluster) error
+
+	// GetUnsecured gets an external cluster
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to get the resources
+	GetUnsecured(clusterName string) (*kubermaticv1.ExternalCluster, error)
+
+	// UpdateUnsecured updates an external cluster
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to update the resources
+	UpdateUnsecured(cluster *kubermaticv1.ExternalCluster) (*kubermaticv1.ExternalCluster, error)
 }

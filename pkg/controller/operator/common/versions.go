@@ -17,11 +17,11 @@ limitations under the License.
 package common
 
 import (
-	"github.com/kubermatic/kubermatic/pkg/util/edition"
+	"k8c.io/kubermatic/v2/pkg/util/edition"
 )
 
 // UIDOCKERTAG is a magic variable containing the tag / git commit hash
-// of the dashboard-v2 Docker image to deploy. It gets fed by the
+// of the dashboard Docker image to deploy. It gets fed by the
 // Makefile as an ldflag.
 var UIDOCKERTAG string
 

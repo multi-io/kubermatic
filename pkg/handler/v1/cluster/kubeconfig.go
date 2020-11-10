@@ -29,12 +29,14 @@ import (
 	"github.com/go-kit/kit/endpoint"
 	"github.com/gorilla/securecookie"
 
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/handler/auth"
-	"github.com/kubermatic/kubermatic/pkg/handler/middleware"
-	"github.com/kubermatic/kubermatic/pkg/handler/v1/common"
-	"github.com/kubermatic/kubermatic/pkg/provider"
-	kcerrors "github.com/kubermatic/kubermatic/pkg/util/errors"
+	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/handler/auth"
+	handlercommon "k8c.io/kubermatic/v2/pkg/handler/common"
+	"k8c.io/kubermatic/v2/pkg/handler/middleware"
+	"k8c.io/kubermatic/v2/pkg/handler/v1/common"
+	"k8c.io/kubermatic/v2/pkg/provider"
+	kcerrors "k8c.io/kubermatic/v2/pkg/util/errors"
 
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/tools/clientcmd"
@@ -52,7 +54,7 @@ func GetAdminKubeconfigEndpoint(projectProvider provider.ProjectProvider, privil
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(GetClusterKubeconfigRequest)
 		clusterProvider := ctx.Value(middleware.ClusterProviderContextKey).(provider.ClusterProvider)
-		cluster, err := GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
+		cluster, err := handlercommon.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -114,7 +116,7 @@ func GetOidcKubeconfigEndpoint(projectProvider provider.ProjectProvider, privile
 		req := request.(common.GetClusterReq)
 		clusterProvider := ctx.Value(middleware.ClusterProviderContextKey).(provider.ClusterProvider)
 
-		cluster, err := GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
+		cluster, err := handlercommon.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -384,7 +386,6 @@ func DecodeGetAdminKubeconfig(c context.Context, r *http.Request) (interface{}, 
 		return nil, err
 	}
 	req.GetClusterReq = clusterReq.(common.GetClusterReq)
-
 	req.UseUniqueNames = r.URL.Query().Get("use-unique-names") == "yes"
 
 	return req, nil
@@ -493,9 +494,11 @@ func (r CreateOIDCKubeconfigReq) GetUserID() string {
 	return r.UserID
 }
 
-// GetDC implements DCGetter interface
-func (r CreateOIDCKubeconfigReq) GetDC() string {
-	return r.Datacenter
+// GetSeedCluster returns the SeedCluster object
+func (r CreateOIDCKubeconfigReq) GetSeedCluster() apiv1.SeedCluster {
+	return apiv1.SeedCluster{
+		SeedName: r.Datacenter,
+	}
 }
 
 // GetProjectID implements ProjectGetter interface

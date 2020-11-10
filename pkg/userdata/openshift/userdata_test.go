@@ -22,11 +22,11 @@ import (
 	"os"
 	"testing"
 
-	testhelper "github.com/kubermatic/kubermatic/pkg/test"
+	clusterv1alpha1 "github.com/kubermatic/machine-controller/pkg/apis/cluster/v1alpha1"
 	"github.com/kubermatic/machine-controller/pkg/apis/plugin"
 	providerconfig "github.com/kubermatic/machine-controller/pkg/providerconfig/types"
+	testhelper "k8c.io/kubermatic/v2/pkg/test"
 
-	clusterv1alpha1 "github.com/kubermatic/machine-controller/pkg/apis/cluster/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -128,6 +128,8 @@ func TestUserdataGeneration(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to call p.Userdata: %v", err)
 			}
+
+			userdata = "# This file has been generated, DO NOT EDIT.\n\n" + userdata
 
 			testhelper.CompareOutput(t, test.name, userdata, *update, ".yaml")
 		})

@@ -5,16 +5,16 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/kubermatic/kubermatic/pkg/handler/middleware"
-	"github.com/kubermatic/kubermatic/pkg/handler/v1/common"
+	"k8c.io/kubermatic/v2/pkg/handler/middleware"
+	"k8c.io/kubermatic/v2/pkg/handler/v1/common"
 
-	v1 "github.com/kubermatic/kubermatic/pkg/api/v1"
+	v1 "k8c.io/kubermatic/v2/pkg/api/v1"
 
 	"github.com/go-kit/kit/endpoint"
-	"github.com/kubermatic/kubermatic/pkg/provider"
-	"github.com/kubermatic/kubermatic/pkg/provider/cloud/openstack"
-	kubernetesprovider "github.com/kubermatic/kubermatic/pkg/provider/kubernetes"
-	"github.com/kubermatic/kubermatic/pkg/util/errors"
+	"k8c.io/kubermatic/v2/pkg/provider"
+	"k8c.io/kubermatic/v2/pkg/provider/cloud/openstack"
+	kubernetesprovider "k8c.io/kubermatic/v2/pkg/provider/kubernetes"
+	"k8c.io/kubermatic/v2/pkg/util/errors"
 )
 
 func OpenstackImageEndpoint(seedsGetter provider.SeedsGetter, presetsProvider provider.PresetProvider, userInfoGetter provider.UserInfoGetter) endpoint.Endpoint {

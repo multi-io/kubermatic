@@ -28,10 +28,10 @@ import (
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
 
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	kuberneteshelper "github.com/kubermatic/kubermatic/pkg/kubernetes"
-	"github.com/kubermatic/kubermatic/pkg/provider"
-	"github.com/kubermatic/kubermatic/pkg/resources"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	kuberneteshelper "k8c.io/kubermatic/v2/pkg/kubernetes"
+	"k8c.io/kubermatic/v2/pkg/provider"
+	"k8c.io/kubermatic/v2/pkg/resources"
 	kruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
@@ -214,6 +214,10 @@ func (v *Provider) ValidateCloudSpec(spec kubermaticv1.CloudSpec) error {
 	username, password, err := GetCredentialsForCluster(spec, v.secretKeySelector, v.dc)
 	if err != nil {
 		return err
+	}
+
+	if spec.VSphere.DatastoreCluster != "" && spec.VSphere.Datastore != "" {
+		return errors.New("either datastore or datastore cluster can be selected")
 	}
 
 	session, err := newSession(context.TODO(), v.dc, username, password)

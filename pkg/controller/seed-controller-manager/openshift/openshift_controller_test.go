@@ -26,10 +26,10 @@ import (
 
 	"go.uber.org/zap"
 
-	clusterclient "github.com/kubermatic/kubermatic/pkg/cluster/client"
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/semver"
-	testhelper "github.com/kubermatic/kubermatic/pkg/test"
+	clusterclient "k8c.io/kubermatic/v2/pkg/cluster/client"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/semver"
+	testhelper "k8c.io/kubermatic/v2/pkg/test"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -41,7 +41,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	ctrlruntimelog "sigs.k8s.io/controller-runtime/pkg/log"
-	ctrlruntimelogzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
+	ctrlruntimezaplog "sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/yaml"
 )
@@ -112,7 +112,7 @@ func TestResources(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ctrlruntimelog.SetLogger(ctrlruntimelogzap.Logger(true))
+			ctrlruntimelog.SetLogger(ctrlruntimezaplog.Logger(false))
 			if err := autoscalingv1beta2.AddToScheme(scheme.Scheme); err != nil {
 				t.Fatalf("failed to add the autoscaling.k8s.io scheme to mgr: %v", err)
 			}
@@ -199,6 +199,8 @@ func TestResources(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to serialize object %q: %v", metav1object.GetName(), err)
 			}
+
+			serializedObject = append([]byte("# This file has been generated, DO NOT EDIT.\n"), serializedObject...)
 
 			testhelper.CompareOutput(t, fmt.Sprintf("%s-%s", strings.ReplaceAll(tc.name, " ", "_"), metav1object.GetName()), string(serializedObject), *update, ".yaml")
 		})

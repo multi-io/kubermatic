@@ -31,15 +31,12 @@ import (
 
 	"go.uber.org/zap"
 
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	eemigrations "github.com/kubermatic/kubermatic/pkg/ee/crd/migrations/master"
-	eeprovider "github.com/kubermatic/kubermatic/pkg/ee/provider"
-	"github.com/kubermatic/kubermatic/pkg/provider"
-	"github.com/kubermatic/kubermatic/pkg/validation/seed"
-	seedvalidation "github.com/kubermatic/kubermatic/pkg/validation/seed"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	eeprovider "k8c.io/kubermatic/v2/pkg/ee/provider"
+	"k8c.io/kubermatic/v2/pkg/provider"
+	"k8c.io/kubermatic/v2/pkg/validation/seed"
+	seedvalidation "k8c.io/kubermatic/v2/pkg/validation/seed"
 
-	"k8s.io/client-go/tools/clientcmd"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
@@ -58,12 +55,12 @@ func SeedsGetterFactory(ctx context.Context, client ctrlruntimeclient.Client, na
 	return eeprovider.SeedsGetterFactory(ctx, client, datacentersFile, namespace, dynamicDatacenters)
 }
 
-func SeedKubeconfigGetterFactory(ctx context.Context, client ctrlruntimeclient.Client, kubeconfig string) (provider.SeedKubeconfigGetter, error) {
+func SeedKubeconfigGetterFactory(ctx context.Context, client ctrlruntimeclient.Client) (provider.SeedKubeconfigGetter, error) {
 	if dynamicDatacenters {
 		return provider.SeedKubeconfigGetterFactory(ctx, client)
 	}
 
-	return eeprovider.SeedKubeconfigGetterFactory(kubeconfig)
+	return eeprovider.SeedKubeconfigGetter, nil
 }
 
 func SetupSeedValidationWebhook(
@@ -74,13 +71,8 @@ func SetupSeedValidationWebhook(
 	namespace string,
 	seedsGetter provider.SeedsGetter,
 	seedKubeconfigGetter provider.SeedKubeconfigGetter,
-	kubeconfig string,
 	workerName string,
 ) error {
-	migrationOptions, err := getMigrationOptions(kubeconfig)
-	if err != nil {
-		return err
-	}
 	// Creates a new default validator
 	validator, err := seedvalidation.NewDefaultSeedValidator(
 		workerName,
@@ -90,59 +82,19 @@ func SetupSeedValidationWebhook(
 	if err != nil {
 		return fmt.Errorf("failed to create seed validator webhook server: %v", err)
 	}
-
 	server, err := webhookOpt.Server(
 		ctx,
 		log,
 		namespace,
 		validator.Validate,
 		kubermaticv1.ComponentSettings{},
-		migrationOptions.SeedMigrationEnabled())
+	)
 	if err != nil {
 		return fmt.Errorf("failed to create server: %v", err)
 	}
 
 	if err := mgr.Add(server); err != nil {
 		return fmt.Errorf("failed to add server to mgr: %v", err)
-	}
-
-	return nil
-}
-
-func getMigrationOptions(kubeconfig string) (*eemigrations.Options, error) {
-	var (
-		clientConfig *clientcmdapi.Config
-		err          error
-	)
-
-	if len(kubeconfig) > 0 {
-		clientConfig, err = clientcmd.LoadFromFile(kubeconfig)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read the kubeconfig: %v", err)
-		}
-	}
-
-	return &eemigrations.Options{
-		DatacentersFile:    datacentersFile,
-		DynamicDatacenters: dynamicDatacenters,
-		Kubeconfig:         clientConfig,
-	}, nil
-}
-
-func RunMigrations(ctx context.Context, client ctrlruntimeclient.Client, log *zap.SugaredLogger, namespace string, kubeconfig string) error {
-	options, err := getMigrationOptions(kubeconfig)
-	if err != nil {
-		return err
-	}
-
-	if options.MigrationEnabled() {
-		log.Info("executing migrations...")
-
-		if err := eemigrations.RunAll(ctx, log, client, namespace, *options); err != nil {
-			return fmt.Errorf("failed to run migrations: %v", err)
-		}
-
-		log.Info("migrations executed successfully")
 	}
 
 	return nil

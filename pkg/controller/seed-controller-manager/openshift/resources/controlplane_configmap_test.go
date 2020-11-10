@@ -21,8 +21,8 @@ import (
 	"strings"
 	"testing"
 
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	testhelper "github.com/kubermatic/kubermatic/pkg/test"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	testhelper "k8c.io/kubermatic/v2/pkg/test"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/yaml"
@@ -65,6 +65,8 @@ func TestOpenshiftAPIServerConfigMapCreator(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to marshal configmap: %v", err)
 			}
+
+			serializedConfigmap = append([]byte("# This file has been generated, DO NOT EDIT.\n"), serializedConfigmap...)
 
 			testhelper.CompareOutput(t, strings.ReplaceAll(tc.name, " ", "_"), string(serializedConfigmap), *update, ".yaml")
 		})

@@ -22,8 +22,8 @@ import (
 
 	"go.uber.org/zap"
 
-	predicateutil "github.com/kubermatic/kubermatic/pkg/controller/util/predicate"
-	"github.com/kubermatic/kubermatic/pkg/handler/v1/cluster"
+	predicateutil "k8c.io/kubermatic/v2/pkg/controller/util/predicate"
+	"k8c.io/kubermatic/v2/pkg/handler/v1/cluster"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -123,10 +123,10 @@ func (r *reconciler) reconcile(log *zap.SugaredLogger, clusterRoleName string) e
 				Name:     clusterRoleName,
 			},
 		}
-		// Bind user who created the cluster to the `admin` ClusterRole.
+		// Bind user who created the cluster to the `cluster-admin` ClusterRole.
 		// Add cluster owner only once when binding doesn't exist yet.
 		// Later the user can remove/add subjects from the binding using the API.
-		if clusterRoleName == "admin" {
+		if clusterRoleName == "cluster-admin" {
 			crb.Subjects = []rbacv1.Subject{
 				{
 					Kind:     rbacv1.UserKind,

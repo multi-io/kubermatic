@@ -12,6 +12,8 @@ type EtcdBackupConfigExpansion interface{}
 
 type EtcdRestoreExpansion interface{}
 
+type ExternalClusterExpansion interface{}
+
 type KubermaticSettingExpansion interface{}
 
 type MachineDeploymentRequestExpansion interface{}

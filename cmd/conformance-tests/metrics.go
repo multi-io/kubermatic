@@ -22,7 +22,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/push"
 	"go.uber.org/zap"
-	"k8s.io/client-go/tools/cache"
 )
 
 const (
@@ -164,7 +163,8 @@ func updateMetrics(log *zap.SugaredLogger) {
 	}
 }
 
-func measureTime(metric cache.GaugeMetric, log *zap.SugaredLogger, callback func() error) error {
+//nolint:interfacer
+func measureTime(metric prometheus.Gauge, log *zap.SugaredLogger, callback func() error) error {
 	start := time.Now()
 	err := callback()
 	metric.Set(time.Since(start).Seconds())
@@ -173,7 +173,7 @@ func measureTime(metric cache.GaugeMetric, log *zap.SugaredLogger, callback func
 	return err
 }
 
-func timeMeasurementWrapper(metric cache.GaugeMetric, log *zap.SugaredLogger, callback func() error) func() error {
+func timeMeasurementWrapper(metric prometheus.Gauge, log *zap.SugaredLogger, callback func() error) func() error {
 	return func() error {
 		return measureTime(metric, log, callback)
 	}

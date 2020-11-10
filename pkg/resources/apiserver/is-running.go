@@ -21,9 +21,9 @@ import (
 	"errors"
 	"fmt"
 
-	httpproberapi "github.com/kubermatic/kubermatic/cmd/http-prober/api"
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/resources"
+	httpproberapi "k8c.io/kubermatic/v2/cmd/http-prober/api"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/resources"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -147,7 +147,7 @@ func wrapContainer(data isRunningInitContainerData, container corev1.Container, 
 	})
 	container.Command = []string{"/http-prober-bin/http-prober"}
 	container.Args = []string{
-		"-endpoint", fmt.Sprintf("https://%s:%d/healthz", data.Cluster().Address.InternalName, data.Cluster().Address.Port),
+		"-endpoint", fmt.Sprintf("https://%s/healthz", data.Cluster().Address.InternalName),
 		"-insecure",
 		"-retries", "100",
 		"-retry-wait", "2",

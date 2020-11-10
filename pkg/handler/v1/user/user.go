@@ -29,13 +29,13 @@ import (
 	"github.com/go-kit/kit/endpoint"
 	"github.com/gorilla/mux"
 
-	apiv1 "github.com/kubermatic/kubermatic/pkg/api/v1"
-	"github.com/kubermatic/kubermatic/pkg/controller/master-controller-manager/rbac"
-	kubermaticapiv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/handler/middleware"
-	"github.com/kubermatic/kubermatic/pkg/handler/v1/common"
-	"github.com/kubermatic/kubermatic/pkg/provider"
-	k8cerrors "github.com/kubermatic/kubermatic/pkg/util/errors"
+	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
+	"k8c.io/kubermatic/v2/pkg/controller/master-controller-manager/rbac"
+	kubermaticapiv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/handler/middleware"
+	"k8c.io/kubermatic/v2/pkg/handler/v1/common"
+	"k8c.io/kubermatic/v2/pkg/provider"
+	k8cerrors "k8c.io/kubermatic/v2/pkg/util/errors"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 )
@@ -177,7 +177,7 @@ func EditEndpoint(projectProvider provider.ProjectProvider, privilegedProjectPro
 			return nil, common.KubernetesErrorToHTTPError(err)
 		}
 
-		externalUser := convertInternalUserToExternal(memberToUpdate, false, updatedMemberBinding)
+		externalUser := apiv1.ConvertInternalUserToExternal(memberToUpdate, false, updatedMemberBinding)
 		externalUser = filterExternalUser(externalUser, project.Name)
 		return externalUser, nil
 	}
@@ -226,7 +226,7 @@ func ListEndpoint(projectProvider provider.ProjectProvider, privilegedProjectPro
 			if err != nil {
 				return nil, common.KubernetesErrorToHTTPError(err)
 			}
-			externalUser := convertInternalUserToExternal(user, false, memberOfProjectBinding)
+			externalUser := apiv1.ConvertInternalUserToExternal(user, false, memberOfProjectBinding)
 			externalUser = filterExternalUser(externalUser, project.Name)
 			externalUsers = append(externalUsers, externalUser)
 		}
@@ -275,7 +275,7 @@ func AddEndpoint(projectProvider provider.ProjectProvider, privilegedProjectProv
 			return nil, common.KubernetesErrorToHTTPError(err)
 		}
 
-		externalUser := convertInternalUserToExternal(userToInvite, false, generatedBinding)
+		externalUser := apiv1.ConvertInternalUserToExternal(userToInvite, false, generatedBinding)
 		externalUser = filterExternalUser(externalUser, project.Name)
 		return externalUser, nil
 	}
@@ -326,7 +326,7 @@ func GetEndpoint(memberMapper provider.ProjectMemberMapper) endpoint.Endpoint {
 			return nil, common.KubernetesErrorToHTTPError(err)
 		}
 
-		return convertInternalUserToExternal(authenticatedUser, true, bindings...), nil
+		return apiv1.ConvertInternalUserToExternal(authenticatedUser, true, bindings...), nil
 	}
 }
 
@@ -373,38 +373,6 @@ func PatchSettingsEndpoint(userProvider provider.UserProvider) endpoint.Endpoint
 
 		return updatedUser.Spec.Settings, nil
 	}
-}
-
-func convertInternalUserToExternal(internalUser *kubermaticapiv1.User, includeSettings bool, bindings ...*kubermaticapiv1.UserProjectBinding) *apiv1.User {
-	apiUser := &apiv1.User{
-		ObjectMeta: apiv1.ObjectMeta{
-			ID:                internalUser.Name,
-			Name:              internalUser.Spec.Name,
-			CreationTimestamp: apiv1.NewTime(internalUser.CreationTimestamp.Time),
-		},
-		Email:   internalUser.Spec.Email,
-		IsAdmin: internalUser.Spec.IsAdmin,
-	}
-
-	if includeSettings {
-		apiUser.Settings = internalUser.Spec.Settings
-	}
-
-	for _, binding := range bindings {
-		bindingAlreadyExists := false
-		for _, pg := range apiUser.Projects {
-			if pg.ID == binding.Spec.ProjectID && pg.GroupPrefix == binding.Spec.Group {
-				bindingAlreadyExists = true
-				break
-			}
-		}
-		if !bindingAlreadyExists {
-			groupPrefix := rbac.ExtractGroupPrefix(binding.Spec.Group)
-			apiUser.Projects = append(apiUser.Projects, apiv1.ProjectGroup{ID: binding.Spec.ProjectID, GroupPrefix: groupPrefix})
-		}
-	}
-
-	return apiUser
 }
 
 func filterExternalUser(externalUser *apiv1.User, projectID string) *apiv1.User {

@@ -1,8 +1,8 @@
 package provider
 
 import (
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
 	"github.com/kubermatic/machine-controller/pkg/apis/cluster/v1alpha1"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 )
 
 // MachineDeploymentRequestProvider declares the set of methods for interacting with MachineDeploymentRequests

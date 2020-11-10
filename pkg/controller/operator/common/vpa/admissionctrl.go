@@ -22,11 +22,11 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/kubermatic/kubermatic/pkg/controller/operator/common"
-	operatorv1alpha1 "github.com/kubermatic/kubermatic/pkg/crd/operator/v1alpha1"
-	"github.com/kubermatic/kubermatic/pkg/resources"
-	"github.com/kubermatic/kubermatic/pkg/resources/certificates/triple"
-	"github.com/kubermatic/kubermatic/pkg/resources/reconciling"
+	"k8c.io/kubermatic/v2/pkg/controller/operator/common"
+	operatorv1alpha1 "k8c.io/kubermatic/v2/pkg/crd/operator/v1alpha1"
+	"k8c.io/kubermatic/v2/pkg/resources"
+	"k8c.io/kubermatic/v2/pkg/resources/certificates/triple"
+	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -67,9 +67,9 @@ func AdmissionControllerDeploymentCreator(cfg *operatorv1alpha1.KubermaticConfig
 
 			d.Spec.Template.Labels = d.Spec.Selector.MatchLabels
 			d.Spec.Template.Annotations = map[string]string{
-				"kubermatic/scrape":      "true",
-				"kubermatic/scrape_port": strconv.Itoa(admissionControllerPort),
-				"fluentbit.io/parser":    "glog",
+				"prometheus.io/scrape": "true",
+				"prometheus.io/port":   strconv.Itoa(admissionControllerPort),
+				"fluentbit.io/parser":  "glog",
 			}
 
 			d.Spec.Template.Spec.Volumes = []corev1.Volume{
@@ -137,6 +137,7 @@ func AdmissionControllerServiceCreator() reconciling.NamedServiceCreatorGetter {
 			s.Spec.Ports = []corev1.ServicePort{
 				{
 					Port:       443,
+					Protocol:   corev1.ProtocolTCP,
 					TargetPort: intstr.FromInt(8000),
 				},
 			}

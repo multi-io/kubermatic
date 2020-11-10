@@ -31,15 +31,15 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/pmezard/go-difflib/difflib"
 
-	kubernetescontroller "github.com/kubermatic/kubermatic/pkg/controller/seed-controller-manager/kubernetes"
-	monitoringcontroller "github.com/kubermatic/kubermatic/pkg/controller/seed-controller-manager/monitoring"
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/resources"
-	metricsserver "github.com/kubermatic/kubermatic/pkg/resources/metrics-server"
-	"github.com/kubermatic/kubermatic/pkg/resources/reconciling"
-	ksemver "github.com/kubermatic/kubermatic/pkg/semver"
-	"github.com/kubermatic/kubermatic/pkg/version"
 	providerconfig "github.com/kubermatic/machine-controller/pkg/providerconfig/types"
+	kubernetescontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/kubernetes"
+	monitoringcontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/monitoring"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/resources"
+	metricsserver "k8c.io/kubermatic/v2/pkg/resources/metrics-server"
+	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
+	ksemver "k8c.io/kubermatic/v2/pkg/semver"
+	"k8c.io/kubermatic/v2/pkg/version"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
@@ -65,6 +65,8 @@ func checkTestResult(t *testing.T, resFile string, testObj interface{}) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	res = append([]byte("# This file has been generated, DO NOT EDIT.\n\n"), res...)
 
 	if *update {
 		if err := ioutil.WriteFile(path, res, 0644); err != nil {
@@ -100,16 +102,13 @@ func checkTestResult(t *testing.T, resFile string, testObj interface{}) {
 func TestLoadFiles(t *testing.T) {
 	versions := []*version.Version{
 		{
-			Version: semver.MustParse("1.15.0"),
-		},
-		{
-			Version: semver.MustParse("1.16.0"),
-		},
-		{
 			Version: semver.MustParse("1.17.0"),
 		},
 		{
 			Version: semver.MustParse("1.18.0"),
+		},
+		{
+			Version: semver.MustParse("1.19.0"),
 		},
 	}
 
@@ -175,12 +174,12 @@ func TestLoadFiles(t *testing.T) {
 				Location: "az-location",
 			},
 			VSphere: &kubermaticv1.DatacenterSpecVSphere{
-				Endpoint:      "https://vs-endpoint.io",
-				AllowInsecure: false,
-				Datastore:     "vs-datastore",
-				Datacenter:    "vs-datacenter",
-				Cluster:       "vs-cluster",
-				RootPath:      "vs-cluster",
+				Endpoint:         "https://vs-endpoint.io",
+				AllowInsecure:    false,
+				DefaultDatastore: "vs-datastore",
+				Datacenter:       "vs-datacenter",
+				Cluster:          "vs-cluster",
+				RootPath:         "vs-cluster",
 			},
 			AWS: &kubermaticv1.DatacenterSpecAWS{
 				Images: kubermaticv1.ImageList{
@@ -480,7 +479,7 @@ func TestLoadFiles(t *testing.T) {
 					},
 					&corev1.Service{
 						ObjectMeta: metav1.ObjectMeta{
-							Name:      resources.ApiserverExternalServiceName,
+							Name:      resources.ApiserverServiceName,
 							Namespace: cluster.Status.NamespaceName,
 						},
 						Spec: corev1.ServiceSpec{
@@ -490,20 +489,6 @@ func TestLoadFiles(t *testing.T) {
 								},
 							},
 							ClusterIP: "192.0.2.10",
-						},
-					},
-					&corev1.Service{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      resources.ApiserverInternalServiceName,
-							Namespace: cluster.Status.NamespaceName,
-						},
-						Spec: corev1.ServiceSpec{
-							Ports: []corev1.ServicePort{
-								{
-									NodePort: 30001,
-								},
-							},
-							ClusterIP: "192.0.2.11",
 						},
 					},
 					&corev1.Service{

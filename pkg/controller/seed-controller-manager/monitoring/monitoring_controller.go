@@ -23,11 +23,11 @@ import (
 
 	"go.uber.org/zap"
 
-	k8cuserclusterclient "github.com/kubermatic/kubermatic/pkg/cluster/client"
-	controllerutil "github.com/kubermatic/kubermatic/pkg/controller/util"
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	kubermaticv1helper "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1/helper"
-	"github.com/kubermatic/kubermatic/pkg/provider"
+	k8cuserclusterclient "k8c.io/kubermatic/v2/pkg/cluster/client"
+	controllerutil "k8c.io/kubermatic/v2/pkg/controller/util"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	kubermaticv1helper "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1/helper"
+	"k8c.io/kubermatic/v2/pkg/provider"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -76,12 +76,12 @@ type Reconciler struct {
 	overwriteRegistry                                string
 	nodePortRange                                    string
 	nodeAccessNetwork                                string
+	monitoringEnvironmentLabel                       string
 	inClusterPrometheusRulesFile                     string
 	inClusterPrometheusDisableDefaultRules           bool
 	inClusterPrometheusDisableDefaultScrapingConfigs bool
 	inClusterPrometheusScrapingConfigsFile           string
 	dockerPullConfigJSON                             []byte
-	monitoringEnvironmentLabel                       string
 	// Annotation prefix to discover user cluster resources
 	// example: kubermatic.io -> kubermatic.io/path,kubermatic.io/port
 	monitoringScrapeAnnotationPrefix string

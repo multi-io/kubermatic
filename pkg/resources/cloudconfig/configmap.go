@@ -24,10 +24,6 @@ import (
 	"net/url"
 	"time"
 
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	gcp "github.com/kubermatic/kubermatic/pkg/provider/cloud/gcp"
-	"github.com/kubermatic/kubermatic/pkg/resources"
-	"github.com/kubermatic/kubermatic/pkg/resources/reconciling"
 	aws "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/aws/types"
 	azure "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/azure/types"
 	gce "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/gce/types"
@@ -35,6 +31,10 @@ import (
 	vsphere "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/vsphere/types"
 	"github.com/kubermatic/machine-controller/pkg/ini"
 	providerconfig "github.com/kubermatic/machine-controller/pkg/providerconfig/types"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	gcp "k8c.io/kubermatic/v2/pkg/provider/cloud/gcp"
+	"k8c.io/kubermatic/v2/pkg/resources"
+	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 
 	corev1 "k8s.io/api/core/v1"
 )
@@ -159,6 +159,13 @@ func CloudConfig(
 				MonitorTimeout:    ini.Duration{Duration: 30 * time.Second},
 				MonitorMaxRetries: 5,
 			}
+			if dc.Spec.Openstack.Region == "cbk" {
+				// NetworkID for the ext-net floating-network in cbk
+				openstackCloudConfig.LoadBalancer.FloatingNetworkID = "caf8de33-1059-4473-a2c1-2a62d12294fa"
+			} else if dc.Spec.Openstack.Region == "dbl" {
+				// NetworkID for the ext-net floating-network in dbl
+				openstackCloudConfig.LoadBalancer.FloatingNetworkID = "8bb661f5-76b9-45f1-9ef9-eeffcd025fe4"
+			}
 		}
 		cloudConfig, err = openstack.CloudConfigToString(openstackCloudConfig)
 		if err != nil {
@@ -261,7 +268,7 @@ func getVsphereCloudConfig(
 			VCenterPort:      port,
 			InsecureFlag:     dc.Spec.VSphere.AllowInsecure,
 			Datacenter:       dc.Spec.VSphere.Datacenter,
-			DefaultDatastore: dc.Spec.VSphere.Datastore,
+			DefaultDatastore: dc.Spec.VSphere.DefaultDatastore,
 			WorkingDir:       cluster.Name,
 		},
 		Workspace: vsphere.WorkspaceOpts{
@@ -274,7 +281,7 @@ func getVsphereCloudConfig(
 			VCenterIP:        vspherURL.Hostname(),
 			Datacenter:       dc.Spec.VSphere.Datacenter,
 			Folder:           cluster.Spec.Cloud.VSphere.Folder,
-			DefaultDatastore: dc.Spec.VSphere.Datastore,
+			DefaultDatastore: dc.Spec.VSphere.DefaultDatastore,
 		},
 		Disk: vsphere.DiskOpts{
 			SCSIControllerType: "pvscsi",

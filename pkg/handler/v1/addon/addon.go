@@ -22,20 +22,24 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/kubermatic/kubermatic/pkg/handler/v1/cluster"
-
 	"github.com/go-kit/kit/endpoint"
 	"github.com/gorilla/mux"
 
-	apiv1 "github.com/kubermatic/kubermatic/pkg/api/v1"
-	kubermaticapiv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/handler/middleware"
-	"github.com/kubermatic/kubermatic/pkg/handler/v1/common"
-	"github.com/kubermatic/kubermatic/pkg/provider"
+	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
+	kubermaticapiv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	handlercommon "k8c.io/kubermatic/v2/pkg/handler/common"
+	"k8c.io/kubermatic/v2/pkg/handler/middleware"
+	"k8c.io/kubermatic/v2/pkg/handler/v1/common"
+	"k8c.io/kubermatic/v2/pkg/provider"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	k8sjson "k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
+)
+
+const (
+	addonEnsureLabelKey = "addons.kubermatic.io/ensure"
+	trueFlag            = "true"
 )
 
 // addonReq defines HTTP request for getAddon and deleteAddon
@@ -172,7 +176,7 @@ func ListInstallableAddonEndpoint(projectProvider provider.ProjectProvider, priv
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(listReq)
 
-		cluster, err := cluster.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
+		cluster, err := handlercommon.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -211,7 +215,7 @@ func listAddons(ctx context.Context, userInfoGetter provider.UserInfoGetter, clu
 func GetAddonEndpoint(projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, userInfoGetter provider.UserInfoGetter) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(addonReq)
-		cluster, err := cluster.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
+		cluster, err := handlercommon.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -250,7 +254,7 @@ func ListAddonEndpoint(projectProvider provider.ProjectProvider, privilegedProje
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(listReq)
 
-		cluster, err := cluster.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
+		cluster, err := handlercommon.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -272,7 +276,7 @@ func CreateAddonEndpoint(projectProvider provider.ProjectProvider, privilegedPro
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(createReq)
 
-		cluster, err := cluster.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
+		cluster, err := handlercommon.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -282,7 +286,11 @@ func CreateAddonEndpoint(projectProvider provider.ProjectProvider, privilegedPro
 			return nil, common.KubernetesErrorToHTTPError(err)
 		}
 
-		addon, err := createAddon(ctx, userInfoGetter, cluster, rawVars, req.ProjectID, req.Body.Name)
+		labels := map[string]string{}
+		if req.Body.Spec.ContinuouslyReconcile {
+			labels[addonEnsureLabelKey] = trueFlag
+		}
+		addon, err := createAddon(ctx, userInfoGetter, cluster, rawVars, labels, req.ProjectID, req.Body.Name)
 		if err != nil {
 			return nil, common.KubernetesErrorToHTTPError(err)
 		}
@@ -295,28 +303,28 @@ func CreateAddonEndpoint(projectProvider provider.ProjectProvider, privilegedPro
 	}
 }
 
-func createAddon(ctx context.Context, userInfoGetter provider.UserInfoGetter, cluster *kubermaticapiv1.Cluster, rawVars *runtime.RawExtension, projectID, name string) (*kubermaticapiv1.Addon, error) {
+func createAddon(ctx context.Context, userInfoGetter provider.UserInfoGetter, cluster *kubermaticapiv1.Cluster, rawVars *runtime.RawExtension, labels map[string]string, projectID, name string) (*kubermaticapiv1.Addon, error) {
 	adminUserInfo, err := userInfoGetter(ctx, "")
 	if err != nil {
 		return nil, err
 	}
 	if adminUserInfo.IsAdmin {
 		privilegedAddonProvider := ctx.Value(middleware.PrivilegedAddonProviderContextKey).(provider.PrivilegedAddonProvider)
-		return privilegedAddonProvider.NewUnsecured(cluster, name, rawVars)
+		return privilegedAddonProvider.NewUnsecured(cluster, name, rawVars, labels)
 	}
 	userInfo, err := userInfoGetter(ctx, projectID)
 	if err != nil {
 		return nil, err
 	}
 	addonProvider := ctx.Value(middleware.AddonProviderContextKey).(provider.AddonProvider)
-	return addonProvider.New(userInfo, cluster, name, rawVars)
+	return addonProvider.New(userInfo, cluster, name, rawVars, labels)
 
 }
 
 func PatchAddonEndpoint(projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, userInfoGetter provider.UserInfoGetter) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(patchReq)
-		cluster, err := cluster.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
+		cluster, err := handlercommon.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -330,6 +338,14 @@ func PatchAddonEndpoint(projectProvider provider.ProjectProvider, privilegedProj
 			return nil, common.KubernetesErrorToHTTPError(err)
 		}
 		addon.Spec.Variables = *rawVars
+
+		if addon.Labels == nil {
+			addon.Labels = map[string]string{}
+		}
+		addon.Labels[addonEnsureLabelKey] = "false"
+		if req.Body.Spec.ContinuouslyReconcile {
+			addon.Labels[addonEnsureLabelKey] = trueFlag
+		}
 
 		addon, err = updateAddon(ctx, userInfoGetter, cluster, addon, req.ProjectID)
 		if err != nil {
@@ -364,7 +380,7 @@ func updateAddon(ctx context.Context, userInfoGetter provider.UserInfoGetter, cl
 func DeleteAddonEndpoint(projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, userInfoGetter provider.UserInfoGetter) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(addonReq)
-		cluster, err := cluster.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
+		cluster, err := handlercommon.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -436,6 +452,10 @@ func convertInternalAddonToExternal(internalAddon *kubermaticapiv1.Addon) (*apiv
 			return nil, err
 		}
 	}
+	if internalAddon.Labels != nil && internalAddon.Labels[addonEnsureLabelKey] == trueFlag {
+		result.Spec.ContinuouslyReconcile = true
+	}
+
 	return result, nil
 }
 

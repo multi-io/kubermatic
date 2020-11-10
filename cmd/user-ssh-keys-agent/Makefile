@@ -12,12 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+DOCKER_REPO ?= "quay.io/kubermatic"
 GOOS ?= $(shell go env GOOS)
 
 build:
-	GOOS=$(GOOS) CGO_ENABLED=0 go build -o user-ssh-keys-agent
+	GOOS=$(GOOS) CGO_ENABLED=0 go build -o ./_build/user-ssh-keys-agent
 
 docker: build
-	docker build -t quay.io/kubermatic/user-ssh-keys-agent:$(TAG) .
+	docker build -t $(DOCKER_REPO)/user-ssh-keys-agent:$(TAG) .
 
 .PHONY: build docker

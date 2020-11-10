@@ -23,16 +23,16 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/kubermatic/kubermatic/pkg/controller/operator/common"
-	"github.com/kubermatic/kubermatic/pkg/controller/operator/common/vpa"
-	"github.com/kubermatic/kubermatic/pkg/controller/operator/seed/resources/kubermatic"
-	"github.com/kubermatic/kubermatic/pkg/controller/operator/seed/resources/nodeportproxy"
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	operatorv1alpha1 "github.com/kubermatic/kubermatic/pkg/crd/operator/v1alpha1"
-	"github.com/kubermatic/kubermatic/pkg/features"
-	"github.com/kubermatic/kubermatic/pkg/kubernetes"
-	"github.com/kubermatic/kubermatic/pkg/provider"
-	"github.com/kubermatic/kubermatic/pkg/resources/reconciling"
+	"k8c.io/kubermatic/v2/pkg/controller/operator/common"
+	"k8c.io/kubermatic/v2/pkg/controller/operator/common/vpa"
+	"k8c.io/kubermatic/v2/pkg/controller/operator/seed/resources/kubermatic"
+	"k8c.io/kubermatic/v2/pkg/controller/operator/seed/resources/nodeportproxy"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	operatorv1alpha1 "k8c.io/kubermatic/v2/pkg/crd/operator/v1alpha1"
+	"k8c.io/kubermatic/v2/pkg/features"
+	"k8c.io/kubermatic/v2/pkg/kubernetes"
+	"k8c.io/kubermatic/v2/pkg/provider"
+	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 
 	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	corev1 "k8s.io/api/core/v1"
@@ -90,6 +90,13 @@ func (r *Reconciler) reconcile(log *zap.SugaredLogger, seedName string) error {
 	seed, exists := seeds[seedName]
 	if !exists {
 		log.Debug("ignoring request for non-existing seed")
+		return nil
+	}
+
+	// to allow a step-by-step migration of seed clusters, it's possible to
+	// disable the operator's reconciling logic for seeds
+	if _, ok := seed.Annotations[common.SkipReconcilingAnnotation]; ok {
+		log.Info("seed is marked as paused, skipping reconciliation")
 		return nil
 	}
 
@@ -414,10 +421,13 @@ func (r *Reconciler) reconcileSecrets(cfg *operatorv1alpha1.KubermaticConfigurat
 	log.Debug("reconciling Secrets")
 
 	creators := []reconciling.NamedSecretCreatorGetter{
-		common.DockercfgSecretCreator(cfg),
 		common.ExtraFilesSecretCreator(cfg),
 		common.SeedWebhookServingCASecretCreator(cfg),
 		common.SeedWebhookServingCertSecretCreator(cfg, client),
+	}
+
+	if cfg.Spec.ImagePullSecret != "" {
+		creators = append(creators, common.DockercfgSecretCreator(cfg))
 	}
 
 	if cfg.Spec.Auth.CABundle != "" {
@@ -461,6 +471,11 @@ func (r *Reconciler) reconcileDeployments(cfg *operatorv1alpha1.KubermaticConfig
 	modifiers := []reconciling.ObjectModifier{
 		common.OwnershipModifierFactory(seed, r.scheme),
 		volumeLabelModifier,
+	}
+	// add the image pull secret wrapper only when an image pull secret is
+	// provided
+	if cfg.Spec.ImagePullSecret != "" {
+		modifiers = append(modifiers, reconciling.ImagePullSecretsWrapper(common.DockercfgSecretName))
 	}
 
 	if err := reconciling.ReconcileDeployments(r.ctx, creators, r.namespace, client, modifiers...); err != nil {
@@ -517,7 +532,7 @@ func (r *Reconciler) reconcileServices(cfg *operatorv1alpha1.KubermaticConfigura
 	// remove the entire Kubermatic namespace.
 	if !seed.Spec.NodeportProxy.Disable {
 		creators = []reconciling.NamedServiceCreatorGetter{
-			nodeportproxy.ServiceCreator(),
+			nodeportproxy.ServiceCreator(seed),
 		}
 
 		if err := reconciling.ReconcileServices(r.ctx, creators, cfg.Namespace, client); err != nil {

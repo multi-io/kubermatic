@@ -24,8 +24,8 @@ import (
 
 	"go.uber.org/zap"
 
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/resources"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/resources"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -127,7 +127,7 @@ func (m *ModifiersBuilder) Build(ctx context.Context) ([]func(*kubermaticv1.Clus
 	}
 
 	// Internal name
-	internalName := fmt.Sprintf("%s.%s.svc.cluster.local.", resources.ApiserverExternalServiceName, m.cluster.Status.NamespaceName)
+	internalName := fmt.Sprintf("%s.%s.svc.cluster.local.", resources.ApiserverServiceName, m.cluster.Status.NamespaceName)
 	if m.cluster.Address.InternalName != internalName {
 		modifiers = append(modifiers, func(c *kubermaticv1.Cluster) {
 			c.Address.InternalName = internalName
@@ -155,7 +155,7 @@ func (m *ModifiersBuilder) Build(ctx context.Context) ([]func(*kubermaticv1.Clus
 	}
 
 	service := &corev1.Service{}
-	serviceKey := types.NamespacedName{Namespace: m.cluster.Status.NamespaceName, Name: resources.ApiserverExternalServiceName}
+	serviceKey := types.NamespacedName{Namespace: m.cluster.Status.NamespaceName, Name: resources.ApiserverServiceName}
 	if err := m.client.Get(ctx, serviceKey, service); err != nil {
 		return nil, err
 	}

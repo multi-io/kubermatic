@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -242,6 +242,7 @@ func generateRBACRoleBindingForResource(resourceName, groupName, namespace strin
 }
 
 // generateRBACRoleForResource generates Role for the given resource in the given namespace
+// Note that for some groups we don't want to generate Role in that case a nil will be returned
 func generateRBACRoleForResource(groupName, policyResource, policyAPIGroups, kind string, namespace string) (*rbacv1.Role, error) {
 	verbs, err := generateVerbsForNamespacedResource(groupName, kind, namespace)
 	if err != nil {

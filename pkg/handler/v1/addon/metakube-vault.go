@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/kubermatic/kubermatic/pkg/resources"
+	"k8c.io/kubermatic/v2/pkg/resources"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/client-go/kubernetes"
@@ -15,10 +15,10 @@ import (
 
 	"github.com/go-kit/kit/endpoint"
 
-	"github.com/kubermatic/kubermatic/pkg/handler/middleware"
-	"github.com/kubermatic/kubermatic/pkg/handler/v1/common"
-	"github.com/kubermatic/kubermatic/pkg/log"
-	"github.com/kubermatic/kubermatic/pkg/provider"
+	"k8c.io/kubermatic/v2/pkg/handler/middleware"
+	"k8c.io/kubermatic/v2/pkg/handler/v1/common"
+	"k8c.io/kubermatic/v2/pkg/log"
+	"k8c.io/kubermatic/v2/pkg/provider"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -101,7 +101,7 @@ func UnsealVaultAddonEndpoint(seedsGetter provider.SeedsGetter, userInfoGetter p
 			return nil, fmt.Errorf("failed to create a master kubernetes client: %v", err)
 		}
 
-		seedConfigSecret, err := masterKubeClient.CoreV1().Secrets("kubermatic").Get("kubeconfig", metaV1.GetOptions{})
+		seedConfigSecret, err := masterKubeClient.CoreV1().Secrets("kubermatic").Get(ctx, "kubeconfig", metaV1.GetOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("failed to get kubeconfig secret: %v", err)
 		}
@@ -116,7 +116,7 @@ func UnsealVaultAddonEndpoint(seedsGetter provider.SeedsGetter, userInfoGetter p
 			return nil, fmt.Errorf("failed to create a seed kubernetes client: %v", err)
 		}
 
-		clusterKubeConfigSecret, err := seedKubeClient.CoreV1().Secrets(fmt.Sprintf("cluster-%s", c.Name)).Get("admin-kubeconfig", metaV1.GetOptions{})
+		clusterKubeConfigSecret, err := seedKubeClient.CoreV1().Secrets(fmt.Sprintf("cluster-%s", c.Name)).Get(ctx, "admin-kubeconfig", metaV1.GetOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("failed to get cluster kubeconfig secret: %v", err)
 		}
@@ -139,7 +139,7 @@ func UnsealVaultAddonEndpoint(seedsGetter provider.SeedsGetter, userInfoGetter p
 		options := metaV1.ListOptions{
 			LabelSelector: requirement.String(),
 		}
-		endpoints, err := clusterKubeClient.CoreV1().Pods("syseleven-vault").List(options)
+		endpoints, err := clusterKubeClient.CoreV1().Pods("syseleven-vault").List(ctx, options)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch vault pods: %v", err)
 		}
@@ -160,7 +160,7 @@ func UnsealVaultAddonEndpoint(seedsGetter provider.SeedsGetter, userInfoGetter p
 					SubResource("proxy").
 					Suffix("v1/sys/unseal").
 					Body(requestBody)
-				_, err := proxyRequest.DoRaw()
+				_, err := proxyRequest.DoRaw(ctx)
 				if err != nil {
 					// only log errors, so that one already unsealed pod does not break the whole unsealing process
 					log.Logger.Error(err)

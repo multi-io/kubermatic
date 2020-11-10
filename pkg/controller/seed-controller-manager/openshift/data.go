@@ -25,12 +25,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kubermatic/kubermatic/pkg/controller/seed-controller-manager/openshift/resources"
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/provider"
-	kubernetesresources "github.com/kubermatic/kubermatic/pkg/resources"
-	"github.com/kubermatic/kubermatic/pkg/resources/certificates/triple"
 	providerconfig "github.com/kubermatic/machine-controller/pkg/providerconfig/types"
+	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/openshift/resources"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/provider"
+	kubernetesresources "k8c.io/kubermatic/v2/pkg/resources"
+	"k8c.io/kubermatic/v2/pkg/resources/certificates/triple"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 
 	corev1 "k8s.io/api/core/v1"
@@ -198,14 +198,14 @@ func (od *openshiftData) GetPodTemplateLabelsWithContext(ctx context.Context, ap
 
 func (od *openshiftData) GetApiserverExternalNodePort(ctx context.Context) (int32, error) {
 	service := &corev1.Service{}
-	err := od.client.Get(ctx, nn(od.cluster.Status.NamespaceName, kubernetesresources.ApiserverExternalServiceName), service)
+	err := od.client.Get(ctx, nn(od.cluster.Status.NamespaceName, kubernetesresources.ApiserverServiceName), service)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get apiservice for cluster %s: %v", od.cluster.Name, err)
 	}
 
 	if portLen := len(service.Spec.Ports); portLen != 1 {
 		return 0, fmt.Errorf("expected service %s to have exactly one port but has %d",
-			kubernetesresources.ApiserverExternalServiceName, portLen)
+			kubernetesresources.ApiserverServiceName, portLen)
 	}
 	return service.Spec.Ports[0].NodePort, nil
 }

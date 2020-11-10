@@ -15,11 +15,12 @@
 # limitations under the License.
 
 set -euo pipefail
+
+cd $(dirname $0)/../..
+source hack/lib.sh
+
 export DEPLOY_STACK=${DEPLOY_STACK:-kubermatic}
 export GIT_HEAD_HASH="$(git rev-parse HEAD|tr -d '\n')"
-cd $(dirname $0)/..
-
-source ./hack/lib.sh
 
 if [[ "${DEPLOY_STACK}" == "kubermatic" ]]; then
   ./hack/ci/ci-push-images.sh

@@ -20,14 +20,15 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"time"
 
 	"go.uber.org/zap"
 
-	controllerutil "github.com/kubermatic/kubermatic/pkg/controller/util"
-	predicateutil "github.com/kubermatic/kubermatic/pkg/controller/util/predicate"
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/provider"
 	"github.com/prometheus/client_golang/prometheus"
+	controllerutil "k8c.io/kubermatic/v2/pkg/controller/util"
+	predicateutil "k8c.io/kubermatic/v2/pkg/controller/util/predicate"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/provider"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -99,7 +100,15 @@ func Add(
 	// prepare a shared cache across all future master managers; this cache
 	// will be wrapped so that ctrlruntime cannot start and stop it, which
 	// would cause it to close the same channels multiple times and panic
-	cache := mgr.GetCache()
+	resync := 2 * time.Second
+	cache, err := cache.New(mgr.GetConfig(), cache.Options{
+		Scheme: mgr.GetScheme(),
+		Mapper: mgr.GetRESTMapper(),
+		Resync: &resync,
+	})
+	if err != nil {
+		return err
+	}
 
 	go func() {
 		if err := cache.Start(ctx.Done()); err != nil {

@@ -25,9 +25,9 @@ import (
 
 	"go.uber.org/zap"
 
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/provider"
-	seedvalidation "github.com/kubermatic/kubermatic/pkg/validation/seed"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/provider"
+	seedvalidation "k8c.io/kubermatic/v2/pkg/validation/seed"
 
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -68,7 +68,7 @@ func setupSeedValidationWebhook(ctx context.Context, mgr manager.Manager, log *z
 			validator.Validate,
 		),
 		kubermaticv1.ComponentSettings{},
-		false)
+	)
 	if err != nil {
 		return fmt.Errorf("failed to create seed validation webhook server: %v", err)
 	}
@@ -77,10 +77,5 @@ func setupSeedValidationWebhook(ctx context.Context, mgr manager.Manager, log *z
 		return fmt.Errorf("failed to add the seed validation webhook to the mgr: %v", err)
 	}
 
-	return nil
-}
-
-func runMigrations(ctx context.Context, client ctrlruntimeclient.Client, log *zap.SugaredLogger, opt controllerRunOptions, ctrlCtx *controllerContext) error {
-	// NOP
 	return nil
 }

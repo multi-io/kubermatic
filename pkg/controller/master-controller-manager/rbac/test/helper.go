@@ -19,7 +19,7 @@ package test
 import (
 	"fmt"
 
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -41,6 +41,7 @@ func CreateProject(name string, owner *kubermaticv1.User) *kubermaticv1.Project 
 					Name:       owner.Name,
 				},
 			},
+			ResourceVersion: "1",
 		},
 		Spec: kubermaticv1.ProjectSpec{
 			Name: name,

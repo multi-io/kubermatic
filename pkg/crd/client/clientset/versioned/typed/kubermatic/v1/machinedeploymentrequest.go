@@ -3,10 +3,11 @@
 package v1
 
 import (
+	"context"
 	"time"
 
-	scheme "github.com/kubermatic/kubermatic/pkg/crd/client/clientset/versioned/scheme"
-	v1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
+	scheme "k8c.io/kubermatic/v2/pkg/crd/client/clientset/versioned/scheme"
+	v1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -21,14 +22,14 @@ type MachineDeploymentRequestsGetter interface {
 
 // MachineDeploymentRequestInterface has methods to work with MachineDeploymentRequest resources.
 type MachineDeploymentRequestInterface interface {
-	Create(*v1.MachineDeploymentRequest) (*v1.MachineDeploymentRequest, error)
-	Update(*v1.MachineDeploymentRequest) (*v1.MachineDeploymentRequest, error)
-	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(name string, options metav1.GetOptions) (*v1.MachineDeploymentRequest, error)
-	List(opts metav1.ListOptions) (*v1.MachineDeploymentRequestList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.MachineDeploymentRequest, err error)
+	Create(ctx context.Context, machineDeploymentRequest *v1.MachineDeploymentRequest, opts metav1.CreateOptions) (*v1.MachineDeploymentRequest, error)
+	Update(ctx context.Context, machineDeploymentRequest *v1.MachineDeploymentRequest, opts metav1.UpdateOptions) (*v1.MachineDeploymentRequest, error)
+	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.MachineDeploymentRequest, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*v1.MachineDeploymentRequestList, error)
+	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.MachineDeploymentRequest, err error)
 	MachineDeploymentRequestExpansion
 }
 
@@ -47,20 +48,20 @@ func newMachineDeploymentRequests(c *KubermaticV1Client, namespace string) *mach
 }
 
 // Get takes name of the machineDeploymentRequest, and returns the corresponding machineDeploymentRequest object, and an error if there is any.
-func (c *machineDeploymentRequests) Get(name string, options metav1.GetOptions) (result *v1.MachineDeploymentRequest, err error) {
+func (c *machineDeploymentRequests) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.MachineDeploymentRequest, err error) {
 	result = &v1.MachineDeploymentRequest{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("machinedeploymentrequests").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of MachineDeploymentRequests that match those selectors.
-func (c *machineDeploymentRequests) List(opts metav1.ListOptions) (result *v1.MachineDeploymentRequestList, err error) {
+func (c *machineDeploymentRequests) List(ctx context.Context, opts metav1.ListOptions) (result *v1.MachineDeploymentRequestList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -71,13 +72,13 @@ func (c *machineDeploymentRequests) List(opts metav1.ListOptions) (result *v1.Ma
 		Resource("machinedeploymentrequests").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested machineDeploymentRequests.
-func (c *machineDeploymentRequests) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+func (c *machineDeploymentRequests) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -88,71 +89,74 @@ func (c *machineDeploymentRequests) Watch(opts metav1.ListOptions) (watch.Interf
 		Resource("machinedeploymentrequests").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(ctx)
 }
 
 // Create takes the representation of a machineDeploymentRequest and creates it.  Returns the server's representation of the machineDeploymentRequest, and an error, if there is any.
-func (c *machineDeploymentRequests) Create(machineDeploymentRequest *v1.MachineDeploymentRequest) (result *v1.MachineDeploymentRequest, err error) {
+func (c *machineDeploymentRequests) Create(ctx context.Context, machineDeploymentRequest *v1.MachineDeploymentRequest, opts metav1.CreateOptions) (result *v1.MachineDeploymentRequest, err error) {
 	result = &v1.MachineDeploymentRequest{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("machinedeploymentrequests").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(machineDeploymentRequest).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Update takes the representation of a machineDeploymentRequest and updates it. Returns the server's representation of the machineDeploymentRequest, and an error, if there is any.
-func (c *machineDeploymentRequests) Update(machineDeploymentRequest *v1.MachineDeploymentRequest) (result *v1.MachineDeploymentRequest, err error) {
+func (c *machineDeploymentRequests) Update(ctx context.Context, machineDeploymentRequest *v1.MachineDeploymentRequest, opts metav1.UpdateOptions) (result *v1.MachineDeploymentRequest, err error) {
 	result = &v1.MachineDeploymentRequest{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("machinedeploymentrequests").
 		Name(machineDeploymentRequest.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(machineDeploymentRequest).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Delete takes name of the machineDeploymentRequest and deletes it. Returns an error if one occurs.
-func (c *machineDeploymentRequests) Delete(name string, options *metav1.DeleteOptions) error {
+func (c *machineDeploymentRequests) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("machinedeploymentrequests").
 		Name(name).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *machineDeploymentRequests) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+func (c *machineDeploymentRequests) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	var timeout time.Duration
-	if listOptions.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
+	if listOpts.TimeoutSeconds != nil {
+		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("machinedeploymentrequests").
-		VersionedParams(&listOptions, scheme.ParameterCodec).
+		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // Patch applies the patch and returns the patched machineDeploymentRequest.
-func (c *machineDeploymentRequests) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.MachineDeploymentRequest, err error) {
+func (c *machineDeploymentRequests) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.MachineDeploymentRequest, err error) {
 	result = &v1.MachineDeploymentRequest{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("machinedeploymentrequests").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }

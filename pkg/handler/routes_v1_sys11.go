@@ -3,14 +3,14 @@ package handler
 import (
 	"net/http"
 
-	"github.com/kubermatic/kubermatic/pkg/handler/v1/addon"
-	"github.com/kubermatic/kubermatic/pkg/handler/v1/node"
+	"k8c.io/kubermatic/v2/pkg/handler/v1/addon"
+	"k8c.io/kubermatic/v2/pkg/handler/v1/node"
 
 	"github.com/go-kit/kit/endpoint"
 	httptransport "github.com/go-kit/kit/transport/http"
-	"github.com/kubermatic/kubermatic/pkg/handler/middleware"
-	"github.com/kubermatic/kubermatic/pkg/handler/v1/cluster"
-	"github.com/kubermatic/kubermatic/pkg/handler/v1/provider"
+	"k8c.io/kubermatic/v2/pkg/handler/middleware"
+	"k8c.io/kubermatic/v2/pkg/handler/v1/cluster"
+	"k8c.io/kubermatic/v2/pkg/handler/v1/provider"
 
 	"github.com/gorilla/mux"
 )
@@ -112,7 +112,7 @@ func (r Routing) listOpenstackImages() http.Handler {
 			middleware.UserSaver(r.userProvider),
 		)(provider.OpenstackImageEndpoint(r.seedsGetter, r.presetsProvider, r.userInfoGetter)),
 		provider.DecodeOpenstackReq,
-		encodeJSON,
+		EncodeJSON,
 		r.defaultServerOptions()...,
 	)
 }
@@ -134,7 +134,7 @@ func (r Routing) listOpenstackQuotaLimits() http.Handler {
 			middleware.UserSaver(r.userProvider),
 		)(provider.OpenstackQuotaLimitEndpoint(r.seedsGetter, r.presetsProvider, r.userInfoGetter)),
 		provider.DecodeOpenstackReq,
-		encodeJSON,
+		EncodeJSON,
 		r.defaultServerOptions()...,
 	)
 }
@@ -158,7 +158,7 @@ func (r Routing) listOpenstackImagesNoCredentials() http.Handler {
 			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
 		)(provider.OpenstackImageNoCredentialsEndpoint(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter, r.userInfoGetter)),
 		provider.DecodeOpenstackNoCredentialsReq,
-		encodeJSON,
+		EncodeJSON,
 		r.defaultServerOptions()...,
 	)
 }
@@ -182,7 +182,7 @@ func (r Routing) listOpenstackQuotaLimitsNoCredentials() http.Handler {
 			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
 		)(provider.OpenstackQuotaLimitNoCredentialsEndpoint(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter, r.userInfoGetter)),
 		provider.DecodeOpenstackNoCredentialsReq,
-		encodeJSON,
+		EncodeJSON,
 		r.defaultServerOptions()...,
 	)
 }
@@ -234,7 +234,7 @@ func (r Routing) unsealVaultAddon() http.Handler {
 			middleware.Addons(r.addonProviderGetter, r.seedsGetter),
 		)(addon.UnsealVaultAddonEndpoint(r.seedsGetter, r.userInfoGetter)),
 		addon.DecodeUnsealVaultAddon,
-		encodeJSON,
+		EncodeJSON,
 		r.defaultServerOptions()...,
 	)
 }
@@ -263,7 +263,7 @@ func (r Routing) createNodeDeploymentRequest() http.Handler {
 			middleware.MachineDeploymentRequests(r.mdRequestProviderGetter, r.seedsGetter),
 		)(node.CreateNodeDeploymentRequestEndpoint(r.sshKeyProvider, r.projectProvider, r.seedsGetter, r.userInfoGetter)),
 		node.DecodeCreateNodeDeploymentRequest,
-		setStatusCreatedHeader(encodeJSON),
+		SetStatusCreatedHeader(EncodeJSON),
 		r.defaultServerOptions()...,
 	)
 }
@@ -289,7 +289,7 @@ func (r Routing) listNodeDeploymentRequests() http.Handler {
 			middleware.MachineDeploymentRequests(r.mdRequestProviderGetter, r.seedsGetter),
 		)(node.ListNodeDeploymentRequestEndpoint(r.projectProvider, r.userInfoGetter)),
 		node.DecodeListNodeDeploymentRequests,
-		encodeJSON,
+		EncodeJSON,
 		r.defaultServerOptions()...,
 	)
 }
@@ -315,7 +315,7 @@ func (r Routing) getNodeDeploymentRequest() http.Handler {
 			middleware.MachineDeploymentRequests(r.mdRequestProviderGetter, r.seedsGetter),
 		)(node.GetNodeDeploymentRequestEndpoint(r.projectProvider, r.userInfoGetter)),
 		node.DecodeGetNodeDeploymentRequest,
-		encodeJSON,
+		EncodeJSON,
 		r.defaultServerOptions()...,
 	)
 }
@@ -344,7 +344,7 @@ func (r Routing) patchNodeDeploymentRequest() http.Handler {
 			middleware.MachineDeploymentRequests(r.mdRequestProviderGetter, r.seedsGetter),
 		)(node.PatchNodeDeploymentRequestEndpoint(r.sshKeyProvider, r.projectProvider, r.seedsGetter, r.userInfoGetter)),
 		node.DecodePatchNodeDeploymentRequest,
-		encodeJSON,
+		EncodeJSON,
 		r.defaultServerOptions()...,
 	)
 }
@@ -370,7 +370,7 @@ func (r Routing) deleteNodeDeploymentRequest() http.Handler {
 			middleware.MachineDeploymentRequests(r.mdRequestProviderGetter, r.seedsGetter),
 		)(node.DeleteNodeDeploymentRequestEndpoint(r.projectProvider, r.userInfoGetter)),
 		node.DecodeGetNodeDeploymentRequest,
-		encodeJSON,
+		EncodeJSON,
 		r.defaultServerOptions()...,
 	)
 }

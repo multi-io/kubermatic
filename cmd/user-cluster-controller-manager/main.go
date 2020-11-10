@@ -31,25 +31,25 @@ import (
 	"github.com/oklog/run"
 	"go.uber.org/zap"
 
-	cmdutil "github.com/kubermatic/kubermatic/cmd/util"
-	sys11nodereadiness "github.com/kubermatic/kubermatic/pkg/controller/sys11-node-readiness"
-	clusterrolelabeler "github.com/kubermatic/kubermatic/pkg/controller/user-cluster-controller-manager/cluster-role-labeler"
-	containerlinux "github.com/kubermatic/kubermatic/pkg/controller/user-cluster-controller-manager/container-linux"
-	"github.com/kubermatic/kubermatic/pkg/controller/user-cluster-controller-manager/ipam"
-	nodelabeler "github.com/kubermatic/kubermatic/pkg/controller/user-cluster-controller-manager/node-labeler"
-	"github.com/kubermatic/kubermatic/pkg/controller/user-cluster-controller-manager/nodecsrapprover"
-	openshiftmasternodelabeler "github.com/kubermatic/kubermatic/pkg/controller/user-cluster-controller-manager/openshift-master-node-labeler"
-	openshiftseedsyncer "github.com/kubermatic/kubermatic/pkg/controller/user-cluster-controller-manager/openshift-seed-syncer"
-	ownerbindingcreator "github.com/kubermatic/kubermatic/pkg/controller/user-cluster-controller-manager/owner-binding-creator"
-	rbacusercluster "github.com/kubermatic/kubermatic/pkg/controller/user-cluster-controller-manager/rbac"
-	usercluster "github.com/kubermatic/kubermatic/pkg/controller/user-cluster-controller-manager/resources"
-	machinecontrolerresources "github.com/kubermatic/kubermatic/pkg/controller/user-cluster-controller-manager/resources/resources/machine-controller"
-	rolecloner "github.com/kubermatic/kubermatic/pkg/controller/user-cluster-controller-manager/role-cloner"
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	kubermaticlog "github.com/kubermatic/kubermatic/pkg/log"
-	"github.com/kubermatic/kubermatic/pkg/pprof"
-	"github.com/kubermatic/kubermatic/pkg/resources/reconciling"
 	clusterv1alpha1 "github.com/kubermatic/machine-controller/pkg/apis/cluster/v1alpha1"
+	cmdutil "k8c.io/kubermatic/v2/cmd/util"
+	sys11nodereadiness "k8c.io/kubermatic/v2/pkg/controller/sys11-node-readiness"
+	clusterrolelabeler "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/cluster-role-labeler"
+	containerlinux "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/container-linux"
+	"k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/ipam"
+	nodelabeler "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/node-labeler"
+	"k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/nodecsrapprover"
+	openshiftmasternodelabeler "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/openshift-master-node-labeler"
+	openshiftseedsyncer "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/openshift-seed-syncer"
+	ownerbindingcreator "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/owner-binding-creator"
+	rbacusercluster "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/rbac"
+	usercluster "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources"
+	machinecontrolerresources "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/machine-controller"
+	rolecloner "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/role-cloner"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
+	"k8c.io/kubermatic/v2/pkg/pprof"
+	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -82,6 +82,7 @@ type controllerRunOptions struct {
 	ownerEmail                    string
 	updateWindowStart             string
 	updateWindowLength            string
+	dnsClusterIP                  string
 }
 
 func main() {
@@ -99,6 +100,7 @@ func main() {
 	flag.Var(&runOp.networks, "ipam-controller-network", "The networks from which the ipam controller should allocate IPs for machines (e.g.: .--ipam-controller-network=10.0.0.0/16,10.0.0.1,8.8.8.8 --ipam-controller-network=192.168.5.0/24,192.168.5.1,1.1.1.1,8.8.4.4)")
 	flag.StringVar(&runOp.namespace, "namespace", "", "Namespace in which the cluster is running in")
 	flag.StringVar(&runOp.clusterURL, "cluster-url", "", "Cluster URL")
+	flag.StringVar(&runOp.dnsClusterIP, "dns-cluster-ip", "", "KubeDNS service IP for the cluster")
 	flag.IntVar(&runOp.openvpnServerPort, "openvpn-server-port", 0, "OpenVPN server port")
 	flag.StringVar(&runOp.overwriteRegistry, "overwrite-registry", "", "registry to use for all images")
 	flag.StringVar(&runOp.cloudProviderName, "cloud-provider-name", "", "Name of the cloudprovider")
@@ -124,6 +126,9 @@ func main() {
 	}
 	if runOp.clusterURL == "" {
 		log.Fatal("-cluster-url must be set")
+	}
+	if runOp.dnsClusterIP == "" {
+		log.Fatal("-dns-cluster-ip must be set")
 	}
 	clusterURL, err := url.Parse(runOp.clusterURL)
 	if err != nil {
@@ -221,6 +226,7 @@ func main() {
 		healthHandler.AddReadinessCheck,
 		cloudCredentialSecretTemplate,
 		runOp.openshiftConsoleCallbackURI,
+		runOp.dnsClusterIP,
 		log,
 	); err != nil {
 		log.Fatalw("Failed to register user cluster controller", zap.Error(err))

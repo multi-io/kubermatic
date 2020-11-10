@@ -1,3 +1,5 @@
+# This file has been generated, DO NOT EDIT.
+
 #cloud-config
 
 hostname: my-vsphere-node
@@ -129,7 +131,7 @@ write_files:
         certificate-authority-data: bXktY2VydA==
         server: https://server:443
       name: ""
-    contexts: []
+    contexts: null
     current-context: ""
     kind: Config
     preferences: {}

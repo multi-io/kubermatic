@@ -3,17 +3,20 @@
 package v1
 
 import (
-	v1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
+	v1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 )
 
 // ProjectLister helps list Projects.
+// All objects returned here must be treated as read-only.
 type ProjectLister interface {
 	// List lists all Projects in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.Project, err error)
 	// Get retrieves the Project from the index for a given name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.Project, error)
 	ProjectListerExpansion
 }

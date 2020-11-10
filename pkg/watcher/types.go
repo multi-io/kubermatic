@@ -17,7 +17,7 @@ limitations under the License.
 package watcher
 
 import (
-	"github.com/kubermatic/kubermatic/pkg/provider"
+	"k8c.io/kubermatic/v2/pkg/provider"
 
 	"code.cloudfoundry.org/go-pubsub"
 )
@@ -25,8 +25,16 @@ import (
 type Providers struct {
 	SettingsProvider provider.SettingsProvider
 	SettingsWatcher  SettingsWatcher
+	UserProvider     provider.UserProvider
+	UserWatcher      UserWatcher
+	MemberMapper     provider.ProjectMemberMapper
 }
 
 type SettingsWatcher interface {
-	Subscribe(subscription pubsub.Subscription)
+	Subscribe(subscription pubsub.Subscription) pubsub.Unsubscriber
+}
+
+type UserWatcher interface {
+	Subscribe(subscription pubsub.Subscription, opts ...pubsub.SubscribeOption) pubsub.Unsubscriber
+	CalculateHash(id string) (uint64, error)
 }

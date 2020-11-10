@@ -21,10 +21,10 @@ import (
 	"fmt"
 	"strings"
 
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/resources"
-	"github.com/kubermatic/kubermatic/pkg/resources/apiserver"
-	"github.com/kubermatic/kubermatic/pkg/resources/reconciling"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/resources"
+	"k8c.io/kubermatic/v2/pkg/resources/apiserver"
+	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -113,12 +113,17 @@ func DeploymentCreator(data userclusterControllerData, openshift bool) reconcili
 
 			dep.Spec.Template.Spec.Volumes = volumes
 
+			dnsClusterIP, err := resources.UserClusterDNSResolverIP(data.Cluster())
+			if err != nil {
+				return nil, err
+			}
 			args := append([]string{
 				"-kubeconfig", "/etc/kubernetes/kubeconfig/kubeconfig",
 				"-metrics-listen-address", "0.0.0.0:8085",
 				"-health-listen-address", "0.0.0.0:8086",
 				"-namespace", "$(NAMESPACE)",
 				"-cluster-url", data.Cluster().Address.URL,
+				"-dns-cluster-ip", dnsClusterIP,
 				"-openvpn-server-port", fmt.Sprint(openvpnServerPort),
 				"-overwrite-registry", data.ImageRegistry(""),
 				fmt.Sprintf("-openshift=%t", openshift),
@@ -129,9 +134,6 @@ func DeploymentCreator(data userclusterControllerData, openshift bool) reconcili
 
 			if openshiftConsoleCallbackURI := data.Cluster().Address.OpenshiftConsoleCallBack; openshiftConsoleCallbackURI != "" {
 				args = append(args, "-openshift-console-callback-uri", openshiftConsoleCallbackURI)
-			}
-			if data.Cluster().Spec.UpdateWindow != nil && data.Cluster().Spec.UpdateWindow.Length != "" && data.Cluster().Spec.UpdateWindow.Start != "" {
-				args = append(args, "-update-window-start", data.Cluster().Spec.UpdateWindow.Start, "-update-window-length", data.Cluster().Spec.UpdateWindow.Length)
 			}
 
 			if data.Cluster().Spec.UpdateWindow != nil && data.Cluster().Spec.UpdateWindow.Length != "" && data.Cluster().Spec.UpdateWindow.Start != "" {

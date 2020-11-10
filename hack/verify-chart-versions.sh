@@ -25,7 +25,7 @@ source hack/lib.sh
 
 echodate "Verifying Helm chart versions..."
 
-charts=$(find config/ -name Chart.yaml | sort)
+charts=$(find charts/ -name Chart.yaml | sort)
 exitCode=0
 
 [ -n "$charts" ] && while read -r chartYAML; do

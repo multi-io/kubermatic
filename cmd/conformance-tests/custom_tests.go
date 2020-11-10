@@ -28,7 +28,7 @@ import (
 
 	"go.uber.org/zap"
 
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -286,7 +287,7 @@ func (r *testRunner) testUserClusterMetrics(log *zap.SugaredLogger, cluster *kub
 		Name("prometheus-0:9090").
 		SubResource("proxy").
 		Suffix("api/v1/label/__name__/values").
-		Do()
+		Do(r.ctx)
 
 	if err := res.Error(); err != nil {
 		return fmt.Errorf("request to Prometheus failed: %v", err)
@@ -330,5 +331,94 @@ func (r *testRunner) testUserClusterMetrics(log *zap.SugaredLogger, cluster *kub
 	}
 
 	log.Info("Successfully validated user cluster metrics.")
+	return nil
+}
+
+func (r *testRunner) testUserClusterPodAndNodeMetrics(log *zap.SugaredLogger, cluster *kubermaticv1.Cluster,
+	userClusterClient ctrlruntimeclient.Client) error {
+	log.Info("Testing user cluster pod and node metrics availability...")
+
+	// check node metrics
+	allNodeMetricsList := &v1beta1.NodeMetricsList{}
+	if err := userClusterClient.List(r.ctx, allNodeMetricsList); err != nil {
+		return fmt.Errorf("error getting node metrics list: %v", err)
+	}
+	if len(allNodeMetricsList.Items) == 0 {
+		return fmt.Errorf("node metrics list is empty")
+	}
+
+	for _, nodeMetric := range allNodeMetricsList.Items {
+		// check a metric to see if it works
+		if nodeMetric.Usage.Memory().IsZero() {
+			return fmt.Errorf("node %q memory usage metric is 0", nodeMetric.Name)
+		}
+	}
+
+	// create pod to check metrics
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "check-metrics",
+			Namespace: "default",
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:  "hello-kubernetes",
+					Image: "gcr.io/google-samples/node-hello:1.0",
+					Ports: []corev1.ContainerPort{
+						{
+							Name:          "http",
+							ContainerPort: 8080,
+							Protocol:      corev1.ProtocolTCP,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if err := userClusterClient.Create(context.Background(), pod); err != nil {
+		return fmt.Errorf("failed to create Pod: %v", err)
+	}
+
+	err := wait.Poll(defaultUserClusterPollInterval, defaultTimeout, func() (done bool, err error) {
+		metricPod := &corev1.Pod{}
+		if err := userClusterClient.Get(context.Background(),
+			types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, metricPod); err != nil {
+			log.Warnw("Failed to get test metric pod", zap.Error(err))
+			return false, nil
+		}
+
+		if !podIsReady(metricPod) {
+			return false, nil
+		}
+
+		return true, nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to check if test metrics pod is ready: %v", err)
+	}
+
+	// check pod metrics
+	err = wait.Poll(defaultUserClusterPollInterval, defaultTimeout, func() (done bool, err error) {
+		podMetrics := &v1beta1.PodMetrics{}
+		if err := userClusterClient.Get(r.ctx,
+			types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, podMetrics); err != nil {
+			log.Warnw("Failed to get test metric pod metrics", zap.Error(err))
+			return false, nil
+		}
+		for _, cont := range podMetrics.Containers {
+			if cont.Usage.Memory().IsZero() {
+				log.Warnw("Metrics test pod memory usage is 0", zap.Error(err))
+				return false, nil
+			}
+		}
+		return true, nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to get metric test pod metrics: %v", err)
+	}
+
+	log.Info("Successfully validated user cluster pod and node metrics.")
 	return nil
 }

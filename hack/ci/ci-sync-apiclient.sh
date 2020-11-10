@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
 # Copyright 2020 The Kubermatic Kubernetes Platform contributors.
 #
@@ -14,9 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -eu
+set -euo pipefail
 
-. $(dirname $0)/../lib.sh
+cd $(dirname $0)/../..
+source hack/lib.sh
 
 URL="git@github.com:kubermatic/go-kubermatic.git"
 
@@ -29,7 +30,7 @@ commit_and_push() {
     (
         cd "$repodir"
 
-        git config --local user.email "dev@loodse.com"
+        git config --local user.email "dev@kubermatic.com"
         git config --local user.name "Prow CI Robot"
         git config --local core.sshCommand 'ssh -o CheckHostIP=no -i /ssh/id_rsa'
 
@@ -65,7 +66,7 @@ GIT_SSH_COMMAND="ssh -o CheckHostIP=no -i /ssh/id_rsa" git clone "$URL" "$tempdi
 
 # rewrite all the import paths
 echo "Rewriting import paths"
-sed_expression="s#github.com/kubermatic/kubermatic/pkg/test/e2e/api/utils/apiclient#github.com/kubermatic/go-kubermatic#g"
+sed_expression="s#k8c.io/kubermatic/v2/pkg/test/e2e/api/utils/apiclient#github.com/kubermatic/go-kubermatic#g"
 time find pkg/test/e2e/api/utils/apiclient/ -type f -exec sed "$sed_expression" -i {} \;
 
 # sync the files

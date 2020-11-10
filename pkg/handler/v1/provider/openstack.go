@@ -23,15 +23,15 @@ import (
 
 	"github.com/go-kit/kit/endpoint"
 
-	apiv1 "github.com/kubermatic/kubermatic/pkg/api/v1"
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/handler/middleware"
-	"github.com/kubermatic/kubermatic/pkg/handler/v1/cluster"
-	"github.com/kubermatic/kubermatic/pkg/handler/v1/common"
-	"github.com/kubermatic/kubermatic/pkg/provider"
-	"github.com/kubermatic/kubermatic/pkg/provider/cloud/openstack"
-	kubernetesprovider "github.com/kubermatic/kubermatic/pkg/provider/kubernetes"
-	"github.com/kubermatic/kubermatic/pkg/util/errors"
+	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	handlercommon "k8c.io/kubermatic/v2/pkg/handler/common"
+	"k8c.io/kubermatic/v2/pkg/handler/middleware"
+	"k8c.io/kubermatic/v2/pkg/handler/v1/common"
+	"k8c.io/kubermatic/v2/pkg/provider"
+	"k8c.io/kubermatic/v2/pkg/provider/cloud/openstack"
+	kubernetesprovider "k8c.io/kubermatic/v2/pkg/provider/kubernetes"
+	"k8c.io/kubermatic/v2/pkg/util/errors"
 )
 
 func OpenstackSizeEndpoint(seedsGetter provider.SeedsGetter, presetsProvider provider.PresetProvider, userInfoGetter provider.UserInfoGetter) endpoint.Endpoint {
@@ -417,8 +417,85 @@ func getOpenstackSubnets(userInfo *provider.UserInfo, seedsGetter provider.Seeds
 	return apiSubnetIDs, nil
 }
 
+func OpenstackAvailabilityZoneEndpoint(seedsGetter provider.SeedsGetter, presetsProvider provider.PresetProvider, userInfoGetter provider.UserInfoGetter) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (interface{}, error) {
+		req, ok := request.(OpenstackReq)
+		if !ok {
+			return nil, fmt.Errorf("incorrect type of request, expected = OpenstackReq, got = %T", request)
+		}
+		userInfo, err := userInfoGetter(ctx, "")
+		if err != nil {
+			return nil, common.KubernetesErrorToHTTPError(err)
+		}
+
+		datacenterName := req.DatacenterName
+		_, datacenter, err := provider.DatacenterFromSeedMap(userInfo, seedsGetter, datacenterName)
+		if err != nil {
+			return nil, fmt.Errorf("error getting dc: %v", err)
+		}
+
+		username, password, domain, tenant, tenantID, err := getOpenstackCredentials(userInfo, req.Credential, req.Username, req.Password, req.Domain, req.Tenant, req.TenantID, presetsProvider)
+		if err != nil {
+			return nil, fmt.Errorf("error getting OpenStack credentials: %v", err)
+		}
+		return getOpenstackAvailabilityZones(username, password, tenant, tenantID, domain, datacenterName, datacenter)
+	}
+}
+
+func OpenstackAvailabilityZoneWithClusterCredentialsEndpoint(projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, seedsGetter provider.SeedsGetter, userInfoGetter provider.UserInfoGetter) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (interface{}, error) {
+		req := request.(OpenstackNoCredentialsReq)
+		cluster, err := getClusterForOpenstack(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID)
+		if err != nil {
+			return nil, err
+		}
+
+		datacenterName := cluster.Spec.Cloud.DatacenterName
+
+		userInfo, err := userInfoGetter(ctx, req.ProjectID)
+		if err != nil {
+			return nil, common.KubernetesErrorToHTTPError(err)
+		}
+
+		_, datacenter, err := provider.DatacenterFromSeedMap(userInfo, seedsGetter, datacenterName)
+		if err != nil {
+			return nil, fmt.Errorf("error getting dc: %v", err)
+		}
+
+		clusterProvider := ctx.Value(middleware.ClusterProviderContextKey).(provider.ClusterProvider)
+		assertedClusterProvider, ok := clusterProvider.(*kubernetesprovider.ClusterProvider)
+		if !ok {
+			return nil, errors.New(http.StatusInternalServerError, "failed to assert clusterProvider")
+		}
+
+		secretKeySelector := provider.SecretKeySelectorValueFuncFactory(ctx, assertedClusterProvider.GetSeedClusterAdminRuntimeClient())
+		creds, err := openstack.GetCredentialsForCluster(cluster.Spec.Cloud, secretKeySelector)
+		if err != nil {
+			return nil, err
+		}
+
+		return getOpenstackAvailabilityZones(creds.Username, creds.Password, creds.Tenant, creds.TenantID, creds.Domain, datacenterName, datacenter)
+	}
+}
+
+func getOpenstackAvailabilityZones(username, password, tenant, tenantID, domain, datacenterName string, datacenter *kubermaticv1.Datacenter) ([]apiv1.OpenstackAvailabilityZone, error) {
+	availabilityZones, err := openstack.GetAvailabilityZones(username, password, domain, tenant, tenantID, datacenter.Spec.Openstack.AuthURL, datacenter.Spec.Openstack.Region)
+	if err != nil {
+		return nil, err
+	}
+
+	apiAvailabilityZones := []apiv1.OpenstackAvailabilityZone{}
+	for _, availabilityZone := range availabilityZones {
+		apiAvailabilityZones = append(apiAvailabilityZones, apiv1.OpenstackAvailabilityZone{
+			Name: availabilityZone.ZoneName,
+		})
+	}
+
+	return apiAvailabilityZones, nil
+}
+
 func getClusterForOpenstack(ctx context.Context, projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, userInfoGetter provider.UserInfoGetter, projectID string, clusterID string) (*kubermaticv1.Cluster, error) {
-	cluster, err := cluster.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, projectID, clusterID, &provider.ClusterGetOptions{CheckInitStatus: true})
+	cluster, err := handlercommon.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, projectID, clusterID, &provider.ClusterGetOptions{CheckInitStatus: true})
 	if err != nil {
 		return nil, err
 	}
@@ -429,7 +506,7 @@ func getClusterForOpenstack(ctx context.Context, projectProvider provider.Projec
 }
 
 // OpenstackReq represent a request for openstack
-// swagger:parameters listOpenstackSizes listOpenstackNetworks listOpenstackSecurityGroups
+// swagger:parameters listOpenstackSizes listOpenstackNetworks listOpenstackSecurityGroups listOpenstackAvailabilityZones
 type OpenstackReq struct {
 	// in: header
 	// Username OpenStack user name
@@ -468,7 +545,7 @@ func DecodeOpenstackReq(c context.Context, r *http.Request) (interface{}, error)
 }
 
 // OpenstackNoCredentialsReq represent a request for openstack
-// swagger:parameters listOpenstackQuotaLimitsNoCredentials listOpenstackImagesNoCredentials listOpenstackSizesNoCredentials listOpenstackTenantsNoCredentials listOpenstackNetworksNoCredentials listOpenstackSecurityGroupsNoCredentials
+// swagger:parameters listOpenstackQuotaLimitsNoCredentials listOpenstackImagesNoCredentials listOpenstackSizesNoCredentials listOpenstackTenantsNoCredentials listOpenstackNetworksNoCredentials listOpenstackSecurityGroupsNoCredentials listOpenstackAvailabilityZonesNoCredentials
 type OpenstackNoCredentialsReq struct {
 	common.GetClusterReq
 }

@@ -20,12 +20,12 @@ import (
 	"fmt"
 	"strings"
 
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/resources"
-	"github.com/kubermatic/kubermatic/pkg/resources/apiserver"
-	"github.com/kubermatic/kubermatic/pkg/resources/cloudconfig"
-	"github.com/kubermatic/kubermatic/pkg/resources/reconciling"
-	"github.com/kubermatic/kubermatic/pkg/resources/vpnsidecar"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/resources"
+	"k8c.io/kubermatic/v2/pkg/resources/apiserver"
+	"k8c.io/kubermatic/v2/pkg/resources/cloudconfig"
+	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
+	"k8c.io/kubermatic/v2/pkg/resources/vpnsidecar"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -278,8 +278,6 @@ func getFlags(data *resources.TemplateData) ([]string, error) {
 	flags = append(flags, "--authorization-kubeconfig", "/etc/kubernetes/kubeconfig/kubeconfig")
 	// We're going to use the https endpoints for scraping the metrics starting from 1.12. Thus we can deactivate the http endpoint
 	flags = append(flags, "--port", "0")
-	// Force the authentication lookup to succeed, otherwise if it fails all requests will be treated as anonymous and thus fail
-	flags = append(flags, "--authentication-tolerate-lookup-failure=false")
 
 	return flags, nil
 }

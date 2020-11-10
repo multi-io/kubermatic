@@ -19,10 +19,10 @@ package kubermatic
 import (
 	"fmt"
 
-	"github.com/kubermatic/kubermatic/pkg/controller/operator/common"
-	operatorv1alpha1 "github.com/kubermatic/kubermatic/pkg/crd/operator/v1alpha1"
-	"github.com/kubermatic/kubermatic/pkg/resources"
-	"github.com/kubermatic/kubermatic/pkg/resources/reconciling"
+	"k8c.io/kubermatic/v2/pkg/controller/operator/common"
+	operatorv1alpha1 "k8c.io/kubermatic/v2/pkg/crd/operator/v1alpha1"
+	"k8c.io/kubermatic/v2/pkg/resources"
+	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -47,17 +47,12 @@ func MasterControllerManagerDeploymentCreator(cfg *operatorv1alpha1.KubermaticCo
 
 			d.Spec.Template.Labels = d.Spec.Selector.MatchLabels
 			d.Spec.Template.Annotations = map[string]string{
-				"kubermatic/scrape":      "true",
-				"kubermatic/scrape_port": "8085",
-				"fluentbit.io/parser":    "json_iso",
+				"prometheus.io/scrape": "true",
+				"prometheus.io/port":   "8085",
+				"fluentbit.io/parser":  "json_iso",
 			}
 
 			d.Spec.Template.Spec.ServiceAccountName = serviceAccountName
-			d.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{
-				{
-					Name: common.DockercfgSecretName,
-				},
-			}
 
 			d.Spec.Template.Spec.Volumes = []corev1.Volume{
 				{

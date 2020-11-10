@@ -3,7 +3,7 @@
 package v1
 
 import (
-	internalinterfaces "github.com/kubermatic/kubermatic/pkg/crd/client/informers/externalversions/internalinterfaces"
+	internalinterfaces "k8c.io/kubermatic/v2/pkg/crd/client/informers/externalversions/internalinterfaces"
 )
 
 // Interface provides access to all the informers in this group version.
@@ -18,6 +18,8 @@ type Interface interface {
 	EtcdBackupConfigs() EtcdBackupConfigInformer
 	// EtcdRestores returns a EtcdRestoreInformer.
 	EtcdRestores() EtcdRestoreInformer
+	// ExternalClusters returns a ExternalClusterInformer.
+	ExternalClusters() ExternalClusterInformer
 	// KubermaticSettings returns a KubermaticSettingInformer.
 	KubermaticSettings() KubermaticSettingInformer
 	// MachineDeploymentRequests returns a MachineDeploymentRequestInformer.
@@ -66,6 +68,11 @@ func (v *version) EtcdBackupConfigs() EtcdBackupConfigInformer {
 // EtcdRestores returns a EtcdRestoreInformer.
 func (v *version) EtcdRestores() EtcdRestoreInformer {
 	return &etcdRestoreInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// ExternalClusters returns a ExternalClusterInformer.
+func (v *version) ExternalClusters() ExternalClusterInformer {
+	return &externalClusterInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // KubermaticSettings returns a KubermaticSettingInformer.

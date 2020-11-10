@@ -17,6 +17,7 @@ limitations under the License.
 package s3
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -27,7 +28,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 
-	kubermaticclientset "github.com/kubermatic/kubermatic/pkg/crd/client/clientset/versioned"
+	kubermaticclientset "k8c.io/kubermatic/v2/pkg/crd/client/clientset/versioned"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -86,7 +87,7 @@ func (e *s3Exporter) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (e *s3Exporter) Collect(ch chan<- prometheus.Metric) {
-	clusters, err := e.kubermaticClient.KubermaticV1().Clusters().List(metav1.ListOptions{})
+	clusters, err := e.kubermaticClient.KubermaticV1().Clusters().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		e.logger.Errorw("Failed to list clusters", zap.Error(err))
 		ch <- prometheus.MustNewConstMetric(

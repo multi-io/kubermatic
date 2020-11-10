@@ -23,14 +23,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kubermatic/kubermatic/pkg/controller/operator/common"
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	operatorv1alpha1 "github.com/kubermatic/kubermatic/pkg/crd/operator/v1alpha1"
-	"github.com/kubermatic/kubermatic/pkg/kubernetes"
-	kubermaticlog "github.com/kubermatic/kubermatic/pkg/log"
+	"k8c.io/kubermatic/v2/pkg/controller/operator/common"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	operatorv1alpha1 "k8c.io/kubermatic/v2/pkg/crd/operator/v1alpha1"
+	"k8c.io/kubermatic/v2/pkg/kubernetes"
+	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
 
 	certmanagerv1alpha2 "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1alpha2"
 	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -41,6 +43,10 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlruntimefakeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
+)
+
+const (
+	imagePullSecret = `{"auths":{"your.private.registry.example.com":{"username":"janedoe","password":"xxxxxxxxxxx","email":"jdoe@example.com","auth":"c3R...zE2"}}}`
 )
 
 func init() {
@@ -82,6 +88,19 @@ func TestBasicReconciling(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "other",
 				Namespace: "kube-system",
+			},
+		},
+		"seed-with-nodeport-proxy-annotations": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "seed-with-nodeport-proxy-annotations",
+				Namespace: "kubermatic",
+			},
+			Spec: kubermaticv1.SeedSpec{
+				NodeportProxy: kubermaticv1.NodeportProxyConfig{
+					Annotations: map[string]string{
+						"foo.bar": "baz",
+					},
+				},
 			},
 		},
 	}
@@ -277,6 +296,111 @@ func TestBasicReconciling(t *testing.T) {
 				}
 
 				return nil
+			},
+		},
+
+		{
+			name:            "nodeport-proxy annotations are carried over to the loadbalancer service",
+			seedToReconcile: "seed-with-nodeport-proxy-annotations",
+			configuration: &operatorv1alpha1.KubermaticConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "kubermatic",
+				},
+				Spec: operatorv1alpha1.KubermaticConfigurationSpec{
+					Ingress: operatorv1alpha1.KubermaticIngressConfiguration{
+						Domain: "example.com",
+					},
+				},
+			},
+			seedsOnMaster: []string{"seed-with-nodeport-proxy-annotations"},
+			syncedSeeds:   sets.NewString("seed-with-nodeport-proxy-annotations"),
+			assertion: func(test *testcase, reconciler *Reconciler) error {
+				if err := reconciler.reconcile(reconciler.log, test.seedToReconcile); err != nil {
+					return fmt.Errorf("reconciliation failed: %v", err)
+				}
+
+				seedClient := reconciler.seedClients["seed-with-nodeport-proxy-annotations"]
+
+				svc := corev1.Service{}
+				if err := seedClient.Get(reconciler.ctx, types.NamespacedName{
+					Namespace: "kubermatic",
+					Name:      "nodeport-proxy",
+				}, &svc); err != nil {
+					return fmt.Errorf("failed to retrieve nodeport-proxy Service: %v", err)
+				}
+
+				if svc.Annotations == nil {
+					return fmt.Errorf("Nodeport service in seed cluster does not have configured annotations: %q", allSeeds["seed-with-nodeport-proxy-annotations"].Spec.NodeportProxy.Annotations)
+				}
+
+				for k, v := range allSeeds["seed-with-nodeport-proxy-annotations"].Spec.NodeportProxy.Annotations {
+					if svc.Annotations[k] != v {
+						return fmt.Errorf("Nodeport service in seed cluster is missing configured annotation: %s: %s", k, v)
+					}
+				}
+
+				return nil
+			},
+		},
+
+		{
+			name:            "when imagePullSecret is given secret should be provisioned",
+			seedToReconcile: "europe",
+			configuration: &operatorv1alpha1.KubermaticConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "kubermatic",
+				},
+				Spec: operatorv1alpha1.KubermaticConfigurationSpec{
+					ImagePullSecret: imagePullSecret,
+				},
+			},
+			seedsOnMaster: []string{"europe"},
+			syncedSeeds:   sets.NewString("europe"),
+			assertion: func(test *testcase, reconciler *Reconciler) error {
+				if err := reconciler.reconcile(reconciler.log, test.seedToReconcile); err != nil {
+					return fmt.Errorf("reconciliation failed: %v", err)
+				}
+
+				seedClient := reconciler.seedClients["europe"]
+
+				// check that secret with image pull secret has been created
+				secret := corev1.Secret{}
+				if err := seedClient.Get(reconciler.ctx, types.NamespacedName{
+					Namespace: "kubermatic",
+					Name:      common.DockercfgSecretName,
+				}, &secret); err != nil {
+					return fmt.Errorf("failed to retrieve dockercfg Secret: %v", err)
+				}
+
+				// secret data is not base64 encoded with fake client
+				if i := string(secret.Data[corev1.DockerConfigJsonKey]); i != imagePullSecret {
+					return fmt.Errorf("secret data expected %q but got %q", imagePullSecret, i)
+				}
+
+				// check that image pull secret has been inserted in the pod
+				// spec of seed controller manager
+				scm := appsv1.Deployment{}
+				if err := seedClient.Get(reconciler.ctx, types.NamespacedName{
+					Namespace: "kubermatic",
+					Name:      common.SeedControllerManagerDeploymentName,
+				}, &scm); err != nil {
+					return fmt.Errorf("failed to retrieve seed controller manager deployment: %v", err)
+				}
+
+				var foundImagePullSecret bool
+				for _, ips := range scm.Spec.Template.Spec.ImagePullSecrets {
+					if ips.Name == common.DockercfgSecretName {
+						foundImagePullSecret = true
+					}
+				}
+				if !foundImagePullSecret {
+					return fmt.Errorf("failed to find ImagePullSecret in seed-controller-manager pod spec")
+				}
+
+				return nil
+
 			},
 		},
 	}

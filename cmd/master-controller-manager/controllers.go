@@ -19,26 +19,24 @@ package main
 import (
 	"context"
 	"fmt"
-	"time"
 
-	projectlabelsynchronizer "github.com/kubermatic/kubermatic/pkg/controller/master-controller-manager/project-label-synchronizer"
-	"github.com/kubermatic/kubermatic/pkg/controller/master-controller-manager/rbac"
-	seedproxy "github.com/kubermatic/kubermatic/pkg/controller/master-controller-manager/seed-proxy"
-	seedsync "github.com/kubermatic/kubermatic/pkg/controller/master-controller-manager/seed-sync"
-	serviceaccount "github.com/kubermatic/kubermatic/pkg/controller/master-controller-manager/service-account"
-	userprojectbinding "github.com/kubermatic/kubermatic/pkg/controller/master-controller-manager/user-project-binding"
-	"github.com/kubermatic/kubermatic/pkg/controller/master-controller-manager/usersshkeyssynchronizer"
-	seedcontrollerlifecycle "github.com/kubermatic/kubermatic/pkg/controller/shared/seed-controller-lifecycle"
-	kubermaticclientset "github.com/kubermatic/kubermatic/pkg/crd/client/clientset/versioned"
-	"github.com/kubermatic/kubermatic/pkg/crd/client/informers/externalversions"
-	kubermaticlog "github.com/kubermatic/kubermatic/pkg/log"
-	"github.com/kubermatic/kubermatic/pkg/provider"
 	"github.com/prometheus/client_golang/prometheus"
+	externalcluster "k8c.io/kubermatic/v2/pkg/controller/master-controller-manager/external-cluster"
+	projectlabelsynchronizer "k8c.io/kubermatic/v2/pkg/controller/master-controller-manager/project-label-synchronizer"
+	"k8c.io/kubermatic/v2/pkg/controller/master-controller-manager/rbac"
+	seedproxy "k8c.io/kubermatic/v2/pkg/controller/master-controller-manager/seed-proxy"
+	seedsync "k8c.io/kubermatic/v2/pkg/controller/master-controller-manager/seed-sync"
+	serviceaccount "k8c.io/kubermatic/v2/pkg/controller/master-controller-manager/service-account"
+	userprojectbinding "k8c.io/kubermatic/v2/pkg/controller/master-controller-manager/user-project-binding"
+	"k8c.io/kubermatic/v2/pkg/controller/master-controller-manager/usersshkeyssynchronizer"
+	seedcontrollerlifecycle "k8c.io/kubermatic/v2/pkg/controller/shared/seed-controller-lifecycle"
+	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
+	"k8c.io/kubermatic/v2/pkg/provider"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 func createAllControllers(ctrlCtx *controllerContext) error {
@@ -47,7 +45,9 @@ func createAllControllers(ctrlCtx *controllerContext) error {
 		ctrlCtx.seedsGetter,
 		ctrlCtx.seedKubeconfigGetter,
 		ctrlCtx.workerCount,
-		ctrlCtx.labelSelectorFunc)
+		ctrlCtx.labelSelectorFunc,
+		ctrlCtx.workerNamePredicate,
+	)
 	projectLabelSynchronizerFactory := projectLabelSynchronizerFactoryCreator(ctrlCtx)
 	userSSHKeysSynchronizerFactory := userSSHKeysSynchronizerFactoryCreator(ctrlCtx)
 
@@ -75,6 +75,10 @@ func createAllControllers(ctrlCtx *controllerContext) error {
 	if err := seedproxy.Add(ctrlCtx.ctx, ctrlCtx.mgr, 1, ctrlCtx.log, ctrlCtx.namespace, ctrlCtx.seedsGetter, ctrlCtx.seedKubeconfigGetter); err != nil {
 		return fmt.Errorf("failed to create seedproxy controller: %v", err)
 	}
+	if err := externalcluster.Add(ctrlCtx.ctx, ctrlCtx.mgr, ctrlCtx.log); err != nil {
+		return fmt.Errorf("failed to create external cluster controller: %v", err)
+	}
+
 	return nil
 }
 
@@ -84,53 +88,18 @@ func rbacControllerFactoryCreator(
 	seedKubeconfigGetter provider.SeedKubeconfigGetter,
 	workerCount int,
 	selectorOps func(*metav1.ListOptions),
+	workerNamePredicate predicate.Predicate,
 ) seedcontrollerlifecycle.ControllerFactory {
 	rbacMetrics := rbac.NewMetrics()
 	prometheus.MustRegister(rbacMetrics.Workers)
 
 	return func(ctx context.Context, mgr manager.Manager, seedManagerMap map[string]manager.Manager) (string, error) {
-		masterClusterProvider, err := rbacClusterProvider(mastercfg, "master", true, selectorOps)
-		if err != nil {
-			return "", fmt.Errorf("failed to create master rbac provider: %v", err)
-		}
-
-		allClusterProviders := []*rbac.ClusterProvider{masterClusterProvider}
-
-		for seedName, seedMgr := range seedManagerMap {
-			clusterProvider, err := rbacClusterProvider(seedMgr.GetConfig(), seedName, false, selectorOps)
-			if err != nil {
-				return "", fmt.Errorf("failed to create rbac provider for seed %q: %v", seedName, err)
-			}
-			allClusterProviders = append(allClusterProviders, clusterProvider)
-		}
-
-		ctrl, err := rbac.New(rbacMetrics, allClusterProviders, workerCount)
+		_, err := rbac.New(ctx, rbacMetrics, mgr, seedManagerMap, selectorOps, workerNamePredicate, workerCount)
 		if err != nil {
 			return "", fmt.Errorf("failed to create rbac controller: %v", err)
 		}
-
-		return "rbac-controller", mgr.Add(ctrl)
+		return "rbac-controller", nil
 	}
-}
-
-func rbacClusterProvider(cfg *rest.Config, name string, master bool, labelSelectorFunc func(*metav1.ListOptions)) (*rbac.ClusterProvider, error) {
-	clusterPrefix := rbac.SeedProviderPrefix
-	if master {
-		clusterPrefix = rbac.MasterProviderPrefix
-	}
-
-	kubeClient, err := kubernetes.NewForConfig(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create kubeClient: %v", err)
-	}
-	kubermaticClient, err := kubermaticclientset.NewForConfig(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create kubermaticClient: %v", err)
-	}
-	kubermaticInformerFactory := externalversions.NewFilteredSharedInformerFactory(kubermaticClient, time.Minute*5, metav1.NamespaceAll, labelSelectorFunc)
-	kubeInformerProvider := rbac.NewInformerProvider(kubeClient, time.Minute*5)
-
-	return rbac.NewClusterProvider(fmt.Sprintf("%s/%s", clusterPrefix, name), kubeClient, kubeInformerProvider, kubermaticClient, kubermaticInformerFactory), nil
 }
 
 func projectLabelSynchronizerFactoryCreator(ctrlCtx *controllerContext) seedcontrollerlifecycle.ControllerFactory {

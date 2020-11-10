@@ -5,7 +5,7 @@ import (
 	goerrors "errors"
 	"fmt"
 
-	"github.com/kubermatic/kubermatic/pkg/resources"
+	"k8c.io/kubermatic/v2/pkg/resources"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -14,10 +14,10 @@ import (
 
 	"github.com/go-kit/kit/endpoint"
 	httptransport "github.com/go-kit/kit/transport/http"
-	"github.com/kubermatic/kubermatic/pkg/handler/middleware"
-	"github.com/kubermatic/kubermatic/pkg/handler/v1/common"
-	"github.com/kubermatic/kubermatic/pkg/provider"
-	k8cerrors "github.com/kubermatic/kubermatic/pkg/util/errors"
+	"k8c.io/kubermatic/v2/pkg/handler/middleware"
+	"k8c.io/kubermatic/v2/pkg/handler/v1/common"
+	"k8c.io/kubermatic/v2/pkg/provider"
+	k8cerrors "k8c.io/kubermatic/v2/pkg/util/errors"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/gorilla/mux"
@@ -112,7 +112,7 @@ func getPrometheusProxyEndpoint(seedsGetter provider.SeedsGetter, userInfoGetter
 			return nil, fmt.Errorf("failed to create a master kubernetes client: %v", err)
 		}
 
-		seedConfigSecret, err := masterKubeClient.CoreV1().Secrets("kubermatic").Get("kubeconfig", metaV1.GetOptions{})
+		seedConfigSecret, err := masterKubeClient.CoreV1().Secrets("kubermatic").Get(ctx, "kubeconfig", metaV1.GetOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("failed to get kubeconfig secret: %v", err)
 		}
@@ -142,7 +142,7 @@ func getPrometheusProxyEndpoint(seedsGetter provider.SeedsGetter, userInfoGetter
 			prometheusQuery,
 		).(*rest.Request)
 
-		body, err := proxyRequest.DoRaw()
+		body, err := proxyRequest.DoRaw(ctx)
 
 		if err != nil {
 			return nil, err

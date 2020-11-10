@@ -25,8 +25,8 @@ import (
 	"sync"
 	"testing"
 
-	kubermaticlog "github.com/kubermatic/kubermatic/pkg/log"
-	"github.com/kubermatic/kubermatic/pkg/resources"
+	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
+	"k8c.io/kubermatic/v2/pkg/resources"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -154,6 +154,14 @@ func TestResourceReconciliationIdempotency(t *testing.T) {
 		clusterURL: &url.URL{},
 		rLock:      &sync.Mutex{},
 		log:        kubermaticlog.New(true, kubermaticlog.FormatJSON).Sugar(),
+	}
+
+	if err := mgr.GetClient().Create(ctx, &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "openshift-infra",
+		},
+	}); err != nil {
+		t.Fatalf("Failed to create openshift base namespace: %v", err)
 	}
 
 	if err := r.reconcile(ctx); err != nil {

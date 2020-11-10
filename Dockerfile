@@ -1,4 +1,4 @@
-# Copyright YEAR The Kubermatic Kubernetes Platform contributors.
+# Copyright 2020 The Kubermatic Kubernetes Platform contributors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,14 +12,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM alpine:3.10
-LABEL maintainer="support@loodse.com"
+FROM alpine:3.12
+LABEL maintainer="support@kubermatic.com"
 
-ADD https://storage.googleapis.com/kubernetes-release/release/v1.17.3/bin/linux/amd64/kubectl /usr/local/bin/kubectl
+ENV KUBERMATIC_CHARTS_DIRECTORY=/opt/charts/
+
+ADD https://storage.googleapis.com/kubernetes-release/release/v1.18.8/bin/linux/amd64/kubectl /usr/local/bin/kubectl
+RUN wget -O- https://get.helm.sh/helm-v3.3.1-linux-amd64.tar.gz | tar xzOf - linux-amd64/helm > /usr/local/bin/helm
+
 # We need the ca-certs so they api doesn't crash because it can't verify the certificate of Dex
-RUN chmod +x /usr/local/bin/kubectl && apk --no-cache add ca-certificates=~20191127
+RUN chmod +x /usr/local/bin/kubectl /usr/local/bin/helm && apk --no-cache add ca-certificates=~20191127
 
-COPY ./_build/* /usr/local/bin/
+# Do not needless copy all binaries into the image.
+COPY ./_build/image-loader \
+     ./_build/kubermatic-api \
+     ./_build/kubermatic-operator \
+     ./_build/kubermatic-operator-util \
+     ./_build/kubermatic-installer \
+     ./_build/master-controller-manager \
+     ./_build/owner-remover \
+     ./_build/seed-controller-manager \
+     ./_build/user-cluster-controller-manager \
+     ./_build/userdata-openshift \
+     /usr/local/bin/
+
 COPY ./cmd/kubermatic-api/swagger.json /opt/swagger.json
+COPY ./charts /opt/charts
 
 USER nobody

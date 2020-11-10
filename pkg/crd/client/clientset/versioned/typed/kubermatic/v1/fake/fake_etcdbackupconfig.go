@@ -3,7 +3,9 @@
 package fake
 
 import (
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
+	"context"
+
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -23,7 +25,7 @@ var etcdbackupconfigsResource = schema.GroupVersionResource{Group: "kubermatic.k
 var etcdbackupconfigsKind = schema.GroupVersionKind{Group: "kubermatic.k8s.io", Version: "v1", Kind: "EtcdBackupConfig"}
 
 // Get takes name of the etcdBackupConfig, and returns the corresponding etcdBackupConfig object, and an error if there is any.
-func (c *FakeEtcdBackupConfigs) Get(name string, options v1.GetOptions) (result *kubermaticv1.EtcdBackupConfig, err error) {
+func (c *FakeEtcdBackupConfigs) Get(ctx context.Context, name string, options v1.GetOptions) (result *kubermaticv1.EtcdBackupConfig, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(etcdbackupconfigsResource, c.ns, name), &kubermaticv1.EtcdBackupConfig{})
 
@@ -34,7 +36,7 @@ func (c *FakeEtcdBackupConfigs) Get(name string, options v1.GetOptions) (result 
 }
 
 // List takes label and field selectors, and returns the list of EtcdBackupConfigs that match those selectors.
-func (c *FakeEtcdBackupConfigs) List(opts v1.ListOptions) (result *kubermaticv1.EtcdBackupConfigList, err error) {
+func (c *FakeEtcdBackupConfigs) List(ctx context.Context, opts v1.ListOptions) (result *kubermaticv1.EtcdBackupConfigList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(etcdbackupconfigsResource, etcdbackupconfigsKind, c.ns, opts), &kubermaticv1.EtcdBackupConfigList{})
 
@@ -56,14 +58,14 @@ func (c *FakeEtcdBackupConfigs) List(opts v1.ListOptions) (result *kubermaticv1.
 }
 
 // Watch returns a watch.Interface that watches the requested etcdBackupConfigs.
-func (c *FakeEtcdBackupConfigs) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeEtcdBackupConfigs) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(etcdbackupconfigsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a etcdBackupConfig and creates it.  Returns the server's representation of the etcdBackupConfig, and an error, if there is any.
-func (c *FakeEtcdBackupConfigs) Create(etcdBackupConfig *kubermaticv1.EtcdBackupConfig) (result *kubermaticv1.EtcdBackupConfig, err error) {
+func (c *FakeEtcdBackupConfigs) Create(ctx context.Context, etcdBackupConfig *kubermaticv1.EtcdBackupConfig, opts v1.CreateOptions) (result *kubermaticv1.EtcdBackupConfig, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(etcdbackupconfigsResource, c.ns, etcdBackupConfig), &kubermaticv1.EtcdBackupConfig{})
 
@@ -74,7 +76,7 @@ func (c *FakeEtcdBackupConfigs) Create(etcdBackupConfig *kubermaticv1.EtcdBackup
 }
 
 // Update takes the representation of a etcdBackupConfig and updates it. Returns the server's representation of the etcdBackupConfig, and an error, if there is any.
-func (c *FakeEtcdBackupConfigs) Update(etcdBackupConfig *kubermaticv1.EtcdBackupConfig) (result *kubermaticv1.EtcdBackupConfig, err error) {
+func (c *FakeEtcdBackupConfigs) Update(ctx context.Context, etcdBackupConfig *kubermaticv1.EtcdBackupConfig, opts v1.UpdateOptions) (result *kubermaticv1.EtcdBackupConfig, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(etcdbackupconfigsResource, c.ns, etcdBackupConfig), &kubermaticv1.EtcdBackupConfig{})
 
@@ -86,7 +88,7 @@ func (c *FakeEtcdBackupConfigs) Update(etcdBackupConfig *kubermaticv1.EtcdBackup
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeEtcdBackupConfigs) UpdateStatus(etcdBackupConfig *kubermaticv1.EtcdBackupConfig) (*kubermaticv1.EtcdBackupConfig, error) {
+func (c *FakeEtcdBackupConfigs) UpdateStatus(ctx context.Context, etcdBackupConfig *kubermaticv1.EtcdBackupConfig, opts v1.UpdateOptions) (*kubermaticv1.EtcdBackupConfig, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(etcdbackupconfigsResource, "status", c.ns, etcdBackupConfig), &kubermaticv1.EtcdBackupConfig{})
 
@@ -97,7 +99,7 @@ func (c *FakeEtcdBackupConfigs) UpdateStatus(etcdBackupConfig *kubermaticv1.Etcd
 }
 
 // Delete takes name of the etcdBackupConfig and deletes it. Returns an error if one occurs.
-func (c *FakeEtcdBackupConfigs) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeEtcdBackupConfigs) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(etcdbackupconfigsResource, c.ns, name), &kubermaticv1.EtcdBackupConfig{})
 
@@ -105,15 +107,15 @@ func (c *FakeEtcdBackupConfigs) Delete(name string, options *v1.DeleteOptions) e
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeEtcdBackupConfigs) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(etcdbackupconfigsResource, c.ns, listOptions)
+func (c *FakeEtcdBackupConfigs) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(etcdbackupconfigsResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &kubermaticv1.EtcdBackupConfigList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched etcdBackupConfig.
-func (c *FakeEtcdBackupConfigs) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *kubermaticv1.EtcdBackupConfig, err error) {
+func (c *FakeEtcdBackupConfigs) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *kubermaticv1.EtcdBackupConfig, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(etcdbackupconfigsResource, c.ns, name, pt, data, subresources...), &kubermaticv1.EtcdBackupConfig{})
 

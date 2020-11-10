@@ -20,12 +20,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kubermatic/kubermatic/pkg/controller/operator/common"
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	operatorv1alpha1 "github.com/kubermatic/kubermatic/pkg/crd/operator/v1alpha1"
-	"github.com/kubermatic/kubermatic/pkg/features"
-	"github.com/kubermatic/kubermatic/pkg/resources"
-	"github.com/kubermatic/kubermatic/pkg/resources/reconciling"
+	"k8c.io/kubermatic/v2/pkg/controller/operator/common"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	operatorv1alpha1 "k8c.io/kubermatic/v2/pkg/crd/operator/v1alpha1"
+	"k8c.io/kubermatic/v2/pkg/features"
+	"k8c.io/kubermatic/v2/pkg/resources"
+	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -50,17 +50,12 @@ func SeedControllerManagerDeploymentCreator(workerName string, versions common.V
 
 			d.Spec.Template.Labels = d.Spec.Selector.MatchLabels
 			d.Spec.Template.Annotations = map[string]string{
-				"kubermatic/scrape":      "true",
-				"kubermatic/scrape_port": "8085",
-				"fluentbit.io/parser":    "json_iso",
+				"prometheus.io/scrape": "true",
+				"prometheus.io/port":   "8085",
+				"fluentbit.io/parser":  "json_iso",
 			}
 
 			d.Spec.Template.Spec.ServiceAccountName = serviceAccountName
-			d.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{
-				{
-					Name: common.DockercfgSecretName,
-				},
-			}
 
 			args := []string{
 				"-logtostderr",
@@ -70,7 +65,6 @@ func SeedControllerManagerDeploymentCreator(workerName string, versions common.V
 				"-worker-count=4",
 				fmt.Sprintf("-backup-container=/opt/backup/%s", storeContainerKey),
 				fmt.Sprintf("-cleanup-container=/opt/backup/%s", cleanupContainerKey),
-				fmt.Sprintf("-docker-pull-config-json-file=/opt/docker/%s", corev1.DockerConfigJsonKey),
 				fmt.Sprintf("-seed-admissionwebhook-cert-file=/opt/seed-webhook-serving-cert/%s", resources.ServingCertSecretKey),
 				fmt.Sprintf("-seed-admissionwebhook-key-file=/opt/seed-webhook-serving-cert/%s", resources.ServingCertKeySecretKey),
 				fmt.Sprintf("-namespace=%s", cfg.Namespace),
@@ -86,7 +80,7 @@ func SeedControllerManagerDeploymentCreator(workerName string, versions common.V
 				fmt.Sprintf("-apiserver-default-replicas=%d", *cfg.Spec.UserCluster.APIServerReplicas),
 				fmt.Sprintf("-controller-manager-default-replicas=%d", 1),
 				fmt.Sprintf("-scheduler-default-replicas=%d", 1),
-				fmt.Sprintf("-max-parallel-reconcile=%d", 10),
+				fmt.Sprintf("-max-parallel-reconcile=%d", cfg.Spec.SeedController.MaximumParallelReconciles),
 				fmt.Sprintf("-apiserver-reconciling-disabled-by-default=%v", cfg.Spec.UserCluster.DisableAPIServerEndpointReconciling),
 				fmt.Sprintf("-pprof-listen-address=%s", *cfg.Spec.SeedController.PProfEndpoint),
 				fmt.Sprintf("-in-cluster-prometheus-disable-default-rules=%v", cfg.Spec.UserCluster.Monitoring.DisableDefaultRules),
@@ -96,6 +90,10 @@ func SeedControllerManagerDeploymentCreator(workerName string, versions common.V
 			// Only EE does support dynamic-datacenters
 			if versions.KubermaticEdition.IsEE() {
 				args = append(args, "-dynamic-datacenters=true")
+			}
+
+			if cfg.Spec.ImagePullSecret != "" {
+				args = append(args, fmt.Sprintf("-docker-pull-config-json-file=/opt/docker/%s", corev1.DockerConfigJsonKey))
 			}
 
 			if cfg.Spec.UserCluster.Monitoring.ScrapeAnnotationPrefix != "" {
@@ -127,14 +125,6 @@ func SeedControllerManagerDeploymentCreator(workerName string, versions common.V
 					},
 				},
 				{
-					Name: "dockercfg",
-					VolumeSource: corev1.VolumeSource{
-						Secret: &corev1.SecretVolumeSource{
-							SecretName: common.DockercfgSecretName,
-						},
-					},
-				},
-				{
 					Name: "seed-webhook-serving-cert",
 					VolumeSource: corev1.VolumeSource{
 						Secret: &corev1.SecretVolumeSource{
@@ -156,15 +146,26 @@ func SeedControllerManagerDeploymentCreator(workerName string, versions common.V
 					ReadOnly:  true,
 				},
 				{
-					Name:      "dockercfg",
-					MountPath: "/opt/docker/",
-					ReadOnly:  true,
-				},
-				{
 					Name:      "seed-webhook-serving-cert",
 					MountPath: "/opt/seed-webhook-serving-cert/",
 					ReadOnly:  true,
 				},
+			}
+
+			if cfg.Spec.ImagePullSecret != "" {
+				volumes = append(volumes, corev1.Volume{
+					Name: "dockercfg",
+					VolumeSource: corev1.VolumeSource{
+						Secret: &corev1.SecretVolumeSource{
+							SecretName: common.DockercfgSecretName,
+						},
+					},
+				})
+				volumeMounts = append(volumeMounts, corev1.VolumeMount{
+					Name:      "dockercfg",
+					MountPath: "/opt/docker/",
+					ReadOnly:  true,
+				})
 			}
 
 			args = append(

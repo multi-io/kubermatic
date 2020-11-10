@@ -20,9 +20,9 @@ import (
 	"context"
 	"fmt"
 
-	kubermaticclientset "github.com/kubermatic/kubermatic/pkg/crd/client/clientset/versioned"
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/provider"
+	kubermaticclientset "k8c.io/kubermatic/v2/pkg/crd/client/clientset/versioned"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/provider"
 
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,7 +38,7 @@ type SettingsProvider struct {
 }
 
 // NewUserProvider returns a user provider
-func NewSettingsProvider(client kubermaticclientset.Interface, runtimeClient ctrlruntimeclient.Client) *SettingsProvider {
+func NewSettingsProvider(ctx context.Context, client kubermaticclientset.Interface, runtimeClient ctrlruntimeclient.Client) *SettingsProvider {
 	return &SettingsProvider{
 		client:        client,
 		runtimeClient: runtimeClient,
@@ -58,7 +58,7 @@ func (s *SettingsProvider) GetGlobalSettings() (*kubermaticv1.KubermaticSetting,
 }
 
 func (s *SettingsProvider) WatchGlobalSettings() (watch.Interface, error) {
-	return s.client.KubermaticV1().KubermaticSettings().Watch(v1.ListOptions{})
+	return s.client.KubermaticV1().KubermaticSettings().Watch(context.Background(), v1.ListOptions{})
 }
 
 func (s *SettingsProvider) UpdateGlobalSettings(userInfo *provider.UserInfo, settings *kubermaticv1.KubermaticSetting) (*kubermaticv1.KubermaticSetting, error) {
@@ -82,13 +82,16 @@ func (s *SettingsProvider) createDefaultGlobalSettings() (*kubermaticv1.Kubermat
 				Enabled:  false,
 				Enforced: false,
 			},
-			DefaultNodeCount:      10,
-			ClusterTypeOptions:    kubermaticv1.ClusterTypeKubernetes,
-			DisplayDemoInfo:       false,
-			DisplayAPIDocs:        false,
-			DisplayTermsOfService: false,
-			EnableDashboard:       true,
-			EnableOIDCKubeconfig:  false,
+			DefaultNodeCount:            10,
+			ClusterTypeOptions:          kubermaticv1.ClusterTypeKubernetes,
+			DisplayDemoInfo:             false,
+			DisplayAPIDocs:              false,
+			DisplayTermsOfService:       false,
+			EnableDashboard:             true,
+			EnableOIDCKubeconfig:        false,
+			UserProjectsLimit:           0,
+			RestrictProjectCreation:     false,
+			EnableExternalClusterImport: true,
 		},
 	}
 	if err := s.runtimeClient.Create(context.Background(), defaultSettings); err != nil {

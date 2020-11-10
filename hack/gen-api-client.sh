@@ -16,33 +16,33 @@
 
 set -euo pipefail
 
-function cleanup() {
-  rm -f $TMP_SWAGGER
+cd $(dirname $0)/..
+source hack/lib.sh
 
-  cd ${API_DIR}/cmd/kubermatic-api/
-  # disable swagger:meta comment
-  perl -0777 -i -p -e 's/(package handler)/\n\1/' ../pkg/handler/routes_v1.go
-}
-trap cleanup EXIT SIGINT SIGTERM
-
-API_DIR="$(go env GOPATH)/src/github.com/kubermatic/kubermatic/api"
+cd cmd/kubermatic-api/
 SWAGGER_FILE="swagger.json"
 TMP_SWAGGER="${SWAGGER_FILE}.tmp"
 
-# install swagger to temp dir
-TMP_DIR=$(mktemp -d)
-mkdir -p "${TMP_DIR}/bin"
+function cleanup() {
+  rm $TMP_SWAGGER
 
-cd ${API_DIR}/vendor/github.com/go-swagger/go-swagger/cmd/swagger
-env "GOBIN=${TMP_DIR}/bin" go install
-export PATH="${TMP_DIR}/bin:${PATH}"
-cd ${API_DIR}/cmd/kubermatic-api/
+  # disable swagger:meta comment
+  perl -0777 -i -p -e 's/(package handler)/\n\1/' ../../pkg/handler/routes_v1.go
+}
+trap cleanup EXIT SIGINT SIGTERM
 
 # enable the package-level swagger:meta comment
-perl -0777 -i -p -e 's/\n(package handler)/\1/' ../pkg/handler/routes_v1.go
+perl -0777 -i -p -e 's/\n(package handler)/\1/' ../../pkg/handler/routes_v1.go
 
-swagger generate spec --scan-models -o ${TMP_SWAGGER}
+go run github.com/go-swagger/go-swagger/cmd/swagger generate spec \
+  --scan-models \
+  -o ${TMP_SWAGGER}
 
-rm -r ../pkg/test/e2e/api/utils/apiclient/
-mkdir -p ../pkg/test/e2e/api/utils/apiclient/
-swagger generate client -q --skip-validation -f ${TMP_SWAGGER} -t ../pkg/test/e2e/api/utils/apiclient/
+rm -r ../../pkg/test/e2e/api/utils/apiclient/
+mkdir -p ../../pkg/test/e2e/api/utils/apiclient/
+
+go run github.com/go-swagger/go-swagger/cmd/swagger generate client \
+  -q \
+  --skip-validation \
+  -f ${TMP_SWAGGER} \
+  -t ../../pkg/test/e2e/api/utils/apiclient/

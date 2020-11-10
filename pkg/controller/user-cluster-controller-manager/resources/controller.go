@@ -27,8 +27,8 @@ import (
 	"github.com/heptiolabs/healthcheck"
 	"go.uber.org/zap"
 
-	"github.com/kubermatic/kubermatic/pkg/resources"
-	"github.com/kubermatic/kubermatic/pkg/resources/certificates/triple"
+	"k8c.io/kubermatic/v2/pkg/resources"
+	"k8c.io/kubermatic/v2/pkg/resources/certificates/triple"
 
 	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	corev1 "k8s.io/api/core/v1"
@@ -70,6 +70,7 @@ func Add(
 	registerReconciledCheck func(name string, check healthcheck.Check),
 	cloudCredentialSecretTemplate *corev1.Secret,
 	openshiftConsoleCallbackURI string,
+	dnsClusterIP string,
 	log *zap.SugaredLogger) error {
 	r := &reconciler{
 		openshift:                     openshift,
@@ -82,6 +83,7 @@ func Add(
 		log:                           log,
 		platform:                      cloudProviderName,
 		openshiftConsoleCallbackURI:   openshiftConsoleCallbackURI,
+		dnsClusterIP:                  dnsClusterIP,
 	}
 
 	if r.openshift {
@@ -220,6 +222,7 @@ type reconciler struct {
 	platform                      string
 	cloudCredentialSecretTemplate *corev1.Secret
 	openshiftConsoleCallbackURI   string
+	dnsClusterIP                  string
 
 	rLock                      *sync.Mutex
 	reconciledSuccessfullyOnce bool

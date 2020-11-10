@@ -9,19 +9,19 @@ import (
 
 	"github.com/Masterminds/semver"
 	jsonpatch "github.com/evanphx/json-patch"
-	"github.com/kubermatic/kubermatic/pkg/validation/nodeupdate"
+	"k8c.io/kubermatic/v2/pkg/validation/nodeupdate"
 
 	"github.com/go-kit/kit/endpoint"
 	"github.com/gorilla/mux"
 
-	apiv1 "github.com/kubermatic/kubermatic/pkg/api/v1"
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/handler/middleware"
-	"github.com/kubermatic/kubermatic/pkg/handler/v1/common"
-	"github.com/kubermatic/kubermatic/pkg/provider"
-	kubernetesprovider "github.com/kubermatic/kubermatic/pkg/provider/kubernetes"
-	machineresource "github.com/kubermatic/kubermatic/pkg/resources/machine"
-	k8cerrors "github.com/kubermatic/kubermatic/pkg/util/errors"
+	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/handler/middleware"
+	"k8c.io/kubermatic/v2/pkg/handler/v1/common"
+	"k8c.io/kubermatic/v2/pkg/provider"
+	kubernetesprovider "k8c.io/kubermatic/v2/pkg/provider/kubernetes"
+	machineresource "k8c.io/kubermatic/v2/pkg/resources/machine"
+	k8cerrors "k8c.io/kubermatic/v2/pkg/util/errors"
 )
 
 // ndrReq defines HTTP request for getNodeDeploymentRequest and deleteNodeDeploymentRequest

@@ -22,9 +22,9 @@ import (
 	"net"
 	"testing"
 
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	kubermaticlog "github.com/kubermatic/kubermatic/pkg/log"
-	"github.com/kubermatic/kubermatic/pkg/resources"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
+	"k8c.io/kubermatic/v2/pkg/resources"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -195,7 +195,7 @@ func TestSyncClusterAddress(t *testing.T) {
 			}
 
 			apiserverService := &tc.apiserverService
-			apiserverService.Name = resources.ApiserverExternalServiceName
+			apiserverService.Name = resources.ApiserverServiceName
 			apiserverService.Namespace = fakeClusterNamespaceName
 			lbService := &tc.frontproxyService
 			lbService.Name = resources.FrontLoadBalancerServiceName
@@ -233,7 +233,7 @@ func TestSyncClusterAddress(t *testing.T) {
 				t.Errorf("expected external name to be %q but was %q", tc.expectedExternalName, cluster.Address.ExternalName)
 			}
 
-			if expectedInternalName := fmt.Sprintf("%s.%s.svc.cluster.local.", resources.ApiserverExternalServiceName, fakeClusterNamespaceName); cluster.Address.InternalName != expectedInternalName {
+			if expectedInternalName := fmt.Sprintf("%s.%s.svc.cluster.local.", resources.ApiserverServiceName, fakeClusterNamespaceName); cluster.Address.InternalName != expectedInternalName {
 				t.Errorf("Expected internal name to be %q but was %q", expectedInternalName, cluster.Address.InternalName)
 			}
 

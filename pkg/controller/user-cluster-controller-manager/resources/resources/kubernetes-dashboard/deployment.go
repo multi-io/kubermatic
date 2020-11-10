@@ -19,8 +19,9 @@ package kubernetesdashboard
 import (
 	"fmt"
 
-	"github.com/kubermatic/kubermatic/pkg/resources"
-	"github.com/kubermatic/kubermatic/pkg/resources/reconciling"
+	"k8c.io/kubermatic/v2/pkg/resources"
+	kubernetesdashboard "k8c.io/kubermatic/v2/pkg/resources/kubernetes-dashboard"
+	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -56,7 +57,7 @@ func DeploymentCreator() reconciling.NamedDeploymentCreatorGetter {
 		return scraperName, func(dep *appsv1.Deployment) (*appsv1.Deployment, error) {
 			dep.Name = scraperName
 			dep.Labels = resources.BaseAppLabels(scraperName, nil)
-
+			dep.Namespace = kubernetesdashboard.Namespace
 			dep.Spec.Replicas = resources.Int32(2)
 			dep.Spec.Selector = &metav1.LabelSelector{
 				MatchLabels: resources.BaseAppLabels(scraperName, nil),

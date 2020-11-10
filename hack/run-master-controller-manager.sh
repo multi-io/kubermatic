@@ -16,18 +16,37 @@
 
 set -euo pipefail
 
-make -C $(dirname $0)/.. master-controller-manager
+cd $(dirname $0)/..
+source hack/lib.sh
 
-KUBERMATIC_WORKERNAME=${KUBERMATIC_WORKERNAME:-$(uname -n)}
+KUBERMATIC_EDITION="${KUBERMATIC_EDITION:-ce}"
 KUBERMATIC_DEBUG=${KUBERMATIC_DEBUG:-true}
 PPROF_PORT=${PPROF_PORT:-6600}
 
-cd $(go env GOPATH)/src/github.com/kubermatic/kubermatic/api
-./_build/master-controller-manager \
-  -dynamic-datacenters=true \
-  -kubeconfig=../secrets/seed-clusters/dev.kubermatic.io/kubeconfig \
+echodate "Compiling master-controller-manager..."
+make master-controller-manager
+
+CTRL_EXTRA_ARGS=""
+if [ "$KUBERMATIC_EDITION" == "ee" ]; then
+  CTRL_EXTRA_ARGS="-dynamic-datacenters"
+fi
+
+if [ -z "${VAULT_ADDR:-}" ]; then
+  export VAULT_ADDR=https://vault.loodse.com/
+fi
+
+if [ -z "${KUBECONFIG:-}" ]; then
+  KUBECONFIG=dev.kubeconfig
+  vault kv get -field=kubeconfig dev/seed-clusters/dev.kubermatic.io > $KUBECONFIG
+fi
+
+echodate "Starting master-controller-manager..."
+set -x
+./_build/master-controller-manager $CTRL_EXTRA_ARGS \
+  -kubeconfig=$KUBECONFIG \
+  -enable-leader-election=false \
   -internal-address=127.0.0.1:8086 \
-  -worker-name="$(tr -cd '[:alnum:]' <<< $KUBERMATIC_WORKERNAME | tr '[:upper:]' '[:lower:]')" \
+  -worker-name="$(worker_name)" \
   -log-debug=$KUBERMATIC_DEBUG \
   -pprof-listen-address=":${PPROF_PORT}" \
   -log-format=Console \

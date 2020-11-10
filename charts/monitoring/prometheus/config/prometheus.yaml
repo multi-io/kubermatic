@@ -1,0 +1,65 @@
+# Copyright 2020 The Kubermatic Kubernetes Platform contributors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+global:
+  scrape_interval: 30s
+  scrape_timeout: 10s
+  evaluation_interval: 30s
+  {{- if or .Values.prometheus.externalLabels .Values.prometheus.thanos.enabled }}
+  external_labels:
+    {{- range $k, $v := .Values.prometheus.externalLabels }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
+    {{- if .Values.prometheus.thanos.enabled }}
+    # Each Prometheus has to have unique labels.
+    replica: $(POD_NAME)
+    {{- end }}
+  {{- end }}
+
+{{- if (or .Values.prometheus.ruleFiles .Values.prometheus.rules) }}
+rule_files:
+{{- if .Values.prometheus.ruleFiles }}
+{{- toYaml .Values.prometheus.ruleFiles | nindent 2 }}
+{{- end }}
+{{- if .Values.prometheus.rules }}
+- /etc/prometheus/rules/_customrules.yaml
+{{- end }}
+{{- end }}
+
+{{- if or .Values.prometheus.alertmanagers.files .Values.prometheus.alertmanagers.configs }}
+alerting:
+  alertmanagers:
+  {{- range .Values.prometheus.alertmanagers.files }}
+  {{- range $filename, $content := $.Files.Glob . }}
+  - {{ (tpl ($.Files.Get $filename) $) | fromYaml | toJson }}
+  {{- end }}
+  {{- end }}
+
+  {{- range .Values.prometheus.alertmanagers.configs }}
+  - {{ . | toJson }}
+  {{- end }}
+{{- end }}
+
+{{- if or .Values.prometheus.scraping.files .Values.prometheus.scraping.configs }}
+scrape_configs:
+{{- range .Values.prometheus.scraping.files }}
+{{- range $filename, $content := $.Files.Glob . }}
+- {{ (tpl ($.Files.Get $filename) $) | fromYaml | toJson }}
+{{- end }}
+{{- end }}
+
+{{- range .Values.prometheus.scraping.configs }}
+- {{ . | toJson }}
+{{- end }}
+{{- end }}

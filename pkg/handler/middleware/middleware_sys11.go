@@ -5,16 +5,15 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/kubermatic/kubermatic/pkg/keycloak"
-	contextutil "github.com/kubermatic/kubermatic/pkg/util/context"
-
-	"github.com/kubermatic/kubermatic/pkg/handler/v1/common"
+	kubermaticapiv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/handler/v1/common"
+	"k8c.io/kubermatic/v2/pkg/keycloak"
+	"k8c.io/kubermatic/v2/pkg/provider"
+	contextutil "k8c.io/kubermatic/v2/pkg/util/context"
+	kubermaticcontext "k8c.io/kubermatic/v2/pkg/util/context"
+	k8cerrors "k8c.io/kubermatic/v2/pkg/util/errors"
 
 	"github.com/go-kit/kit/endpoint"
-	kubermaticapiv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/provider"
-	kubermaticcontext "github.com/kubermatic/kubermatic/pkg/util/context"
-	k8cerrors "github.com/kubermatic/kubermatic/pkg/util/errors"
 )
 
 const (
@@ -74,10 +73,10 @@ func MachineDeploymentRequests(mdrProviderGetter provider.MachineDeploymentReque
 			if err != nil {
 				return nil, err
 			}
-			seedName := request.(dCGetter).GetDC()
-			seed, found := seeds[seedName]
+			seedCluster := request.(seedClusterGetter).GetSeedCluster()
+			seed, found := seeds[seedCluster.SeedName]
 			if !found {
-				return nil, fmt.Errorf("couldn't find seed %q", seedName)
+				return nil, fmt.Errorf("couldn't find seed %q", seedCluster.SeedName)
 			}
 
 			mdrProvider, err := mdrProviderGetter(seed)

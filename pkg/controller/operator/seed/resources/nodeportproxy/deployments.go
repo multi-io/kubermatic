@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/kubermatic/kubermatic/pkg/controller/operator/common"
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/resources/reconciling"
+	"k8c.io/kubermatic/v2/pkg/controller/operator/common"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -60,19 +60,14 @@ func EnvoyDeploymentCreator(seed *kubermaticv1.Seed, versions common.Versions) r
 
 			d.Spec.Template.Labels = d.Spec.Selector.MatchLabels
 			d.Spec.Template.Annotations = map[string]string{
-				"kubermatic/scrape":      "true",
-				"kubermatic/scrape_port": strconv.Itoa(EnvoyPort),
-				"kubermatic/metric_path": "/stats/prometheus",
-				"fluentbit.io/parser":    "json_iso",
+				"prometheus.io/scrape":       "true",
+				"prometheus.io/port":         strconv.Itoa(EnvoyPort),
+				"prometheus.io/metrics_path": "/stats/prometheus",
+				"fluentbit.io/parser":        "json_iso",
 			}
 
 			d.Spec.Template.Spec.RestartPolicy = corev1.RestartPolicyAlways
 			d.Spec.Template.Spec.ServiceAccountName = ServiceAccountName
-			d.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{
-				{
-					Name: common.DockercfgSecretName,
-				},
-			}
 
 			d.Spec.Template.Spec.InitContainers = []corev1.Container{
 				{
@@ -212,11 +207,6 @@ func UpdaterDeploymentCreator(seed *kubermaticv1.Seed, versions common.Versions)
 			}
 
 			d.Spec.Template.Spec.ServiceAccountName = ServiceAccountName
-			d.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{
-				{
-					Name: common.DockercfgSecretName,
-				},
-			}
 
 			d.Spec.Template.Spec.Containers = []corev1.Container{
 				{

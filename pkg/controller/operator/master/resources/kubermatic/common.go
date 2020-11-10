@@ -20,8 +20,8 @@ import (
 	"errors"
 	"fmt"
 
-	operatorv1alpha1 "github.com/kubermatic/kubermatic/pkg/crd/operator/v1alpha1"
-	"github.com/kubermatic/kubermatic/pkg/resources/reconciling"
+	operatorv1alpha1 "k8c.io/kubermatic/v2/pkg/crd/operator/v1alpha1"
+	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 
 	certmanagerv1alpha2 "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1alpha2"
 	corev1 "k8s.io/api/core/v1"
@@ -35,9 +35,9 @@ const (
 	uiConfigConfigMapName = "ui-config"
 	ingressName           = "kubermatic"
 	apiDeploymentName     = "kubermatic-api"
-	uiDeploymentName      = "kubermatic-ui"
+	uiDeploymentName      = "kubermatic-dashboard"
 	apiServiceName        = "kubermatic-api"
-	uiServiceName         = "kubermatic-ui"
+	uiServiceName         = "kubermatic-dashboard"
 	certificateName       = "kubermatic"
 	certificateSecretName = "kubermatic-tls"
 )
@@ -100,16 +100,37 @@ func IngressCreator(cfg *operatorv1alpha1.KubermaticConfiguration) reconciling.N
 			}
 			i.Annotations["kubernetes.io/ingress.class"] = cfg.Spec.Ingress.ClassName
 
-			i.Spec.TLS = []extensionsv1beta1.IngressTLS{
-				{
-					Hosts:      []string{cfg.Spec.Ingress.Domain},
-					SecretName: certificateSecretName,
-				},
+			// If a Certificate is being issued, reference it,
+			// otherwise leave any possible customization intact.
+			if cfg.Spec.Ingress.CertificateIssuer.Name != "" {
+				i.Spec.TLS = []extensionsv1beta1.IngressTLS{
+					{
+						Hosts:      []string{cfg.Spec.Ingress.Domain},
+						SecretName: certificateSecretName,
+					},
+				}
 			}
 
 			i.Spec.Backend = &extensionsv1beta1.IngressBackend{
 				ServiceName: uiServiceName,
 				ServicePort: intstr.FromInt(80),
+			}
+
+			// PathType has been added in Kubernetes 1.18 and defaults to
+			// "ImplementationSpecific". To prevent reconcile loops in previous
+			// Kubernetes versions, this code is carefully written to not
+			// overwrite a PathType that has been defaulted by the apiserver.
+			var pathType *extensionsv1beta1.PathType
+
+			// As we control the entire rule set anyway, it's enough to find
+			// the first pathType -- they will all be identical eventually.
+			if rules := i.Spec.Rules; len(rules) > 0 {
+				if http := rules[0].IngressRuleValue.HTTP; http != nil {
+					for _, path := range http.Paths {
+						pathType = path.PathType
+						break
+					}
+				}
 			}
 
 			i.Spec.Rules = []extensionsv1beta1.IngressRule{
@@ -119,15 +140,17 @@ func IngressCreator(cfg *operatorv1alpha1.KubermaticConfiguration) reconciling.N
 						HTTP: &extensionsv1beta1.HTTPIngressRuleValue{
 							Paths: []extensionsv1beta1.HTTPIngressPath{
 								{
-									Path: "/api",
+									Path:     "/api",
+									PathType: pathType,
 									Backend: extensionsv1beta1.IngressBackend{
 										ServiceName: apiServiceName,
 										ServicePort: intstr.FromInt(80),
 									},
 								},
 								{
-									Path:    "/",
-									Backend: *i.Spec.Backend,
+									Path:     "/",
+									PathType: pathType,
+									Backend:  *i.Spec.Backend,
 								},
 							},
 						},
@@ -145,7 +168,7 @@ func CertificateCreator(cfg *operatorv1alpha1.KubermaticConfiguration) reconcili
 		return certificateName, func(c *certmanagerv1alpha2.Certificate) (*certmanagerv1alpha2.Certificate, error) {
 			name := cfg.Spec.Ingress.CertificateIssuer.Name
 			if name == "" {
-				return nil, errors.New("no certificateIssuer configured in KubermaticConfiguration")
+				return nil, errors.New("no certificateIssuer configured in KubermaticConfiguration, this creator should not have been called")
 			}
 
 			c.Spec.IssuerRef.Name = name

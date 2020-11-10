@@ -19,22 +19,23 @@ package hack
 import (
 	"net/http"
 
-	"github.com/kubermatic/kubermatic/pkg/keycloak"
+	v2 "k8c.io/kubermatic/v2/pkg/handler/v2"
 
 	"github.com/gorilla/mux"
 	prometheusapi "github.com/prometheus/client_golang/api"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/kubermatic/kubermatic/pkg/handler"
-	"github.com/kubermatic/kubermatic/pkg/handler/auth"
-	"github.com/kubermatic/kubermatic/pkg/handler/test"
-	"github.com/kubermatic/kubermatic/pkg/handler/v1/common"
-	kubermaticlog "github.com/kubermatic/kubermatic/pkg/log"
-	"github.com/kubermatic/kubermatic/pkg/provider"
-	"github.com/kubermatic/kubermatic/pkg/provider/kubernetes"
-	"github.com/kubermatic/kubermatic/pkg/serviceaccount"
-	"github.com/kubermatic/kubermatic/pkg/version"
-	"github.com/kubermatic/kubermatic/pkg/watcher"
+	"k8c.io/kubermatic/v2/pkg/handler"
+	"k8c.io/kubermatic/v2/pkg/handler/auth"
+	"k8c.io/kubermatic/v2/pkg/handler/test"
+	"k8c.io/kubermatic/v2/pkg/handler/v1/common"
+	"k8c.io/kubermatic/v2/pkg/keycloak"
+	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
+	"k8c.io/kubermatic/v2/pkg/provider"
+	"k8c.io/kubermatic/v2/pkg/provider/kubernetes"
+	"k8c.io/kubermatic/v2/pkg/serviceaccount"
+	"k8c.io/kubermatic/v2/pkg/version"
+	"k8c.io/kubermatic/v2/pkg/watcher"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -75,50 +76,61 @@ func NewTestRouting(
 	keycloakFacade keycloak.Facade,
 	presetsProvider provider.PresetProvider,
 	admissionPluginProvider provider.AdmissionPluginsProvider,
-	settingsWatcher watcher.SettingsWatcher) http.Handler {
+	settingsWatcher watcher.SettingsWatcher,
+	userWatcher watcher.UserWatcher,
+	externalClusterProvider provider.ExternalClusterProvider,
+	privilegedExternalClusterProvider provider.PrivilegedExternalClusterProvider) http.Handler {
 
 	updateManager := version.New(versions, updates)
-	r := handler.NewRouting(
-		kubermaticlog.Logger,
-		presetsProvider,
-		seedsGetter,
-		seedClientGetter,
-		clusterProvidersGetter,
-		addonProviderGetter,
-		addonConfigProvider,
-		sshKeyProvider,
-		privilegedSSHKeyProvider,
-		userProvider,
-		serviceAccountProvider,
-		privilegedServiceAccountProvider,
-		serviceAccountTokenProvider,
-		privilegedServiceAccountTokenProvider,
-		projectProvider,
-		mdRequestProviderGetter,
-		privilegedProjectProvider,
-		issuerVerifier,
-		tokenVerifiers,
-		tokenExtractors,
-		updateManager,
-		prometheusClient,
-		projectMemberProvider,
-		privilegedProjectMemberProvider,
-		projectMemberProvider, /*satisfies also a different interface*/
-		saTokenAuthenticator,
-		saTokenGenerator,
-		eventRecorderProvider,
-		keycloakFacade,
-		corev1.ServiceTypeNodePort,
-		sets.String{},
-		userInfoGetter,
-		settingsProvider,
-		adminProvider,
-		admissionPluginProvider,
-		settingsWatcher,
-	)
+
+	routingParams := handler.RoutingParams{
+		Log:                                   kubermaticlog.Logger,
+		PresetsProvider:                       presetsProvider,
+		SeedsGetter:                           seedsGetter,
+		SeedsClientGetter:                     seedClientGetter,
+		SSHKeyProvider:                        sshKeyProvider,
+		PrivilegedSSHKeyProvider:              privilegedSSHKeyProvider,
+		UserProvider:                          userProvider,
+		ServiceAccountProvider:                serviceAccountProvider,
+		PrivilegedServiceAccountProvider:      privilegedServiceAccountProvider,
+		ServiceAccountTokenProvider:           serviceAccountTokenProvider,
+		PrivilegedServiceAccountTokenProvider: privilegedServiceAccountTokenProvider,
+		ProjectProvider:                       projectProvider,
+		MdRequestProviderGetter:               mdRequestProviderGetter,
+		PrivilegedProjectProvider:             privilegedProjectProvider,
+		OIDCIssuerVerifier:                    issuerVerifier,
+		TokenVerifiers:                        tokenVerifiers,
+		TokenExtractors:                       tokenExtractors,
+		ClusterProviderGetter:                 clusterProvidersGetter,
+		AddonProviderGetter:                   addonProviderGetter,
+		AddonConfigProvider:                   addonConfigProvider,
+		UpdateManager:                         updateManager,
+		PrometheusClient:                      prometheusClient,
+		ProjectMemberProvider:                 projectMemberProvider,
+		PrivilegedProjectMemberProvider:       privilegedProjectMemberProvider,
+		UserProjectMapper:                     projectMemberProvider, /*satisfies also a different interface*/
+		SATokenAuthenticator:                  saTokenAuthenticator,
+		SATokenGenerator:                      saTokenGenerator,
+		EventRecorderProvider:                 eventRecorderProvider,
+		KeycloakFacade:                        keycloakFacade,
+		ExposeStrategy:                        corev1.ServiceTypeNodePort,
+		AccessibleAddons:                      sets.String{},
+		UserInfoGetter:                        userInfoGetter,
+		SettingsProvider:                      settingsProvider,
+		AdminProvider:                         adminProvider,
+		AdmissionPluginProvider:               admissionPluginProvider,
+		SettingsWatcher:                       settingsWatcher,
+		UserWatcher:                           userWatcher,
+		ExternalClusterProvider:               externalClusterProvider,
+		PrivilegedExternalClusterProvider:     privilegedExternalClusterProvider,
+	}
+
+	r := handler.NewRouting(routingParams)
+	rv2 := v2.NewV2Routing(routingParams)
 
 	mainRouter := mux.NewRouter()
 	v1Router := mainRouter.PathPrefix("/api/v1").Subrouter()
+	v2Router := mainRouter.PathPrefix("/api/v2").Subrouter()
 	r.RegisterV1(v1Router, generateDefaultMetrics())
 	r.RegisterV1Legacy(v1Router)
 	r.RegisterV1Optional(v1Router,
@@ -128,6 +140,8 @@ func NewTestRouting(
 	)
 	r.RegisterV1Admin(v1Router)
 	r.RegisterV1SysEleven(v1Router)
+	r.RegisterV1Websocket(v1Router)
+	rv2.RegisterV2(v2Router, generateDefaultMetrics())
 	return mainRouter
 }
 

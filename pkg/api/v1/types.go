@@ -21,23 +21,14 @@ import (
 
 	"github.com/Masterminds/semver"
 
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	ksemver "github.com/kubermatic/kubermatic/pkg/semver"
 	"github.com/kubermatic/machine-controller/pkg/apis/cluster/v1alpha1"
+	"k8c.io/kubermatic/v2/pkg/controller/master-controller-manager/rbac"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	ksemver "k8c.io/kubermatic/v2/pkg/semver"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 )
-
-// LegacyObjectMeta is an object storing common metadata for persistable objects.
-type LegacyObjectMeta struct { // Deprecated: LegacyObjectMeta is deprecated use ObjectMeta instead.
-	Name            string `json:"name"`
-	ResourceVersion string `json:"resourceVersion,omitempty"`
-	UID             string `json:"uid,omitempty"`
-
-	Annotations map[string]string `json:"annotations,omitempty"`
-	Labels      map[string]string `json:"labels,omitempty"`
-}
 
 // ObjectMeta defines the set of fields that objects returned from the API have
 // swagger:model ObjectMeta
@@ -57,89 +48,39 @@ type ObjectMeta struct {
 	CreationTimestamp Time `json:"creationTimestamp,omitempty"`
 }
 
-// DigitialoceanDatacenterSpec specifies a datacenter of DigitalOcean.
-type DigitialoceanDatacenterSpec struct {
-	Region string `json:"region"`
-}
-
-// HetznerDatacenterSpec specifies a datacenter of Hetzner.
-type HetznerDatacenterSpec struct {
-	Datacenter string `json:"datacenter"`
-	Location   string `json:"location"`
-}
-
-// ImageList defines a map of operating system and the image to use
-type ImageList map[string]string
-
-// VSphereDatacenterSpec specifies a datacenter of VSphere.
-type VSphereDatacenterSpec struct {
-	Endpoint   string    `json:"endpoint"`
-	Datacenter string    `json:"datacenter"`
-	Datastore  string    `json:"datastore"`
-	Cluster    string    `json:"cluster"`
-	Templates  ImageList `json:"templates"`
-}
-
-// KubevirtDatacenterSpec specifies a datacenter of Kubevirt.
-type KubevirtDatacenterSpec struct {
-}
-
-// AlibabaDatacenterSpec specifies a datacenter of Alibaba.
-type AlibabaDatacenterSpec struct {
-	Region string `json:"region"`
-}
-
-// BringYourOwnDatacenterSpec specifies a data center with bring-your-own nodes.
-type BringYourOwnDatacenterSpec struct{}
-
-// AWSDatacenterSpec specifies a data center of Amazon Web Services.
-type AWSDatacenterSpec struct {
-	Region string `json:"region"`
-}
-
-// AzureDatacenterSpec specifies a datacenter of Azure.
-type AzureDatacenterSpec struct {
-	Location string `json:"location"`
-}
-
-// OpenstackDatacenterSpec specifies a generic bare metal datacenter.
-type OpenstackDatacenterSpec struct {
-	AvailabilityZone  string    `json:"availability_zone"`
-	Region            string    `json:"region"`
-	AuthURL           string    `json:"auth_url"`
-	Images            ImageList `json:"images"`
-	EnforceFloatingIP bool      `json:"enforce_floating_ip"`
-}
-
-// PacketDatacenterSpec specifies a datacenter of Packet.
-type PacketDatacenterSpec struct {
-	Facilities []string `json:"facilities"`
-}
-
-// GCPDatacenterSpec specifies a datacenter of GCP.
-type GCPDatacenterSpec struct {
-	Region       string   `json:"region"`
-	ZoneSuffixes []string `json:"zone_suffixes"`
-	Regional     bool     `json:"regional"`
-}
-
 // DatacenterSpec specifies the data for a datacenter.
 type DatacenterSpec struct {
-	Seed         string                       `json:"seed"`
-	Country      string                       `json:"country,omitempty"`
-	Location     string                       `json:"location,omitempty"`
-	Provider     string                       `json:"provider,omitempty"`
-	Digitalocean *DigitialoceanDatacenterSpec `json:"digitalocean,omitempty"`
-	BringYourOwn *BringYourOwnDatacenterSpec  `json:"bringyourown,omitempty"`
-	AWS          *AWSDatacenterSpec           `json:"aws,omitempty"`
-	Azure        *AzureDatacenterSpec         `json:"azure,omitempty"`
-	Openstack    *OpenstackDatacenterSpec     `json:"openstack,omitempty"`
-	Packet       *PacketDatacenterSpec        `json:"packet,omitempty"`
-	GCP          *GCPDatacenterSpec           `json:"gcp,omitempty"`
-	Hetzner      *HetznerDatacenterSpec       `json:"hetzner,omitempty"`
-	VSphere      *VSphereDatacenterSpec       `json:"vsphere,omitempty"`
-	Kubevirt     *KubevirtDatacenterSpec      `json:"kubevirt,omitempty"`
-	Alibaba      *AlibabaDatacenterSpec       `json:"alibaba,omitempty"`
+	// Name of the seed this datacenter belongs to.
+	Seed string `json:"seed,omitempty"`
+	// Optional: Country of the seed as ISO-3166 two-letter code, e.g. DE or UK.
+	// It is used for informational purposes.
+	Country string `json:"country,omitempty"`
+	// Optional: Detailed location of the cluster, like "Hamburg" or "Datacenter 7".
+	// It is used for informational purposes.
+	Location string `json:"location,omitempty"`
+	// Name of the datacenter provider. Extracted based on which provider is defined in the spec.
+	// It is used for informational purposes.
+	Provider     string                                   `json:"provider,omitempty"`
+	Digitalocean *kubermaticv1.DatacenterSpecDigitalocean `json:"digitalocean,omitempty"`
+	BringYourOwn *kubermaticv1.DatacenterSpecBringYourOwn `json:"bringyourown,omitempty"`
+	AWS          *kubermaticv1.DatacenterSpecAWS          `json:"aws,omitempty"`
+	Azure        *kubermaticv1.DatacenterSpecAzure        `json:"azure,omitempty"`
+	Openstack    *kubermaticv1.DatacenterSpecOpenstack    `json:"openstack,omitempty"`
+	Packet       *kubermaticv1.DatacenterSpecPacket       `json:"packet,omitempty"`
+	GCP          *kubermaticv1.DatacenterSpecGCP          `json:"gcp,omitempty"`
+	Hetzner      *kubermaticv1.DatacenterSpecHetzner      `json:"hetzner,omitempty"`
+	VSphere      *kubermaticv1.DatacenterSpecVSphere      `json:"vsphere,omitempty"`
+	Kubevirt     *kubermaticv1.DatacenterSpecKubevirt     `json:"kubevirt,omitempty"`
+	Alibaba      *kubermaticv1.DatacenterSpecAlibaba      `json:"alibaba,omitempty"`
+
+	//nolint:staticcheck
+	//lint:ignore SA5008 omitgenyaml is used by the example-yaml-generator
+	Fake *kubermaticv1.DatacenterSpecFake `json:"fake,omitempty,omitgenyaml"`
+
+	// Node holds node-specific settings, like e.g. HTTP proxy, Docker
+	// registries and the like. Proxy settings are inherited from the seed if
+	// not specified here.
+	Node kubermaticv1.NodeSettings `json:"node"`
 
 	// Deprecated. Automatically migrated to the RequiredEmailDomains field.
 	RequiredEmailDomain  string   `json:"requiredEmailDomain,omitempty"`
@@ -148,6 +89,10 @@ type DatacenterSpec struct {
 	// EnforceAuditLogging enforces audit logging on every cluster within the DC,
 	// ignoring cluster-specific settings.
 	EnforceAuditLogging bool `json:"enforceAuditLogging"`
+
+	// EnforcePodSecurityPolicy enforces pod security policy plugin on every clusters within the DC,
+	// ignoring cluster-specific settings
+	EnforcePodSecurityPolicy bool `json:"enforcePodSecurityPolicy"`
 }
 
 // DatacenterList represents a list of datacenters
@@ -157,9 +102,13 @@ type DatacenterList []Datacenter
 // Datacenter is the object representing a Kubernetes infra datacenter.
 // swagger:model Datacenter
 type Datacenter struct {
-	Metadata LegacyObjectMeta `json:"metadata"`
-	Spec     DatacenterSpec   `json:"spec"`
-	Seed     bool             `json:"seed,omitempty"`
+	Metadata DatacenterMeta `json:"metadata,omitempty"`
+	Spec     DatacenterSpec `json:"spec,omitempty"`
+}
+
+// DatacenterMeta holds datacenter metadata information.
+type DatacenterMeta struct {
+	Name string `json:"name"`
 }
 
 // AWSSize represents a object of AWS size.
@@ -458,6 +407,38 @@ type User struct {
 	Settings *kubermaticv1.UserSettings `json:"userSettings,omitempty"`
 }
 
+func ConvertInternalUserToExternal(internalUser *kubermaticv1.User, includeSettings bool, bindings ...*kubermaticv1.UserProjectBinding) *User {
+	apiUser := &User{
+		ObjectMeta: ObjectMeta{
+			ID:                internalUser.Name,
+			Name:              internalUser.Spec.Name,
+			CreationTimestamp: NewTime(internalUser.CreationTimestamp.Time),
+		},
+		Email:   internalUser.Spec.Email,
+		IsAdmin: internalUser.Spec.IsAdmin,
+	}
+
+	if includeSettings {
+		apiUser.Settings = internalUser.Spec.Settings
+	}
+
+	for _, binding := range bindings {
+		bindingAlreadyExists := false
+		for _, pg := range apiUser.Projects {
+			if pg.ID == binding.Spec.ProjectID && pg.GroupPrefix == binding.Spec.Group {
+				bindingAlreadyExists = true
+				break
+			}
+		}
+		if !bindingAlreadyExists {
+			groupPrefix := rbac.ExtractGroupPrefix(binding.Spec.Group)
+			apiUser.Projects = append(apiUser.Projects, ProjectGroup{ID: binding.Spec.ProjectID, GroupPrefix: groupPrefix})
+		}
+	}
+
+	return apiUser
+}
+
 // Admin represents admin user
 // swagger:model Admin
 type Admin struct {
@@ -587,6 +568,13 @@ type OpenstackSecurityGroup struct {
 	// Id uniquely identifies the current security group
 	ID string `json:"id"`
 	// Name is the name of the security group
+	Name string `json:"name"`
+}
+
+// OpenstackAvailabilityZone is the object representing a openstack availability zone.
+// swagger:model OpenstackAvailabilityZone
+type OpenstackAvailabilityZone struct {
+	// Name is the name of the availability zone
 	Name string `json:"name"`
 }
 
@@ -968,6 +956,8 @@ type AddonSpec struct {
 	Variables map[string]interface{} `json:"variables,omitempty"`
 	// IsDefault indicates whether the addon is default
 	IsDefault bool `json:"isDefault,omitempty"`
+	// ContinuouslyReconcile indicates that the addon cannot be deleted or modified outside of the UI after installation
+	ContinuouslyReconcile bool `json:"continuouslyReconcile,omitempty"`
 }
 
 // AddonConfig represents a addon configuration
@@ -1564,7 +1554,7 @@ type SeedSpec struct {
 	// Datacenters contains a map of the possible datacenters (DCs) in this seed.
 	// Each DC must have a globally unique identifier (i.e. names must be unique
 	// across all seeds).
-	SeedDatacenters map[string]SeedDatacenter `json:"datacenters,omitempty"`
+	SeedDatacenters map[string]Datacenter `json:"datacenters,omitempty"`
 	// Optional: This can be used to override the DNS name used for this seed.
 	// By default the seed name is used.
 	SeedDNSOverwrite string `json:"seed_dns_overwrite,omitempty"`
@@ -1575,53 +1565,13 @@ type SeedSpec struct {
 	ExposeStrategy corev1.ServiceType `json:"expose_strategy,omitempty"`
 }
 
-type SeedDatacenter struct {
-	// Optional: Country of the seed as ISO-3166 two-letter code, e.g. DE or UK.
-	// For informational purposes in the Kubermatic dashboard only.
-	Country string `json:"country,omitempty"`
-	// Optional: Detailed location of the cluster, like "Hamburg" or "Datacenter 7".
-	// For informational purposes in the Kubermatic dashboard only.
-	Location string `json:"location,omitempty"`
-	// Node holds node-specific settings, like e.g. HTTP proxy, Docker
-	// registries and the like. Proxy settings are inherited from the seed if
-	// not specified here.
-	Node kubermaticv1.NodeSettings `json:"node"`
-	// Spec describes the cloud provider settings used to manage resources
-	// in this datacenter. Exactly one cloud provider must be defined.
-	Spec SeedDatacenterSpec `json:"spec"`
-}
+// swagger:model SeedNamesList
+type SeedNamesList []string
 
-// SeedDatacenterSpec mutually points to provider datacenter spec
-type SeedDatacenterSpec struct {
-	Digitalocean *kubermaticv1.DatacenterSpecDigitalocean `json:"digitalocean,omitempty"`
-	// BringYourOwn contains settings for clusters using manually created
-	// nodes via kubeadm.
-	BringYourOwn *kubermaticv1.DatacenterSpecBringYourOwn `json:"bringyourown,omitempty"`
-	AWS          *kubermaticv1.DatacenterSpecAWS          `json:"aws,omitempty"`
-	Azure        *kubermaticv1.DatacenterSpecAzure        `json:"azure,omitempty"`
-	Openstack    *kubermaticv1.DatacenterSpecOpenstack    `json:"openstack,omitempty"`
-	Packet       *kubermaticv1.DatacenterSpecPacket       `json:"packet,omitempty"`
-	Hetzner      *kubermaticv1.DatacenterSpecHetzner      `json:"hetzner,omitempty"`
-	VSphere      *kubermaticv1.DatacenterSpecVSphere      `json:"vsphere,omitempty"`
-	GCP          *kubermaticv1.DatacenterSpecGCP          `json:"gcp,omitempty"`
-	Kubevirt     *kubermaticv1.DatacenterSpecKubevirt     `json:"kubevirt,omitempty"`
-	Alibaba      *kubermaticv1.DatacenterSpecAlibaba      `json:"alibaba,omitempty"`
-
-	//nolint:staticcheck
-	//lint:ignore SA5008 omitgenyaml is used by the example-yaml-generator
-	Fake *kubermaticv1.DatacenterSpecFake `json:"fake,omitempty,omitgenyaml"`
-
-	// Optional: When defined, only users with an e-mail address on the
-	// given domains can make use of this datacenter. You can define multiple
-	// domains, e.g. "example.com", one of which must match the email domain
-	// exactly (i.e. "example.com" will not match "user@test.example.com").
-	// RequiredEmailDomain is deprecated. Automatically migrated to the RequiredEmailDomains field.
-	RequiredEmailDomain  string   `json:"requiredEmailDomain,omitempty"`
-	RequiredEmailDomains []string `json:"requiredEmailDomains,omitempty"`
-
-	// EnforceAuditLogging enforces audit logging on every cluster within the DC,
-	// ignoring cluster-specific settings.
-	EnforceAuditLogging bool `json:"enforceAuditLogging"`
+// SeedCluster holds seed name for the cluster
+type SeedCluster struct {
+	SeedName  string
+	ClusterID string
 }
 
 const (
@@ -1641,6 +1591,8 @@ const (
 	CredentialsSecretsCleanupFinalizer = "kubermatic.io/cleanup-credentials-secrets"
 	// UserClusterRoleCleanupFinalizer indicates that user cluster role still need cleanup
 	UserClusterRoleCleanupFinalizer = "kubermatic.io/user-cluster-role"
+	// ExternalClusterKubeconfigCleanupFinalizer indicates that secrets for kubeconfig still need cleanup
+	ExternalClusterKubeconfigCleanupFinalizer = "kubermatic.io/cleanup-kubeconfig-secret"
 )
 
 func ToInternalClusterType(externalClusterType string) kubermaticv1.ClusterType {

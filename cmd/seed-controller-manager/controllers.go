@@ -21,20 +21,20 @@ import (
 	"fmt"
 	"io/ioutil"
 
-	"github.com/kubermatic/kubermatic/pkg/controller/seed-controller-manager/addon"
-	"github.com/kubermatic/kubermatic/pkg/controller/seed-controller-manager/addoninstaller"
-	cloudcontroller "github.com/kubermatic/kubermatic/pkg/controller/seed-controller-manager/cloud"
-	etcdbackupcontroller "github.com/kubermatic/kubermatic/pkg/controller/seed-controller-manager/etcdbackup"
-	etcdrestorecontroller "github.com/kubermatic/kubermatic/pkg/controller/seed-controller-manager/etcdrestore"
-	kubernetescontroller "github.com/kubermatic/kubermatic/pkg/controller/seed-controller-manager/kubernetes"
-	"github.com/kubermatic/kubermatic/pkg/controller/seed-controller-manager/monitoring"
-	openshiftcontroller "github.com/kubermatic/kubermatic/pkg/controller/seed-controller-manager/openshift"
-	"github.com/kubermatic/kubermatic/pkg/controller/seed-controller-manager/pvwatcher"
-	"github.com/kubermatic/kubermatic/pkg/controller/seed-controller-manager/rancher"
-	"github.com/kubermatic/kubermatic/pkg/controller/seed-controller-manager/seedresourcesuptodatecondition"
-	updatecontroller "github.com/kubermatic/kubermatic/pkg/controller/seed-controller-manager/update"
-	"github.com/kubermatic/kubermatic/pkg/features"
-	"github.com/kubermatic/kubermatic/pkg/version"
+	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/addon"
+	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/addoninstaller"
+	cloudcontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/cloud"
+	etcdbackupcontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/etcdbackup"
+	etcdrestorecontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/etcdrestore"
+	kubernetescontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/kubernetes"
+	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/monitoring"
+	openshiftcontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/openshift"
+	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/pvwatcher"
+	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/rancher"
+	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/seedresourcesuptodatecondition"
+	updatecontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/update"
+	"k8c.io/kubermatic/v2/pkg/features"
+	"k8c.io/kubermatic/v2/pkg/version"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
@@ -44,14 +44,14 @@ import (
 // each entry holds the name of the controller and the corresponding
 // start function that will essentially run the controller
 var AllControllers = map[string]controllerCreator{
-	kubernetescontroller.ControllerName: createKubernetesController,
-	updatecontroller.ControllerName:     createUpdateController,
-	addon.ControllerName:                createAddonController,
-	addoninstaller.ControllerName:       createAddonInstallerController,
-	etcdbackupcontroller.ControllerName: createEtcdBackupController,
+	kubernetescontroller.ControllerName:  createKubernetesController,
+	updatecontroller.ControllerName:      createUpdateController,
+	addon.ControllerName:                 createAddonController,
+	addoninstaller.ControllerName:        createAddonInstallerController,
+	etcdbackupcontroller.ControllerName:  createEtcdBackupController,
+	etcdrestorecontroller.ControllerName: createEtcdRestoreController,
 	// Sys11: disable old backup controller.
 	// backupcontroller.ControllerName:               createBackupController,
-	etcdrestorecontroller.ControllerName:          createEtcdRestoreController,
 	monitoring.ControllerName:                     createMonitoringController,
 	cloudcontroller.ControllerName:                createCloudController,
 	openshiftcontroller.ControllerName:            createOpenshiftController,
@@ -215,7 +215,7 @@ func createEtcdBackupController(ctrlCtx *controllerContext) error {
 // 		ctrlCtx.runOptions.backupContainerImage,
 // 	)
 // }
-//
+
 func createEtcdRestoreController(ctrlCtx *controllerContext) error {
 	return etcdrestorecontroller.Add(
 		ctrlCtx.mgr,
@@ -226,11 +226,6 @@ func createEtcdRestoreController(ctrlCtx *controllerContext) error {
 }
 
 func createMonitoringController(ctrlCtx *controllerContext) error {
-	dockerPullConfigJSON, err := ioutil.ReadFile(ctrlCtx.runOptions.dockerPullConfigJSONFile)
-	if err != nil {
-		return fmt.Errorf("failed to load ImagePullSecret from %s: %v", ctrlCtx.runOptions.dockerPullConfigJSONFile, err)
-	}
-
 	return monitoring.Add(
 		ctrlCtx.mgr,
 		ctrlCtx.log,
@@ -248,7 +243,7 @@ func createMonitoringController(ctrlCtx *controllerContext) error {
 		ctrlCtx.runOptions.inClusterPrometheusDisableDefaultRules,
 		ctrlCtx.runOptions.inClusterPrometheusDisableDefaultScrapingConfigs,
 		ctrlCtx.runOptions.inClusterPrometheusScrapingConfigsFile,
-		dockerPullConfigJSON,
+		ctrlCtx.dockerPullConfigJSON,
 		ctrlCtx.runOptions.concurrentClusterUpdate,
 		monitoring.Features{
 			VPA: ctrlCtx.runOptions.featureGates.Enabled(features.VerticalPodAutoscaler),

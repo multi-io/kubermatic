@@ -22,14 +22,13 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
 	"net"
 	"net/http"
 	"time"
 
 	"github.com/coreos/go-oidc"
 	"golang.org/x/oauth2"
-
-	apiv1 "github.com/kubermatic/kubermatic/pkg/api/v1"
 )
 
 // OIDCToken represents the credentials used to authorize

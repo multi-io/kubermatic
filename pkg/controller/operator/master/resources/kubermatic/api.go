@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kubermatic/kubermatic/pkg/controller/operator/common"
-	operatorv1alpha1 "github.com/kubermatic/kubermatic/pkg/crd/operator/v1alpha1"
-	"github.com/kubermatic/kubermatic/pkg/features"
-	"github.com/kubermatic/kubermatic/pkg/resources/reconciling"
+	"k8c.io/kubermatic/v2/pkg/controller/operator/common"
+	operatorv1alpha1 "k8c.io/kubermatic/v2/pkg/crd/operator/v1alpha1"
+	"k8c.io/kubermatic/v2/pkg/features"
+	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -63,17 +63,12 @@ func APIDeploymentCreator(cfg *operatorv1alpha1.KubermaticConfiguration, workerN
 
 			d.Spec.Template.Labels = d.Spec.Selector.MatchLabels
 			d.Spec.Template.Annotations = map[string]string{
-				"kubermatic/scrape":      "true",
-				"kubermatic/scrape_port": "8085",
-				"fluentbit.io/parser":    "json_iso",
+				"prometheus.io/scrape": "true",
+				"prometheus.io/port":   "8085",
+				"fluentbit.io/parser":  "json_iso",
 			}
 
 			d.Spec.Template.Spec.ServiceAccountName = serviceAccountName
-			d.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{
-				{
-					Name: common.DockercfgSecretName,
-				},
-			}
 
 			volumes := []corev1.Volume{
 				{
@@ -126,6 +121,25 @@ func APIDeploymentCreator(cfg *operatorv1alpha1.KubermaticConfiguration, workerN
 				args = append(args, "-v=2")
 			}
 
+			if cfg.Spec.Auth.CABundle != "" {
+				args = append(args, "-oidc-ca-file=/opt/dex-ca/caBundle.pem")
+
+				volumes = append(volumes, corev1.Volume{
+					Name: "dex-ca",
+					VolumeSource: corev1.VolumeSource{
+						Secret: &corev1.SecretVolumeSource{
+							SecretName: common.DexCASecretName,
+						},
+					},
+				})
+
+				volumeMounts = append(volumeMounts, corev1.VolumeMount{
+					Name:      "dex-ca",
+					MountPath: "/opt/dex-ca",
+					ReadOnly:  true,
+				})
+			}
+
 			if cfg.Spec.FeatureGates.Has(features.OIDCKubeCfgEndpoint) {
 				args = append(
 					args,
@@ -134,25 +148,6 @@ func APIDeploymentCreator(cfg *operatorv1alpha1.KubermaticConfiguration, workerN
 					fmt.Sprintf("-oidc-issuer-client-secret=%s", cfg.Spec.Auth.IssuerClientSecret),
 					fmt.Sprintf("-oidc-issuer-cookie-hash-key=%s", cfg.Spec.Auth.IssuerCookieKey),
 				)
-
-				if cfg.Spec.Auth.CABundle != "" {
-					args = append(args, "-oidc-ca-file=/opt/dex-ca/caBundle.pem")
-
-					volumes = append(volumes, corev1.Volume{
-						Name: "dex-ca",
-						VolumeSource: corev1.VolumeSource{
-							Secret: &corev1.SecretVolumeSource{
-								SecretName: common.DexCASecretName,
-							},
-						},
-					})
-
-					volumeMounts = append(volumeMounts, corev1.VolumeMount{
-						Name:      "dex-ca",
-						MountPath: "/opt/dex-ca",
-						ReadOnly:  true,
-					})
-				}
 			}
 
 			if workerName != "" {

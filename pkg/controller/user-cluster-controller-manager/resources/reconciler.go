@@ -20,25 +20,27 @@ import (
 	"context"
 	"fmt"
 
-	openshiftresources "github.com/kubermatic/kubermatic/pkg/controller/seed-controller-manager/openshift/resources"
-	"github.com/kubermatic/kubermatic/pkg/controller/user-cluster-controller-manager/resources/cloudcontroller"
-	"github.com/kubermatic/kubermatic/pkg/controller/user-cluster-controller-manager/resources/resources/clusterautoscaler"
-	controllermanager "github.com/kubermatic/kubermatic/pkg/controller/user-cluster-controller-manager/resources/resources/controller-manager"
-	dnatcontroller "github.com/kubermatic/kubermatic/pkg/controller/user-cluster-controller-manager/resources/resources/dnat-controller"
-	kubestatemetrics "github.com/kubermatic/kubermatic/pkg/controller/user-cluster-controller-manager/resources/resources/kube-state-metrics"
-	kubernetesdashboard "github.com/kubermatic/kubermatic/pkg/controller/user-cluster-controller-manager/resources/resources/kubernetes-dashboard"
-	machinecontroller "github.com/kubermatic/kubermatic/pkg/controller/user-cluster-controller-manager/resources/resources/machine-controller"
-	metricsserver "github.com/kubermatic/kubermatic/pkg/controller/user-cluster-controller-manager/resources/resources/metrics-server"
-	"github.com/kubermatic/kubermatic/pkg/controller/user-cluster-controller-manager/resources/resources/openshift"
-	"github.com/kubermatic/kubermatic/pkg/controller/user-cluster-controller-manager/resources/resources/openvpn"
-	"github.com/kubermatic/kubermatic/pkg/controller/user-cluster-controller-manager/resources/resources/prometheus"
-	"github.com/kubermatic/kubermatic/pkg/controller/user-cluster-controller-manager/resources/resources/scheduler"
-	systembasicuser "github.com/kubermatic/kubermatic/pkg/controller/user-cluster-controller-manager/resources/resources/system-basic-user"
-	userauth "github.com/kubermatic/kubermatic/pkg/controller/user-cluster-controller-manager/resources/resources/user-auth"
-	"github.com/kubermatic/kubermatic/pkg/controller/user-cluster-controller-manager/resources/resources/usersshkeys"
-	"github.com/kubermatic/kubermatic/pkg/resources"
-	"github.com/kubermatic/kubermatic/pkg/resources/certificates/triple"
-	"github.com/kubermatic/kubermatic/pkg/resources/reconciling"
+	openshiftresources "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/openshift/resources"
+	"k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/cloudcontroller"
+	"k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/clusterautoscaler"
+	controllermanager "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/controller-manager"
+	coredns "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/core-dns"
+	dnatcontroller "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/dnat-controller"
+	kubestatemetrics "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/kube-state-metrics"
+	kubernetesdashboard "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/kubernetes-dashboard"
+	machinecontroller "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/machine-controller"
+	metricsserver "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/metrics-server"
+	nodelocaldns "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/node-local-dns"
+	"k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/openshift"
+	"k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/openvpn"
+	"k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/prometheus"
+	"k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/scheduler"
+	systembasicuser "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/system-basic-user"
+	userauth "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/user-auth"
+	"k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/usersshkeys"
+	"k8c.io/kubermatic/v2/pkg/resources"
+	"k8c.io/kubermatic/v2/pkg/resources/certificates/triple"
+	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -81,7 +83,15 @@ func (r *reconciler) reconcile(ctx context.Context) error {
 		return err
 	}
 
+	if err := r.reconcileServiceAcconts(ctx); err != nil {
+		return err
+	}
+
 	if err := r.reconcileUnstructured(ctx); err != nil {
+		return err
+	}
+
+	if err := r.reconcilePodDisruptionBudgets(ctx); err != nil {
 		return err
 	}
 
@@ -90,10 +100,6 @@ func (r *reconciler) reconcile(ctx context.Context) error {
 	}
 
 	if err := r.reconcileServices(ctx); err != nil {
-		return err
-	}
-
-	if err := r.reconcileServiceAcconts(ctx); err != nil {
 		return err
 	}
 
@@ -170,15 +176,22 @@ func (r *reconciler) reconcileServiceAcconts(ctx context.Context) error {
 		return fmt.Errorf("failed to reconcile ServiceAccounts in the namespace %s: %v", metav1.NamespaceSystem, err)
 	}
 
-	//if !r.openshift {
-	//	// Kubernetes Dashboard and related resources
-	//	creators = []reconciling.NamedServiceAccountCreatorGetter{
-	//		kubernetesdashboard.ServiceAccountCreator(),
-	//	}
-	//	if err := reconciling.ReconcileServiceAccounts(ctx, creators, kubernetesdashboard.Namespace, r.Client); err != nil {
-	//		return fmt.Errorf("failed to reconcile ServiceAccounts in the namespace %s: %v", kubernetesdashboard.Namespace, err)
-	//	}
-	//}
+	// if !r.openshift {
+	// 	// Kubernetes Dashboard and related resources
+	// 	creators = []reconciling.NamedServiceAccountCreatorGetter{
+	// 		kubernetesdashboard.ServiceAccountCreator(),
+	// 	}
+	// 	if err := reconciling.ReconcileServiceAccounts(ctx, creators, kubernetesdashboard.Namespace, r.Client); err != nil {
+	// 		return fmt.Errorf("failed to reconcile ServiceAccounts in the namespace %s: %v", kubernetesdashboard.Namespace, err)
+	// 	}
+	// 	creators = []reconciling.NamedServiceAccountCreatorGetter{
+	// 		coredns.ServiceAccountCreator(),
+	// 		nodelocaldns.ServiceAccountCreator(),
+	// 	}
+	// 	if err := reconciling.ReconcileServiceAccounts(ctx, creators, metav1.NamespaceSystem, r.Client); err != nil {
+	// 		return fmt.Errorf("failed to reconcile ServiceAccounts in the namespace %s: %v", metav1.NamespaceSystem, err)
+	// 	}
+	// }
 
 	return nil
 }
@@ -215,15 +228,15 @@ func (r *reconciler) reconcileRoles(ctx context.Context) error {
 		return fmt.Errorf("failed to reconcile Roles in the namespace %s: %v", metav1.NamespaceDefault, err)
 	}
 
-	//if !r.openshift {
-	//	// Kubernetes Dashboard and related resources
-	//	creators = []reconciling.NamedRoleCreatorGetter{
-	//		kubernetesdashboard.RoleCreator(),
-	//	}
-	//	if err := reconciling.ReconcileRoles(ctx, creators, kubernetesdashboard.Namespace, r.Client); err != nil {
-	//		return fmt.Errorf("failed to reconcile Roles in the namespace %s: %v", kubernetesdashboard.Namespace, err)
-	//	}
-	//}
+	// if !r.openshift {
+	// 	// Kubernetes Dashboard and related resources
+	// 	creators = []reconciling.NamedRoleCreatorGetter{
+	// 		kubernetesdashboard.RoleCreator(),
+	// 	}
+	// 	if err := reconciling.ReconcileRoles(ctx, creators, kubernetesdashboard.Namespace, r.Client); err != nil {
+	// 		return fmt.Errorf("failed to reconcile Roles in the namespace %s: %v", kubernetesdashboard.Namespace, err)
+	// 	}
+	// }
 
 	if r.openshift {
 		namespacedName, roleCreator := openshiftresources.MachineControllerRole()
@@ -279,15 +292,15 @@ func (r *reconciler) reconcileRoleBindings(ctx context.Context) error {
 		return fmt.Errorf("failed to reconcile RoleBindings in default Namespace: %v", err)
 	}
 
-	//if !r.openshift {
-	//	// Kubernetes Dashboard and related resources
-	//	creators = []reconciling.NamedRoleBindingCreatorGetter{
-	//		kubernetesdashboard.RoleBindingCreator(),
-	//	}
-	//	if err := reconciling.ReconcileRoleBindings(ctx, creators, kubernetesdashboard.Namespace, r.Client); err != nil {
-	//		return fmt.Errorf("failed to reconcile RoleBindings in the namespace: %s: %v", kubernetesdashboard.Namespace, err)
-	//	}
-	//}
+	// if !r.openshift {
+	// 	// Kubernetes Dashboard and related resources
+	// 	creators = []reconciling.NamedRoleBindingCreatorGetter{
+	// 		kubernetesdashboard.RoleBindingCreator(),
+	// 	}
+	// 	if err := reconciling.ReconcileRoleBindings(ctx, creators, kubernetesdashboard.Namespace, r.Client); err != nil {
+	// 		return fmt.Errorf("failed to reconcile RoleBindings in the namespace: %s: %v", kubernetesdashboard.Namespace, err)
+	// 	}
+	// }
 
 	if r.openshift {
 		namespacedName, roleBindingCreator := openshiftresources.MachineControllerRoleBinding()
@@ -322,7 +335,11 @@ func (r *reconciler) reconcileClusterRoles(ctx context.Context) error {
 	}
 
 	if !r.openshift {
-		creators = append(creators, kubernetesdashboard.ClusterRoleCreator())
+		creators = append(creators,
+			[]reconciling.NamedClusterRoleCreatorGetter{
+				kubernetesdashboard.ClusterRoleCreator(),
+				coredns.ClusterRoleCreator(),
+			}...)
 	}
 
 	if err := reconciling.ReconcileClusterRoles(ctx, creators, "", r.Client); err != nil {
@@ -352,7 +369,11 @@ func (r *reconciler) reconcileClusterRoleBindings(ctx context.Context) error {
 	if r.openshift {
 		creators = append(creators, openshift.TokenOwnerServiceAccountClusterRoleBinding)
 	} else {
-		creators = append(creators, kubernetesdashboard.ClusterRoleBindingCreator())
+		creators = append(creators,
+			[]reconciling.NamedClusterRoleBindingCreatorGetter{
+				kubernetesdashboard.ClusterRoleBindingCreator(),
+				coredns.ClusterRoleBindingCreator(),
+			}...)
 	}
 
 	if err := reconciling.ReconcileClusterRoleBindings(ctx, creators, "", r.Client); err != nil {
@@ -398,16 +419,21 @@ func (r *reconciler) reconcileServices(ctx context.Context) error {
 		return fmt.Errorf("failed to reconcile Services in kube-system namespace: %v", err)
 	}
 
-	//if !r.openshift {
-	//	// Kubernetes Dashboard and related resources
-	//	creators := []reconciling.NamedServiceCreatorGetter{
-	//		kubernetesdashboard.ServiceCreator(),
-	//	}
-	//
-	//	if err := reconciling.ReconcileServices(ctx, creators, kubernetesdashboard.Namespace, r.Client); err != nil {
-	//		return fmt.Errorf("failed to reconcile Services in namespace %s: %v", kubernetesdashboard.Namespace, err)
-	//	}
-	//}
+	// if !r.openshift {
+	// 	// Kubernetes Dashboard and related resources
+	// 	creators := []reconciling.NamedServiceCreatorGetter{
+	// 		kubernetesdashboard.ServiceCreator(),
+	// 	}
+	// 	if err := reconciling.ReconcileServices(ctx, creators, kubernetesdashboard.Namespace, r.Client); err != nil {
+	// 		return fmt.Errorf("failed to reconcile Services in namespace %s: %v", kubernetesdashboard.Namespace, err)
+	// 	}
+	// 	creatorsKubeSystem = []reconciling.NamedServiceCreatorGetter{
+	// 		coredns.ServiceCreator(r.dnsClusterIP),
+	// 	}
+	// 	if err := reconciling.ReconcileServices(ctx, creatorsKubeSystem, metav1.NamespaceSystem, r.Client); err != nil {
+	// 		return fmt.Errorf("failed to reconcile Services in kube-system namespace: %v", err)
+	// 	}
+	// }
 
 	if r.openshift {
 		if err := reconciling.ReconcileServices(ctx, []reconciling.NamedServiceCreatorGetter{openshift.APIServicecreatorGetterFactory(r.namespace)}, "openshift-apiserver", r.Client); err != nil {
@@ -431,6 +457,11 @@ func (r *reconciler) reconcileConfigMaps(ctx context.Context, data reconcileData
 	}
 	if r.openshift {
 		creators = append(creators, openshift.ControlplaneConfigCreator(r.platform))
+	} else {
+		creators = append(creators, []reconciling.NamedConfigMapCreatorGetter{
+			coredns.ConfigMapCreator(),
+			nodelocaldns.ConfigMapCreator(r.dnsClusterIP),
+		}...)
 	}
 
 	if err := reconciling.ReconcileConfigMaps(ctx, creators, metav1.NamespaceSystem, r.Client); err != nil {
@@ -456,17 +487,17 @@ func (r *reconciler) reconcileSecrets(ctx context.Context, data reconcileData) e
 		return fmt.Errorf("failed to reconcile Secrets in kube-system Namespace: %v", err)
 	}
 
-	//if !r.openshift {
-	//	// Kubernetes Dashboard and related resources
-	//	creators = []reconciling.NamedSecretCreatorGetter{
-	//		kubernetesdashboard.KeyHolderSecretCreator(),
-	//		kubernetesdashboard.CsrfTokenSecretCreator(),
-	//	}
-	//
-	//	if err := reconciling.ReconcileSecrets(ctx, creators, kubernetesdashboard.Namespace, r.Client); err != nil {
-	//		return fmt.Errorf("failed to reconcile Secrets in namespace %s: %v", kubernetesdashboard.Namespace, err)
-	//	}
-	//}
+	// if !r.openshift {
+	// 	// Kubernetes Dashboard and related resources
+	// 	creators = []reconciling.NamedSecretCreatorGetter{
+	// 		kubernetesdashboard.KeyHolderSecretCreator(),
+	// 		kubernetesdashboard.CsrfTokenSecretCreator(),
+	// 	}
+
+	// 	if err := reconciling.ReconcileSecrets(ctx, creators, kubernetesdashboard.Namespace, r.Client); err != nil {
+	// 		return fmt.Errorf("failed to reconcile Secrets in namespace %s: %v", kubernetesdashboard.Namespace, err)
+	// 	}
+	// }
 
 	if r.openshift {
 		creators = []reconciling.NamedSecretCreatorGetter{openshift.RegistryServingCert(data.caCert)}
@@ -482,6 +513,9 @@ func (r *reconciler) reconcileDaemonSet(ctx context.Context) error {
 	dsCreators := []reconciling.NamedDaemonSetCreatorGetter{
 		usersshkeys.DaemonSetCreator(),
 	}
+	if !r.openshift {
+		dsCreators = append(dsCreators, nodelocaldns.DaemonSetCreator())
+	}
 
 	if err := reconciling.ReconcileDaemonSets(ctx, dsCreators, metav1.NamespaceSystem, r.Client); err != nil {
 		return fmt.Errorf("failed to reconcile the DaemonSet: %v", err)
@@ -493,12 +527,12 @@ func (r *reconciler) reconcileDaemonSet(ctx context.Context) error {
 func (r *reconciler) reconcileNamespaces(ctx context.Context) error {
 
 	if !r.openshift {
-		//creators := []reconciling.NamedNamespaceCreatorGetter{
-		//	kubernetesdashboard.NamespaceCreator,
-		//}
-		//if err := reconciling.ReconcileNamespaces(ctx, creators, "", r.Client); err != nil {
-		//	return fmt.Errorf("failed to reconcile namespaces: %v", err)
-		//}
+		// creators := []reconciling.NamedNamespaceCreatorGetter{
+		// 	kubernetesdashboard.NamespaceCreator,
+		// }
+		// if err := reconciling.ReconcileNamespaces(ctx, creators, "", r.Client); err != nil {
+		// 	return fmt.Errorf("failed to reconcile namespaces: %v", err)
+		// }
 		return nil
 	}
 
@@ -558,17 +592,32 @@ type ctrlruntimeclientClient struct {
 }
 
 func (r *reconciler) reconcileDeployments(ctx context.Context) error {
-	//if !r.openshift {
-	//	// Kubernetes Dashboard and related resources
-	//	creators := []reconciling.NamedDeploymentCreatorGetter{
-	//		kubernetesdashboard.DeploymentCreator(),
-	//	}
-	//
-	//	if err := reconciling.ReconcileDeployments(ctx, creators, kubernetesdashboard.Namespace, r.Client); err != nil {
-	//		return fmt.Errorf("failed to reconcile Deployments in namespace %s: %v", kubernetesdashboard.Namespace, err)
-	//	}
-	//}
+	// if r.openshift {
+	// 	return nil
+	// }
+	// // Kubernetes Dashboard and related resources
+	// creators := []reconciling.NamedDeploymentCreatorGetter{
+	// 	kubernetesdashboard.DeploymentCreator(),
+	// }
+	// if err := reconciling.ReconcileDeployments(ctx, creators, kubernetesdashboard.Namespace, r.Client); err != nil {
+	// 	return fmt.Errorf("failed to reconcile Deployments in namespace %s: %v", kubernetesdashboard.Namespace, err)
+	// }
 
+	// kubeSystemCreators := []reconciling.NamedDeploymentCreatorGetter{coredns.DeploymentCreator()}
+	// if err := reconciling.ReconcileDeployments(ctx, kubeSystemCreators, metav1.NamespaceSystem, r.Client); err != nil {
+	// 	return fmt.Errorf("failed to reconcile Deployments in namespace %s: %v", metav1.NamespaceSystem, err)
+	// }
+
+	return nil
+}
+
+func (r *reconciler) reconcilePodDisruptionBudgets(ctx context.Context) error {
+	creators := []reconciling.NamedPodDisruptionBudgetCreatorGetter{
+		coredns.PodDisruptionBudgetCreator(),
+	}
+	if err := reconciling.ReconcilePodDisruptionBudgets(ctx, creators, metav1.NamespaceSystem, r.Client); err != nil {
+		return fmt.Errorf("failed to reconcile PodDisruptionBudgets: %v", err)
+	}
 	return nil
 }
 

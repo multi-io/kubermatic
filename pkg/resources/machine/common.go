@@ -22,8 +22,6 @@ import (
 
 	"github.com/aws/aws-sdk-go/service/ec2"
 
-	apiv1 "github.com/kubermatic/kubermatic/pkg/api/v1"
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
 	alibaba "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/alibaba/types"
 	aws "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/aws/types"
 	azure "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/azure/types"
@@ -41,6 +39,8 @@ import (
 	"github.com/kubermatic/machine-controller/pkg/userdata/rhel"
 	"github.com/kubermatic/machine-controller/pkg/userdata/sles"
 	"github.com/kubermatic/machine-controller/pkg/userdata/ubuntu"
+	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -162,17 +162,24 @@ func getAzureProviderSpec(c *kubermaticv1.Cluster, nodeSpec apiv1.NodeSpec, dc *
 }
 
 func getVSphereProviderSpec(c *kubermaticv1.Cluster, nodeSpec apiv1.NodeSpec, dc *kubermaticv1.Datacenter) (*runtime.RawExtension, error) {
+	var datastore = ""
+	// If `DatastoreCluster` is not specified we use either the Datastore
+	// specified at `Cluster` or the one specified at `Datacenter` level.
+	if c.Spec.Cloud.VSphere.DatastoreCluster == "" {
+		datastore = defaultIfEmpty(c.Spec.Cloud.VSphere.Datastore, dc.Spec.VSphere.DefaultDatastore)
+	}
 	config := vsphere.RawConfig{
-		TemplateVMName: providerconfig.ConfigVarString{Value: nodeSpec.Cloud.VSphere.Template},
-		VMNetName:      providerconfig.ConfigVarString{Value: c.Spec.Cloud.VSphere.VMNetName},
-		CPUs:           int32(nodeSpec.Cloud.VSphere.CPUs),
-		MemoryMB:       int64(nodeSpec.Cloud.VSphere.Memory),
-		DiskSizeGB:     nodeSpec.Cloud.VSphere.DiskSizeGB,
-		Datacenter:     providerconfig.ConfigVarString{Value: dc.Spec.VSphere.Datacenter},
-		Datastore:      providerconfig.ConfigVarString{Value: dc.Spec.VSphere.Datastore},
-		Cluster:        providerconfig.ConfigVarString{Value: dc.Spec.VSphere.Cluster},
-		Folder:         providerconfig.ConfigVarString{Value: c.Spec.Cloud.VSphere.Folder},
-		AllowInsecure:  providerconfig.ConfigVarBool{Value: dc.Spec.VSphere.AllowInsecure},
+		TemplateVMName:   providerconfig.ConfigVarString{Value: nodeSpec.Cloud.VSphere.Template},
+		VMNetName:        providerconfig.ConfigVarString{Value: c.Spec.Cloud.VSphere.VMNetName},
+		CPUs:             int32(nodeSpec.Cloud.VSphere.CPUs),
+		MemoryMB:         int64(nodeSpec.Cloud.VSphere.Memory),
+		DiskSizeGB:       nodeSpec.Cloud.VSphere.DiskSizeGB,
+		Datacenter:       providerconfig.ConfigVarString{Value: dc.Spec.VSphere.Datacenter},
+		Datastore:        providerconfig.ConfigVarString{Value: datastore},
+		DatastoreCluster: providerconfig.ConfigVarString{Value: c.Spec.Cloud.VSphere.DatastoreCluster},
+		Cluster:          providerconfig.ConfigVarString{Value: dc.Spec.VSphere.Cluster},
+		Folder:           providerconfig.ConfigVarString{Value: c.Spec.Cloud.VSphere.Folder},
+		AllowInsecure:    providerconfig.ConfigVarBool{Value: dc.Spec.VSphere.AllowInsecure},
 	}
 
 	ext := &runtime.RawExtension{}
@@ -212,11 +219,9 @@ func getOpenstackProviderSpec(c *kubermaticv1.Cluster, nodeSpec apiv1.NodeSpec, 
 		config.TrustDevicePath = providerconfig.ConfigVarBool{Value: *dc.Spec.Openstack.TrustDevicePath}
 	}
 
-	if multiAZ := c.Spec.Features[kubermaticv1.ClusterFeatureOpenstackMultiAZ]; multiAZ {
-		// Use the nodeDeployment spec AvailabilityZone if set, otherwise we stick to the default from the datacenter
-		if nodeSpec.Cloud.Openstack.AvailabilityZone != "" {
-			config.AvailabilityZone = providerconfig.ConfigVarString{Value: nodeSpec.Cloud.Openstack.AvailabilityZone}
-		}
+	// Use the nodeDeployment spec AvailabilityZone if set, otherwise we stick to the default from the datacenter
+	if nodeSpec.Cloud.Openstack.AvailabilityZone != "" {
+		config.AvailabilityZone = providerconfig.ConfigVarString{Value: nodeSpec.Cloud.Openstack.AvailabilityZone}
 	}
 
 	config.Tags = map[string]string{}
@@ -419,7 +424,7 @@ func getCentOSOperatingSystemSpec(nodeSpec apiv1.NodeSpec) (*runtime.RawExtensio
 
 func getCoreosOperatingSystemSpec(nodeSpec apiv1.NodeSpec) (*runtime.RawExtension, error) {
 	config := coreos.Config{
-		DisableUpdateEngine: nodeSpec.OperatingSystem.ContainerLinux.DisableAutoUpdate,
+		DisableAutoUpdate: nodeSpec.OperatingSystem.ContainerLinux.DisableAutoUpdate,
 		// We manage CoreOS updates via the CoreOS update operator which requires locksmithd
 		// to be disabled: https://github.com/coreos/container-linux-update-operator#design
 		DisableLocksmithD: true,
@@ -485,7 +490,7 @@ func getRHELOperatingSystemSpec(nodeSpec apiv1.NodeSpec) (*runtime.RawExtension,
 
 func getFlatcarOperatingSystemSpec(nodeSpec apiv1.NodeSpec) (*runtime.RawExtension, error) {
 	config := flatcar.Config{
-		DisableUpdateEngine: nodeSpec.OperatingSystem.Flatcar.DisableAutoUpdate,
+		DisableAutoUpdate: nodeSpec.OperatingSystem.Flatcar.DisableAutoUpdate,
 		// We manage Flatcar updates via the CoreOS update operator which requires locksmithd
 		// to be disabled: https://github.com/coreos/container-linux-update-operator#design
 		DisableLocksmithD: true,
@@ -499,4 +504,13 @@ func getFlatcarOperatingSystemSpec(nodeSpec apiv1.NodeSpec) (*runtime.RawExtensi
 
 	ext.Raw = b
 	return ext, nil
+}
+
+// defaultIfEmpty returns the given value if not empty or the default value
+// otherwise.
+func defaultIfEmpty(value, defaultValue string) string {
+	if value != "" {
+		return value
+	}
+	return defaultValue
 }

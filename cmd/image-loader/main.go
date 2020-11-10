@@ -18,26 +18,32 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"path"
+	"os"
 
 	"github.com/Masterminds/semver"
 	"go.uber.org/zap"
 
-	addonutil "github.com/kubermatic/kubermatic/pkg/addon"
-	apiv1 "github.com/kubermatic/kubermatic/pkg/api/v1"
-	kubernetescontroller "github.com/kubermatic/kubermatic/pkg/controller/seed-controller-manager/kubernetes"
-	"github.com/kubermatic/kubermatic/pkg/controller/seed-controller-manager/monitoring"
-	containerlinux "github.com/kubermatic/kubermatic/pkg/controller/user-cluster-controller-manager/container-linux"
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/docker"
-	kubermaticlog "github.com/kubermatic/kubermatic/pkg/log"
-	"github.com/kubermatic/kubermatic/pkg/resources"
-	metricsserver "github.com/kubermatic/kubermatic/pkg/resources/metrics-server"
-	ksemver "github.com/kubermatic/kubermatic/pkg/semver"
-	kubermaticversion "github.com/kubermatic/kubermatic/pkg/version"
+	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
+	"k8c.io/kubermatic/v2/pkg/controller/operator/common"
+	"k8c.io/kubermatic/v2/pkg/controller/operator/common/vpa"
+	masteroperator "k8c.io/kubermatic/v2/pkg/controller/operator/master/resources/kubermatic"
+	seedoperatorkubermatic "k8c.io/kubermatic/v2/pkg/controller/operator/seed/resources/kubermatic"
+	seedoperatornodeportproxy "k8c.io/kubermatic/v2/pkg/controller/operator/seed/resources/nodeportproxy"
+	kubernetescontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/kubernetes"
+	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/monitoring"
+	containerlinux "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/container-linux"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	operatorv1alpha1 "k8c.io/kubermatic/v2/pkg/crd/operator/v1alpha1"
+	"k8c.io/kubermatic/v2/pkg/docker"
+	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
+	"k8c.io/kubermatic/v2/pkg/resources"
+	metricsserver "k8c.io/kubermatic/v2/pkg/resources/metrics-server"
+	ksemver "k8c.io/kubermatic/v2/pkg/semver"
+	kubermaticversion "k8c.io/kubermatic/v2/pkg/version"
 
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
@@ -52,8 +58,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 )
@@ -65,33 +69,53 @@ var (
 )
 
 type opts struct {
-	versionsFile  string
-	versionFilter string
-	registry      string
-	dryRun        bool
-	addonsPath    string
+	configurationFile string
+	versionsFile      string
+	versionFilter     string
+	registry          string
+	dryRun            bool
+	addonsPath        string
+	addonsImage       string
+	chartsPath        string
+	helmValuesPath    string
+	helmBinary        string
 }
 
 func main() {
-	klog.InitFlags(nil)
+	var err error
 
 	logOpts := kubermaticlog.NewDefaultOptions()
+	logOpts.Format = kubermaticlog.FormatConsole
 	logOpts.AddFlags(flag.CommandLine)
 
 	o := opts{}
-	flag.StringVar(&o.versionsFile, "versions", "../config/kubermatic/static/master/versions.yaml", "The versions.yaml file path")
+	flag.StringVar(&o.configurationFile, "configuration-file", "", "Path to the KubermaticConfiguration YAML file")
+	flag.StringVar(&o.versionsFile, "versions-file", "", "The versions.yaml file path (deprecated, EE-only, used only if no -configuration-file is given)")
 	flag.StringVar(&o.versionFilter, "version-filter", "", "Version constraint which can be used to filter for specific versions")
-	flag.StringVar(&o.registry, "registry", "registry.corp.local", "Address of the registry to push to")
+	flag.StringVar(&o.registry, "registry", "", "Address of the registry to push to, for example localhost:5000")
 	flag.BoolVar(&o.dryRun, "dry-run", false, "Only print the names of found images")
-	flag.StringVar(&o.addonsPath, "addons-path", "", "Path to the folder containing the addons")
+	flag.StringVar(&o.addonsPath, "addons-path", "", "Path to a directory containing the KKP addons, if not given, falls back to -addons-image, then the Docker image configured in the KubermaticConfiguration")
+	flag.StringVar(&o.addonsImage, "addons-image", "", "Docker image containing KKP addons, if not given, falls back to the Docker image configured in the KubermaticConfiguration")
+	flag.StringVar(&o.chartsPath, "charts-path", "", "Path to the folder containing all Helm charts")
+	flag.StringVar(&o.helmValuesPath, "helm-values-file", "", "Use this values.yaml file when rendering the Helm charts (-charts-path)")
+	flag.StringVar(&o.helmBinary, "helm-binary", "helm", "Helm 3.x binary to use for rendering the charts")
 	flag.Parse()
 
-	log := kubermaticlog.New(logOpts.Debug, logOpts.Format)
+	rawLog := kubermaticlog.New(logOpts.Debug, logOpts.Format)
+	log := rawLog.Sugar()
 	defer func() {
 		if err := log.Sync(); err != nil {
 			fmt.Println(err)
 		}
 	}()
+
+	if (o.configurationFile == "") == (o.versionsFile == "") {
+		log.Panic("Either -configuration-file or -versions-file must be specified.")
+	}
+
+	if o.addonsPath != "" && o.addonsImage != "" {
+		log.Panic("-addons-path or -addons-image must not be specified at the same time.")
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -102,12 +126,46 @@ func main() {
 	}()
 
 	if o.registry == "" {
-		log.Fatal("Error: registry-name parameter must contain a valid registry address!")
+		log.Panic("-registry parameter must contain a valid registry address!")
 	}
 
-	versions, err := getVersions(log, o.versionsFile, o.versionFilter)
+	// If given, load the KubermaticConfiguration. It's not yet a required
+	// parameter in order to support Helm-based Enterprise setups.
+	var kubermaticConfig *operatorv1alpha1.KubermaticConfiguration
+	if o.configurationFile != "" {
+		kubermaticConfig, err = loadKubermaticConfiguration(log, o.configurationFile)
+		if err != nil {
+			log.Panicw("Failed to load KubermaticConfiguration", zap.Error(err))
+		}
+	}
+
+	versions, err := getVersions(log, kubermaticConfig, o.versionsFile, o.versionFilter)
 	if err != nil {
-		log.Fatal("Error loading versions", zap.Error(err))
+		log.Panicw("Error loading versions", zap.Error(err))
+	}
+
+	// if no local addons path is given, use the configured addons
+	// Docker image and extract the addons from there
+	if o.addonsPath == "" {
+		addonsImage := o.addonsImage
+		if addonsImage == "" {
+			if kubermaticConfig == nil {
+				log.Warn("No KubermaticConfiguration, -addons-image or -addons-path given, cannot mirror images referenced in addons.")
+			} else {
+				v := common.NewDefaultVersions()
+				addonsImage = kubermaticConfig.Spec.UserCluster.Addons.Kubernetes.DockerRepository + ":" + v.Kubermatic
+			}
+		}
+
+		if addonsImage != "" {
+			tempDir, err := extractAddonsFromDockerImage(ctx, log, addonsImage)
+			if err != nil {
+				log.Panicw("Failed to create local addons path", zap.Error(err))
+			}
+			defer os.RemoveAll(tempDir)
+
+			o.addonsPath = tempDir
+		}
 	}
 
 	// Using a set here for deduplication
@@ -123,19 +181,48 @@ func main() {
 			continue
 		}
 		versionLog.Info("Collecting images...")
-		images, err := getImagesForVersion(log, version, o.addonsPath)
+		images, err := getImagesForVersion(log, version, kubermaticConfig, o.addonsPath)
 		if err != nil {
-			versionLog.Fatal("failed to get images", zap.Error(err))
+			versionLog.Panicw("failed to get images", zap.Error(err))
+		}
+		imageSet.Insert(images...)
+	}
+
+	if o.chartsPath != "" {
+		log.Infow("Rendering Helm charts", "directory", o.chartsPath)
+
+		images, err := getImagesForHelmCharts(ctx, log, kubermaticConfig, o.chartsPath, o.helmValuesPath, o.helmBinary)
+		if err != nil {
+			log.Panicw("Failed to get images", zap.Error(err))
 		}
 		imageSet.Insert(images...)
 	}
 
 	if err := processImages(ctx, log, o.dryRun, imageSet.List(), o.registry); err != nil {
-		log.Fatal("Failed to process images", zap.Error(err))
+		log.Panicw("Failed to process images", zap.Error(err))
 	}
 }
 
-func processImages(ctx context.Context, log *zap.Logger, dryRun bool, images []string, registry string) error {
+func extractAddonsFromDockerImage(ctx context.Context, log *zap.SugaredLogger, imageName string) (string, error) {
+	tempDir, err := ioutil.TempDir("", "imageloader*")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temporary directory: %v", err)
+	}
+
+	log.Infow("Extracting addon manifests from Docker image", "image", imageName, "temp-directory", tempDir)
+
+	if err := docker.DownloadImages(ctx, log, false, []string{imageName}); err != nil {
+		return tempDir, fmt.Errorf("failed to download addons image: %v", err)
+	}
+
+	if err := docker.Copy(ctx, log, imageName, tempDir, "/addons"); err != nil {
+		return tempDir, fmt.Errorf("failed to extract addons: %v", err)
+	}
+
+	return tempDir, nil
+}
+
+func processImages(ctx context.Context, log *zap.SugaredLogger, dryRun bool, images []string, registry string) error {
 	if err := docker.DownloadImages(ctx, log, dryRun, images); err != nil {
 		return fmt.Errorf("failed to download all images: %v", err)
 	}
@@ -151,36 +238,50 @@ func processImages(ctx context.Context, log *zap.Logger, dryRun bool, images []s
 	return nil
 }
 
-func getImagesForVersion(log *zap.Logger, version *kubermaticversion.Version, addonsPath string) (images []string, err error) {
+func getImagesForVersion(log *zap.SugaredLogger, version *kubermaticversion.Version, config *operatorv1alpha1.KubermaticConfiguration, addonsPath string) (images []string, err error) {
 	templateData, err := getTemplateData(version)
 	if err != nil {
 		return nil, err
 	}
 
-	creatorImages, err := getImagesFromCreators(templateData)
+	creatorImages, err := getImagesFromCreators(log, templateData, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get images from internal creator functions: %v", err)
 	}
 	images = append(images, creatorImages...)
 
-	if addonsPath != "" {
-		addonImages, err := getImagesFromAddons(log, addonsPath, templateData.Cluster())
-		if err != nil {
-			return nil, fmt.Errorf("failed to get images from addons: %v", err)
-		}
-		images = append(images, addonImages...)
+	addonImages, err := getImagesFromAddons(log, addonsPath, templateData.Cluster())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get images from addons: %v", err)
 	}
+	images = append(images, addonImages...)
 
 	return images, nil
 }
 
-func getImagesFromCreators(templateData *resources.TemplateData) (images []string, err error) {
+func getImagesFromCreators(log *zap.SugaredLogger, templateData *resources.TemplateData, config *operatorv1alpha1.KubermaticConfiguration) (images []string, err error) {
+	v := common.NewDefaultVersions()
+
+	seed, err := common.DefaultSeed(&kubermaticv1.Seed{}, log)
+	if err != nil {
+		return nil, fmt.Errorf("failed to default Seed: %v", err)
+	}
+
 	statefulsetCreators := kubernetescontroller.GetStatefulSetCreators(templateData, false)
 	statefulsetCreators = append(statefulsetCreators, monitoring.GetStatefulSetCreators(templateData)...)
 
 	deploymentCreators := kubernetescontroller.GetDeploymentCreators(templateData, false)
 	deploymentCreators = append(deploymentCreators, monitoring.GetDeploymentCreators(templateData)...)
 	deploymentCreators = append(deploymentCreators, containerlinux.GetDeploymentCreators("", kubermaticv1.UpdateWindow{})...)
+	deploymentCreators = append(deploymentCreators, masteroperator.APIDeploymentCreator(config, "", v))
+	deploymentCreators = append(deploymentCreators, masteroperator.MasterControllerManagerDeploymentCreator(config, "", v))
+	deploymentCreators = append(deploymentCreators, masteroperator.UIDeploymentCreator(config, v))
+	deploymentCreators = append(deploymentCreators, seedoperatorkubermatic.SeedControllerManagerDeploymentCreator("", v, config, seed))
+	deploymentCreators = append(deploymentCreators, seedoperatornodeportproxy.EnvoyDeploymentCreator(seed, v))
+	deploymentCreators = append(deploymentCreators, seedoperatornodeportproxy.UpdaterDeploymentCreator(seed, v))
+	deploymentCreators = append(deploymentCreators, vpa.AdmissionControllerDeploymentCreator(config, v))
+	deploymentCreators = append(deploymentCreators, vpa.RecommenderDeploymentCreator(config, v))
+	deploymentCreators = append(deploymentCreators, vpa.UpdaterDeploymentCreator(config, v))
 
 	cronjobCreators := kubernetescontroller.GetCronJobCreators(templateData)
 
@@ -284,24 +385,14 @@ func getTemplateData(version *kubermaticversion.Version) (*resources.TemplateDat
 	configMapList := &corev1.ConfigMapList{
 		Items: []corev1.ConfigMap{cloudConfigConfigMap, prometheusConfigMap, dnsResolverConfigMap, openvpnClientConfigsConfigMap, auditConfigMap, clusterProxyConfigMap, schedulerPolicyConfigMap},
 	}
-	apiServerExternalService := corev1.Service{
+	apiServerService := corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      resources.ApiserverExternalServiceName,
+			Name:      resources.ApiserverServiceName,
 			Namespace: mockNamespaceName,
 		},
 		Spec: corev1.ServiceSpec{
 			Ports:     []corev1.ServicePort{{NodePort: 99}},
 			ClusterIP: "192.0.2.10",
-		},
-	}
-	apiserverService := corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      resources.ApiserverInternalServiceName,
-			Namespace: mockNamespaceName,
-		},
-		Spec: corev1.ServiceSpec{
-			Ports:     []corev1.ServicePort{{NodePort: 98}},
-			ClusterIP: "192.0.2.11",
 		},
 	}
 	openvpnserverService := corev1.Service{
@@ -326,8 +417,7 @@ func getTemplateData(version *kubermaticversion.Version) (*resources.TemplateDat
 	}
 	serviceList := &corev1.ServiceList{
 		Items: []corev1.Service{
-			apiServerExternalService,
-			apiserverService,
+			apiServerService,
 			openvpnserverService,
 			dnsService,
 		},
@@ -420,15 +510,26 @@ func createNamedSecrets(secretNames []string) *corev1.SecretList {
 	return &secretList
 }
 
-func getVersions(log *zap.Logger, versionsFile, versionFilter string) ([]*kubermaticversion.Version, error) {
-	log = log.With(
-		zap.String("versions-file", versionsFile),
-		zap.String("versions-filter", versionFilter),
-	)
-	log.Debug("Loading versions")
-	versions, err := kubermaticversion.LoadVersions(versionsFile)
-	if err != nil {
-		return nil, err
+func getVersions(log *zap.SugaredLogger, config *operatorv1alpha1.KubermaticConfiguration, versionsFile, versionFilter string) ([]*kubermaticversion.Version, error) {
+	var versions []*kubermaticversion.Version
+
+	log = log.With("versions-filter", versionFilter)
+
+	if config != nil {
+		log.Debug("Loading versions")
+		versions = getVersionsFromKubermaticConfiguration(config)
+	} else {
+		if versionsFile == "" {
+			return nil, errors.New("either a KubermaticConfiguration or a versions file must be specified")
+		}
+
+		var err error
+
+		log.Debugw("Loading versions", "file", versionsFile)
+		versions, err = kubermaticversion.LoadVersions(versionsFile)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if versionFilter == "" {
@@ -447,60 +548,11 @@ func getVersions(log *zap.Logger, versionsFile, versionFilter string) ([]*kuberm
 			filteredVersions = append(filteredVersions, ver)
 		}
 	}
+
 	return filteredVersions, nil
 }
 
-func getImagesFromAddons(log *zap.Logger, addonsPath string, cluster *kubermaticv1.Cluster) ([]string, error) {
-	credentials := resources.Credentials{}
-
-	addonData, err := addonutil.NewTemplateData(cluster, credentials, "", "", "", nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create addon template data: %v", err)
-	}
-
-	infos, err := ioutil.ReadDir(addonsPath)
-	if err != nil {
-		return nil, fmt.Errorf("unable to list addons: %v", err)
-	}
-
-	serializer := json.NewSerializer(&json.SimpleMetaFactory{}, scheme.Scheme, scheme.Scheme, false)
-	var images []string
-	for _, info := range infos {
-		if !info.IsDir() {
-			continue
-		}
-		addonName := info.Name()
-		addonImages, err := getImagesFromAddon(log, path.Join(addonsPath, addonName), serializer, addonData)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get images for addon %s: %v", addonName, err)
-		}
-		images = append(images, addonImages...)
-	}
-
-	return images, nil
-}
-
-func getImagesFromAddon(log *zap.Logger, addonPath string, decoder runtime.Decoder, data *addonutil.TemplateData) ([]string, error) {
-	log = log.With(zap.String("addon", path.Base(addonPath)))
-	log.Debug("Processing manifests...")
-
-	allManifests, err := addonutil.ParseFromFolder(log.Sugar(), "", addonPath, data)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse addon templates in %s: %v", addonPath, err)
-	}
-
-	var images []string
-	for _, manifest := range allManifests {
-		manifestImages, err := getImagesFromManifest(log, decoder, manifest.Raw)
-		if err != nil {
-			return nil, err
-		}
-		images = append(images, manifestImages...)
-	}
-	return images, nil
-}
-
-func getImagesFromManifest(log *zap.Logger, decoder runtime.Decoder, b []byte) ([]string, error) {
+func getImagesFromManifest(log *zap.SugaredLogger, decoder runtime.Decoder, b []byte) ([]string, error) {
 	obj, err := runtime.Decode(decoder, b)
 	if err != nil {
 		if runtime.IsNotRegisteredError(err) {

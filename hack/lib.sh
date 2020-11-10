@@ -17,6 +17,10 @@
 # receives a SIGINT
 set -o monitor
 
+worker_name() {
+  echo "${KUBERMATIC_WORKERNAME:-$(uname -n)}" | tr -cd '[:alnum:]' | tr '[:upper:]' '[:lower:]'
+}
+
 retry() {
   # Works only with bash but doesn't fail on other shells
   start_time=$(date +%s)
@@ -58,7 +62,7 @@ write_junit() {
   # Doesn't make any sense if we don't know a testname
   if [ -z "${TEST_NAME:-}" ]; then return; fi
   # Only run in CI
-  if [ -z "$ARTIFACTS" ]; then return; fi
+  if [ -z "${ARTIFACTS:-}" ]; then return; fi
 
   rc=$1
   duration=${2:-0}
@@ -103,7 +107,7 @@ get_latest_dashboard_hash() {
 
   ensure_github_host_pubkey
   git config --global core.sshCommand 'ssh -o CheckHostIP=no -i /ssh/id_rsa'
-  local DASHBOARD_URL="git@github.com:kubermatic/dashboard-v2.git"
+  local DASHBOARD_URL="git@github.com:kubermatic/dashboard.git"
 
   # `local` always sets the rc to 0, so declare as local _before_ doing the substitution
   # which may fail
@@ -121,7 +125,7 @@ get_latest_dashboard_tag() {
 
   ensure_github_host_pubkey
   git config --global core.sshCommand 'ssh -o CheckHostIP=no -i /ssh/id_rsa'
-  local DASHBOARD_URL="git@github.com:kubermatic/dashboard-v2.git"
+  local DASHBOARD_URL="git@github.com:kubermatic/dashboard.git"
 
   local TMPDIR
   TMPDIR=$(mktemp -d dashboard.XXXXX)
@@ -142,7 +146,7 @@ check_dashboard_tag() {
 
   ensure_github_host_pubkey
   git config --global core.sshCommand 'ssh -o CheckHostIP=no -i /ssh/id_rsa'
-  local DASHBOARD_URL="git@github.com:kubermatic/dashboard-v2.git"
+  local DASHBOARD_URL="git@github.com:kubermatic/dashboard.git"
 
   retry 5 git ls-remote "$DASHBOARD_URL" "refs/tags/$TAG"
 }
@@ -242,4 +246,51 @@ pushMetric() {
 
 pushElapsed() {
   pushMetric "$1" $(elapsed $2) "${3:-}" "${4:-}" "${5:-}"
+}
+
+# err print an error log to stderr
+err() {
+  echo "$(date) E: $*" >>/dev/stderr
+}
+
+# fatal can be used to print logs to stderr
+fatal() {
+  echo "$(date) F: $*" >>/dev/stderr
+  exit 1
+}
+
+check_all_deployments_ready() {
+  local namespace="$1"
+
+  # check that Deployments have been created
+  local deployments
+  deployments=$(kubectl -n $namespace get deployments -o json)
+
+  if [ $(jq '.items | length' <<< $deployments) -eq 0 ]; then
+    echodate "No Deployments created yet."
+    return 1
+  fi
+
+  # check that all Deployments are ready
+  local unready
+  unready=$(jq -r '[.items[] | select(.spec.replicas > 0) | select (.status.availableReplicas < .spec.replicas) | .metadata.name] | @tsv' <<< $deployments)
+  if [ -n "$unready" ]; then
+    echodate "Not all Deployments have finished rolling out, namely: $unready"
+    return 1
+  fi
+
+  return 0
+}
+
+function cleanup_kubermatic_clusters_in_kind {
+  # Tolerate errors and just continue
+  set +e
+  # Clean up clusters
+  echodate "Cleaning up clusters..."
+  kubectl delete cluster --all --ignore-not-found=true
+  echodate "Done cleaning up clusters"
+
+  # Kill all descendant processes
+  pkill -P $$
+  set -e
 }

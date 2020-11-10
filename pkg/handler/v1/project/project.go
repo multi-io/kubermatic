@@ -22,21 +22,22 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-kit/kit/endpoint"
 
-	apiv1 "github.com/kubermatic/kubermatic/pkg/api/v1"
-	kubermaticapiv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/handler/middleware"
-	"github.com/kubermatic/kubermatic/pkg/handler/v1/common"
-	"github.com/kubermatic/kubermatic/pkg/provider"
-	"github.com/kubermatic/kubermatic/pkg/util/errors"
+	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
+	kubermaticapiv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/handler/middleware"
+	"k8c.io/kubermatic/v2/pkg/handler/v1/common"
+	"k8c.io/kubermatic/v2/pkg/provider"
+	"k8c.io/kubermatic/v2/pkg/util/errors"
 
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 // CreateEndpoint defines an HTTP endpoint that creates a new project in the system
-func CreateEndpoint(projectProvider provider.ProjectProvider) endpoint.Endpoint {
+func CreateEndpoint(projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, settingsProvider provider.SettingsProvider, memberMapper provider.ProjectMemberMapper, memberProvider provider.ProjectMemberProvider, userProvider provider.UserProvider) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		projectRq, ok := request.(projectReq)
 		if !ok {
@@ -48,28 +49,97 @@ func CreateEndpoint(projectProvider provider.ProjectProvider) endpoint.Endpoint 
 		}
 
 		user := ctx.Value(middleware.UserCRContextKey).(*kubermaticapiv1.User)
+		settings, err := settingsProvider.GetGlobalSettings()
+		if err != nil {
+			return nil, common.KubernetesErrorToHTTPError(err)
+		}
+
+		if err := checkProjectRestriction(user, settings); err != nil {
+			return nil, err
+		}
+
+		if err := validateUserProjectsLimit(user, settings, projectProvider, privilegedProjectProvider, memberMapper, memberProvider, userProvider); err != nil {
+			return nil, err
+		}
+
 		kubermaticProject, err := projectProvider.New(user, projectRq.Body.Name, projectRq.Body.Labels)
 		if err != nil {
 			return nil, common.KubernetesErrorToHTTPError(err)
 		}
-		return apiv1.Project{
-			ObjectMeta: apiv1.ObjectMeta{
-				ID:                kubermaticProject.Name,
-				Name:              kubermaticProject.Spec.Name,
-				CreationTimestamp: apiv1.NewTime(kubermaticProject.CreationTimestamp.Time),
-			},
-			Status: kubermaticProject.Status.Phase,
-			Labels: kubermaticProject.Labels,
-			Owners: []apiv1.User{
-				{
-					ObjectMeta: apiv1.ObjectMeta{
-						Name: user.Spec.Name,
-					},
-					Email: user.Spec.Email,
+
+		owners := []apiv1.User{
+			{
+				ObjectMeta: apiv1.ObjectMeta{
+					Name: user.Spec.Name,
 				},
+				Email: user.Spec.Email,
 			},
-		}, nil
+		}
+
+		return common.ConvertInternalProjectToExternal(kubermaticProject, owners, 0), nil
 	}
+}
+
+func checkProjectRestriction(user *kubermaticapiv1.User, settings *kubermaticapiv1.KubermaticSetting) error {
+	if user.Spec.IsAdmin {
+		return nil
+	}
+	if settings.Spec.RestrictProjectCreation {
+		return errors.New(http.StatusForbidden, "project creation is restricted")
+	}
+	return nil
+}
+
+func validateUserProjectsLimit(user *kubermaticapiv1.User, settings *kubermaticapiv1.KubermaticSetting, projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, memberMapper provider.ProjectMemberMapper, memberProvider provider.ProjectMemberProvider, userProvider provider.UserProvider) error {
+	if user.Spec.IsAdmin {
+		return nil
+	}
+	if settings.Spec.UserProjectsLimit <= 0 {
+		return nil
+	}
+
+	userMappings, err := memberMapper.MappingsFor(user.Spec.Email)
+	if err != nil {
+		return common.KubernetesErrorToHTTPError(err)
+	}
+	var errorList []string
+	var projectsCounter int64
+	for _, mapping := range userMappings {
+		userInfo := &provider.UserInfo{Email: mapping.Spec.UserEmail, Group: mapping.Spec.Group}
+		projectInternal, err := projectProvider.Get(userInfo, mapping.Spec.ProjectID, &provider.ProjectGetOptions{IncludeUninitialized: true})
+		if err != nil {
+			// Request came from the specified user. Instead `Not found` error status the `Forbidden` is returned.
+			// Next request with privileged user checks if the project doesn't exist or some other error occurred.
+			if !isStatus(err, http.StatusForbidden) {
+				errorList = append(errorList, err.Error())
+				continue
+			}
+			_, errGetUnsecured := privilegedProjectProvider.GetUnsecured(mapping.Spec.ProjectID, &provider.ProjectGetOptions{IncludeUninitialized: true})
+			if !isStatus(errGetUnsecured, http.StatusNotFound) {
+				// store original error
+				errorList = append(errorList, err.Error())
+			}
+			continue
+		}
+		// get only owned projects
+		projectOwners, err := common.GetOwnersForProject(userInfo, projectInternal, memberProvider, userProvider)
+		if err != nil {
+			return common.KubernetesErrorToHTTPError(err)
+		}
+		for _, owner := range projectOwners {
+			if strings.EqualFold(owner.Email, user.Spec.Email) {
+				projectsCounter++
+			}
+		}
+	}
+	if len(errorList) > 0 {
+		return errors.NewWithDetails(http.StatusInternalServerError, "failed to get some projects, please examine details field for more info", errorList)
+	}
+
+	if projectsCounter >= settings.Spec.UserProjectsLimit {
+		return errors.New(http.StatusForbidden, "reached maximum number of projects")
+	}
+	return nil
 }
 
 // ListEndpoint defines an HTTP endpoint for listing projects
@@ -97,6 +167,9 @@ func ListEndpoint(userInfoGetter provider.UserInfoGetter, projectProvider provid
 			userInfo := &provider.UserInfo{Email: mapping.Spec.UserEmail, Group: mapping.Spec.Group}
 			projectInternal, err := projectProvider.Get(userInfo, mapping.Spec.ProjectID, &provider.ProjectGetOptions{IncludeUninitialized: true})
 			if err != nil {
+				if isStatus(err, http.StatusNotFound) {
+					continue
+				}
 				// Request came from the specified user. Instead `Not found` error status the `Forbidden` is returned.
 				// Next request with privileged user checks if the project doesn't exist or some other error occurred.
 				if !isStatus(err, http.StatusForbidden) {

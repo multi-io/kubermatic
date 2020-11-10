@@ -17,15 +17,21 @@ limitations under the License.
 package test
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"time"
 
-	kubermaticapiv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/provider"
+	kubermaticapiv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/provider"
+	"k8c.io/kubermatic/v2/pkg/provider/kubernetes"
+	"k8c.io/kubermatic/v2/pkg/semver"
 
+	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -118,4 +124,67 @@ func createError(status int32, message string) error {
 		Reason:  metav1.StatusReasonBadRequest,
 		Message: message,
 	}}
+}
+
+type FakeExternalClusterProvider struct {
+	Provider   *kubernetes.ExternalClusterProvider
+	FakeClient ctrlruntimeclient.Client
+}
+
+func (p *FakeExternalClusterProvider) IsMetricServerAvailable(cluster *kubermaticapiv1.ExternalCluster) (bool, error) {
+	return true, nil
+}
+
+func (p *FakeExternalClusterProvider) GetNode(cluster *kubermaticapiv1.ExternalCluster, nodeName string) (*corev1.Node, error) {
+	node := &corev1.Node{}
+	if err := p.FakeClient.Get(context.Background(), ctrlruntimeclient.ObjectKey{Name: nodeName}, node); err != nil {
+		return nil, err
+	}
+
+	return node, nil
+}
+
+func (p *FakeExternalClusterProvider) ListNodes(cluster *kubermaticapiv1.ExternalCluster) (*corev1.NodeList, error) {
+	nodes := &corev1.NodeList{}
+	if err := p.FakeClient.List(context.Background(), nodes); err != nil {
+		return nil, err
+	}
+
+	return nodes, nil
+}
+
+func (p *FakeExternalClusterProvider) Update(userInfo *provider.UserInfo, cluster *kubermaticapiv1.ExternalCluster) (*kubermaticapiv1.ExternalCluster, error) {
+	return p.Provider.Update(userInfo, cluster)
+}
+
+func (p *FakeExternalClusterProvider) GetVersion(cluster *kubermaticapiv1.ExternalCluster) (*semver.Semver, error) {
+	return semver.NewSemver(DefaultKubernetesVersion)
+}
+
+func (p *FakeExternalClusterProvider) GetClient(cluster *kubermaticapiv1.ExternalCluster) (ctrlruntimeclient.Client, error) {
+	return p.FakeClient, nil
+}
+
+func (p *FakeExternalClusterProvider) List(project *kubermaticapiv1.Project) (*kubermaticapiv1.ExternalClusterList, error) {
+	return p.Provider.List(project)
+}
+
+func (p *FakeExternalClusterProvider) Get(userInfo *provider.UserInfo, clusterName string) (*kubermaticapiv1.ExternalCluster, error) {
+	return p.Provider.Get(userInfo, clusterName)
+}
+
+func (p *FakeExternalClusterProvider) Delete(userInfo *provider.UserInfo, cluster *kubermaticapiv1.ExternalCluster) error {
+	return p.Provider.Delete(userInfo, cluster)
+}
+
+func (p *FakeExternalClusterProvider) GenerateClient(cfg *clientcmdapi.Config) (ctrlruntimeclient.Client, error) {
+	return p.FakeClient, nil
+}
+
+func (p *FakeExternalClusterProvider) CreateOrUpdateKubeconfigSecretForCluster(ctx context.Context, cluster *kubermaticapiv1.ExternalCluster, kubeconfig string) error {
+	return p.Provider.CreateOrUpdateKubeconfigSecretForCluster(ctx, cluster, kubeconfig)
+}
+
+func (p *FakeExternalClusterProvider) New(userInfo *provider.UserInfo, project *kubermaticapiv1.Project, cluster *kubermaticapiv1.ExternalCluster) (*kubermaticapiv1.ExternalCluster, error) {
+	return p.Provider.New(userInfo, project, cluster)
 }

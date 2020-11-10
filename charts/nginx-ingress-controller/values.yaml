@@ -1,0 +1,59 @@
+# Copyright 2020 The Kubermatic Kubernetes Platform contributors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+nginx:
+  hostNetwork: false
+  asDaemonSet: false
+  replicas: 3
+  image:
+    # us, eu or asia
+    repository: eu.gcr.io/k8s-artifacts-prod/ingress-nginx/controller
+    tag: v0.34.1
+  config: {}
+#   load-balance: "least_conn"
+  extraArgs: []
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 512Mi
+  nodeSelector: {}
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        preference:
+          matchExpressions:
+          - key: kubermatic.io/type
+            operator: In
+            values:
+            - stable
+  tolerations:
+  - key: only_critical
+    operator: Equal
+    value: "true"
+    effect: NoSchedule
+
+  # set this to true to automatically add these tolerations
+  # to make nginx run on master nodes:
+  #   - { key: dedicated, operator: Equal, value: master, effect: NoSchedule }
+  #   - { key: node-role.kubernetes.io/master, effect: NoSchedule }
+  ignoreMasterTaint: false
+
+  # Optionally change this to ClusterFirstWithHostNet in case you have 'hostNetwork: true'.
+  # By default, while using host network, name resolution uses the host's DNS. If you wish nginx-controller
+  # to keep resolving names inside the k8s network, use ClusterFirstWithHostNet.
+  dnsPolicy: ClusterFirst

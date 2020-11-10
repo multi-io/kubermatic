@@ -22,7 +22,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/kubermatic/kubermatic/pkg/controller/master-controller-manager/rbac"
+	"k8c.io/kubermatic/v2/pkg/controller/master-controller-manager/rbac"
 
 	apps "k8s.io/api/apps/v1"
 	autoscaling "k8s.io/api/autoscaling/v1"
@@ -59,7 +59,6 @@ func generateVerbsForGroup(groupName string) ([]string, error) {
 
 // GenerateRBACClusterRole creates role for specific group
 func GenerateRBACClusterRole(resourceName string) (*rbacv1.ClusterRole, error) {
-
 	groupName, err := getGroupName(resourceName)
 	if err != nil {
 		return nil, err
@@ -157,7 +156,8 @@ func GenerateRBACClusterRole(resourceName string) (*rbacv1.ClusterRole, error) {
 				APIGroups: []string{"*"},
 				Resources: []string{"*"},
 				Verbs:     verbs,
-			}}
+			},
+		}
 	}
 	return clusterRole, nil
 }

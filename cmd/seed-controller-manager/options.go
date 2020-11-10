@@ -29,15 +29,15 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/kubermatic/kubermatic/pkg/cluster/client"
-	"github.com/kubermatic/kubermatic/pkg/controller/operator/common"
-	backupcontroller "github.com/kubermatic/kubermatic/pkg/controller/seed-controller-manager/backup"
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/features"
-	"github.com/kubermatic/kubermatic/pkg/keycloak"
-	"github.com/kubermatic/kubermatic/pkg/provider"
-	"github.com/kubermatic/kubermatic/pkg/resources"
-	seedvalidation "github.com/kubermatic/kubermatic/pkg/validation/seed"
+	"k8c.io/kubermatic/v2/pkg/cluster/client"
+	"k8c.io/kubermatic/v2/pkg/controller/operator/common"
+	backupcontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/backup"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/features"
+	"k8c.io/kubermatic/v2/pkg/keycloak"
+	"k8c.io/kubermatic/v2/pkg/provider"
+	"k8c.io/kubermatic/v2/pkg/resources"
+	seedvalidation "k8c.io/kubermatic/v2/pkg/validation/seed"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -48,9 +48,9 @@ import (
 )
 
 type controllerRunOptions struct {
-	kubeconfig   string
-	masterURL    string
-	internalAddr string
+	internalAddr            string
+	enableLeaderElection    bool
+	leaderElectionNamespace string
 
 	externalURL                                      string
 	dc                                               string
@@ -83,7 +83,6 @@ type controllerRunOptions struct {
 	etcdLauncherImage                                string
 	dnatControllerImage                              string
 	namespace                                        string
-	disableLeaderElection                            bool
 	apiServerDefaultReplicas                         int
 	apiServerEndpointReconcilingDisabled             bool
 	controllerManagerDefaultReplicas                 int
@@ -92,8 +91,6 @@ type controllerRunOptions struct {
 	concurrentClusterUpdate                          int
 	addonEnforceInterval                             int
 	defaultComponentSettings                         string
-	k8sClientQPS                                     float64
-	k8sClientBurst                                   int
 
 	// OIDC configuration
 	oidcCAFile             string
@@ -113,8 +110,9 @@ func newControllerRunOptions() (controllerRunOptions, error) {
 	var defaultOpenshiftAddonList string
 	var defaultOpenshiftAddonsFile string
 
-	flag.StringVar(&c.kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
-	flag.StringVar(&c.masterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
+	flag.BoolVar(&c.enableLeaderElection, "enable-leader-election", true, "Enable leader election for controller manager. "+
+		"Enabling this will ensure there is only one active controller manager.")
+	flag.StringVar(&c.leaderElectionNamespace, "leader-election-namespace", "", "Leader election namespace. In-cluster discovery will be attempted in such case.")
 	flag.StringVar(&c.internalAddr, "internal-address", "127.0.0.1:8085", "The address on which the internal server is running on")
 	flag.StringVar(&c.externalURL, "external-url", "", "The external url for the apiserver host and the the dc.(Required)")
 	flag.StringVar(&c.dc, "datacenter-name", "", "The name of the seed datacenter, the controller is running in. It will be used to build the absolute url for a customer cluster.")
@@ -139,7 +137,7 @@ func newControllerRunOptions() (controllerRunOptions, error) {
 	flag.StringVar(&rawEtcdDiskSize, "etcd-disk-size", "5Gi", "Size for the etcd PV's. Only applies to new clusters.")
 	flag.StringVar(&c.inClusterPrometheusRulesFile, "in-cluster-prometheus-rules-file", "", "The file containing the custom alerting rules for the prometheus running in the cluster-foo namespaces.")
 	flag.BoolVar(&c.inClusterPrometheusDisableDefaultRules, "in-cluster-prometheus-disable-default-rules", false, "A flag indicating whether the default rules for the prometheus running in the cluster-foo namespaces should be deployed.")
-	flag.StringVar(&c.dockerPullConfigJSONFile, "docker-pull-config-json-file", "config.json", "The file containing the docker auth config.")
+	flag.StringVar(&c.dockerPullConfigJSONFile, "docker-pull-config-json-file", "", "The file containing the docker auth config.")
 	flag.BoolVar(&c.inClusterPrometheusDisableDefaultScrapingConfigs, "in-cluster-prometheus-disable-default-scraping-configs", false, "A flag indicating whether the default scraping configs for the prometheus running in the cluster-foo namespaces should be deployed.")
 	flag.StringVar(&c.inClusterPrometheusScrapingConfigsFile, "in-cluster-prometheus-scraping-configs-file", "", "The file containing the custom scraping configs for the prometheus running in the cluster-foo namespaces.")
 	flag.StringVar(&c.monitoringEnvironmentLabel, "monitoring-environment-label", "", "The label for monitoring environment label. Default: ''")
@@ -151,10 +149,9 @@ func newControllerRunOptions() (controllerRunOptions, error) {
 	flag.StringVar(&c.oidcIssuerClientSecret, "oidc-issuer-client-secret", "", "OpenID client secret")
 	flag.StringVar(&c.kubermaticImage, "kubermatic-image", resources.DefaultKubermaticImage, "The location from which to pull the Kubermatic image")
 	flag.DurationVar(&c.keycloakCacheExpiry, "keycloak-cache-expiry", 2*time.Hour, "Time duration after which items in the Keycloak client cache expire.")
-	flag.StringVar(&c.etcdLauncherImage, "etcd-launcher-image", resources.DefaultEtcdLauncherImage, fmt.Sprintf("The location from which to pull the etcd launcher image, if image tag is not specified tag %s is used", resources.KUBERMATICCOMMIT))
+	flag.StringVar(&c.etcdLauncherImage, "etcd-launcher-image", resources.DefaultEtcdLauncherImage, "The location from which to pull the etcd launcher image")
 	flag.StringVar(&c.dnatControllerImage, "dnatcontroller-image", resources.DefaultDNATControllerImage, "The location of the dnatcontroller-image")
 	flag.StringVar(&c.namespace, "namespace", "kubermatic", "The namespace kubermatic runs in, uses to determine where to look for datacenter custom resources")
-	flag.BoolVar(&c.disableLeaderElection, "disable-leader-election", false, "A flag indicating whether the controller should skip the leader election. Only enable this for debugging purposes.")
 	flag.IntVar(&c.apiServerDefaultReplicas, "apiserver-default-replicas", 2, "The default number of replicas for usercluster api servers")
 	flag.BoolVar(&c.apiServerEndpointReconcilingDisabled, "apiserver-reconciling-disabled-by-default", false, "Whether to disable reconciling for the apiserver endpoints by default")
 	flag.IntVar(&c.controllerManagerDefaultReplicas, "controller-manager-default-replicas", 1, "The default number of replicas for usercluster controller managers")
@@ -162,8 +159,6 @@ func newControllerRunOptions() (controllerRunOptions, error) {
 	flag.IntVar(&c.concurrentClusterUpdate, "max-parallel-reconcile", 10, "The default number of resources updates per cluster")
 	flag.IntVar(&c.addonEnforceInterval, "addon-enforce-interval", 5, "Check and ensure default usercluster addons are deployed every interval in minutes. Set to 0 to disable.")
 	flag.StringVar(&c.defaultComponentSettings, "default-component-settings", "", "YAML file with default cluster component settings")
-	flag.Float64Var(&c.k8sClientQPS, "k8s-client-qps", 20, "Maximum QPS for the k8s client when talking to seed cluster APIs.")
-	flag.IntVar(&c.k8sClientBurst, "k8s-client-burst", 50, "Maximum burst for k8s client requests when talking to seed cluster APIs.")
 	c.seedValidationHook.AddFlags(flag.CommandLine)
 	addFlags(flag.CommandLine)
 	flag.Parse()
@@ -227,10 +222,6 @@ func (o controllerRunOptions) validate() error {
 
 	if o.backupContainerFile == "" {
 		return fmt.Errorf("backup-container is undefined")
-	}
-
-	if o.dockerPullConfigJSONFile == "" {
-		return fmt.Errorf("docker-pull-config-json-file is undefined")
 	}
 
 	if o.monitoringScrapeAnnotationPrefix == "" {

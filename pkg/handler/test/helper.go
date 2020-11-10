@@ -30,36 +30,33 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kubermatic/kubermatic/pkg/keycloak"
-	"github.com/kubermatic/kubermatic/pkg/resources"
-
 	ver "github.com/Masterminds/semver"
 	prometheusapi "github.com/prometheus/client_golang/api"
 
-	apiv1 "github.com/kubermatic/kubermatic/pkg/api/v1"
-	k8cuserclusterclient "github.com/kubermatic/kubermatic/pkg/cluster/client"
-	"github.com/kubermatic/kubermatic/pkg/controller/master-controller-manager/rbac"
-	kubermaticfakeclentset "github.com/kubermatic/kubermatic/pkg/crd/client/clientset/versioned/fake"
-	kubermaticinformers "github.com/kubermatic/kubermatic/pkg/crd/client/informers/externalversions"
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/handler/auth"
-	kubermaticlog "github.com/kubermatic/kubermatic/pkg/log"
-	"github.com/kubermatic/kubermatic/pkg/provider"
-	"github.com/kubermatic/kubermatic/pkg/provider/kubernetes"
-	"github.com/kubermatic/kubermatic/pkg/semver"
-	"github.com/kubermatic/kubermatic/pkg/serviceaccount"
-	"github.com/kubermatic/kubermatic/pkg/version"
-	"github.com/kubermatic/kubermatic/pkg/watcher"
-	kuberneteswatcher "github.com/kubermatic/kubermatic/pkg/watcher/kubernetes"
 	clusterv1alpha1 "github.com/kubermatic/machine-controller/pkg/apis/cluster/v1alpha1"
+	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
+	k8cuserclusterclient "k8c.io/kubermatic/v2/pkg/cluster/client"
+	"k8c.io/kubermatic/v2/pkg/controller/master-controller-manager/rbac"
+	kubermaticfakeclentset "k8c.io/kubermatic/v2/pkg/crd/client/clientset/versioned/fake"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/handler/auth"
+	"k8c.io/kubermatic/v2/pkg/keycloak"
+	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
+	"k8c.io/kubermatic/v2/pkg/provider"
+	"k8c.io/kubermatic/v2/pkg/provider/kubernetes"
+	"k8c.io/kubermatic/v2/pkg/resources"
+	"k8c.io/kubermatic/v2/pkg/semver"
+	"k8c.io/kubermatic/v2/pkg/serviceaccount"
+	"k8c.io/kubermatic/v2/pkg/version"
+	"k8c.io/kubermatic/v2/pkg/watcher"
+	kuberneteswatcher "k8c.io/kubermatic/v2/pkg/watcher/kubernetes"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/informers"
 	kubernetesclientset "k8s.io/client-go/kubernetes"
 	fakerestclient "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -119,6 +116,8 @@ const (
 	TestFakeCredential = "fake"
 	// RequiredEmailDomain required domain for predefined credentials
 	RequiredEmailDomain = "acme.com"
+	// DefaultKubernetesVersion kubernetes version
+	DefaultKubernetesVersion = "1.17.9"
 )
 
 // GetUser is a convenience function for generating apiv1.User
@@ -169,7 +168,10 @@ type newRoutingFunc func(
 	keycloakFacade keycloak.Facade,
 	presetsProvider provider.PresetProvider,
 	admissionPluginProvider provider.AdmissionPluginsProvider,
-	settingsWatcher watcher.SettingsWatcher) http.Handler
+	settingsWatcher watcher.SettingsWatcher,
+	userWatcher watcher.UserWatcher,
+	externalClusterProvider provider.ExternalClusterProvider,
+	privilegedExternalClusterProvider provider.PrivilegedExternalClusterProvider) http.Handler
 
 func initTestEndpoint(user apiv1.User, seedsGetter provider.SeedsGetter, kubeObjects, machineObjects, kubermaticObjects []runtime.Object, versions []*version.Version, updates []*version.Update, routingFunc newRoutingFunc) (http.Handler, *ClientsSets, error) {
 	if seedsGetter == nil {
@@ -180,9 +182,7 @@ func initTestEndpoint(user apiv1.User, seedsGetter provider.SeedsGetter, kubeObj
 	allObjects = append(allObjects, kubermaticObjects...)
 	fakeClient := fakectrlruntimeclient.NewFakeClientWithScheme(scheme.Scheme, allObjects...)
 	kubermaticClient := kubermaticfakeclentset.NewSimpleClientset(kubermaticObjects...)
-	kubermaticInformerFactory := kubermaticinformers.NewSharedInformerFactory(kubermaticClient, 10*time.Millisecond)
 	kubernetesClient := fakerestclient.NewSimpleClientset(kubeObjects...)
-	kubernetesInformerFactory := informers.NewSharedInformerFactory(kubernetesClient, 10*time.Millisecond)
 	fakeImpersonationClient := func(impCfg restclient.ImpersonationConfig) (ctrlruntimeclient.Client, error) {
 		return fakeClient, nil
 	}
@@ -192,9 +192,9 @@ func initTestEndpoint(user apiv1.User, seedsGetter provider.SeedsGetter, kubeObj
 	if err != nil {
 		return nil, nil, err
 	}
-	userProvider := kubernetes.NewUserProvider(fakeClient, kubernetes.IsServiceAccount)
+	userProvider := kubernetes.NewUserProvider(fakeClient, kubernetes.IsServiceAccount, kubermaticClient)
 	adminProvider := kubernetes.NewAdminProvider(fakeClient)
-	settingsProvider := kubernetes.NewSettingsProvider(kubermaticClient, fakeClient)
+	settingsProvider := kubernetes.NewSettingsProvider(context.Background(), kubermaticClient, fakeClient)
 	addonConfigProvider := kubernetes.NewAddonConfigProvider(fakeClient)
 	tokenGenerator, err := serviceaccount.JWTTokenGenerator([]byte(TestServiceAccountHashKey))
 	if err != nil {
@@ -298,15 +298,25 @@ func initTestEndpoint(user apiv1.User, seedsGetter provider.SeedsGetter, kubeObj
 		return fakeClient, nil
 	}
 
-	kubernetesInformerFactory.Start(wait.NeverStop)
-	kubernetesInformerFactory.WaitForCacheSync(wait.NeverStop)
-	kubermaticInformerFactory.Start(wait.NeverStop)
-	kubermaticInformerFactory.WaitForCacheSync(wait.NeverStop)
+	externalClusterProvider, err := kubernetes.NewExternalClusterProvider(fakeImpersonationClient, fakeClient)
+	if err != nil {
+		return nil, nil, err
+	}
+	fakeExternalClusterProvider := &FakeExternalClusterProvider{
+		Provider:   externalClusterProvider,
+		FakeClient: fakeClient,
+	}
 
 	eventRecorderProvider := kubernetes.NewEventRecorder()
 
 	keycloakFacade := &testKeycloak{}
+
 	settingsWatcher, err := kuberneteswatcher.NewSettingsWatcher(settingsProvider)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	userWatcher, err := kuberneteswatcher.NewUserWatcher(userProvider)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -349,6 +359,9 @@ func initTestEndpoint(user apiv1.User, seedsGetter provider.SeedsGetter, kubeObj
 		credentialsManager,
 		admissionPluginProvider,
 		settingsWatcher,
+		userWatcher,
+		fakeExternalClusterProvider,
+		externalClusterProvider,
 	)
 
 	return mainRouter, &ClientsSets{kubermaticClient, fakeClient, kubernetesClient, tokenAuth, tokenGenerator}, nil
@@ -392,6 +405,10 @@ func GenTestSeed() *kubermaticv1.Seed {
 						Digitalocean: &kubermaticv1.DatacenterSpecDigitalocean{
 							Region: "ams2",
 						},
+						EnforcePodSecurityPolicy: true,
+					},
+					Node: &kubermaticv1.NodeSettings{
+						PauseImage: "image-pause",
 					},
 				},
 				"regular-do1": {
@@ -432,6 +449,29 @@ func GenTestSeed() *kubermaticv1.Seed {
 					Spec: kubermaticv1.DatacenterSpec{
 						Fake:                &kubermaticv1.DatacenterSpecFake{},
 						EnforceAuditLogging: true,
+					},
+				},
+				"psp-dc": {
+					Location: "Alexandria",
+					Country:  "Egypt",
+					Spec: kubermaticv1.DatacenterSpec{
+						Fake:                     &kubermaticv1.DatacenterSpecFake{},
+						EnforcePodSecurityPolicy: true,
+					},
+				},
+				"node-dc": {
+					Location: "Santiago",
+					Country:  "Chile",
+					Spec: kubermaticv1.DatacenterSpec{
+						Fake: &kubermaticv1.DatacenterSpecFake{},
+					},
+					Node: &kubermaticv1.NodeSettings{
+						ProxySettings: kubermaticv1.ProxySettings{
+							HTTPProxy: kubermaticv1.NewProxyValue("HTTPProxy"),
+						},
+						InsecureRegistries: []string{"incsecure-registry"},
+						PauseImage:         "pause-image",
+						HyperkubeImage:     "hyperkube-image",
 					},
 				},
 			},
@@ -994,4 +1034,152 @@ func GenBlacklistTokenSecret(name string, tokens []byte) *corev1.Secret {
 			resources.TokenBlacklist: tokens,
 		},
 	}
+}
+
+func GenDefaultGlobalSettings() *kubermaticv1.KubermaticSetting {
+	return &kubermaticv1.KubermaticSetting{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: kubermaticv1.GlobalSettingsName,
+		},
+		Spec: kubermaticv1.SettingSpec{
+			CustomLinks: []kubermaticv1.CustomLink{
+				{
+					Label:    "label",
+					URL:      "url:label",
+					Icon:     "icon",
+					Location: "EU",
+				},
+			},
+			CleanupOptions: kubermaticv1.CleanupOptions{
+				Enabled:  true,
+				Enforced: true,
+			},
+			DefaultNodeCount:            5,
+			ClusterTypeOptions:          5,
+			DisplayDemoInfo:             true,
+			DisplayAPIDocs:              true,
+			DisplayTermsOfService:       true,
+			EnableExternalClusterImport: true,
+		},
+	}
+}
+
+func GenClusterWithOpenstack(cluster *kubermaticv1.Cluster) *kubermaticv1.Cluster {
+	cluster.Spec.Cloud = kubermaticv1.CloudSpec{
+		DatacenterName: "OpenstackDatacenter",
+		Openstack: &kubermaticv1.OpenstackCloudSpec{
+			Username:       "username",
+			Password:       "password",
+			SubnetID:       "subnetID",
+			Domain:         "domain",
+			FloatingIPPool: "floatingIPPool",
+			Network:        "network",
+			RouterID:       "routerID",
+			SecurityGroups: "securityGroups",
+			Tenant:         "tenant",
+		},
+	}
+	return cluster
+}
+
+func GenDefaultExternalClusterNodes() (*corev1.NodeList, error) {
+	cpuQuantity, err := resource.ParseQuantity("290")
+	if err != nil {
+		return nil, err
+	}
+	memoryQuantity, err := resource.ParseQuantity("687202304")
+	if err != nil {
+		return nil, err
+	}
+	return &corev1.NodeList{Items: []corev1.Node{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "node1"},
+			Spec: corev1.NodeSpec{
+				PodCIDR:       "abc",
+				ProviderID:    "abc",
+				Unschedulable: false,
+			},
+			Status: corev1.NodeStatus{
+				Capacity:        nil,
+				Allocatable:     corev1.ResourceList{"cpu": cpuQuantity, "memory": memoryQuantity},
+				Phase:           "init",
+				DaemonEndpoints: corev1.NodeDaemonEndpoints{},
+				NodeInfo: corev1.NodeSystemInfo{
+					MachineID:               "abc",
+					SystemUUID:              "abc",
+					BootID:                  "190ee9ec-75b7-43f3-9c39-0ebf361d64f0",
+					KernelVersion:           "4.14",
+					OSImage:                 "Container-Optimized OS from Google",
+					ContainerRuntimeVersion: "containerd://1.2.8",
+					KubeletVersion:          "v1.15.12-gke.2",
+					KubeProxyVersion:        "v1.15.12-gke.2",
+					OperatingSystem:         "linux",
+					Architecture:            "amd64",
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "node2"},
+			Spec: corev1.NodeSpec{
+				PodCIDR:       "def",
+				ProviderID:    "def",
+				Unschedulable: false,
+			},
+			Status: corev1.NodeStatus{
+				Capacity:        nil,
+				Allocatable:     corev1.ResourceList{"cpu": cpuQuantity, "memory": memoryQuantity},
+				Phase:           "init",
+				DaemonEndpoints: corev1.NodeDaemonEndpoints{},
+				NodeInfo: corev1.NodeSystemInfo{
+					MachineID:               "def",
+					SystemUUID:              "def",
+					BootID:                  "190ee9ec-75b7-43f3-9c39-0ebf361d64f0",
+					KernelVersion:           "4.14",
+					OSImage:                 "Container-Optimized OS from Google",
+					ContainerRuntimeVersion: "containerd://1.2.8",
+					KubeletVersion:          "v1.15.12-gke.2",
+					KubeProxyVersion:        "v1.15.12-gke.2",
+					OperatingSystem:         "linux",
+					Architecture:            "amd64",
+				},
+			},
+		},
+	}}, nil
+}
+
+func GenDefaultExternalClusterNode() (*corev1.Node, error) {
+	cpuQuantity, err := resource.ParseQuantity("290")
+	if err != nil {
+		return nil, err
+	}
+	memoryQuantity, err := resource.ParseQuantity("687202304")
+	if err != nil {
+		return nil, err
+	}
+	return &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "node1"},
+		Spec: corev1.NodeSpec{
+			PodCIDR:       "abc",
+			ProviderID:    "abc",
+			Unschedulable: false,
+		},
+		Status: corev1.NodeStatus{
+			Capacity:        nil,
+			Allocatable:     corev1.ResourceList{"cpu": cpuQuantity, "memory": memoryQuantity},
+			Phase:           "init",
+			DaemonEndpoints: corev1.NodeDaemonEndpoints{},
+			NodeInfo: corev1.NodeSystemInfo{
+				MachineID:               "abc",
+				SystemUUID:              "abc",
+				BootID:                  "190ee9ec-75b7-43f3-9c39-0ebf361d64f0",
+				KernelVersion:           "4.14",
+				OSImage:                 "Container-Optimized OS from Google",
+				ContainerRuntimeVersion: "containerd://1.2.8",
+				KubeletVersion:          "v1.15.12-gke.2",
+				KubeProxyVersion:        "v1.15.12-gke.2",
+				OperatingSystem:         "linux",
+				Architecture:            "amd64",
+			},
+		},
+	}, nil
 }

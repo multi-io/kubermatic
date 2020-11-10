@@ -21,13 +21,12 @@ import (
 	"errors"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/api/resource"
-
 	providerconfig "github.com/kubermatic/machine-controller/pkg/providerconfig/types"
 
-	"github.com/kubermatic/kubermatic/pkg/semver"
+	"k8c.io/kubermatic/v2/pkg/semver"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -116,12 +115,12 @@ type ClusterSpec struct {
 
 	Sys11Auth Sys11AuthSettings `json:"sys11auth,omitempty"`
 
-	UpdateWindow *UpdateWindow `json:"updateWindow,omitempty"`
-
 	// Feature flags
 	// This unfortunately has to be a string map, because we use it in templating and that
 	// can not cope with string types
 	Features map[string]bool `json:"features,omitempty"`
+
+	UpdateWindow *UpdateWindow `json:"updateWindow,omitempty"`
 
 	// Openshift holds all openshift-specific settings
 	Openshift *Openshift `json:"openshift,omitempty"`
@@ -150,9 +149,6 @@ const (
 	// ClusterFeatureEtcdLauncher enables features related to the experimental etcd-launcher. This includes user-cluster
 	// etcd scaling, automatic volume recovery and new backup/restore contorllers.
 	ClusterFeatureEtcdLauncher = "etcdLauncher"
-
-	// ClusterFeatureOpenstackMultiAZ enables OpenStack multiple availability zones support
-	ClusterFeatureOpenstackMultiAZ = "openstackMultiAZ"
 )
 
 // ClusterConditionType is used to indicate the type of a cluster condition. For all condition
@@ -178,6 +174,7 @@ const (
 	ClusterConditionEtcdRestoreControllerReconcilingSuccess    ClusterConditionType = "EtcdRestoreControllerReconciledSuccessfully"
 	ClusterConditionBackupScheduleControllerReconcilingSuccess ClusterConditionType = "BackupScheduleControllerReconciledSuccessfully"
 	ClusterConditionCloudControllerReconcilingSuccess          ClusterConditionType = "CloudControllerReconcilledSuccessfully"
+	ClusterConditionComponentDefaulterReconcilingSuccess       ClusterConditionType = "ComponentDefaulterReconciledSuccessfully"
 	ClusterConditionUpdateControllerReconcilingSuccess         ClusterConditionType = "UpdateControllerReconciledSuccessfully"
 	ClusterConditionMonitoringControllerReconcilingSuccess     ClusterConditionType = "MonitoringControllerReconciledSuccessfully"
 	ClusterConditionOpenshiftControllerReconcilingSuccess      ClusterConditionType = "OpenshiftControllerReconciledSuccessfully"
@@ -200,6 +197,7 @@ var AllClusterConditionTypes = []ClusterConditionType{
 	ClusterConditionEtcdRestoreControllerReconcilingSuccess,
 	ClusterConditionBackupScheduleControllerReconcilingSuccess,
 	ClusterConditionCloudControllerReconcilingSuccess,
+	ClusterConditionComponentDefaulterReconcilingSuccess,
 	ClusterConditionUpdateControllerReconcilingSuccess,
 	ClusterConditionMonitoringControllerReconcilingSuccess,
 	ClusterConditionOpenshiftControllerReconcilingSuccess,
@@ -466,10 +464,30 @@ type VSphereCredentials struct {
 type VSphereCloudSpec struct {
 	CredentialsReference *providerconfig.GlobalSecretKeySelector `json:"credentialsReference,omitempty"`
 
-	Username  string `json:"username,omitempty"`
-	Password  string `json:"password,omitempty"`
+	// Username is the vSphere user name.
+	// +optional
+	Username string `json:"username"`
+	// Password is the vSphere user password.
+	// +optional
+	Password string `json:"password"`
+	// VMNetName is the name of the vSphere network.
 	VMNetName string `json:"vmNetName"`
-	Folder    string `json:"folder,omitempty"`
+	// Folder is the folder to be used to group the provisioned virtual
+	// machines.
+	// +optional
+	Folder string `json:"folder"`
+	// If both Datastore and DatastoreCluster are not specified the virtual
+	// machines are stored in the `DefaultDatastore` specified in the
+	// Datacenter.
+
+	// Datastore to be used for storing virtual machines, it is mutually
+	// exclusive with DatastoreCluster.
+	// +optional
+	Datastore string `json:"datastore,omitempty"`
+	// DatastoreCluster to be used for determining the Datastore for virtual
+	// machines, it is mutually exclusive with Datastore.
+	// +optional
+	DatastoreCluster string `json:"datastoreCluster,omitempty"`
 
 	// This user will be used for everything except cloud provider functionality
 	InfraManagementUser VSphereCredentials `json:"infraManagementUser"`
@@ -490,10 +508,6 @@ type AWSCloudSpec struct {
 	RouteTableID        string `json:"routeTableId"`
 	InstanceProfileName string `json:"instanceProfileName"`
 	SecurityGroupID     string `json:"securityGroupID"`
-
-	AvailabilityZone string `json:"availabilityZone"`
-
-	OpenstackBillingTenant string `json:"openstackBillingTenant"`
 
 	// DEPRECATED. Don't care for the role name. We only require the ControlPlaneRoleARN to be set so the control plane
 	// can perform the assume-role.

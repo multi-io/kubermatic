@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/kubermatic/kubermatic/pkg/util/errors"
+	"k8c.io/kubermatic/v2/pkg/util/errors"
 )
 
 type Client struct {

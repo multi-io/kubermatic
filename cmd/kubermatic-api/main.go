@@ -45,41 +45,42 @@ import (
 	"os"
 	"time"
 
-	"github.com/kubermatic/kubermatic/pkg/keycloak"
+	"k8c.io/kubermatic/v2/pkg/keycloak"
 
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	prometheusapi "github.com/prometheus/client_golang/api"
 	"go.uber.org/zap"
 
-	cmdutil "github.com/kubermatic/kubermatic/cmd/util"
-	"github.com/kubermatic/kubermatic/pkg/cluster/client"
-	"github.com/kubermatic/kubermatic/pkg/controller/master-controller-manager/rbac"
-	kubermaticclientset "github.com/kubermatic/kubermatic/pkg/crd/client/clientset/versioned"
-	kubermaticinformers "github.com/kubermatic/kubermatic/pkg/crd/client/informers/externalversions"
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/features"
-	"github.com/kubermatic/kubermatic/pkg/handler"
-	"github.com/kubermatic/kubermatic/pkg/handler/auth"
-	"github.com/kubermatic/kubermatic/pkg/handler/v1/common"
-	kubermaticlog "github.com/kubermatic/kubermatic/pkg/log"
-	metricspkg "github.com/kubermatic/kubermatic/pkg/metrics"
-	"github.com/kubermatic/kubermatic/pkg/pprof"
-	"github.com/kubermatic/kubermatic/pkg/provider"
-	kubernetesprovider "github.com/kubermatic/kubermatic/pkg/provider/kubernetes"
-	"github.com/kubermatic/kubermatic/pkg/serviceaccount"
-	"github.com/kubermatic/kubermatic/pkg/version"
-	kuberneteswatcher "github.com/kubermatic/kubermatic/pkg/watcher/kubernetes"
 	clusterv1alpha1 "github.com/kubermatic/machine-controller/pkg/apis/cluster/v1alpha1"
+	cmdutil "k8c.io/kubermatic/v2/cmd/util"
+	"k8c.io/kubermatic/v2/pkg/cluster/client"
+	"k8c.io/kubermatic/v2/pkg/controller/master-controller-manager/rbac"
+	kubermaticclientset "k8c.io/kubermatic/v2/pkg/crd/client/clientset/versioned"
+	kubermaticinformers "k8c.io/kubermatic/v2/pkg/crd/client/informers/externalversions"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/features"
+	"k8c.io/kubermatic/v2/pkg/handler"
+	"k8c.io/kubermatic/v2/pkg/handler/auth"
+	"k8c.io/kubermatic/v2/pkg/handler/v1/common"
+	v2 "k8c.io/kubermatic/v2/pkg/handler/v2"
+	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
+	metricspkg "k8c.io/kubermatic/v2/pkg/metrics"
+	"k8c.io/kubermatic/v2/pkg/pprof"
+	"k8c.io/kubermatic/v2/pkg/provider"
+	kubernetesprovider "k8c.io/kubermatic/v2/pkg/provider/kubernetes"
+	"k8c.io/kubermatic/v2/pkg/serviceaccount"
+	"k8c.io/kubermatic/v2/pkg/version"
+	kuberneteswatcher "k8c.io/kubermatic/v2/pkg/watcher/kubernetes"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
 	"k8s.io/metrics/pkg/apis/metrics/v1beta1"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
@@ -160,7 +161,7 @@ func requireEnv(key string) string {
 }
 
 func createInitProviders(options serverRunOptions) (providers, error) {
-	masterCfg, err := clientcmd.BuildConfigFromFlags("", options.kubeconfig)
+	masterCfg, err := ctrl.GetConfig()
 	if err != nil {
 		return providers{}, fmt.Errorf("unable to build client configuration from kubeconfig due to %v", err)
 	}
@@ -178,19 +179,22 @@ func createInitProviders(options serverRunOptions) (providers, error) {
 		return providers{}, fmt.Errorf("failed to construct manager: %v", err)
 	}
 
+	ctx := context.Background()
+	client := mgr.GetClient()
+
 	defaultImpersonationClient := kubernetesprovider.NewImpersonationClient(masterCfg, mgr.GetRESTMapper())
 
-	seedsGetter, err := seedsGetterFactory(context.Background(), mgr.GetClient(), options)
+	seedsGetter, err := seedsGetterFactory(ctx, client, options)
 	if err != nil {
 		return providers{}, err
 	}
-	seedKubeconfigGetter, err := seedKubeconfigGetterFactory(context.Background(), mgr.GetClient(), options)
+	seedKubeconfigGetter, err := seedKubeconfigGetterFactory(ctx, client, options)
 	if err != nil {
 		return providers{}, err
 	}
 
 	// Make sure the manager creates a cache for Seeds by requesting an informer
-	if _, err := mgr.GetCache().GetInformer(&kubermaticv1.Seed{}); err != nil {
+	if _, err := mgr.GetCache().GetInformer(ctx, &kubermaticv1.Seed{}); err != nil {
 		kubermaticlog.Logger.Fatalw("failed to get seed informer", zap.Error(err))
 	}
 	// mgr.Start() is blocking
@@ -199,7 +203,7 @@ func createInitProviders(options serverRunOptions) (providers, error) {
 			kubermaticlog.Logger.Fatalw("failed to start the mgr", zap.Error(err))
 		}
 	}()
-	mgrSyncCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	mgrSyncCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	if synced := mgr.GetCache().WaitForCacheSync(mgrSyncCtx.Done()); !synced {
 		kubermaticlog.Logger.Fatal("failed to sync mgr cache")
@@ -208,11 +212,11 @@ func createInitProviders(options serverRunOptions) (providers, error) {
 	seedClientGetter := provider.SeedClientGetterFactory(seedKubeconfigGetter)
 	clusterProviderGetter := clusterProviderFactory(mgr.GetRESTMapper(), seedKubeconfigGetter, seedClientGetter, options.workerName, options.featureGates.Enabled(features.OIDCKubeCfgEndpoint))
 
-	presetsProvider, err := kubernetesprovider.NewPresetsProvider(context.Background(), mgr.GetClient(), options.presetsFile, options.dynamicPresets)
+	presetsProvider, err := kubernetesprovider.NewPresetsProvider(ctx, client, options.presetsFile, options.dynamicPresets)
 	if err != nil {
 		return providers{}, err
 	}
-	admissionPluginProvider := kubernetesprovider.NewAdmissionPluginsProvider(context.Background(), mgr.GetClient())
+	admissionPluginProvider := kubernetesprovider.NewAdmissionPluginsProvider(ctx, client)
 	// Warm up the restMapper cache. Log but ignore errors encountered here, maybe there are stale seeds
 	go func() {
 		seeds, err := seedsGetter()
@@ -227,34 +231,39 @@ func createInitProviders(options serverRunOptions) (providers, error) {
 		}
 	}()
 
-	sshKeyProvider := kubernetesprovider.NewSSHKeyProvider(defaultImpersonationClient.CreateImpersonatedClient, mgr.GetClient())
-	privilegedSSHKeyProvider, err := kubernetesprovider.NewPrivilegedSSHKeyProvider(mgr.GetClient())
+	sshKeyProvider := kubernetesprovider.NewSSHKeyProvider(defaultImpersonationClient.CreateImpersonatedClient, client)
+	privilegedSSHKeyProvider, err := kubernetesprovider.NewPrivilegedSSHKeyProvider(client)
 	if err != nil {
 		return providers{}, fmt.Errorf("failed to create privileged SSH key provider due to %v", err)
 	}
-	userProvider := kubernetesprovider.NewUserProvider(mgr.GetClient(), kubernetesprovider.IsServiceAccount)
-	settingsProvider := kubernetesprovider.NewSettingsProvider(kubermaticMasterClient, mgr.GetClient())
-	addonConfigProvider := kubernetesprovider.NewAddonConfigProvider(mgr.GetClient())
-	adminProvider := kubernetesprovider.NewAdminProvider(mgr.GetClient())
+	userProvider := kubernetesprovider.NewUserProvider(client, kubernetesprovider.IsServiceAccount, kubermaticMasterClient)
+	settingsProvider := kubernetesprovider.NewSettingsProvider(ctx, kubermaticMasterClient, client)
+	addonConfigProvider := kubernetesprovider.NewAddonConfigProvider(client)
+	adminProvider := kubernetesprovider.NewAdminProvider(client)
 
-	serviceAccountTokenProvider, err := kubernetesprovider.NewServiceAccountTokenProvider(defaultImpersonationClient.CreateImpersonatedClient, mgr.GetClient())
+	serviceAccountTokenProvider, err := kubernetesprovider.NewServiceAccountTokenProvider(defaultImpersonationClient.CreateImpersonatedClient, client)
 	if err != nil {
 		return providers{}, fmt.Errorf("failed to create service account token provider due to %v", err)
 	}
 
-	serviceAccountProvider := kubernetesprovider.NewServiceAccountProvider(defaultImpersonationClient.CreateImpersonatedClient, mgr.GetClient(), options.domain)
-	projectMemberProvider := kubernetesprovider.NewProjectMemberProvider(defaultImpersonationClient.CreateImpersonatedClient, mgr.GetClient(), kubernetesprovider.IsServiceAccount)
-	projectProvider, err := kubernetesprovider.NewProjectProvider(defaultImpersonationClient.CreateImpersonatedClient, mgr.GetClient())
+	serviceAccountProvider := kubernetesprovider.NewServiceAccountProvider(defaultImpersonationClient.CreateImpersonatedClient, client, options.domain)
+	projectMemberProvider := kubernetesprovider.NewProjectMemberProvider(defaultImpersonationClient.CreateImpersonatedClient, client, kubernetesprovider.IsServiceAccount)
+	projectProvider, err := kubernetesprovider.NewProjectProvider(defaultImpersonationClient.CreateImpersonatedClient, client)
 	if err != nil {
 		return providers{}, fmt.Errorf("failed to create project provider due to %v", err)
 	}
 
-	privilegedProjectProvider, err := kubernetesprovider.NewPrivilegedProjectProvider(mgr.GetClient())
+	privilegedProjectProvider, err := kubernetesprovider.NewPrivilegedProjectProvider(client)
 	if err != nil {
 		return providers{}, fmt.Errorf("failed to create privileged project provider due to %v", err)
 	}
 
 	userInfoGetter, err := provider.UserInfoGetterFactory(projectMemberProvider)
+	if err != nil {
+		return providers{}, fmt.Errorf("failed to create user info getter due to %v", err)
+	}
+
+	externalClusterProvider, err := kubernetesprovider.NewExternalClusterProvider(defaultImpersonationClient.CreateImpersonatedClient, mgr.GetClient())
 	if err != nil {
 		return providers{}, fmt.Errorf("failed to create user info getter due to %v", err)
 	}
@@ -273,6 +282,11 @@ func createInitProviders(options serverRunOptions) (providers, error) {
 	settingsWatcher, err := kuberneteswatcher.NewSettingsWatcher(settingsProvider)
 	if err != nil {
 		return providers{}, fmt.Errorf("failed to create settings watcher due to %v", err)
+	}
+
+	userWatcher, err := kuberneteswatcher.NewUserWatcher(userProvider)
+	if err != nil {
+		return providers{}, fmt.Errorf("failed to create user watcher due to %v", err)
 	}
 
 	return providers{
@@ -301,6 +315,9 @@ func createInitProviders(options serverRunOptions) (providers, error) {
 		presetProvider:                        presetsProvider,
 		admissionPluginProvider:               admissionPluginProvider,
 		settingsWatcher:                       settingsWatcher,
+		userWatcher:                           userWatcher,
+		externalClusterProvider:               externalClusterProvider,
+		privilegedExternalClusterProvider:     externalClusterProvider,
 	}, nil
 }
 
@@ -366,50 +383,57 @@ func createAPIHandler(options serverRunOptions, prov providers, oidcIssuerVerifi
 	}
 	serviceAccountTokenAuth := serviceaccount.JWTTokenAuthenticator([]byte(options.serviceAccountSigningKey))
 
-	r := handler.NewRouting(
-		kubermaticlog.New(options.log.Debug, options.log.Format).Sugar(),
-		prov.presetProvider,
-		prov.seedsGetter,
-		prov.seedClientGetter,
-		prov.clusterProviderGetter,
-		prov.addons,
-		prov.addonConfigProvider,
-		prov.sshKey,
-		prov.privilegedSSHKeyProvider,
-		prov.user,
-		prov.serviceAccountProvider,
-		prov.privilegedServiceAccountProvider,
-		prov.serviceAccountTokenProvider,
-		prov.privilegedServiceAccountTokenProvider,
-		prov.project,
-		prov.mdRequestProviderGetter,
-		prov.privilegedProject,
-		oidcIssuerVerifier,
-		tokenVerifiers,
-		tokenExtractors,
-		updateManager,
-		prometheusClient,
-		prov.projectMember,
-		prov.privilegedProjectMemberProvider,
-		prov.memberMapper,
-		serviceAccountTokenAuth,
-		serviceAccountTokenGenerator,
-		prov.eventRecorderProvider,
-		keycloakFacade,
-		options.exposeStrategy,
-		options.accessibleAddons,
-		prov.userInfoGetter,
-		prov.settingsProvider,
-		prov.adminProvider,
-		prov.admissionPluginProvider,
-		prov.settingsWatcher,
-	)
+	routingParams := handler.RoutingParams{
+		Log:                                   kubermaticlog.New(options.log.Debug, options.log.Format).Sugar(),
+		PresetsProvider:                       prov.presetProvider,
+		SeedsGetter:                           prov.seedsGetter,
+		SeedsClientGetter:                     prov.seedClientGetter,
+		SSHKeyProvider:                        prov.sshKey,
+		PrivilegedSSHKeyProvider:              prov.privilegedSSHKeyProvider,
+		UserProvider:                          prov.user,
+		ServiceAccountProvider:                prov.serviceAccountProvider,
+		PrivilegedServiceAccountProvider:      prov.privilegedServiceAccountProvider,
+		ServiceAccountTokenProvider:           prov.serviceAccountTokenProvider,
+		PrivilegedServiceAccountTokenProvider: prov.privilegedServiceAccountTokenProvider,
+		ProjectProvider:                       prov.project,
+		MdRequestProviderGetter:               prov.mdRequestProviderGetter,
+		PrivilegedProjectProvider:             prov.privilegedProject,
+		OIDCIssuerVerifier:                    oidcIssuerVerifier,
+		TokenVerifiers:                        tokenVerifiers,
+		TokenExtractors:                       tokenExtractors,
+		ClusterProviderGetter:                 prov.clusterProviderGetter,
+		AddonProviderGetter:                   prov.addons,
+		AddonConfigProvider:                   prov.addonConfigProvider,
+		UpdateManager:                         updateManager,
+		PrometheusClient:                      prometheusClient,
+		ProjectMemberProvider:                 prov.projectMember,
+		PrivilegedProjectMemberProvider:       prov.privilegedProjectMemberProvider,
+		UserProjectMapper:                     prov.memberMapper,
+		SATokenAuthenticator:                  serviceAccountTokenAuth,
+		SATokenGenerator:                      serviceAccountTokenGenerator,
+		EventRecorderProvider:                 prov.eventRecorderProvider,
+		KeycloakFacade:                        keycloakFacade,
+		ExposeStrategy:                        options.exposeStrategy,
+		AccessibleAddons:                      options.accessibleAddons,
+		UserInfoGetter:                        prov.userInfoGetter,
+		SettingsProvider:                      prov.settingsProvider,
+		AdminProvider:                         prov.adminProvider,
+		AdmissionPluginProvider:               prov.admissionPluginProvider,
+		SettingsWatcher:                       prov.settingsWatcher,
+		UserWatcher:                           prov.userWatcher,
+		ExternalClusterProvider:               prov.externalClusterProvider,
+		PrivilegedExternalClusterProvider:     prov.privilegedExternalClusterProvider,
+	}
+
+	r := handler.NewRouting(routingParams)
+	rv2 := v2.NewV2Routing(routingParams)
 
 	registerMetrics()
 
 	mainRouter := mux.NewRouter()
 	mainRouter.Use(setSecureHeaders)
 	v1Router := mainRouter.PathPrefix("/api/v1").Subrouter()
+	v2Router := mainRouter.PathPrefix("/api/v2").Subrouter()
 	r.RegisterV1(v1Router, metrics)
 	r.RegisterV1Legacy(v1Router)
 	r.RegisterV1Optional(v1Router,
@@ -426,6 +450,7 @@ func createAPIHandler(options serverRunOptions, prov providers, oidcIssuerVerifi
 	r.RegisterV1Admin(v1Router)
 	r.RegisterV1SysEleven(v1Router)
 	r.RegisterV1Websocket(v1Router)
+	rv2.RegisterV2(v2Router, metrics)
 
 	mainRouter.Methods(http.MethodGet).
 		Path("/api/swagger.json").

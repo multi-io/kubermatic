@@ -3,12 +3,12 @@ package kubernetes
 import (
 	"context"
 
-	"github.com/kubermatic/kubermatic/pkg/provider"
 	"github.com/kubermatic/machine-controller/pkg/apis/cluster/v1alpha1"
+	"k8c.io/kubermatic/v2/pkg/provider"
 	"k8s.io/apimachinery/pkg/api/meta"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

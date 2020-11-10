@@ -21,7 +21,7 @@ import (
 	"errors"
 	"testing"
 
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -63,7 +63,8 @@ func TestSetSeedResourcesUpToDateCondition(t *testing.T) {
 	var (
 		inProgressStatefulSet = &appsv1.StatefulSet{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: "testing-namespace",
+				Name:      "sts-in-progress",
+				Namespace: "cluster-test",
 			},
 			Spec: appsv1.StatefulSetSpec{
 				Replicas: utilpointer.Int32Ptr(2),
@@ -76,7 +77,8 @@ func TestSetSeedResourcesUpToDateCondition(t *testing.T) {
 		}
 		inProgressDeployment = &appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: "testing-namespace",
+				Name:      "deployment-in-progress",
+				Namespace: "cluster-test",
 			},
 			Spec: appsv1.DeploymentSpec{
 				Replicas: utilpointer.Int32Ptr(2),
@@ -89,7 +91,8 @@ func TestSetSeedResourcesUpToDateCondition(t *testing.T) {
 		}
 		readyStatefulSet = &appsv1.StatefulSet{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: "testing-namespace",
+				Name:      "sts-ready",
+				Namespace: "cluster-test",
 			},
 			Spec: appsv1.StatefulSetSpec{
 				Replicas: utilpointer.Int32Ptr(2),
@@ -102,7 +105,8 @@ func TestSetSeedResourcesUpToDateCondition(t *testing.T) {
 		}
 		readyDeployment = &appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: "testing-namespace",
+				Name:      "deployment-ready",
+				Namespace: "cluster-test",
 			},
 			Spec: appsv1.DeploymentSpec{
 				Replicas: utilpointer.Int32Ptr(2),
@@ -173,7 +177,7 @@ func TestSetSeedResourcesUpToDateCondition(t *testing.T) {
 func cluster() *kubermaticv1.Cluster {
 	return &kubermaticv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "testing-namespace",
+			Name: "test",
 		},
 	}
 }

@@ -1,0 +1,64 @@
+# Copyright 2020 The Kubermatic Kubernetes Platform contributors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+minio:
+  image:
+    repository: docker.io/minio/minio
+    tag: RELEASE.2020-09-10T22-02-45Z
+  storeSize: 100Gi
+
+  # These settings are required. Keys must be alphanumeric.
+  credentials:
+    accessKey: '' # 32 byte long
+    secretKey: '' # 64 byte long
+
+  flags:
+    # Set to true to enable Minio's strict S3 compatibility mode.
+    # See https://github.com/minio/minio/pull/7609 for more information.
+    compat: false
+
+    # hide sensitive information from logging
+    anonymous: false
+
+  backup:
+    enabled: true
+    image:
+      repository: quay.io/kubermatic/util
+      tag: 1.4.1
+
+  # If your cluster does not have a default storage class,
+  # you can specify the class to use for Minio. Note that
+  # you cannot change this later on without purging the
+  # chart and losing data.
+  #storageClass: hdd
+
+  resources:
+    minio:
+      requests:
+        cpu: 100m
+        memory: 32Mi
+      limits:
+        cpu: 300m
+        memory: 512Mi
+    backup:
+      requests:
+        cpu: 50m
+        memory: 32Mi
+      limits:
+        cpu: 500m
+        memory: 1500Mi
+
+  nodeSelector: {}
+  affinity: {}
+  tolerations: []

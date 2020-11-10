@@ -22,10 +22,10 @@ import (
 
 	providerconfig "github.com/kubermatic/machine-controller/pkg/providerconfig/types"
 
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/resources"
-	"github.com/kubermatic/kubermatic/pkg/resources/apiserver"
-	"github.com/kubermatic/kubermatic/pkg/resources/reconciling"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/resources"
+	"k8c.io/kubermatic/v2/pkg/resources/apiserver"
+	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -243,7 +243,7 @@ func getEnvVars(data machinecontrollerData) ([]corev1.EnvVar, error) {
 	return vars, nil
 }
 
-func getFlags(clusterDNSIP string, nodeSettings kubermaticv1.NodeSettings, externalCloudProvider bool) []string {
+func getFlags(clusterDNSIP string, nodeSettings *kubermaticv1.NodeSettings, externalCloudProvider bool) []string {
 	flags := []string{
 		"-kubeconfig", "/etc/kubernetes/kubeconfig/kubeconfig",
 		"-logtostderr",
@@ -252,22 +252,25 @@ func getFlags(clusterDNSIP string, nodeSettings kubermaticv1.NodeSettings, exter
 		"-cluster-dns", clusterDNSIP,
 		"-internal-listen-address", "0.0.0.0:8085",
 	}
-	if len(nodeSettings.InsecureRegistries) > 0 {
-		flags = append(flags, "-node-insecure-registries", strings.Join(nodeSettings.InsecureRegistries, ","))
-	}
-	if !nodeSettings.HTTPProxy.Empty() {
-		flags = append(flags, "-node-http-proxy", nodeSettings.HTTPProxy.String())
-	}
-	if !nodeSettings.NoProxy.Empty() {
-		flags = append(flags, "-node-no-proxy", nodeSettings.NoProxy.String())
-	}
-	if nodeSettings.PauseImage != "" {
-		flags = append(flags, "-node-pause-image", nodeSettings.PauseImage)
-	}
 
-	// TODO(kron4eg): deprecate and remove this
-	if nodeSettings.HyperkubeImage != "" {
-		flags = append(flags, "-node-hyperkube-image", nodeSettings.HyperkubeImage)
+	if nodeSettings != nil {
+		if len(nodeSettings.InsecureRegistries) > 0 {
+			flags = append(flags, "-node-insecure-registries", strings.Join(nodeSettings.InsecureRegistries, ","))
+		}
+		if !nodeSettings.HTTPProxy.Empty() {
+			flags = append(flags, "-node-http-proxy", nodeSettings.HTTPProxy.String())
+		}
+		if !nodeSettings.NoProxy.Empty() {
+			flags = append(flags, "-node-no-proxy", nodeSettings.NoProxy.String())
+		}
+		if nodeSettings.PauseImage != "" {
+			flags = append(flags, "-node-pause-image", nodeSettings.PauseImage)
+		}
+
+		// TODO(kron4eg): deprecate and remove this
+		if nodeSettings.HyperkubeImage != "" {
+			flags = append(flags, "-node-hyperkube-image", nodeSettings.HyperkubeImage)
+		}
 	}
 
 	if externalCloudProvider {

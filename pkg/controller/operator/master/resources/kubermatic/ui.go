@@ -17,9 +17,9 @@ limitations under the License.
 package kubermatic
 
 import (
-	"github.com/kubermatic/kubermatic/pkg/controller/operator/common"
-	operatorv1alpha1 "github.com/kubermatic/kubermatic/pkg/crd/operator/v1alpha1"
-	"github.com/kubermatic/kubermatic/pkg/resources/reconciling"
+	"k8c.io/kubermatic/v2/pkg/controller/operator/common"
+	operatorv1alpha1 "k8c.io/kubermatic/v2/pkg/crd/operator/v1alpha1"
+	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -44,11 +44,6 @@ func UIDeploymentCreator(cfg *operatorv1alpha1.KubermaticConfiguration, versions
 			}
 
 			d.Spec.Template.Labels = d.Spec.Selector.MatchLabels
-			d.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{
-				{
-					Name: common.DockercfgSecretName,
-				},
-			}
 
 			d.Spec.Template.Spec.SecurityContext = &corev1.PodSecurityContext{
 				RunAsNonRoot: pointer.BoolPtr(true),
@@ -101,7 +96,7 @@ func UIDeploymentCreator(cfg *operatorv1alpha1.KubermaticConfiguration, versions
 
 func UIPDBCreator(cfg *operatorv1alpha1.KubermaticConfiguration) reconciling.NamedPodDisruptionBudgetCreatorGetter {
 	return func() (string, reconciling.PodDisruptionBudgetCreator) {
-		return "kubermatic-ui", func(pdb *policyv1beta1.PodDisruptionBudget) (*policyv1beta1.PodDisruptionBudget, error) {
+		return "kubermatic-dashboard", func(pdb *policyv1beta1.PodDisruptionBudget) (*policyv1beta1.PodDisruptionBudget, error) {
 			min := intstr.FromInt(1)
 
 			pdb.Spec.MinAvailable = &min

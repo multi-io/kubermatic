@@ -31,25 +31,25 @@ import (
 	"github.com/go-kit/kit/endpoint"
 	"github.com/gorilla/mux"
 
-	apiv1 "github.com/kubermatic/kubermatic/pkg/api/v1"
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/handler/middleware"
-	"github.com/kubermatic/kubermatic/pkg/handler/v1/cluster"
-	"github.com/kubermatic/kubermatic/pkg/handler/v1/common"
-	"github.com/kubermatic/kubermatic/pkg/handler/v1/label"
-	machineconversions "github.com/kubermatic/kubermatic/pkg/machine"
-	"github.com/kubermatic/kubermatic/pkg/provider"
-	kubernetesprovider "github.com/kubermatic/kubermatic/pkg/provider/kubernetes"
-	machineresource "github.com/kubermatic/kubermatic/pkg/resources/machine"
-	k8cerrors "github.com/kubermatic/kubermatic/pkg/util/errors"
-	"github.com/kubermatic/kubermatic/pkg/validation/nodeupdate"
 	clusterv1alpha1 "github.com/kubermatic/machine-controller/pkg/apis/cluster/v1alpha1"
+	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	handlercommon "k8c.io/kubermatic/v2/pkg/handler/common"
+	"k8c.io/kubermatic/v2/pkg/handler/middleware"
+	"k8c.io/kubermatic/v2/pkg/handler/v1/common"
+	"k8c.io/kubermatic/v2/pkg/handler/v1/label"
+	machineconversions "k8c.io/kubermatic/v2/pkg/machine"
+	"k8c.io/kubermatic/v2/pkg/provider"
+	kubernetesprovider "k8c.io/kubermatic/v2/pkg/provider/kubernetes"
+	machineresource "k8c.io/kubermatic/v2/pkg/resources/machine"
+	k8cerrors "k8c.io/kubermatic/v2/pkg/util/errors"
+	"k8c.io/kubermatic/v2/pkg/validation/nodeupdate"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -100,7 +100,7 @@ func CreateNodeDeployment(sshKeyProvider provider.SSHKeyProvider, projectProvide
 			return nil, common.KubernetesErrorToHTTPError(err)
 		}
 
-		cluster, err := cluster.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, &provider.ClusterGetOptions{CheckInitStatus: true})
+		cluster, err := handlercommon.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, &provider.ClusterGetOptions{CheckInitStatus: true})
 		if err != nil {
 			return nil, err
 		}
@@ -143,6 +143,7 @@ func CreateNodeDeployment(sshKeyProvider provider.SSHKeyProvider, projectProvide
 		}
 
 		data := common.CredentialsData{
+			Ctx:               ctx,
 			KubermaticCluster: cluster,
 			Client:            assertedClusterProvider.GetSeedClusterAdminRuntimeClient(),
 		}
@@ -251,7 +252,7 @@ func ListNodeDeployments(projectProvider provider.ProjectProvider, privilegedPro
 		req := request.(listNodeDeploymentsReq)
 		clusterProvider := ctx.Value(middleware.ClusterProviderContextKey).(provider.ClusterProvider)
 
-		cluster, err := cluster.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
+		cluster, err := handlercommon.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -326,7 +327,7 @@ func GetNodeDeployment(projectProvider provider.ProjectProvider, privilegedProje
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(nodeDeploymentReq)
 		clusterProvider := ctx.Value(middleware.ClusterProviderContextKey).(provider.ClusterProvider)
-		cluster, err := cluster.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
+		cluster, err := handlercommon.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -437,7 +438,7 @@ func ListNodeDeploymentNodes(projectProvider provider.ProjectProvider, privilege
 		req := request.(nodeDeploymentNodesReq)
 		clusterProvider := ctx.Value(middleware.ClusterProviderContextKey).(provider.ClusterProvider)
 
-		cluster, err := cluster.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
+		cluster, err := handlercommon.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -505,7 +506,7 @@ func ListNodeDeploymentMetrics(projectProvider provider.ProjectProvider, privile
 		req := request.(nodeDeploymentMetricsReq)
 		clusterProvider := ctx.Value(middleware.ClusterProviderContextKey).(provider.ClusterProvider)
 
-		cluster, err := cluster.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
+		cluster, err := handlercommon.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -538,7 +539,10 @@ func ListNodeDeploymentMetrics(projectProvider provider.ProjectProvider, privile
 		nodeDeploymentNodesMetrics := make([]v1beta1.NodeMetrics, 0)
 		allNodeMetricsList := &v1beta1.NodeMetricsList{}
 		if err := dynamicCLient.List(ctx, allNodeMetricsList); err != nil {
-			return nil, common.KubernetesErrorToHTTPError(err)
+			// Happens during cluster creation when the CRD is not setup yet
+			if _, ok := err.(*meta.NoKindMatchError); !ok {
+				return nil, common.KubernetesErrorToHTTPError(err)
+			}
 		}
 
 		for _, m := range allNodeMetricsList.Items {
@@ -547,54 +551,8 @@ func ListNodeDeploymentMetrics(projectProvider provider.ProjectProvider, privile
 			}
 		}
 
-		return convertNodeMetrics(nodeDeploymentNodesMetrics, availableResources)
+		return handlercommon.ConvertNodeMetrics(nodeDeploymentNodesMetrics, availableResources)
 	}
-}
-
-func convertNodeMetrics(metrics []v1beta1.NodeMetrics, availableResources map[string]corev1.ResourceList) ([]apiv1.NodeMetric, error) {
-	nodeMetrics := make([]apiv1.NodeMetric, 0)
-	var usage corev1.ResourceList
-
-	if metrics == nil {
-		return nil, fmt.Errorf("metric list can not be nil")
-	}
-
-	for _, m := range metrics {
-		nodeMetric := apiv1.NodeMetric{
-			Name: m.Name,
-		}
-		err := scheme.Scheme.Convert(&m.Usage, &usage, nil)
-		if err != nil {
-			return nil, err
-		}
-		resourceMetricsInfo := common.ResourceMetricsInfo{
-			Name:      m.Name,
-			Metrics:   usage,
-			Available: availableResources[m.Name],
-		}
-
-		if available, found := resourceMetricsInfo.Available[corev1.ResourceCPU]; found {
-			quantityCPU := resourceMetricsInfo.Metrics[corev1.ResourceCPU]
-			// cpu in mili cores
-			nodeMetric.CPUTotalMillicores = quantityCPU.MilliValue()
-			nodeMetric.CPUAvailableMillicores = available.MilliValue()
-			fraction := float64(quantityCPU.MilliValue()) / float64(available.MilliValue()) * 100
-			nodeMetric.CPUUsedPercentage = int64(fraction)
-		}
-
-		if available, found := resourceMetricsInfo.Available[corev1.ResourceMemory]; found {
-			quantityM := resourceMetricsInfo.Metrics[corev1.ResourceMemory]
-			// memory in bytes
-			nodeMetric.MemoryTotalBytes = quantityM.Value() / (1024 * 1024)
-			nodeMetric.MemoryAvailableBytes = available.Value() / (1024 * 1024)
-			fraction := float64(quantityM.MilliValue()) / float64(available.MilliValue()) * 100
-			nodeMetric.MemoryUsedPercentage = int64(fraction)
-		}
-
-		nodeMetrics = append(nodeMetrics, nodeMetric)
-	}
-
-	return nodeMetrics, nil
 }
 
 // patchNodeDeploymentReq defines HTTP request for patchNodeDeployment endpoint
@@ -649,7 +607,7 @@ func PatchNodeDeployment(sshKeyProvider provider.SSHKeyProvider, projectProvider
 			return nil, common.KubernetesErrorToHTTPError(err)
 		}
 
-		cluster, err := cluster.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
+		cluster, err := handlercommon.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -710,6 +668,7 @@ func PatchNodeDeployment(sshKeyProvider provider.SSHKeyProvider, projectProvider
 			return nil, k8cerrors.New(http.StatusInternalServerError, "clusterprovider is not a kubernetesprovider.Clusterprovider, can not create nodeDeployment")
 		}
 		data := common.CredentialsData{
+			Ctx:               ctx,
 			KubermaticCluster: cluster,
 			Client:            assertedClusterProvider.GetSeedClusterAdminRuntimeClient(),
 		}
@@ -770,7 +729,7 @@ func DeleteNodeDeployment(projectProvider provider.ProjectProvider, privilegedPr
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(deleteNodeDeploymentReq)
 		clusterProvider := ctx.Value(middleware.ClusterProviderContextKey).(provider.ClusterProvider)
-		cluster, err := cluster.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
+		cluster, err := handlercommon.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -838,7 +797,7 @@ func ListNodeDeploymentNodesEvents(projectProvider provider.ProjectProvider, pri
 		req := request.(nodeDeploymentNodesEventsReq)
 		clusterProvider := ctx.Value(middleware.ClusterProviderContextKey).(provider.ClusterProvider)
 
-		cluster, err := cluster.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
+		cluster, err := handlercommon.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
 		if err != nil {
 			return nil, err
 		}

@@ -20,25 +20,25 @@ import (
 	"context"
 	"fmt"
 
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/resources"
-	"github.com/kubermatic/kubermatic/pkg/resources/apiserver"
-	"github.com/kubermatic/kubermatic/pkg/resources/certificates"
-	"github.com/kubermatic/kubermatic/pkg/resources/cloudconfig"
-	"github.com/kubermatic/kubermatic/pkg/resources/cloudcontroller"
-	"github.com/kubermatic/kubermatic/pkg/resources/clusterautoscaler"
-	"github.com/kubermatic/kubermatic/pkg/resources/clusterproxy"
-	"github.com/kubermatic/kubermatic/pkg/resources/controllermanager"
-	"github.com/kubermatic/kubermatic/pkg/resources/dns"
-	"github.com/kubermatic/kubermatic/pkg/resources/etcd"
-	"github.com/kubermatic/kubermatic/pkg/resources/machinecontroller"
-	metricsserver "github.com/kubermatic/kubermatic/pkg/resources/metrics-server"
-	"github.com/kubermatic/kubermatic/pkg/resources/nodeportproxy"
-	"github.com/kubermatic/kubermatic/pkg/resources/openvpn"
-	"github.com/kubermatic/kubermatic/pkg/resources/rancherserver"
-	"github.com/kubermatic/kubermatic/pkg/resources/reconciling"
-	"github.com/kubermatic/kubermatic/pkg/resources/scheduler"
-	"github.com/kubermatic/kubermatic/pkg/resources/usercluster"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/resources"
+	"k8c.io/kubermatic/v2/pkg/resources/apiserver"
+	"k8c.io/kubermatic/v2/pkg/resources/certificates"
+	"k8c.io/kubermatic/v2/pkg/resources/cloudconfig"
+	"k8c.io/kubermatic/v2/pkg/resources/cloudcontroller"
+	"k8c.io/kubermatic/v2/pkg/resources/clusterautoscaler"
+	"k8c.io/kubermatic/v2/pkg/resources/clusterproxy"
+	"k8c.io/kubermatic/v2/pkg/resources/controllermanager"
+	"k8c.io/kubermatic/v2/pkg/resources/dns"
+	"k8c.io/kubermatic/v2/pkg/resources/etcd"
+	"k8c.io/kubermatic/v2/pkg/resources/machinecontroller"
+	metricsserver "k8c.io/kubermatic/v2/pkg/resources/metrics-server"
+	"k8c.io/kubermatic/v2/pkg/resources/nodeportproxy"
+	"k8c.io/kubermatic/v2/pkg/resources/openvpn"
+	"k8c.io/kubermatic/v2/pkg/resources/rancherserver"
+	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
+	"k8c.io/kubermatic/v2/pkg/resources/scheduler"
+	"k8c.io/kubermatic/v2/pkg/resources/usercluster"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -213,8 +213,7 @@ func (r *Reconciler) ensureNamespaceExists(ctx context.Context, cluster *kuberma
 // GetServiceCreators returns all service creators that are currently in use
 func GetServiceCreators(data *resources.TemplateData) []reconciling.NamedServiceCreatorGetter {
 	creators := []reconciling.NamedServiceCreatorGetter{
-		apiserver.InternalServiceCreator(),
-		apiserver.ExternalServiceCreator(data.Cluster().Spec.ExposeStrategy),
+		apiserver.ServiceCreator(data.Cluster().Spec.ExposeStrategy),
 		openvpn.ServiceCreator(data.Cluster().Spec.ExposeStrategy),
 		etcd.ServiceCreator(data),
 		dns.ServiceCreator(),
@@ -250,7 +249,7 @@ func GetDeploymentCreators(data *resources.TemplateData, enableAPIserverOIDCAuth
 		metricsserver.DeploymentCreator(data),
 		usercluster.DeploymentCreator(data, false),
 		clusterproxy.DeploymentCreator(data),
-		//kubernetesdashboard.DeploymentCreator(data),
+		// kubernetesdashboard.DeploymentCreator(data),
 	}
 	if data.Cluster().Annotations[kubermaticv1.AnnotationNameClusterAutoscalerEnabled] != "" {
 		deployments = append(deployments, clusterautoscaler.DeploymentCreator(data))

@@ -21,7 +21,7 @@ set -euo pipefail
 set -o monitor
 
 cd "$(dirname "$0")/"
-source ./../lib.sh
+source ../lib.sh
 
 echodate "Getting secrets from Vault"
 export VAULT_ADDR=https://vault.loodse.com/
@@ -48,8 +48,6 @@ VERSIONS=${VERSIONS:-'v1.13.5'}
 
 VALUES_FILE="/tmp/values.yaml"
 vault kv get -field=values.yaml dev/seed-clusters/offline.kubermatic.io > ${VALUES_FILE}
-DATACENTERS_FILE="/tmp/datacenters.yaml"
-vault kv get -field=datacenters.yaml dev/seed-clusters/offline.kubermatic.io > ${DATACENTERS_FILE}
 
 vault kv get -field=kubeconfig dev/gcp-offline-env > /tmp/kubeconfig
 export KUBECONFIG="/tmp/kubeconfig"
@@ -124,15 +122,21 @@ trap finish EXIT
 docker ps &>/dev/null || start-docker.sh
 
 retry 5 docker login -u ${QUAY_IO_USERNAME} -p ${QUAY_IO_PASSWORD} quay.io
-echodate "Building and pushing quay images"
-retry 5 ./../push_image.sh ${GIT_HEAD_HASH} $(git tag -l --points-at HEAD)
+
+echodate "Building and pushing Docker images"
+
+# prepare Helm charts
+sed -i "s/__KUBERMATIC_TAG__/${GIT_HEAD_HASH}/g" charts/*/*.yaml
+sed -i "s/__DASHBOARD_TAG__/latest/g" charts/*/*.yaml
+
+retry 5 ./../release-docker-images.sh ${GIT_HEAD_HASH} $(git tag -l --points-at HEAD)
 echodate "Sucessfully finished building and pushing quay images"
 
 # Ensure we have pushed the kubermatic chart
-cd ./../../config
+cd ../../charts
 HELM_EXTRA_ARGS="--set kubermatic.controller.image.tag=${GIT_HEAD_HASH},kubermatic.api.image.tag=${GIT_HEAD_HASH},kubermatic.masterController.image.tag=${GIT_HEAD_HASH}"
 # We must not pull those images from remote. We build them on the fly
-helm template ${HELM_EXTRA_ARGS} kubermatic | grep -v quay.io/kubermatic/kubermatic | ./hack/retag-images.sh
+helm template ${HELM_EXTRA_ARGS} kubermatic | grep -v quay.io/kubermatic/kubermatic |../hack/retag-images.sh
 
 # Push a tiller image
 docker pull gcr.io/kubernetes-helm/tiller:${HELM_VERSION}
@@ -141,31 +145,29 @@ docker push 127.0.0.1:5000/kubernetes-helm/tiller:${HELM_VERSION}
 
 # Pull & Push the images for the nodes
 docker pull k8s.gcr.io/pause:3.1
-# Needs to match the defined image in the datacenters yaml: https://github.com/kubermatic/secrets/blob/master/seed-clusters/offline.kubermatic.io/datacenters.yaml
+# Needs to match the defined image in the Seed resource's datacenter
 docker tag k8s.gcr.io/pause:3.1 127.0.0.1:5000/kubernetes/pause:3.1
 docker push 127.0.0.1:5000/kubernetes/pause:3.1
 
-for VERSION in $(echo ${VERSIONS} | sed "s/,/ /g")
-do
-    docker pull k8s.gcr.io/hyperkube-amd64:${VERSION}
-    docker tag k8s.gcr.io/hyperkube-amd64:${VERSION} 127.0.0.1:5000/kubernetes/hyperkube-amd64:${VERSION}
-    docker push 127.0.0.1:5000/kubernetes/hyperkube-amd64:${VERSION}
+for VERSION in $(echo ${VERSIONS} | sed "s/,/ /g"); do
+  docker pull k8s.gcr.io/hyperkube-amd64:${VERSION}
+  docker tag k8s.gcr.io/hyperkube-amd64:${VERSION} 127.0.0.1:5000/kubernetes/hyperkube-amd64:${VERSION}
+  docker push 127.0.0.1:5000/kubernetes/hyperkube-amd64:${VERSION}
 done
 
 # Push all kubermatic images
 cd ..
 KUBERMATICCOMMIT=${GIT_HEAD_HASH} GITTAG=${GIT_HEAD_HASH} make image-loader
 ./_build/image-loader \
-  -versions config/kubermatic/static/master/versions.yaml \
+  -configuration-file /dev/null \
   -addons-path addons \
   -registry 127.0.0.1:5000 \
   -log-format=Console
 
 # Build kubermatic binaries and push the image
-if ! curl -Ss --fail "http://127.0.0.1:5000/v2/kubermatic/tags/list"|grep -q ${GIT_HEAD_HASH}; then
+if ! curl -Ss --fail "http://127.0.0.1:5000/v2/kubermatic/api/tags/list"|grep -q ${GIT_HEAD_HASH}; then
   echodate "Building binaries"
-  time make -C api build
-  cd api
+  time make build
   echodate "Building docker image"
   time docker build -t 127.0.0.1:5000/kubermatic/api:${GIT_HEAD_HASH} .
   echodate "Pushing docker image"
@@ -243,9 +245,9 @@ retry 3 helm upgrade --install --force --wait --timeout 300 \
   --set=kubermatic.checks.crd.disable=true \
   --values ${VALUES_FILE} \
   --namespace ${NAMESPACE} \
-  kubermatic-${BUILD_ID} ./config/kubermatic/
+  kubermatic-${BUILD_ID} charts/kubermatic/
 
-go build --tags "$KUBERMATIC_EDITION" github.com/kubermatic/kubermatic/cmd/conformance-tests
+go build --tags "$KUBERMATIC_EDITION" ./cmd/conformance-tests
 
 cp ${KUBECONFIG} /tmp/kubeconfig-remote
 kubectl --kubeconfig /tmp/kubeconfig-remote config set-cluster kubernetes --server=https://${KUBERNETES_CONTROLLER_ADDR}:6443;
@@ -254,14 +256,12 @@ SSH_OPTS="-i /tmp/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyCheckin
 ssh ${SSH_OPTS} root@${PROXY_EXTERNAL_ADDR} "mkdir -p /tmp/${BUILD_ID}/reports"
 scp ${SSH_OPTS} ./conformance-tests root@${PROXY_EXTERNAL_ADDR}:/tmp/${BUILD_ID}/conformance-tests
 scp ${SSH_OPTS} /tmp/kubeconfig-remote root@${PROXY_EXTERNAL_ADDR}:/tmp/${BUILD_ID}/kubeconfig
-scp ${SSH_OPTS} ${DATACENTERS_FILE} root@${PROXY_EXTERNAL_ADDR}:/tmp/${BUILD_ID}/datacenters.yaml
 scp ${SSH_OPTS} /tmp/id_rsa.pub root@${PROXY_EXTERNAL_ADDR}:/tmp/id_rsa.pub
 ssh ${SSH_OPTS} root@${PROXY_EXTERNAL_ADDR} << EOF
   /tmp/${BUILD_ID}/conformance-tests \
     -worker-name=${BUILD_ID} \
     -kubeconfig=/tmp/${BUILD_ID}/kubeconfig \
     -node-ssh-pub-key=/tmp/id_rsa.pub \
-    -datacenters=/tmp/${BUILD_ID}/datacenters.yaml \
     -kubermatic-nodes=3 \
     -kubermatic-parallel-clusters=1 \
     -name-prefix=prow-e2e \

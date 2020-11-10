@@ -24,10 +24,10 @@ import (
 	"strings"
 	"testing"
 
-	apiv1 "github.com/kubermatic/kubermatic/pkg/api/v1"
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/handler/test"
-	"github.com/kubermatic/kubermatic/pkg/handler/test/hack"
+	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/handler/test"
+	"k8c.io/kubermatic/v2/pkg/handler/test/hack"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	k8sjson "k8s.io/apimachinery/pkg/util/json"
@@ -352,6 +352,9 @@ func TestCreateAddon(t *testing.T) {
 					ID:   "addon1",
 					Name: "addon1",
 				},
+				Spec: apiv1.AddonSpec{
+					ContinuouslyReconcile: true,
+				},
 			},
 			ExpectedHTTPStatus: http.StatusCreated,
 			ExistingKubermaticObjs: []runtime.Object{
@@ -402,6 +405,9 @@ func TestCreateAddon(t *testing.T) {
 					ID:   "addon1",
 					Name: "addon1",
 				},
+				Spec: apiv1.AddonSpec{
+					ContinuouslyReconcile: true,
+				},
 			},
 			ExpectedHTTPStatus: http.StatusCreated,
 			ExistingKubermaticObjs: []runtime.Object{
@@ -416,6 +422,38 @@ func TestCreateAddon(t *testing.T) {
 				cluster,
 			},
 			ExistingAPIUser: test.GenAPIUser("bob", "bob@acme.com"),
+		},
+		// scenario 4
+		{
+			Name: "scenario 4: create an addon with continuouslyReconcile flag",
+			Body: `{
+				"name": "addon1",
+				"spec": {
+					"variables": null,
+					"continuouslyReconcile": true
+				}
+			}`,
+			ExpectedResponse: apiv1.Addon{
+				ObjectMeta: apiv1.ObjectMeta{
+					ID:   "addon1",
+					Name: "addon1",
+				},
+				Spec: apiv1.AddonSpec{
+					ContinuouslyReconcile: true,
+				},
+			},
+			ExpectedHTTPStatus: http.StatusCreated,
+			ExistingKubermaticObjs: []runtime.Object{
+				/*add projects*/
+				test.GenProject("my-first-project", kubermaticv1.ProjectActive, test.DefaultCreationTimestamp()),
+				/*add bindings*/
+				test.GenBinding("my-first-project-ID", "john@acme.com", "owners"),
+				/*add users*/
+				test.GenUser("", "john", "john@acme.com"),
+				/*add cluster*/
+				cluster,
+			},
+			ExistingAPIUser: test.GenAPIUser("john", "john@acme.com"),
 		},
 	}
 
@@ -548,6 +586,49 @@ func TestCreatePatchGetAddon(t *testing.T) {
 				cluster,
 			},
 			ExistingAPIUser: test.GenAPIUser("bob", "bob@acme.com"),
+		},
+		// scenario 3
+		{
+			Name: "scenario 3: create, patch continuouslyReconcile flag, get an addon",
+			CreateBody: `{
+				"name": "addon1",
+				"spec": {
+					"variables": null
+				}
+			}`,
+			ExpectedCreateHTTPStatus: http.StatusCreated,
+			AddonToPatch:             "addon1",
+			PatchBody: `{
+				"name": "addon1",
+				"spec": {
+					"variables": {"foo": "bar"},
+                    "continuouslyReconcile": true
+				}
+			}`,
+			ExpectedPatchHTTPStatus: http.StatusOK,
+			AddonToGet:              "addon1",
+			ExpectedGetHTTPStatus:   http.StatusOK,
+			ExpectedGetResponse: apiv1.Addon{
+				ObjectMeta: apiv1.ObjectMeta{
+					ID:   "addon1",
+					Name: "addon1",
+				},
+				Spec: apiv1.AddonSpec{
+					Variables:             map[string]interface{}{"foo": "bar"},
+					ContinuouslyReconcile: true,
+				},
+			},
+			ExistingKubermaticObjs: []runtime.Object{
+				/*add projects*/
+				test.GenProject("my-first-project", kubermaticv1.ProjectActive, test.DefaultCreationTimestamp()),
+				/*add bindings*/
+				test.GenBinding("my-first-project-ID", "john@acme.com", "owners"),
+				/*add users*/
+				test.GenUser("", "john", "john@acme.com"),
+				/*add cluster*/
+				cluster,
+			},
+			ExistingAPIUser: test.GenAPIUser("john", "john@acme.com"),
 		},
 	}
 

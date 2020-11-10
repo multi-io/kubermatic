@@ -19,9 +19,9 @@ import (
 
 	"github.com/go-kit/kit/endpoint"
 	httptransport "github.com/go-kit/kit/transport/http"
-	"github.com/kubermatic/kubermatic/pkg/handler/middleware"
-	"github.com/kubermatic/kubermatic/pkg/handler/v1/common"
-	"github.com/kubermatic/kubermatic/pkg/provider"
+	"k8c.io/kubermatic/v2/pkg/handler/middleware"
+	"k8c.io/kubermatic/v2/pkg/handler/v1/common"
+	"k8c.io/kubermatic/v2/pkg/provider"
 )
 
 var resourceUsageCollectorAuthToken = os.Getenv("RESOURCE_USAGE_COLLECTOR_AUTH_TOKEN")
@@ -175,9 +175,8 @@ func getResourceUsageCollectorProxyEndpoint(seedsGetter provider.SeedsGetter, us
 		ctx, cancel := context.WithTimeout(ctx, time.Second*100)
 		defer cancel()
 
-		proxyRequest.Context(ctx)
 		proxyRequest.SetHeader("x-auth", resourceUsageCollectorAuthToken)
-		body, err := proxyRequest.DoRaw()
+		body, err := proxyRequest.DoRaw(ctx)
 
 		if err != nil {
 			return nil, err

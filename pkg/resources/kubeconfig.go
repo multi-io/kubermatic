@@ -20,9 +20,9 @@ import (
 	"crypto/x509"
 	"fmt"
 
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/resources/certificates/triple"
-	"github.com/kubermatic/kubermatic/pkg/resources/reconciling"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/resources/certificates/triple"
+	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -124,7 +124,7 @@ func GetInternalKubeconfigCreator(name, commonName string, organizations []strin
 			}
 
 			b := se.Data[KubeconfigSecretKey]
-			apiserverURL := fmt.Sprintf("https://%s:%d", data.Cluster().Address.InternalName, data.Cluster().Address.Port)
+			apiserverURL := fmt.Sprintf("https://%s", data.Cluster().Address.InternalName)
 			valid, err := IsValidKubeconfig(b, ca.Cert, apiserverURL, commonName, organizations, data.Cluster().Name)
 			if err != nil || !valid {
 				if err != nil {

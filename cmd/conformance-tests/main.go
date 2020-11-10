@@ -36,19 +36,20 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/crypto/ssh"
 
-	cmdutil "github.com/kubermatic/kubermatic/cmd/util"
-	clusterclient "github.com/kubermatic/kubermatic/pkg/cluster/client"
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	kubermaticlog "github.com/kubermatic/kubermatic/pkg/log"
-	"github.com/kubermatic/kubermatic/pkg/provider"
-	"github.com/kubermatic/kubermatic/pkg/semver"
-	kubermaticsignals "github.com/kubermatic/kubermatic/pkg/signals"
-	apitest "github.com/kubermatic/kubermatic/pkg/test/e2e/api"
-	apiclient "github.com/kubermatic/kubermatic/pkg/test/e2e/api/utils/apiclient/client"
-	"github.com/kubermatic/kubermatic/pkg/test/e2e/api/utils/apiclient/client/project"
-	"github.com/kubermatic/kubermatic/pkg/test/e2e/api/utils/dex"
 	clusterv1alpha1 "github.com/kubermatic/machine-controller/pkg/apis/cluster/v1alpha1"
 	providerconfig "github.com/kubermatic/machine-controller/pkg/providerconfig/types"
+	cmdutil "k8c.io/kubermatic/v2/cmd/util"
+	clusterclient "k8c.io/kubermatic/v2/pkg/cluster/client"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
+	"k8c.io/kubermatic/v2/pkg/provider"
+	"k8c.io/kubermatic/v2/pkg/semver"
+	kubermaticsignals "k8c.io/kubermatic/v2/pkg/signals"
+	apitest "k8c.io/kubermatic/v2/pkg/test/e2e/api"
+	apiclient "k8c.io/kubermatic/v2/pkg/test/e2e/api/utils/apiclient/client"
+	"k8c.io/kubermatic/v2/pkg/test/e2e/api/utils/apiclient/client/project"
+	"k8c.io/kubermatic/v2/pkg/test/e2e/api/utils/apiclient/models"
+	"k8c.io/kubermatic/v2/pkg/test/e2e/api/utils/dex"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -56,6 +57,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	metricsv1beta1 "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -95,8 +97,8 @@ type Opts struct {
 	pspEnabled                   bool
 	createOIDCToken              bool
 	dexHelmValuesFile            string
-	kubermatcProjectID           string
-	kubermaticClient             *apiclient.MetaKube
+	kubermaticProjectID          string
+	kubermaticClient             *apiclient.MetaKubeAPI
 	kubermaticAuthenticator      runtime.ClientAuthInfoWriter
 	scenarioOptions              string
 	pushgatewayEndpoint          string
@@ -144,11 +146,11 @@ type secrets struct {
 	Kubevirt struct {
 		Kubeconfig string
 	}
-	kubermaticClient *apiclient.MetaKube
-	Alibaba          struct {
+	Alibaba struct {
 		AccessKeyID     string
 		AccessKeySecret string
 	}
+	kubermaticClient        *apiclient.MetaKubeAPI
 	kubermaticAuthenticator runtime.ClientAuthInfoWriter
 }
 
@@ -196,21 +198,17 @@ func main() {
 	flag.StringVar(&opts.repoRoot, "repo-root", "/opt/kube-test/", "Root path for the different kubernetes repositories")
 	flag.IntVar(&opts.nodeCount, "kubermatic-nodes", 3, "number of worker nodes")
 	flag.IntVar(&opts.clusterParallelCount, "kubermatic-parallel-clusters", 5, "number of clusters to test in parallel")
-	_ = flag.String("datacenters", "", "No-Op flag kept for compatibility reasons")
 	flag.StringVar(&opts.reportsRoot, "reports-root", "/opt/reports", "Root for reports")
-	_ = flag.Bool("cleanup-on-start", false, "No-Op kept for compatibility reasons")
 	flag.DurationVar(&opts.controlPlaneReadyWaitTimeout, "kubermatic-cluster-timeout", defaultTimeout, "cluster creation timeout")
 	flag.BoolVar(&opts.deleteClusterAfterTests, "kubermatic-delete-cluster", true, "delete test cluster when tests where successful")
 	flag.StringVar(&pubKeyPath, "node-ssh-pub-key", pubkeyPath, "path to a public key which gets deployed onto every node")
 	flag.StringVar(&opts.workerName, "worker-name", "", "name of the worker, if set the 'worker-name' label will be set on all clusters")
-	flag.StringVar(&sversions, "versions", "v1.15.11,v1.16.9,,v1.17.5,v1.18.2", "a comma-separated list of versions to test")
+	flag.StringVar(&sversions, "versions", "v1.16.14,v1.17.11,v1.18.8,v1.19.0", "a comma-separated list of versions to test")
 	flag.StringVar(&opts.excludeSelectorRaw, "exclude-distributions", "", "a comma-separated list of distributions that will get excluded from the tests")
-	_ = flag.Bool("run-kubermatic-controller-manager", false, "Unused, but kept for compatibility reasons")
 	flag.IntVar(&defaultTimeoutMinutes, "default-timeout-minutes", 10, "The default timeout in minutes")
 	flag.BoolVar(&opts.openshift, "openshift", false, "Whether to create an openshift cluster")
 	flag.BoolVar(&opts.printGinkoLogs, "print-ginkgo-logs", false, "Whether to print ginkgo logs when ginkgo encountered failures")
 	flag.BoolVar(&opts.onlyTestCreation, "only-test-creation", false, "Only test if nodes become ready. Does not perform any extended checks like conformance tests")
-	_ = flag.Bool("debug", false, "No-Op flag kept for compatibility reasons")
 	flag.BoolVar(&opts.createOIDCToken, "create-oidc-token", false, "Whether to create a OIDC token. If false, environment vars for projectID and OIDC token must be set.")
 	// This won't be used directly for backwards compatibility in upgrade-tests;
 	// instead the KUBERMATIC_DEX_VALUES_FILE env variable will be used.
@@ -269,7 +267,7 @@ func main() {
 			case "flatcar":
 				opts.excludeSelector.Distributions[providerconfig.OperatingSystemFlatcar] = true
 			default:
-				log.Fatalf("Unknown distribution '%s' in '-exclude-distributions' param", excludedDistribution)
+				log.Panicf("Unknown distribution '%s' in '-exclude-distributions' param", excludedDistribution)
 			}
 		}
 	}
@@ -280,16 +278,16 @@ func main() {
 
 	kubermaticAPIServerAddress := os.Getenv("KUBERMATIC_HOST")
 	if kubermaticAPIServerAddress == "" {
-		log.Fatal("Kubermatic apiserver address must be set via KUBERMATIC_HOST env var")
+		log.Panic("Kubermatic apiserver address must be set via KUBERMATIC_HOST env var")
 	}
 	kubermaticAPIServerScheme := os.Getenv("KUBERMATIC_SCHEME")
 	if kubermaticAPIServerScheme == "" {
-		log.Fatal("Kubermatic apiserver protocol must be set via KUBERMATIC_SCHEME env var")
+		log.Panic("Kubermatic apiserver protocol must be set via KUBERMATIC_SCHEME env var")
 	}
 	opts.kubermaticClient = apiclient.New(httptransport.New(kubermaticAPIServerAddress, "", []string{kubermaticAPIServerScheme}), nil)
 	opts.secrets.kubermaticClient = opts.kubermaticClient
 	// May be empty if creating an OIDC token
-	opts.kubermatcProjectID = strings.TrimSpace(os.Getenv("KUBERMATIC_PROJECT_ID"))
+	opts.kubermaticProjectID = strings.TrimSpace(os.Getenv("KUBERMATIC_PROJECT_ID"))
 
 	rootCtx, rootCancel := context.WithCancel(context.Background())
 	defer rootCancel()
@@ -298,12 +296,12 @@ func main() {
 	defer updateMetrics(log)
 
 	if !opts.createOIDCToken {
-		if opts.kubermatcProjectID == "" {
-			log.Fatal("Kubermatic project id must be set via KUBERMATIC_PROJECT_ID env var")
+		if opts.kubermaticProjectID == "" {
+			log.Panic("Kubermatic project id must be set via KUBERMATIC_PROJECT_ID env var")
 		}
 		kubermaticServiceaAccountToken := os.Getenv("KUBERMATIC_SERVICEACCOUNT_TOKEN")
 		if kubermaticServiceaAccountToken == "" {
-			log.Fatal("A Kubermatic serviceAccountToken must be set via KUBERMATIC_SERVICEACCOUNT_TOKEN env var")
+			log.Panic("A Kubermatic serviceAccountToken must be set via KUBERMATIC_SERVICEACCOUNT_TOKEN env var")
 		}
 		opts.kubermaticAuthenticator = httptransport.BearerToken(kubermaticServiceaAccountToken)
 	} else {
@@ -315,7 +313,7 @@ func main() {
 
 		dexClient, err := dex.NewClientFromHelmValues(opts.dexHelmValuesFile, "kubermatic", log)
 		if err != nil {
-			log.Fatalw("Failed to create OIDC client", zap.Error(err))
+			log.Panicw("Failed to create OIDC client", zap.Error(err))
 		}
 
 		var login, password, token string
@@ -329,19 +327,19 @@ func main() {
 				return err
 			},
 		); err != nil {
-			log.Fatalw("Failed to get master token", zap.Error(err))
+			log.Panicw("Failed to get master token", zap.Error(err))
 		}
 
 		log.Info("Successfully retrieved master token")
 
 		opts.kubermaticAuthenticator = httptransport.BearerToken(token)
 
-		if opts.kubermatcProjectID == "" {
+		if opts.kubermaticProjectID == "" {
 			projectID, err := createProject(opts.kubermaticClient, opts.kubermaticAuthenticator, log)
 			if err != nil {
-				log.Fatalw("Failed to create project", zap.Error(err))
+				log.Panicw("Failed to create project", zap.Error(err))
 			}
-			opts.kubermatcProjectID = projectID
+			opts.kubermaticProjectID = projectID
 		}
 	}
 	opts.secrets.kubermaticAuthenticator = opts.kubermaticAuthenticator
@@ -349,7 +347,7 @@ func main() {
 	if opts.openshift {
 		opts.openshiftPullSecret = os.Getenv("OPENSHIFT_IMAGE_PULL_SECRET")
 		if opts.openshiftPullSecret == "" {
-			log.Fatal("Testing openshift requires the `OPENSHIFT_IMAGE_PULL_SECRET` env var to be set")
+			log.Panic("Testing openshift requires the `OPENSHIFT_IMAGE_PULL_SECRET` env var to be set")
 		}
 	}
 
@@ -363,11 +361,11 @@ func main() {
 	// doesn't have all flags
 	seedName := os.Getenv("SEED_NAME")
 	if seedName == "" {
-		log.Fatal("The name of the seed dc must be configured via the SEED_NAME env var")
+		log.Panic("The name of the seed dc must be configured via the SEED_NAME env var")
 	}
 
 	if opts.existingClusterLabel != "" && opts.clusterParallelCount != 1 {
-		log.Fatal("-cluster-parallel-count must be 1 when testing an existing cluster")
+		log.Panic("-cluster-parallel-count must be 1 when testing an existing cluster")
 	}
 
 	for _, s := range strings.Split(providers, ",") {
@@ -377,17 +375,21 @@ func main() {
 	if pubKeyPath != "" {
 		keyData, err := ioutil.ReadFile(pubKeyPath)
 		if err != nil {
-			log.Fatalw("Failed to load ssh key", zap.Error(err))
+			log.Panicw("Failed to load ssh key", zap.Error(err))
 		}
 		opts.publicKeys = append(opts.publicKeys, keyData)
 	}
 
 	homeDir, e2eTestPubKeyBytes, err := setupHomeDir(log)
 	if err != nil {
-		log.Fatalw("Failed to setup temporary home dir", zap.Error(err))
+		log.Panicw("Failed to setup temporary home dir", zap.Error(err))
 	}
 	opts.publicKeys = append(opts.publicKeys, e2eTestPubKeyBytes)
 	opts.homeDir = homeDir
+
+	if err := createSSHKeys(opts.kubermaticClient, opts.kubermaticAuthenticator, &opts, log); err != nil {
+		log.Panicw("Failed to create SSH keys", zap.Error(err))
+	}
 
 	stopCh := kubermaticsignals.SetupSignalHandler()
 
@@ -403,23 +405,27 @@ func main() {
 
 	config, err := clientcmd.BuildConfigFromFlags("", opts.kubeconfigPath)
 	if err != nil {
-		log.Fatal(err)
+		log.Panic(err)
 	}
 	opts.seedRestConfig = config
 
 	if err := clusterv1alpha1.SchemeBuilder.AddToScheme(scheme.Scheme); err != nil {
-		log.Fatalw("Failed to add clusterv1alpha1 to scheme", zap.Error(err))
+		log.Panicw("Failed to add clusterv1alpha1 to scheme", zap.Error(err))
+	}
+
+	if err := metricsv1beta1.SchemeBuilder.AddToScheme(scheme.Scheme); err != nil {
+		log.Panicw("Failed to add metrics v1beta1 to scheme", zap.Error(err))
 	}
 
 	seedClusterClient, err := ctrlruntimeclient.New(config, ctrlruntimeclient.Options{})
 	if err != nil {
-		log.Fatal(err)
+		log.Panic(err)
 	}
 	opts.seedClusterClient = seedClusterClient
 
 	seedGeneratedClient, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		log.Fatal(err)
+		log.Panic(err)
 	}
 	opts.seedGeneratedClient = seedGeneratedClient
 
@@ -430,16 +436,16 @@ func main() {
 	}
 	seedGetter, err := provider.SeedGetterFactory(context.Background(), seedClusterClient, seedName, namespaceName)
 	if err != nil {
-		log.Fatalw("Failed to consturct seedGetter", zap.Error(err))
+		log.Panicw("Failed to construct seedGetter", zap.Error(err))
 	}
 	opts.seed, err = seedGetter()
 	if err != nil {
-		log.Fatalw("Failed to get seed", zap.Error(err))
+		log.Panicw("Failed to get seed", zap.Error(err))
 	}
 
 	clusterClientProvider, err := clusterclient.NewExternal(seedClusterClient)
 	if err != nil {
-		log.Fatalw("Failed to get clusterClientProvider", zap.Error(err))
+		log.Panicw("Failed to get clusterClientProvider", zap.Error(err))
 	}
 	opts.clusterClientProvider = clusterClientProvider
 
@@ -448,7 +454,7 @@ func main() {
 
 	start := time.Now()
 	if err := runner.Run(); err != nil {
-		log.Fatal(err)
+		log.Panic(err)
 	}
 	log.Infof("Whole suite took: %.2f seconds", time.Since(start).Seconds())
 }
@@ -461,6 +467,7 @@ func getScenarios(opts Opts, log *zap.SugaredLogger) []testScenario {
 		opts.excludeSelector.Distributions[providerconfig.OperatingSystemCentOS] = false
 		opts.excludeSelector.Distributions[providerconfig.OperatingSystemSLES] = true
 		opts.excludeSelector.Distributions[providerconfig.OperatingSystemRHEL] = true
+		opts.excludeSelector.Distributions[providerconfig.OperatingSystemFlatcar] = true
 	}
 
 	scenarioOptions := strings.Split(opts.scenarioOptions, ",")
@@ -614,7 +621,7 @@ func shuffle(vals []testScenario) []testScenario {
 	return ret
 }
 
-func createProject(client *apiclient.MetaKube, bearerToken runtime.ClientAuthInfoWriter, log *zap.SugaredLogger) (string, error) {
+func createProject(client *apiclient.MetaKubeAPI, bearerToken runtime.ClientAuthInfoWriter, log *zap.SugaredLogger) (string, error) {
 	params := &project.CreateProjectParams{Body: project.CreateProjectBody{Name: "kubermatic-conformance-tester"}}
 	params.WithTimeout(15 * time.Second)
 
@@ -650,4 +657,33 @@ func createProject(client *apiclient.MetaKube, bearerToken runtime.ClientAuthInf
 	}
 
 	return projectID, nil
+}
+
+func createSSHKeys(client *apiclient.MetaKubeAPI, bearerToken runtime.ClientAuthInfoWriter, opts *Opts, log *zap.SugaredLogger) error {
+	for i, key := range opts.publicKeys {
+		log.Infow("Creating UserSSHKey", "pubkey", string(key))
+		if err := wait.PollImmediate(10*time.Second, time.Minute, func() (bool, error) {
+			body := project.CreateSSHKeyParams{
+				ProjectID: opts.kubermaticProjectID,
+				Key: &models.SSHKey{
+					Name: fmt.Sprintf("SSH Key No. %d", i+1),
+					Spec: &models.SSHKeySpec{
+						PublicKey: string(key),
+					},
+				},
+			}
+			body.WithTimeout(15 * time.Second)
+
+			if _, err := client.Project.CreateSSHKey(&body, bearerToken); err != nil {
+				log.Errorw("Failed to create SSH key", "error", fmtSwaggerError(err))
+				return false, nil
+			}
+
+			return true, nil
+		}); err != nil {
+			return fmt.Errorf("failed creating SSH key: %v", err)
+		}
+	}
+
+	return nil
 }

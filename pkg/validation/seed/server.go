@@ -27,7 +27,7 @@ import (
 
 	"go.uber.org/zap"
 
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,15 +54,12 @@ func (opts *WebhookOpts) AddFlags(fs *flag.FlagSet) {
 }
 
 // Server returns a Server that validates AdmissionRequests for Seed CRs.
-// When migrationModeEnabled is enabled, only creating new seeds is allowed, not
-// changing or deleting existing.
 func (opts *WebhookOpts) Server(
 	ctx context.Context,
 	log *zap.SugaredLogger,
 	namespace string,
 	validateFunc ValidateFunc,
-	defaultComponentsOverrides kubermaticv1.ComponentSettings,
-	migrationModeEnabled bool) (*Server, error) {
+	defaultComponentsOverrides kubermaticv1.ComponentSettings) (*Server, error) {
 
 	if opts.CertFile == "" || opts.KeyFile == "" {
 		return nil, fmt.Errorf("seed-admissionwebhook-cert-file or seed-admissionwebhook-key-file cannot be empty")
@@ -72,13 +69,13 @@ func (opts *WebhookOpts) Server(
 		Server: &http.Server{
 			Addr: opts.ListenAddress,
 		},
+		ctx:                        ctx,
 		log:                        log.Named("seed-webhook-server"),
 		listenAddress:              opts.ListenAddress,
 		certFile:                   opts.CertFile,
 		keyFile:                    opts.KeyFile,
 		validateFunc:               validateFunc,
 		namespace:                  namespace,
-		migrationModeEnabled:       migrationModeEnabled,
 		defaultComponentsOverrides: defaultComponentsOverrides,
 	}
 	mux := http.NewServeMux()
@@ -97,9 +94,8 @@ type Server struct {
 	certFile                   string
 	keyFile                    string
 	validateFunc               ValidateFunc
-	namespace                  string
 	defaultComponentsOverrides kubermaticv1.ComponentSettings
-	migrationModeEnabled       bool
+	namespace                  string
 }
 
 // Server implements LeaderElectionRunnable to indicate that it does not require to run
@@ -174,13 +170,6 @@ func (s *Server) handleSeedValidation(req *http.Request) (*admissionv1beta1.Admi
 		seed.Namespace = admissionReview.Request.Namespace
 	} else if err := json.Unmarshal(admissionReview.Request.Object.Raw, seed); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal object from request into a Seed: %v", err)
-	}
-
-	// during datacenters->seed migration we reject any changes, so the seeds can never get
-	// out of sync with the datacenters.yaml; this must happen after the checks above or else
-	// we would block deleting namespaces
-	if s.migrationModeEnabled && admissionReview.Request.Operation != admissionv1beta1.Create {
-		return admissionReview.Request, errors.New("migration is enabled, changes to Seed resources are forbidden; disable migration by removing either -datacenters or -dynamic-datacenters flags from the master-controller-manager")
 	}
 
 	validationErr := s.validateFunc(s.ctx, seed, admissionReview.Request.Operation)

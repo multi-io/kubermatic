@@ -12,15 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-default: test build
-
+DOCKER_REPO ?= "quay.io/kubermatic"
 GOOS ?= $(shell go env GOOS)
 
+default: test build
+
 lb-updater:
-	GOOS=$(GOOS) CGO_ENABLED=0 go build -o ./_build/lb-updater github.com/kubermatic/kubermatic/cmd/nodeport-proxy/lb-updater
+	GOOS=$(GOOS) CGO_ENABLED=0 go build -o ./_build/lb-updater k8c.io/kubermatic/v2/cmd/nodeport-proxy/lb-updater
 
 envoy-manager:
-	GOOS=$(GOOS) CGO_ENABLED=0 go build -o ./_build/envoy-manager github.com/kubermatic/kubermatic/cmd/nodeport-proxy/envoy-manager
+	GOOS=$(GOOS) CGO_ENABLED=0 go build -o ./_build/envoy-manager k8c.io/kubermatic/v2/cmd/nodeport-proxy/envoy-manager
 
 build: envoy-manager lb-updater
 
@@ -28,7 +29,7 @@ clean:
 	rm -f envoy-manager lb-updater
 
 docker: build
-	docker build -t quay.io/kubermatic/nodeport-proxy:$(TAG) .
+	docker build -t $(DOCKER_REPO)/nodeport-proxy:$(TAG) .
 
 test:
 	go test ./...

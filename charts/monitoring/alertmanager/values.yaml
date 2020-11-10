@@ -1,0 +1,107 @@
+# Copyright 2020 The Kubermatic Kubernetes Platform contributors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+alertmanager:
+  image:
+    repository: quay.io/prometheus/alertmanager
+    tag: v0.21.0
+    pullPolicy: IfNotPresent
+  configReloaderImage:
+    repository: docker.io/jimmidyson/configmap-reload
+    tag: v0.3.0
+    pullPolicy: IfNotPresent
+  host: ""
+  replicas: 3
+  storageSize: 100Mi
+  storageClass: kubermatic-fast
+
+  config:
+    global:
+      slack_api_url: https://hooks.slack.com/services/YOUR_KEYS_HERE
+    route:
+      receiver: default
+      repeat_interval: 1h
+      routes:
+      - receiver: blackhole
+        match:
+          severity: none
+    receivers:
+    - name: blackhole
+    - name: default
+      slack_configs:
+      - channel: '#alerting'
+        send_resolved: true
+    inhibit_rules:
+    # do not alert about anything going wrong inside paused clusters
+    - source_match: { alertname: KubermaticClusterPaused }
+      equal: [seed_cluster, cluster]
+    # if etcd is down, it brings down everything else as well
+    - source_match_re: { alertname: EtcdDown, cluster: .+ }
+      equal: [seed_cluster, cluster]
+    # if a user-cluster apiserver is down, ignore other components failing
+    - source_match_re: { alertname: KubernetesApiserverDown, cluster: .+ }
+      equal: [seed_cluster, cluster]
+    # if a user-cluster OpenVPN server is dead, we cannot connect to the nodes anymore
+    - source_match_re: { alertname: OpenVPNServerDown, cluster: .+ }
+      target_match_re: { alertname: (CAdvisorDown|KubernetesNodeDown) }
+      equal: [seed_cluster, cluster]
+
+  resources:
+    alertmanager:
+      requests:
+        cpu: 100m
+        memory: 32Mi
+      limits:
+        cpu: 200m
+        memory: 48Mi
+    reloader:
+      requests:
+        cpu: 50m
+        memory: 24Mi
+      limits:
+        cpu: 150m
+        memory: 32Mi
+    migration:
+      resources:
+        requests:
+          cpu: 100m
+          memory: 64Mi
+        limits:
+          cpu: 200m
+          memory: 128Mi
+  nodeSelector: {}
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app: '{{ template "name" . }}'
+          topologyKey: kubernetes.io/hostname
+        weight: 100
+  tolerations: []
+
+  # When upgrading the chart from 1.x => 2.0, the naming for volumes
+  # has changed and without a migration your existing Alertmanager database
+  # would not be used anymore. Set the enabled flag to true to let an
+  # init container copy the data over. A lockfile is created so that when
+  # the pod for whatever reason restarts the migration is not executed
+  # again.
+  # Once the migration has finished and you set the flag to false again,
+  # you can safely remove the old `alertmanager-kubermatic-db-...` PVCs.
+  migration:
+    enabled: false
+    image:
+      repository: quay.io/kubermatic/util
+      tag: 1.4.1

@@ -19,9 +19,9 @@ package kubernetes
 import (
 	"reflect"
 
-	v1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/log"
-	"github.com/kubermatic/kubermatic/pkg/provider"
+	v1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/log"
+	"k8c.io/kubermatic/v2/pkg/provider"
 
 	"code.cloudfoundry.org/go-pubsub"
 	"k8s.io/apimachinery/pkg/watch"
@@ -85,6 +85,6 @@ func (watcher *SettingsWatcher) run() {
 }
 
 // Subscribe allows to register subscription handler which will be invoked on each settings change.
-func (watcher *SettingsWatcher) Subscribe(subscription pubsub.Subscription) {
-	watcher.publisher.Subscribe(subscription)
+func (watcher *SettingsWatcher) Subscribe(subscription pubsub.Subscription) pubsub.Unsubscriber {
+	return watcher.publisher.Subscribe(subscription)
 }

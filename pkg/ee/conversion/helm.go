@@ -30,14 +30,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/kubermatic/kubermatic/pkg/controller/operator/common"
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/crd/migrations/util"
-	operatorv1alpha1 "github.com/kubermatic/kubermatic/pkg/crd/operator/v1alpha1"
-	"github.com/kubermatic/kubermatic/pkg/ee/provider"
-	"github.com/kubermatic/kubermatic/pkg/features"
-	"github.com/kubermatic/kubermatic/pkg/provider/kubernetes"
-	"github.com/kubermatic/kubermatic/pkg/resources"
+	"k8c.io/kubermatic/v2/pkg/controller/operator/common"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/crd/migrations/util"
+	operatorv1alpha1 "k8c.io/kubermatic/v2/pkg/crd/operator/v1alpha1"
+	"k8c.io/kubermatic/v2/pkg/ee/provider"
+	"k8c.io/kubermatic/v2/pkg/features"
+	"k8c.io/kubermatic/v2/pkg/provider/kubernetes"
+	"k8c.io/kubermatic/v2/pkg/resources"
 
 	certmanagerv1alpha2 "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1alpha2"
 	corev1 "k8s.io/api/core/v1"
@@ -89,7 +89,7 @@ type kubermaticValues struct {
 	APIServerDefaultReplicas             *string `yaml:"apiserverDefaultReplicas"`
 	ControllerManagerDefaultReplicas     *string `yaml:"controllerManagerDefaultReplicas"`
 	SchedulerDefaultReplicas             *string `yaml:"schedulerDefaultReplicas"`
-	MaxParallelReconcile                 string  `yaml:"maxParallelReconcile"`
+	MaxParallelReconcile                 *string `yaml:"maxParallelReconcile"`
 	APIServerEndpointReconcilingDisabled bool    `yaml:"apiserverEndpointReconcilingDisabled"`
 	DynamicDatacenters                   bool    `yaml:"dynamicDatacenters"`
 	DynamicPresets                       bool    `yaml:"dynamicPresets"`
@@ -143,7 +143,14 @@ type kubermaticValues struct {
 	} `yaml:"clusterNamespacePrometheus"`
 }
 
-func HelmValuesFileToCRDs(yamlContent []byte, targetNamespace string) ([]runtime.Object, error) {
+type Options struct {
+	Namespace      string
+	IncludeSeeds   bool
+	IncludePresets bool
+	PauseSeeds     bool
+}
+
+func HelmValuesFileToCRDs(yamlContent []byte, opt Options) ([]runtime.Object, error) {
 	values := helmValues{}
 	if err := yaml.Unmarshal(yamlContent, &values); err != nil {
 		return nil, fmt.Errorf("failed to decode file: %v", err)
@@ -151,23 +158,27 @@ func HelmValuesFileToCRDs(yamlContent []byte, targetNamespace string) ([]runtime
 
 	result := []runtime.Object{}
 
-	config, err := convertKubermaticConfiguration(&values, targetNamespace)
+	config, err := convertKubermaticConfiguration(&values, opt.Namespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create KubermaticConfiguration: %v", err)
 	}
 	result = append(result, config)
 
-	seeds, err := convertSeeds(&values, targetNamespace)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Seeds: %v", err)
+	if opt.IncludeSeeds {
+		seeds, err := convertSeeds(&values, opt.Namespace, opt.PauseSeeds)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create Seeds: %v", err)
+		}
+		result = append(result, seeds...)
 	}
-	result = append(result, seeds...)
 
-	presets, err := convertPresets(&values, targetNamespace)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Presets: %v", err)
+	if opt.IncludePresets {
+		presets, err := convertPresets(&values, opt.Namespace)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create Presets: %v", err)
+		}
+		result = append(result, presets...)
 	}
-	result = append(result, presets...)
 
 	return result, nil
 }
@@ -249,11 +260,11 @@ func convertKubermaticConfiguration(values *helmValues, targetNamespace string) 
 	return &config, nil
 }
 
-type datacentersMeta struct {
+type DatacentersMeta struct {
 	Datacenters map[string]provider.DatacenterMeta `json:"datacenters"`
 }
 
-func convertSeeds(values *helmValues, targetNamespace string) ([]runtime.Object, error) {
+func convertSeeds(values *helmValues, targetNamespace string, pauseProvisioning bool) ([]runtime.Object, error) {
 	if values.Kubermatic.Datacenters == "" {
 		return nil, nil
 	}
@@ -263,19 +274,11 @@ func convertSeeds(values *helmValues, targetNamespace string) ([]runtime.Object,
 		return nil, fmt.Errorf("datacenters are not valid base64: %v", err)
 	}
 
-	dcMetas := datacentersMeta{}
+	dcMetas := DatacentersMeta{}
 	if err := yaml.UnmarshalStrict(datacenters, &dcMetas); err != nil {
 		return nil, fmt.Errorf("failed to parse datacenters.yaml: %v", err)
 	}
 
-	seeds, err := provider.DatacenterMetasToSeeds(dcMetas.Datacenters)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert datacenters.yaml: %v", err)
-	}
-
-	result := []runtime.Object{}
-
-	// if there is a kubeconfig, try to generate Secrets per seed
 	var kubeconfig *clientcmdapi.Config
 	if values.Kubermatic.Kubeconfig != "" {
 		kubeconfigBytes, err := base64.StdEncoding.DecodeString(values.Kubermatic.Kubeconfig)
@@ -289,23 +292,42 @@ func convertSeeds(values *helmValues, targetNamespace string) ([]runtime.Object,
 		}
 	}
 
+	return ConvertDatacenters(dcMetas.Datacenters, kubeconfig, targetNamespace, pauseProvisioning)
+}
+
+func ConvertDatacenters(datacenterMeta map[string]provider.DatacenterMeta, globalKubeconfig *clientcmdapi.Config, targetNamespace string, pauseProvisioning bool) ([]runtime.Object, error) {
+	result := []runtime.Object{}
+
+	seeds, err := provider.DatacenterMetasToSeeds(datacenterMeta)
+	if err != nil {
+		return result, fmt.Errorf("failed to convert datacenters.yaml: %v", err)
+	}
+
 	for _, seed := range seeds {
 		seed.APIVersion = kubermaticv1.SchemeGroupVersion.String()
 		seed.Kind = "Seed"
 		seed.Namespace = targetNamespace
 
+		if pauseProvisioning {
+			if seed.Annotations == nil {
+				seed.Annotations = map[string]string{}
+			}
+
+			seed.Annotations[common.SkipReconcilingAnnotation] = ""
+		}
+
 		var seedKubeconfig *clientcmdapi.Config
-		if kubeconfig != nil {
-			seedKubeconfig, err = util.SingleSeedKubeconfig(kubeconfig, seed.Name)
+		if globalKubeconfig != nil {
+			seedKubeconfig, err = util.SingleSeedKubeconfig(globalKubeconfig, seed.Name)
 			if err != nil {
-				return nil, fmt.Errorf("kubeconfig does not contain a valid context for seed %s: %v", seed.Name, err)
+				return result, fmt.Errorf("kubeconfig does not contain a valid context for seed %s: %v", seed.Name, err)
 			}
 
 			secretName := fmt.Sprintf("kubeconfig-%s", seed.Name)
 
 			secret, fieldPath, err := util.CreateKubeconfigSecret(seedKubeconfig, secretName, targetNamespace)
 			if err != nil {
-				return nil, fmt.Errorf("failed to create kubeconfig Secret for seed %s: %v", seed.Name, err)
+				return result, fmt.Errorf("failed to create kubeconfig Secret for seed %s: %v", seed.Name, err)
 			}
 			secret.APIVersion = "v1"
 			secret.Kind = "Secret"
@@ -407,13 +429,22 @@ func convertSeedController(values *kubermaticValues) (*operatorv1alpha1.Kubermat
 		cleanupContainer = ""
 	}
 
+	maxParallelReconciles := 0
+	if values.MaxParallelReconcile != nil && *values.MaxParallelReconcile != "" {
+		maxParallelReconciles, err = numericValue(*values.MaxParallelReconcile)
+		if err != nil {
+			return nil, fmt.Errorf("invalid maxParallelReconcile: %v", err)
+		}
+	}
+
 	return &operatorv1alpha1.KubermaticSeedControllerConfiguration{
-		DockerRepository:       strIfChanged(values.Controller.Image.Repository, resources.DefaultKubermaticImage),
-		BackupStoreContainer:   storeContainer,
-		BackupCleanupContainer: cleanupContainer,
-		PProfEndpoint:          getPProfEndpoint(values.Controller.PProfEndpoint),
-		Replicas:               replicas,
-		Resources:              convertResources(values.Controller.Resources, common.DefaultSeedControllerMgrResources),
+		MaximumParallelReconciles: maxParallelReconciles,
+		DockerRepository:          strIfChanged(values.Controller.Image.Repository, resources.DefaultKubermaticImage),
+		BackupStoreContainer:      storeContainer,
+		BackupCleanupContainer:    cleanupContainer,
+		PProfEndpoint:             getPProfEndpoint(values.Controller.PProfEndpoint),
+		Replicas:                  replicas,
+		Resources:                 convertResources(values.Controller.Resources, common.DefaultSeedControllerMgrResources),
 	}, nil
 }
 

@@ -16,15 +16,14 @@
 
 set -euo pipefail
 
-source $(dirname $0)/../lib.sh
-
 cd $(dirname $0)/../..
+source hack/lib.sh
 
 TARGET_DIR=docs_sync
 REVISION=$(git rev-parse --short HEAD)
 
 # configure Git
-git config --global user.email "dev@loodse.com"
+git config --global user.email "dev@kubermatic.com"
 git config --global user.name "Prow CI Robot"
 git config --global core.sshCommand 'ssh -o CheckHostIP=no -i /ssh/id_rsa'
 ensure_github_host_pubkey

@@ -28,12 +28,12 @@ import (
 	"net"
 	"time"
 
-	"github.com/kubermatic/kubermatic/pkg/semver"
 	"github.com/minio/minio-go"
 
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/resources/certificates/triple"
-	"github.com/kubermatic/kubermatic/pkg/resources/reconciling"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/resources/certificates/triple"
+	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
+	"k8c.io/kubermatic/v2/pkg/semver"
 
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -63,6 +63,9 @@ const (
 	RancherServerServiceName            = "rancher-server-svc"
 	RancherServerIngressName            = "rancher-server-ingress"
 )
+
+// ApiServer secure port
+const APIServerSecurePort = 6443
 
 const (
 	// ApiserverDeploymentName is the name of the apiserver deployment
@@ -109,8 +112,8 @@ const (
 	// EtcdDefaultBackupConfigName is the name for the default (preinstalled) EtcdBackupConfig of a cluster.
 	EtcdDefaultBackupConfigName = "default-backups"
 
-	// ApiserverExternalServiceName is the name for the external apiserver service
-	ApiserverExternalServiceName = "apiserver-external"
+	// ApiserverServiceName is the name for the apiserver service
+	ApiserverServiceName = "apiserver-external"
 	// ApiserverInternalServiceName is the name for the internal apiserver service
 	ApiserverInternalServiceName = "apiserver"
 	// FrontLoadBalancerServiceName is the name of the LoadBalancer service that fronts everything

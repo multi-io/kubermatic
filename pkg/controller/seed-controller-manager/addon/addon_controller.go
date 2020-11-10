@@ -28,19 +28,18 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kubermatic/kubermatic/pkg/provider"
-
 	"github.com/ghodss/yaml"
 
 	"go.uber.org/zap"
 
-	addonutils "github.com/kubermatic/kubermatic/pkg/addon"
-	clusterclient "github.com/kubermatic/kubermatic/pkg/cluster/client"
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	kubermaticv1helper "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1/helper"
-	kuberneteshelper "github.com/kubermatic/kubermatic/pkg/kubernetes"
-	"github.com/kubermatic/kubermatic/pkg/resources"
-	"github.com/kubermatic/kubermatic/pkg/resources/machinecontroller"
+	addonutils "k8c.io/kubermatic/v2/pkg/addon"
+	clusterclient "k8c.io/kubermatic/v2/pkg/cluster/client"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	kubermaticv1helper "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1/helper"
+	kuberneteshelper "k8c.io/kubermatic/v2/pkg/kubernetes"
+	"k8c.io/kubermatic/v2/pkg/provider"
+	"k8c.io/kubermatic/v2/pkg/resources"
+	"k8c.io/kubermatic/v2/pkg/resources/machinecontroller"
 
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -281,7 +280,7 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, addo
 		return nil, fmt.Errorf("failed to deploy the addon manifests into the cluster: %v", err)
 	}
 	if err := r.ensureFinalizerIsSet(ctx, addon); err != nil {
-		return nil, fmt.Errorf("failed to ensure that the cleanup finalizer existis on the addon: %v", err)
+		return nil, fmt.Errorf("failed to ensure that the cleanup finalizer exists on the addon: %v", err)
 	}
 	if err := r.ensureResourcesCreatedConditionIsSet(ctx, addon); err != nil {
 		return nil, fmt.Errorf("failed to set add ResourcesCreated Condition: %v", err)
@@ -448,7 +447,7 @@ func getFileDeleteFinalizer(log *zap.SugaredLogger, filename string) fileHandlin
 }
 
 func (r *Reconciler) writeCombinedManifest(log *zap.SugaredLogger, manifest *bytes.Buffer, addon *kubermaticv1.Addon, cluster *kubermaticv1.Cluster) (string, fileHandlingDone, error) {
-	//Write combined Manifest to disk
+	// Write combined Manifest to disk
 	manifestFilename := path.Join("/tmp", fmt.Sprintf("cluster-%s-%s.yaml", cluster.Name, addon.Name))
 	if err := ioutil.WriteFile(manifestFilename, manifest.Bytes(), 0644); err != nil {
 		return "", nil, fmt.Errorf("failed to write combined manifest to %s: %v", manifestFilename, err)
@@ -562,6 +561,11 @@ func (r *Reconciler) ensureResourcesCreatedConditionIsSet(ctx context.Context, a
 func (r *Reconciler) cleanupManifests(ctx context.Context, log *zap.SugaredLogger, addon *kubermaticv1.Addon, cluster *kubermaticv1.Cluster) error {
 	kubeconfigFilename, manifestFilename, done, err := r.setupManifestInteraction(log, addon, cluster)
 	if err != nil {
+		// FIXME: use a dedicated error type and proper error unwrapping when we have the technology to do it
+		if strings.Contains(err.Error(), "no such file or directory") { // if the manifest is already deleted, that's ok
+			log.Debugf("cleanupManifests failed for addon %s/%s: %v", addon.Namespace, addon.Name, err)
+			return nil
+		}
 		return err
 	}
 	defer done()

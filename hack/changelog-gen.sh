@@ -31,12 +31,12 @@ usage(){
 
 # Get arguments from cli
 while getopts r:help: opts; do
-   case ${opts} in
-      r) NEW_RELEASE=${OPTARG}
-        ;;
-      ?) usage
-        ;;
-   esac
+  case ${opts} in
+    r) NEW_RELEASE=${OPTARG}
+      ;;
+    ?) usage
+      ;;
+  esac
 done
 
 # Check if a version flag is provided.

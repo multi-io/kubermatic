@@ -22,10 +22,10 @@ import (
 	"fmt"
 	"net"
 
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/resources"
-	"github.com/kubermatic/kubermatic/pkg/resources/certificates/triple"
-	"github.com/kubermatic/kubermatic/pkg/resources/reconciling"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/resources"
+	"k8c.io/kubermatic/v2/pkg/resources/certificates/triple"
+	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 
 	corev1 "k8s.io/api/core/v1"
 	certutil "k8s.io/client-go/util/cert"
@@ -72,16 +72,11 @@ func TLSServingCertificateCreator(data tlsServingCertCreatorData) reconciling.Na
 					"kubernetes.default",
 					"kubernetes.default.svc",
 					fmt.Sprintf("kubernetes.default.svc.%s", data.Cluster().Spec.ClusterNetwork.DNSDomain),
-					// Internal - apiserver-external
-					resources.ApiserverExternalServiceName,
-					fmt.Sprintf("%s.%s", resources.ApiserverExternalServiceName, data.Cluster().Status.NamespaceName),
-					fmt.Sprintf("%s.%s.svc", resources.ApiserverExternalServiceName, data.Cluster().Status.NamespaceName),
-					fmt.Sprintf("%s.%s.svc.cluster.local", resources.ApiserverExternalServiceName, data.Cluster().Status.NamespaceName),
 					// Internal - apiserver
-					resources.ApiserverInternalServiceName,
-					fmt.Sprintf("%s.%s", resources.ApiserverInternalServiceName, data.Cluster().Status.NamespaceName),
-					fmt.Sprintf("%s.%s.svc", resources.ApiserverInternalServiceName, data.Cluster().Status.NamespaceName),
-					fmt.Sprintf("%s.%s.svc.cluster.local", resources.ApiserverInternalServiceName, data.Cluster().Status.NamespaceName),
+					resources.ApiserverServiceName,
+					fmt.Sprintf("%s.%s", resources.ApiserverServiceName, data.Cluster().Status.NamespaceName),
+					fmt.Sprintf("%s.%s.svc", resources.ApiserverServiceName, data.Cluster().Status.NamespaceName),
+					fmt.Sprintf("%s.%s.svc.cluster.local", resources.ApiserverServiceName, data.Cluster().Status.NamespaceName),
 				},
 				IPs: []net.IP{
 					externalIPParsed,

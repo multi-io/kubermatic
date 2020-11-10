@@ -5,7 +5,7 @@ package externalversions
 import (
 	"fmt"
 
-	v1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
+	v1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
 )
@@ -47,6 +47,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Kubermatic().V1().EtcdBackupConfigs().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("etcdrestores"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Kubermatic().V1().EtcdRestores().Informer()}, nil
+	case v1.SchemeGroupVersion.WithResource("externalclusters"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Kubermatic().V1().ExternalClusters().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("kubermaticsettings"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Kubermatic().V1().KubermaticSettings().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("machinedeploymentrequests"):

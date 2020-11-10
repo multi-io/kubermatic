@@ -3,7 +3,9 @@
 package fake
 
 import (
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
+	"context"
+
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -23,7 +25,7 @@ var machinedeploymentrequestsResource = schema.GroupVersionResource{Group: "kube
 var machinedeploymentrequestsKind = schema.GroupVersionKind{Group: "kubermatic.k8s.io", Version: "v1", Kind: "MachineDeploymentRequest"}
 
 // Get takes name of the machineDeploymentRequest, and returns the corresponding machineDeploymentRequest object, and an error if there is any.
-func (c *FakeMachineDeploymentRequests) Get(name string, options v1.GetOptions) (result *kubermaticv1.MachineDeploymentRequest, err error) {
+func (c *FakeMachineDeploymentRequests) Get(ctx context.Context, name string, options v1.GetOptions) (result *kubermaticv1.MachineDeploymentRequest, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(machinedeploymentrequestsResource, c.ns, name), &kubermaticv1.MachineDeploymentRequest{})
 
@@ -34,7 +36,7 @@ func (c *FakeMachineDeploymentRequests) Get(name string, options v1.GetOptions) 
 }
 
 // List takes label and field selectors, and returns the list of MachineDeploymentRequests that match those selectors.
-func (c *FakeMachineDeploymentRequests) List(opts v1.ListOptions) (result *kubermaticv1.MachineDeploymentRequestList, err error) {
+func (c *FakeMachineDeploymentRequests) List(ctx context.Context, opts v1.ListOptions) (result *kubermaticv1.MachineDeploymentRequestList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(machinedeploymentrequestsResource, machinedeploymentrequestsKind, c.ns, opts), &kubermaticv1.MachineDeploymentRequestList{})
 
@@ -56,14 +58,14 @@ func (c *FakeMachineDeploymentRequests) List(opts v1.ListOptions) (result *kuber
 }
 
 // Watch returns a watch.Interface that watches the requested machineDeploymentRequests.
-func (c *FakeMachineDeploymentRequests) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeMachineDeploymentRequests) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(machinedeploymentrequestsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a machineDeploymentRequest and creates it.  Returns the server's representation of the machineDeploymentRequest, and an error, if there is any.
-func (c *FakeMachineDeploymentRequests) Create(machineDeploymentRequest *kubermaticv1.MachineDeploymentRequest) (result *kubermaticv1.MachineDeploymentRequest, err error) {
+func (c *FakeMachineDeploymentRequests) Create(ctx context.Context, machineDeploymentRequest *kubermaticv1.MachineDeploymentRequest, opts v1.CreateOptions) (result *kubermaticv1.MachineDeploymentRequest, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(machinedeploymentrequestsResource, c.ns, machineDeploymentRequest), &kubermaticv1.MachineDeploymentRequest{})
 
@@ -74,7 +76,7 @@ func (c *FakeMachineDeploymentRequests) Create(machineDeploymentRequest *kuberma
 }
 
 // Update takes the representation of a machineDeploymentRequest and updates it. Returns the server's representation of the machineDeploymentRequest, and an error, if there is any.
-func (c *FakeMachineDeploymentRequests) Update(machineDeploymentRequest *kubermaticv1.MachineDeploymentRequest) (result *kubermaticv1.MachineDeploymentRequest, err error) {
+func (c *FakeMachineDeploymentRequests) Update(ctx context.Context, machineDeploymentRequest *kubermaticv1.MachineDeploymentRequest, opts v1.UpdateOptions) (result *kubermaticv1.MachineDeploymentRequest, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(machinedeploymentrequestsResource, c.ns, machineDeploymentRequest), &kubermaticv1.MachineDeploymentRequest{})
 
@@ -85,7 +87,7 @@ func (c *FakeMachineDeploymentRequests) Update(machineDeploymentRequest *kuberma
 }
 
 // Delete takes name of the machineDeploymentRequest and deletes it. Returns an error if one occurs.
-func (c *FakeMachineDeploymentRequests) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeMachineDeploymentRequests) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(machinedeploymentrequestsResource, c.ns, name), &kubermaticv1.MachineDeploymentRequest{})
 
@@ -93,15 +95,15 @@ func (c *FakeMachineDeploymentRequests) Delete(name string, options *v1.DeleteOp
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeMachineDeploymentRequests) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(machinedeploymentrequestsResource, c.ns, listOptions)
+func (c *FakeMachineDeploymentRequests) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(machinedeploymentrequestsResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &kubermaticv1.MachineDeploymentRequestList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched machineDeploymentRequest.
-func (c *FakeMachineDeploymentRequests) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *kubermaticv1.MachineDeploymentRequest, err error) {
+func (c *FakeMachineDeploymentRequests) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *kubermaticv1.MachineDeploymentRequest, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(machinedeploymentrequestsResource, c.ns, name, pt, data, subresources...), &kubermaticv1.MachineDeploymentRequest{})
 

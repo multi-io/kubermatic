@@ -24,6 +24,7 @@ import (
 
 	"github.com/gophercloud/gophercloud"
 	goopenstack "github.com/gophercloud/gophercloud/openstack"
+	osavailabilityzones "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/availabilityzones"
 	osservergroups "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/servergroups"
 	osflavors "github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
 	osprojects "github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
@@ -33,10 +34,10 @@ import (
 	ossubnets "github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
 	"github.com/gophercloud/gophercloud/pagination"
 
-	kubermaticv1 "github.com/kubermatic/kubermatic/pkg/crd/kubermatic/v1"
-	"github.com/kubermatic/kubermatic/pkg/kubernetes"
-	"github.com/kubermatic/kubermatic/pkg/provider"
-	"github.com/kubermatic/kubermatic/pkg/resources"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/kubernetes"
+	"k8c.io/kubermatic/v2/pkg/provider"
+	"k8c.io/kubermatic/v2/pkg/resources"
 
 	"k8s.io/klog"
 )
@@ -484,6 +485,20 @@ func GetSecurityGroups(username, password, domain, tenant, tenantID, authURL, re
 	return secGroups, nil
 }
 
+// GetAvailabilityZones lists availability zones for the given CloudSpec.DatacenterName and OpenstackSpec.Region
+func GetAvailabilityZones(username, password, domain, tenant, tenantID, authURL, region string) ([]osavailabilityzones.AvailabilityZone, error) {
+	computeClient, err := getComputeClient(username, password, domain, tenant, tenantID, authURL, region)
+	if err != nil {
+		return nil, err
+	}
+	availabilityZones, err := getAvailabilityZones(computeClient)
+	if err != nil {
+		return nil, err
+	}
+
+	return availabilityZones, nil
+}
+
 func getAuthClient(username, password, domain, tenant, tenantID, authURL string) (*gophercloud.ProviderClient, error) {
 	opts := gophercloud.AuthOptions{
 		IdentityEndpoint: authURL,
@@ -521,7 +536,6 @@ func getNetClient(username, password, domain, tenant, tenantID, authURL, region 
 			return nil, err
 		}
 	}
-
 	return serviceClient, err
 }
 
