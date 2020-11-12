@@ -27,6 +27,7 @@ go-mod-vendor:
   script:
   - go mod download
   - go mod vendor
+  - cp -r vendor ${CI_PROJECT_DIR}/vendor
 
 build-kubermatic:
   stage: compile
@@ -138,7 +139,6 @@ docker-release-kubermatic:
   stage: release
   image: docker:latest
   script:
-  - cd api
   - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
   - docker login -u sys11kubermatic -p $DOCKER_PASSWORD
   - docker build --tag syseleven/kubermatic:$CI_COMMIT_TAG --tag $CI_REGISTRY_IMAGE:$CI_COMMIT_TAG --tag $CI_REGISTRY_IMAGE:latest .
@@ -187,9 +187,8 @@ docker-release-etcd-launcher:
   stage: release
   image: docker:latest
   script:
-    - cd cmd/etcd-launcher
     - docker login -u sys11kubermatic -p $DOCKER_PASSWORD
-    - docker build --tag syseleven/etcd-launcher:$CI_COMMIT_TAG .
+    - docker build --tag syseleven/etcd-launcher:$CI_COMMIT_TAG -f ./cmd/etcd-launcher/Dockerfile .
     - docker push syseleven/etcd-launcher:$CI_COMMIT_TAG
   dependencies:
     - test-cloud
