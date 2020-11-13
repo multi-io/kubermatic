@@ -19,14 +19,22 @@ package nodelocaldns
 import (
 	"fmt"
 
+	sys11nodereadiness "k8c.io/kubermatic/v2/pkg/controller/sys11-node-readiness"
 	"k8c.io/kubermatic/v2/pkg/resources"
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
+)
+
+const (
+	extraConfigVolume     = "extra-configs-volume"
+	extraConficMountPath  = "/etc/coredns/extra-configs"
+	extraConfigImportPath = extraConficMountPath + "/*Corefile"
 )
 
 func DaemonSetCreator() reconciling.NamedDaemonSetCreatorGetter {
@@ -64,14 +72,40 @@ func DaemonSetCreator() reconciling.NamedDaemonSetCreatorGetter {
 					Key:      "CriticalAddonsOnly",
 					Operator: corev1.TolerationOpExists,
 				},
+				// Sys11 start
+				{
+					Effect:   corev1.TaintEffectNoExecute,
+					Operator: corev1.TolerationOpExists,
+				},
+				{
+					Effect:   corev1.TaintEffectNoSchedule,
+					Operator: corev1.TolerationOpExists,
+				},
+				{
+					Key:      sys11nodereadiness.NotReadyTaintKey,
+					Effect:   corev1.TaintEffectNoSchedule,
+					Operator: corev1.TolerationOpExists,
+				},
+				// Sys11 end
 			}
 
 			hostPathType := corev1.HostPathFileOrCreate
 			ds.Spec.Template.Spec.Containers = []corev1.Container{
 				{
+					// Sys11 start
+					Resources: corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+						Requests: corev1.ResourceList{
+							corev1.ResourceMemory: resource.MustParse("20Mi"),
+							corev1.ResourceCPU:    resource.MustParse("50m"),
+						},
+					},
+					// Sys11 end
 					Name:            "node-cache",
 					ImagePullPolicy: corev1.PullAlways,
-					Image:           fmt.Sprintf("%s/google_containers/k8s-dns-node-cache:1.15.7", resources.RegistryGCR),
+					Image:           fmt.Sprintf("%s/google_containers/k8s-dns-node-cache:1.15.10", resources.RegistryGCR),
 					Args: []string{
 						"-localip",
 						"169.254.20.10",
@@ -88,6 +122,12 @@ func DaemonSetCreator() reconciling.NamedDaemonSetCreatorGetter {
 							Name:      "config-volume",
 							MountPath: "/etc/coredns",
 						},
+						// Sys11 start
+						{
+							Name:      extraConfigVolume,
+							MountPath: extraConficMountPath,
+						},
+						// Sys11 end
 					},
 
 					Ports: []corev1.ContainerPort{
@@ -156,6 +196,17 @@ func DaemonSetCreator() reconciling.NamedDaemonSetCreatorGetter {
 									Path: "Corefile",
 								},
 							},
+						},
+					},
+				},
+				{
+					Name: extraConfigVolume,
+					VolumeSource: corev1.VolumeSource{
+						ConfigMap: &corev1.ConfigMapVolumeSource{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: resources.NodeLocalDNSExtraConfigMapName,
+							},
+							Optional: pointer.BoolPtr(true),
 						},
 					},
 				},

@@ -17,6 +17,8 @@ limitations under the License.
 package coredns
 
 import (
+	"fmt"
+
 	"k8c.io/kubermatic/v2/pkg/resources"
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 
@@ -31,7 +33,8 @@ func ConfigMapCreator() reconciling.NamedConfigMapCreatorGetter {
 				cm.Data = map[string]string{}
 			}
 			cm.Labels = resources.BaseAppLabels(resources.CoreDNSServiceName, nil)
-			cm.Data["Corefile"] = `
+			cm.Data["Corefile"] = fmt.Sprintf(`
+      import %s
       .:53 {
           errors
           health
@@ -47,7 +50,7 @@ func ConfigMapCreator() reconciling.NamedConfigMapCreatorGetter {
           reload
           loadbalance
       }
-      `
+      `, ExtraConfigImportPath)
 
 			return cm, nil
 		}

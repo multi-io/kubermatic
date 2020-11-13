@@ -23,12 +23,13 @@ import (
 const (
 	ControllerName                                  = "sys11_node_readiness_controller"
 	conditionTypeNodeReady corev1.NodeConditionType = "MetakubeNodeReady"
-	taintKey               string                   = "node.syseleven.de/not-ready"
+	// NotReadyTaintKey is a key to taint not ready nodes.
+	NotReadyTaintKey string = "node.syseleven.de/not-ready"
 )
 
 var (
 	taintTemplate = &corev1.Taint{
-		Key:    taintKey,
+		Key:    NotReadyTaintKey,
 		Effect: corev1.TaintEffectNoSchedule,
 	}
 )

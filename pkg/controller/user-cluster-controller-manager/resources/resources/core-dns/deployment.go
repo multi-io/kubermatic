@@ -19,6 +19,7 @@ package coredns
 import (
 	"fmt"
 
+	sys11nodereadiness "k8c.io/kubermatic/v2/pkg/controller/sys11-node-readiness"
 	"k8c.io/kubermatic/v2/pkg/resources"
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 
@@ -30,6 +31,16 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+)
+
+const (
+	// extraConfigsMountPath is a directory used to mount extra configuration.
+	extraConfigsMountPath = "/etc/coredns/extra-configs"
+
+	// ExtraConfigImportPath is a path to import extra configuration.
+	ExtraConfigImportPath = extraConfigsMountPath + "/*Corefile"
+
+	extraConfigVolume = "extra-configs-volume"
 )
 
 var (
@@ -55,7 +66,7 @@ func DeploymentCreator() reconciling.NamedDeploymentCreatorGetter {
 			dep.Namespace = metav1.NamespaceSystem
 			dep.Labels = resources.BaseAppLabels(resources.CoreDNSDeploymentName, nil)
 
-			dep.Spec.Replicas = resources.Int32(2)
+			dep.Spec.Replicas = resources.Int32(1)
 			// The Selector is immutable, so we don't change it if it's set. This happens in upgrade cases
 			// where coredns is switched from a manifest based addon to a user-cluster-controller-manager resource
 			if dep.Spec.Selector == nil {
@@ -88,6 +99,25 @@ func DeploymentCreator() reconciling.NamedDeploymentCreatorGetter {
 			volumes := getVolumes()
 			dep.Spec.Template.Spec.Volumes = volumes
 
+			// Sys11 start
+			tolerations := getTolerations()
+			dep.Spec.Template.Spec.Tolerations = tolerations
+
+			// TODO(furkhat): after autoscaler resource.
+			// affinity:
+			//   podAntiAffinity:
+			//     preferredDuringSchedulingIgnoredDuringExecution:
+			//     - podAffinityTerm:
+			//         labelSelector:
+			//           matchExpressions:
+			//           - key: k8s-app
+			//             operator: In
+			//             values:
+			//             - kube-dns
+			//         topologyKey: kubernetes.io/hostname
+			//       weight: 100
+			// Sys11 end
+
 			dep.Spec.Template.Spec.Containers = getContainers()
 			err := resources.SetResourceRequirements(dep.Spec.Template.Spec.Containers, defaultResourceRequirements, nil, dep.Annotations)
 			if err != nil {
@@ -101,6 +131,7 @@ func DeploymentCreator() reconciling.NamedDeploymentCreatorGetter {
 	}
 }
 
+// PodDisruptionBudgetCreator returns function to create PodDisruptionBudget for core-dns.
 func PodDisruptionBudgetCreator() reconciling.NamedPodDisruptionBudgetCreatorGetter {
 	return func() (string, reconciling.PodDisruptionBudgetCreator) {
 		return resources.CoreDNSPodDisruptionBudgetName, func(pdb *policyv1beta1.PodDisruptionBudget) (*policyv1beta1.PodDisruptionBudget, error) {
@@ -128,6 +159,10 @@ func getContainers() []corev1.Container {
 					Name:      "config-volume",
 					MountPath: "/etc/coredns",
 					ReadOnly:  true,
+				},
+				{
+					Name:      extraConfigVolume,
+					MountPath: extraConfigsMountPath,
 				},
 				{
 					Name:      "tmp",
@@ -219,6 +254,32 @@ func getVolumes() []corev1.Volume {
 					},
 				},
 			},
+		},
+		// Sys11
+		{
+			Name: extraConfigVolume,
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: resources.CoreDNSExtraConfigMapName,
+					},
+					Optional: pointer.BoolPtr(true),
+				},
+			},
+		},
+	}
+}
+
+func getTolerations() []corev1.Toleration {
+	return []corev1.Toleration{
+		{
+			Key:      "CriticalAddonsOnly",
+			Operator: corev1.TolerationOpExists,
+		},
+		{
+			Key:      sys11nodereadiness.NotReadyTaintKey,
+			Effect:   corev1.TaintEffectNoSchedule,
+			Operator: corev1.TolerationOpExists,
 		},
 	}
 }
