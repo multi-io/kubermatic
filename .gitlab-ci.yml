@@ -158,6 +158,8 @@ docker-release-kubermatic:
   - test-create
   - test-e2e
   - test-integration
+  - verify-swagger-spec
+  - verify-codegen
   - build-kubermatic
 
 docker-release-dnatcontroller:
@@ -181,6 +183,8 @@ docker-release-dnatcontroller:
   - test-create
   - test-e2e
   - test-integration
+  - verify-swagger-spec
+  - verify-codegen
   - build-dnatcontroller
 
 docker-release-etcd-launcher:
@@ -203,4 +207,6 @@ docker-release-etcd-launcher:
   - test-create
   - test-e2e
   - test-integration
+  - verify-swagger-spec
+  - verify-codegen
   - build-kubermatic
