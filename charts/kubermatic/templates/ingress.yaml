@@ -13,12 +13,15 @@
 # limitations under the License.
 
 {{ if .Values.kubermatic.isMaster }}
-apiVersion: extensions/v1beta1
+apiVersion: networking.k8s.io/v1beta1
 kind: Ingress
 metadata:
   name: api
   annotations:
     kubernetes.io/ingress.class: {{ (default "nginx" .Values.kubermatic.ingressClass) }}
+{{- if .Values.kubermatic.ingressAnnotations }}
+{{ toYaml .Values.kubermatic.ingressAnnotations | indent 4 }}
+{{- end }}
 spec:
   tls:
   - secretName: kubermatic-tls

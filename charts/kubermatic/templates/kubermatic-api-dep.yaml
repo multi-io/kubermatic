@@ -36,6 +36,10 @@ spec:
         checksum/datecenters: {{ include (print $.Template.BasePath "/datacenter-yaml-secret.yaml") . | sha256sum }}
         checksum/kubeconfig: {{ include (print $.Template.BasePath "/kubeconfig-secret.yaml") . | sha256sum }}
         checksum/master-files: {{ include (print $.Template.BasePath "/master-files-secret.yaml") . | sha256sum }}
+        {{- if .Values.keycloak }}
+        checksum/keycloak-credentials: {{ include (print $.Template.BasePath "/keycloak-credentials-yaml-secret.yaml") . | sha256sum }}
+        {{- end }}
+        fluentbit.io/parser: glog
     spec:
       serviceAccountName: kubermatic
       containers:
@@ -100,6 +104,8 @@ spec:
           valueFrom:
            fieldRef:
              fieldPath: metadata.namespace
+        - name: RESOURCE_USAGE_COLLECTOR_AUTH_TOKEN
+          value: {{ .Values.kubermatic.resourceUsageCollectorAuthToken }}
         ports:
         - name: metrics
           containerPort: 8085
@@ -131,6 +137,13 @@ spec:
         - name: presets
           mountPath: "/opt/presets/"
           readOnly: true
+        {{- end }}
+        {{- if .Values.kubermatic.api.envSecrets }}
+        envFrom:
+        {{- range .Values.kubermatic.api.envSecrets }}
+        - secretRef:
+            name: {{.}}
+        {{- end }}
         {{- end }}
         resources:
 {{ toYaml .Values.kubermatic.api.resources | indent 10 }}

@@ -21,6 +21,11 @@ metadata:
 data:
   config.yaml: |
 {{- with .config }}
-{{ toToml . | indent 4 }}
-{{ end }}
+{{ toYaml . | indent 4 }}
+{{- end }}
+{{- if .signin_page }}
+    sign-in-page: /config/signin.html
+  signin.html: |
+{{ toYaml .signin_page | b64dec | indent 4 }}
+{{- end }}
 {{ end }}

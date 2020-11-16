@@ -30,3 +30,8 @@ data:
 {{- else }}
 {{ .Files.Get "static/cleanup-container.yaml" | indent 4 }}
 {{- end }}
+
+{{- if .Values.kubermatic.deleteContainer }}
+  delete-container.yaml: |
+{{ .Values.kubermatic.deleteContainer | indent 4 }}
+{{- end }}
