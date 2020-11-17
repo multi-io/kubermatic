@@ -16,7 +16,7 @@
 
 set -euo pipefail
 
-cd $(go env GOPATH)/src/github.com/kubermatic/kubermatic/api
+cd $(go env GOPATH)/src/k8c.io/kubermatic/v2
 make user-cluster-controller-manager
 
 KUBERMATIC_DEBUG=${KUBERMATIC_DEBUG:-true}
