@@ -64,6 +64,10 @@ func (d *Deletion) CleanupCluster(ctx context.Context, log *zap.SugaredLogger, c
 		return nil
 	}
 
+	if err := d.cleanupEtcdBackupConfigs(ctx, cluster); err != nil {
+		return err
+	}
+
 	if err := d.cleanupNodes(ctx, cluster); err != nil {
 		return err
 	}
