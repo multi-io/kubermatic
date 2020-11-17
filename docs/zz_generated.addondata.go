@@ -63,6 +63,7 @@ type ClusterData struct {
 }
 
 type ClusterNetwork struct {
+	DNSDomain         string
 	DNSClusterIP      string
 	DNSResolverIP     string
 	PodCIDRBlocks     []string
