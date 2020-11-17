@@ -66,7 +66,7 @@ func DeploymentCreator() reconciling.NamedDeploymentCreatorGetter {
 			dep.Namespace = metav1.NamespaceSystem
 			dep.Labels = resources.BaseAppLabels(resources.CoreDNSDeploymentName, nil)
 
-			dep.Spec.Replicas = resources.Int32(1)
+			dep.Spec.Replicas = resources.Int32(2)
 			// The Selector is immutable, so we don't change it if it's set. This happens in upgrade cases
 			// where coredns is switched from a manifest based addon to a user-cluster-controller-manager resource
 			if dep.Spec.Selector == nil {
