@@ -116,6 +116,7 @@ func NewTemplateData(
 			Features:             sets.StringKeySet(cluster.Spec.Features),
 			CloudSpec:            cluster.Spec.Cloud,
 			Network: ClusterNetwork{
+				DNSDomain:         cluster.Spec.ClusterNetwork.DNSDomain,
 				DNSClusterIP:      dnsClusterIP,
 				DNSResolverIP:     dnsResolverIP,
 				PodCIDRBlocks:     cluster.Spec.ClusterNetwork.Pods.CIDRBlocks,
@@ -179,6 +180,7 @@ type ClusterData struct {
 }
 
 type ClusterNetwork struct {
+	DNSDomain         string
 	DNSClusterIP      string
 	DNSResolverIP     string
 	PodCIDRBlocks     []string
