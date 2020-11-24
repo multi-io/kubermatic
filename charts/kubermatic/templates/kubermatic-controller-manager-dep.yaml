@@ -231,7 +231,7 @@ spec:
       {{- if .Values.kubermatic.defaultComponentSettings }}
       - name: cluster-component-settings
         configMap:
-          name: default-component-settings-{{ .Release.Name }}-{{ .Release.Revision }}
+          name: default-component-settings
       {{- end }}
       {{- if .Values.kubermatic.auth.caBundle }}
       - name: dex-ca

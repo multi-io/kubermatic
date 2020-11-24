@@ -16,7 +16,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: default-component-settings-{{ .Release.Name }}-{{ .Release.Revision }}
+  name: default-component-settings
 data:
   config.yaml: |
 {{ toYaml .Values.kubermatic.defaultComponentSettings | indent 4 }}
