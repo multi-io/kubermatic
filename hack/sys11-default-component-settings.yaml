@@ -1,0 +1,9 @@
+apiserver:
+  replicas: 2
+  endpointReconcilingDisabled: false
+controllerManager:
+  replicas: 1
+scheduler:
+  replicas: 1
+etcd:
+  replicas: 3

@@ -2,10 +2,9 @@ command:
 - /bin/sh
 - -c
 - |
-  set -euo pipefail
-  s3-storeuploader store --endpoint s3.cbk.cloud.syseleven.net --secure --bucket metakube-etcd-backup-dev --create-bucket --prefix $CLUSTER --file /backup/snapshot.db
-  s3-storeuploader delete-old-revisions --endpoint s3.cbk.cloud.syseleven.net --secure --bucket metakube-etcd-backup-dev --prefix $CLUSTER --file /backup/snapshot.db --max-revisions 20
-image: quay.io/kubermatic/s3-storer:v0.1.4
+  set -e
+  s3cmd --access_key=$ACCESS_KEY_ID --secret_key=$SECRET_ACCESS_KEY --host=$ENDPOINT --host-bucket='%(bucket).'$ENDPOINT put /backup/snapshot.db s3://$BUCKET_NAME/$CLUSTER-$BACKUP_TO_CREATE
+image: d3fk/s3cmd:latest
 name: store-container
 env:
 - name: ACCESS_KEY_ID
@@ -18,7 +17,16 @@ env:
     secretKeyRef:
       name: s3-credentials
       key: SECRET_ACCESS_KEY
+- name: BUCKET_NAME
+  valueFrom:
+    configMapKeyRef:
+      name: s3-settings
+      key: BUCKET_NAME
+- name: ENDPOINT
+  valueFrom:
+    configMapKeyRef:
+      name: s3-settings
+      key: ENDPOINT
 volumeMounts:
 - name: etcd-backup
   mountPath: /backup
-

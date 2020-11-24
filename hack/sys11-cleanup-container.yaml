@@ -17,4 +17,3 @@ env:
     secretKeyRef:
       name: s3-credentials
       key: SECRET_ACCESS_KEY
-

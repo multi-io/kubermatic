@@ -1,10 +1,10 @@
 #!/bin/bash
 
-set -o errexit
-set -o pipefail
-set -x
+# set -o errexit
+# set -o pipefail
+# set -x
 
-: "${SRC_DIR:=$(go env GOPATH)/src/k8c.io/kubermatic/v2}"
+: "${SRC_DIR:=$(go env GOPATH)/src/k8c.io/kubermatic}"
 : "${KUBERMATIC_WORKERNAME:=${KUBERMATIC_WORKERNAME:-$(uname -n)}}"
 : "${INSTALLER_DIR:="$(go env GOPATH)/src/gitlab.syseleven.de/kubernetes/kubermatic-installer"}"
 : "${KUBERMATIC_ENV:=dev}"
@@ -47,24 +47,12 @@ kubectl --kubeconfig $seedKubeconfig config use-context $KUBERMATIC_CLUSTER
 
 defaultAddons=$(cat "${INSTALLER_DIR}/kubermatic/values.yaml" | yq '.kubermatic.controller.addons.kubernetes.defaultAddons | join(",")' -r)
 
-if [[ "${TAG_WORKER}" == "false" ]]; then
-    WORKER_OPTION=
-else
-    WORKER_OPTION="-worker-name=$(tr -cd '[:alnum:]' <<< ${KUBERMATIC_WORKERNAME} | tr '[:upper:]' '[:lower:]')"
-fi
-
-if [[ "${DISABLE_LEADER_ELECTION}" == "true" ]]; then
-    DISABLE_LE_OPTION="-disable-leader-election"
-else
-    DISABLE_LE_OPTION=
-fi
-
 # TODO extract hack/sys11-store-container.yaml / hack/sys11-cleanup-container.yaml from the installer
 
 if [[ "${DEBUG}" == "true" ]]; then
-    make KUBERMATIC_EDITION="ee" KUBERMATICCOMMIT=$KUBERMATICCOMMIT GITTAG=$GITTAG GOTOOLFLAGS_EXTRA="-gcflags='all=-N -l'" LDFLAGS_EXTRA="" -C ${SRC_DIR} seed-controller-manager
+    make KUBERMATIC_EDITION="ee" KUBERMATICCOMMIT=$KUBERMATICCOMMIT GITTAG=$GITTAG GOBUILDFLAGS="-gcflags='all=-N -l'" seed-controller-manager
 else
-    make KUBERMATIC_EDITION="ee" KUBERMATICCOMMIT=$KUBERMATICCOMMIT GITTAG=$GITTAG -C ${SRC_DIR} seed-controller-manager
+    make KUBERMATIC_EDITION="ee" KUBERMATICCOMMIT=$KUBERMATICCOMMIT GITTAG=$GITTAG seed-controller-manager
 fi
 
 cd ${SRC_DIR}
@@ -79,22 +67,25 @@ if [[ "${DEBUG}" == "true" ]]; then
       -openshift-addons-path=openshift_addons \
       -kubernetes-addons-list=$defaultAddons \
       -overwrite-registry= \
+      -nodeport-range=30000-32767 \
+      -docker-pull-config-json-file="$dockercfgjson" \
+      -feature-gates=etcdLauncher=true \
       -keycloak-cache-expiry=2h \
-      -feature-gates= \
       -monitoring-environment-label=${KUBERMATIC_ENV} \
       -monitoring-scrape-annotation-prefix=monitoring.metakube.de \
       -namespace=kubermatic \
-      ${WORKER_OPTION} \
+      -worker-name=${KUBERMATIC_WORKERNAME} \
       -external-url=${EXTERNAL_URL} \
-      -docker-pull-config-json-file="$dockercfgjson" \
-      -monitoring-scrape-annotation-prefix=${KUBERMATIC_ENV} \
       -logtostderr=1 \
       -log-debug=1 \
       -backup-container=./hack/sys11-store-container.yaml \
       -cleanup-container=./hack/sys11-cleanup-container.yaml \
+      -backup-delete-container=./hack/sys11-delete-container.yaml \
+      -default-component-settings=./hack/sys11-default-component-settings.yaml \
       -worker-count=1 \
       -kubermatic-image=docker.io/syseleven/kubermatic \
       -dnatcontroller-image=syseleven/kubeletdnat-controller \
+      -enable-leader-election=false \
       ${DISABLE_LE_OPTION} \
       -v=8 $@
 
@@ -110,24 +101,27 @@ else
       -openshift-addons-path=openshift_addons \
       -kubernetes-addons-list=$defaultAddons \
       -overwrite-registry= \
+      -nodeport-range=30000-32767 \
+      -docker-pull-config-json-file="$dockercfgjson" \
+      -feature-gates=etcdLauncher=true \
       -keycloak-cache-expiry=2h \
-      -feature-gates= \
       -monitoring-environment-label=${KUBERMATIC_ENV} \
       -monitoring-scrape-annotation-prefix=monitoring.metakube.de \
       -namespace=kubermatic \
-      ${WORKER_OPTION} \
+      -worker-name=${KUBERMATIC_WORKERNAME} \
       -external-url=${EXTERNAL_URL} \
-      -docker-pull-config-json-file="$dockercfgjson" \
-      -monitoring-scrape-annotation-prefix=${KUBERMATIC_ENV} \
       -logtostderr=1 \
       -log-debug=1 \
       -backup-container=./hack/sys11-store-container.yaml \
       -cleanup-container=./hack/sys11-cleanup-container.yaml \
+      -backup-delete-container=./hack/sys11-delete-container.yaml \
+      -default-component-settings=./hack/sys11-default-component-settings.yaml \
       -worker-count=1 \
       -kubermatic-image=docker.io/syseleven/kubermatic \
       -dnatcontroller-image=syseleven/kubeletdnat-controller \
+      -enable-leader-election=false \
       ${DISABLE_LE_OPTION} \
-      -v=6 $@
+      -v=4 $@
 
       # TODO
       #-in-cluster-prometheus-rules-file="$inClusterPrometheusRulesFile" \
