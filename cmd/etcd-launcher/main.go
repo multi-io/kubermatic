@@ -31,8 +31,8 @@ import (
 	"time"
 
 	"github.com/minio/minio-go"
-	"go.etcd.io/etcd/clientv3/snapshot"
 	"go.etcd.io/etcd/v3/clientv3"
+	"go.etcd.io/etcd/v3/clientv3/snapshot"
 	"go.etcd.io/etcd/v3/etcdserver/api/v3rpc/rpctypes"
 	"go.etcd.io/etcd/v3/etcdserver/etcdserverpb"
 	"go.etcd.io/etcd/v3/pkg/transport"
