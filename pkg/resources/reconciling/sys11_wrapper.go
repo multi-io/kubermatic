@@ -27,7 +27,7 @@ func SetRunningReplicasNumberIfExistsWrapper(ctx context.Context, client ctrlrun
 					Name:      o.Name,
 				}
 				if err := client.Get(ctx, key, deployed); err != nil {
-					if !kubeerrors.IsNotFound(err) {
+					if kubeerrors.IsNotFound(err) {
 						return obj, nil
 					}
 					return nil, fmt.Errorf("failed to get Deployment %+v: %v", key, err)
