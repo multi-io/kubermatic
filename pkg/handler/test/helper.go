@@ -30,7 +30,7 @@ import (
 	"testing"
 	"time"
 
-	ver "github.com/Masterminds/semver"
+	ver "github.com/Masterminds/semver/v3"
 	prometheusapi "github.com/prometheus/client_golang/api"
 
 	clusterv1alpha1 "github.com/kubermatic/machine-controller/pkg/apis/cluster/v1alpha1"

@@ -7,7 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/Masterminds/semver"
+	"github.com/Masterminds/semver/v3"
 	jsonpatch "github.com/evanphx/json-patch"
 	"k8c.io/kubermatic/v2/pkg/validation/nodeupdate"
 
