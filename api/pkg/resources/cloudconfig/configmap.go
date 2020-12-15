@@ -157,13 +157,6 @@ func CloudConfig(
 				MonitorTimeout:    ini.Duration{Duration: 30 * time.Second},
 				MonitorMaxRetries: 5,
 			}
-			if dc.Spec.Openstack.Region == "cbk" {
-				// NetworkID for the ext-net floating-network in cbk
-				openstackCloudConfig.LoadBalancer.FloatingNetworkID = "caf8de33-1059-4473-a2c1-2a62d12294fa"
-			} else if dc.Spec.Openstack.Region == "dbl" {
-				// NetworkID for the ext-net floating-network in dbl
-				openstackCloudConfig.LoadBalancer.FloatingNetworkID = "8bb661f5-76b9-45f1-9ef9-eeffcd025fe4"
-			}
 		}
 		cloudConfig, err = openstack.CloudConfigToString(openstackCloudConfig)
 		if err != nil {
