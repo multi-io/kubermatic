@@ -27,6 +27,7 @@ import (
 	etcdbackupcontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/etcdbackup"
 	etcdrestorecontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/etcdrestore"
 	kubernetescontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/kubernetes"
+	localstoragepvwatcher "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/localstorage-pvwatcher"
 	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/monitoring"
 	openshiftcontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/openshift"
 	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/pvwatcher"
@@ -58,6 +59,7 @@ var AllControllers = map[string]controllerCreator{
 	seedresourcesuptodatecondition.ControllerName: createSeedConditionUpToDateController,
 	rancher.ControllerName:                        createRancherController,
 	pvwatcher.ControllerName:                      createPvWatcherController,
+	localstoragepvwatcher.ControllerName:          createLocalStoragePVController,
 }
 
 type controllerCreator func(*controllerContext) error
@@ -334,4 +336,11 @@ func createPvWatcherController(ctrlCtx *controllerContext) error {
 		ctrlCtx.runOptions.workerCount,
 		ctrlCtx.runOptions.workerName)
 
+}
+
+func createLocalStoragePVController(ctrlCtx *controllerContext) error {
+	return localstoragepvwatcher.Add(
+		ctrlCtx.log,
+		ctrlCtx.mgr,
+		ctrlCtx.runOptions.workerCount)
 }

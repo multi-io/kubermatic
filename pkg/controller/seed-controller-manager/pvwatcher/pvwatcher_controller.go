@@ -152,7 +152,7 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, requ
 		}
 		return pvcPod.Status.Phase == corev1.PodPending, nil
 	}); err != nil {
-		return reconcile.Result{}, err
+		return reconcile.Result{Requeue: true}, err
 	}
 
 	// delete the pvc, make sure it's deleted
@@ -167,7 +167,7 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, requ
 		}
 		return false, err
 	}); err != nil {
-		return reconcile.Result{}, err
+		return reconcile.Result{Requeue: true}, err
 	}
 	// Workaround to force the sts to recreate the PVC/PV, we need to "reboot" the StatefulSet.
 	return reconcile.Result{},
