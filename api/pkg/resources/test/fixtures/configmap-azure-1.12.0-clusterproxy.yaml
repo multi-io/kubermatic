@@ -11,7 +11,7 @@ data:
     \ resolver 192.0.2.14 valid=30s;\n\n      location /healthz {\n          access_log
     off;\n          return 200 \"healthy\\n\";\n      }\n\t  location = /prometheus
     {\n\t\t  return 302 https://$server_name/prometheus/;\n\t  }\n\t  location /prometheus/
-    {\n\t\t  set $upstream \"syseleven-monitoring-kube-prometheus.syseleven-monitoring.svc.cluster.local:9090\";\n\t\t
+    {\n\t\t  set $upstream \"syseleven-monitoring-prome-prometheus.syseleven-monitoring.svc.cluster.local:9090\";\n\t\t
     \ rewrite ^/prometheus(/.*) $1 break;\n\t\t  proxy_pass http://$upstream$uri$is_args$args;\n\t\t
     \ proxy_http_version 1.1;\n\t\t  proxy_pass_request_headers on;\n\t  }\n\t  location
     = /grafana {\n\t\t  return 302 https://$server_name/grafana/;\n\t  }\n\t  location
@@ -19,7 +19,7 @@ data:
     \ rewrite ^/grafana(/.*) $1 break;\n\t\t  proxy_pass http://$upstream$uri$is_args$args;\n\t\t
     \ proxy_http_version 1.1;\n\t\t  proxy_pass_request_headers on;\n\t  }\n\t  location
     = /alertmanager {\n\t\t  return 302 https://$server_name/alertmanager/;\n\t  }\n\t
-    \ location /alertmanager/ {\n\t\t  set $upstream \"syseleven-monitoring-kube-alertmanager.syseleven-monitoring.svc.cluster.local:9093\";\n\t\t
+    \ location /alertmanager/ {\n\t\t  set $upstream \"syseleven-monitoring-prome-alertmanager.syseleven-monitoring.svc.cluster.local:9093\";\n\t\t
     \ rewrite ^/alertmanager(/.*) $1 break;\n\t\t  proxy_pass http://$upstream$uri$is_args$args;\n\t\t
     \ proxy_http_version 1.1;\n\t\t  proxy_pass_request_headers on;\n\t  }\n\t  location
     = /webterminal {\n\t\t  return 302 https://$server_name/webterminal/;\n\t  }\n\t
