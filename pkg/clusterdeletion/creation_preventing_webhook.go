@@ -30,6 +30,7 @@ import (
 func creationPreventingWebhook(apiGroup string, resources []string) reconciling.NamedValidatingWebhookConfigurationCreatorGetter {
 	failurePolicy := admissionregistrationv1.Fail
 	sideEffects := admissionregistrationv1.SideEffectClassNone
+
 	return func() (string, reconciling.ValidatingWebhookConfigurationCreator) {
 		return "kubernetes-cluster-cleanup-" + strings.Join(resources, "-"),
 			func(vwc *admissionregistrationv1.ValidatingWebhookConfiguration) (*admissionregistrationv1.ValidatingWebhookConfiguration, error) {
