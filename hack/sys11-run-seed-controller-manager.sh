@@ -50,7 +50,7 @@ defaultAddons=$(cat "${INSTALLER_DIR}/kubermatic/values.yaml" | yq '.kubermatic.
 # TODO extract hack/sys11-store-container.yaml / hack/sys11-cleanup-container.yaml from the installer
 
 if [[ "${DEBUG}" == "true" ]]; then
-    make KUBERMATIC_EDITION="ee" KUBERMATICCOMMIT=$KUBERMATICCOMMIT GITTAG=$GITTAG GOBUILDFLAGS="-gcflags='all=-N -l'" seed-controller-manager
+    GOTOOLFLAGS="-gcflags='all=-N -l'" make KUBERMATIC_EDITION="ee" KUBERMATICCOMMIT=$KUBERMATICCOMMIT GITTAG=$GITTAG seed-controller-manager
 else
     make KUBERMATIC_EDITION="ee" KUBERMATICCOMMIT=$KUBERMATICCOMMIT GITTAG=$GITTAG seed-controller-manager
 fi
@@ -85,6 +85,7 @@ if [[ "${DEBUG}" == "true" ]]; then
       -worker-count=1 \
       -kubermatic-image=docker.io/syseleven/kubermatic \
       -dnatcontroller-image=syseleven/kubeletdnat-controller \
+      -etcd-launcher-image=syseleven/etcd-launcher \
       -enable-leader-election=false \
       ${DISABLE_LE_OPTION} \
       -v=8 $@
@@ -119,6 +120,7 @@ else
       -worker-count=1 \
       -kubermatic-image=docker.io/syseleven/kubermatic \
       -dnatcontroller-image=syseleven/kubeletdnat-controller \
+      -etcd-launcher-image=syseleven/etcd-launcher \
       -enable-leader-election=false \
       ${DISABLE_LE_OPTION} \
       -v=4 $@
