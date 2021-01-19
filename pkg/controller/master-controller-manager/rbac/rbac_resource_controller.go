@@ -121,10 +121,5 @@ func newResourcesControllers(ctx context.Context, metrics *Metrics, mgr manager.
 }
 
 func (c *resourcesController) Reconcile(req reconcile.Request) (reconcile.Result, error) {
-	err := c.syncProjectResource(req.NamespacedName)
-	if err != nil {
-		return reconcile.Result{}, err
-	}
-
-	return reconcile.Result{}, nil
+	return reconcile.Result{}, c.syncProjectResource(req.NamespacedName)
 }
