@@ -20,6 +20,9 @@ fi
 : "${DEBUG:="false"}"
 : "${KUBERMATICCOMMIT:="$(git rev-parse HEAD)"}"
 : "${GITTAG:=$(git describe --tags --always)}"
+: "${KUBERMATIC_EDITION:=ee}"
+
+export KUBERMATIC_EDITION
 
 # $GITTAG and $KUBERMATICCOMMIT will be compiled into the binary. $GITTAG will only be used for reporting
 # Kubermatic version information via the API; $KUBERMATICCOMMIT will be set as the image tag for
@@ -82,9 +85,9 @@ fi
 # TODO extract hack/sys11-store-container.yaml / hack/sys11-cleanup-container.yaml from the installer
 
 if [[ "${DEBUG}" == "true" ]]; then
-    GOTOOLFLAGS="-gcflags='all=-N -l'" make KUBERMATIC_EDITION="ee" KUBERMATICCOMMIT=$KUBERMATICCOMMIT GITTAG=$GITTAG seed-controller-manager
+    make KUBERMATICCOMMIT=$KUBERMATICCOMMIT GITTAG=$GITTAG GOTOOLFLAGS_EXTRA="-gcflags='all=-N -l'" LDFLAGS_EXTRA="" -C ${SRC_DIR} seed-controller-manager
 else
-    make KUBERMATIC_EDITION="ee" KUBERMATICCOMMIT=$KUBERMATICCOMMIT GITTAG=$GITTAG seed-controller-manager
+    make KUBERMATICCOMMIT=$KUBERMATICCOMMIT GITTAG=$GITTAG seed-controller-manager
 fi
 
 cd ${SRC_DIR}
