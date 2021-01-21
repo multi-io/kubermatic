@@ -76,14 +76,6 @@ else
     LE_NAMESPACE_OPTION=
 fi
 
-if [[ "${DYNAMIC_DATACENTERS}" == "false" ]]; then
-    DC_OPTION="-datacenters=${CONFIG_DIR}/datacenters.yaml"
-elif [[ "${DYNAMIC_DATACENTERS}" == "true" ]]; then
-    DC_OPTION="-dynamic-datacenters=true"
-else
-    DC_OPTION=
-fi
-
 # TODO extract hack/sys11-store-container.yaml / hack/sys11-cleanup-container.yaml from the installer
 
 if [[ "${DEBUG}" == "true" ]]; then
