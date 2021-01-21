@@ -53,6 +53,18 @@ build-dnatcontroller:
       - cmd/kubeletdnat-controller/_build
   needs: ["go-mod-vendor"]
 
+build-nodeport-proxy:
+  stage: compile
+  script:
+    - cd cmd/nodeport-proxy
+    - go mod vendor
+    - make build
+    - cp -r _build ${CI_PROJECT_DIR}/cmd/nodeport-proxy/_build
+  artifacts:
+    paths:
+      - cmd/nodeport-proxy/_build
+  needs: ["go-mod-vendor"]
+
 lint-docker:
   stage: test
   image: hadolint/hadolint:latest-debian
@@ -210,3 +222,18 @@ docker-release-etcd-launcher:
   - verify-swagger-spec
   - verify-codegen
   - build-kubermatic
+
+docker-release-nodeport-proxy:
+  stage: release
+  image: docker:latest
+  script:
+    - cd cmd/nodeport-proxy
+    - docker login -u sys11kubermatic -p $DOCKER_PASSWORD
+    - docker build --tag syseleven/nodeport-proxy:$CI_COMMIT_TAG .
+    - docker push syseleven/nodeport-proxy:$CI_COMMIT_TAG
+  dependencies:
+    - build-nodeport-proxy
+  only:
+    - tags
+  needs:
+    - build-nodeport-proxy
