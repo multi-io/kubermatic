@@ -24,11 +24,13 @@ import (
 )
 
 const (
-	clusterNamespacePrometheusScrapingConfigsConfigMapName = "clusterns-prometheus-scraping-configs"
-	clusterNamespacePrometheusRulesConfigMapName           = "clusterns-prometheus-rules"
+	clusterNamespacePrometheusScrapingConfigsConfigMapName    = "clusterns-prometheus-scraping-configs"
+	clusterNamespacePrometheusRulesConfigMapName              = "clusterns-prometheus-rules"
+	clusterNamespacePrometheusRemoteWriteConfigsConfigMapName = "clusterns-prometheus-remote-write-configs"
 
-	clusterNamespacePrometheusScrapingConfigsKey = "_custom-scraping-configs.yaml"
-	clusterNamespacePrometheusRulesKey           = "_customrules.yaml"
+	clusterNamespacePrometheusScrapingConfigsKey    = "_custom-scraping-configs.yaml"
+	clusterNamespacePrometheusRulesKey              = "_customrules.yaml"
+	clusterNamespacePrometheusRemoteWriteConfigsKey = "_custom-remote-write-configs.yaml"
 )
 
 func ClusterNamespacePrometheusScrapingConfigsConfigMapCreator(cfg *operatorv1alpha1.KubermaticConfiguration) reconciling.NamedConfigMapCreatorGetter {
@@ -61,6 +63,24 @@ func ClusterNamespacePrometheusRulesConfigMapCreator(cfg *operatorv1alpha1.Kuber
 			}
 
 			c.Data[clusterNamespacePrometheusRulesKey] = cfg.Spec.UserCluster.Monitoring.CustomRules
+
+			return c, nil
+		}
+	}
+}
+
+func ClusterNamespacePrometheusRemoteWriteConfigsConfigMapCreator(cfg *operatorv1alpha1.KubermaticConfiguration) reconciling.NamedConfigMapCreatorGetter {
+	if len(cfg.Spec.UserCluster.Monitoring.CustomRemoteWriteConfigs) == 0 {
+		return nil
+	}
+
+	return func() (string, reconciling.ConfigMapCreator) {
+		return clusterNamespacePrometheusRemoteWriteConfigsConfigMapName, func(c *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+			if c.Data == nil {
+				c.Data = make(map[string]string)
+			}
+
+			c.Data[clusterNamespacePrometheusRemoteWriteConfigsKey] = cfg.Spec.UserCluster.Monitoring.CustomRemoteWriteConfigs
 
 			return c, nil
 		}

@@ -142,6 +142,7 @@ func createKubernetesController(ctrlCtx *controllerContext) error {
 		ctrlCtx.runOptions.inClusterPrometheusDisableDefaultRules,
 		ctrlCtx.runOptions.inClusterPrometheusDisableDefaultScrapingConfigs,
 		ctrlCtx.runOptions.inClusterPrometheusScrapingConfigsFile,
+		ctrlCtx.runOptions.inClusterPrometheusRemoteWriteConfigsFile,
 		ctrlCtx.dockerPullConfigJSON,
 		ctrlCtx.runOptions.nodeLocalDNSCacheEnabled(),
 		ctrlCtx.runOptions.concurrentClusterUpdate,
@@ -245,6 +246,7 @@ func createMonitoringController(ctrlCtx *controllerContext) error {
 		ctrlCtx.runOptions.inClusterPrometheusDisableDefaultRules,
 		ctrlCtx.runOptions.inClusterPrometheusDisableDefaultScrapingConfigs,
 		ctrlCtx.runOptions.inClusterPrometheusScrapingConfigsFile,
+		ctrlCtx.runOptions.inClusterPrometheusRemoteWriteConfigsFile,
 		ctrlCtx.dockerPullConfigJSON,
 		ctrlCtx.runOptions.concurrentClusterUpdate,
 		monitoring.Features{

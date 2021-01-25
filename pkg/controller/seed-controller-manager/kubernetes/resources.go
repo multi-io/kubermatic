@@ -168,6 +168,7 @@ func (r *Reconciler) getClusterTemplateData(ctx context.Context, cluster *kuberm
 		r.inClusterPrometheusDisableDefaultRules,
 		r.inClusterPrometheusDisableDefaultScrapingConfigs,
 		r.inClusterPrometheusScrapingConfigsFile,
+		r.inClusterPrometheusRemoteWriteConfigsFile,
 		r.externalURL,
 		r.keycloakFacade,
 		r.oidcCAFile,

@@ -272,6 +272,28 @@ func SeedControllerManagerDeploymentCreator(workerName string, versions common.V
 				})
 			}
 
+			if len(cfg.Spec.UserCluster.Monitoring.CustomRemoteWriteConfigs) > 0 {
+				path := "/opt/" + clusterNamespacePrometheusRemoteWriteConfigsConfigMapName
+				args = append(args, fmt.Sprintf("-in-cluster-prometheus-remote-write-configs-file=%s/%s", path, clusterNamespacePrometheusRemoteWriteConfigsKey))
+
+				volumes = append(volumes, corev1.Volume{
+					Name: clusterNamespacePrometheusRemoteWriteConfigsConfigMapName,
+					VolumeSource: corev1.VolumeSource{
+						ConfigMap: &corev1.ConfigMapVolumeSource{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: clusterNamespacePrometheusRemoteWriteConfigsConfigMapName,
+							},
+						},
+					},
+				})
+
+				volumeMounts = append(volumeMounts, corev1.VolumeMount{
+					Name:      clusterNamespacePrometheusRemoteWriteConfigsConfigMapName,
+					MountPath: path,
+					ReadOnly:  true,
+				})
+			}
+
 			d.Spec.Template.Spec.Volumes = volumes
 			d.Spec.Template.Spec.InitContainers = []corev1.Container{
 				createKubernetesAddonsInitContainer(cfg.Spec.UserCluster.Addons.Kubernetes, sharedAddonVolume, versions.Kubermatic),

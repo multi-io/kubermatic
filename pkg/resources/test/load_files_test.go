@@ -575,6 +575,7 @@ func TestLoadFiles(t *testing.T) {
 					false,
 					false,
 					tmpFilePath,
+					tmpFilePath,
 					"foo.bar",
 					nil,
 					"test",

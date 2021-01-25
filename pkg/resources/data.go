@@ -54,6 +54,7 @@ type TemplateData struct {
 	inClusterPrometheusDisableDefaultRules           bool
 	inClusterPrometheusDisableDefaultScrapingConfigs bool
 	inClusterPrometheusScrapingConfigsFile           string
+	inClusterPrometheusRemoteWriteConfigsFile        string
 	oidcCAFile                                       string
 	oidcIssuerURL                                    string
 	oidcIssuerClientID                               string
@@ -83,6 +84,7 @@ func NewTemplateData(
 	inClusterPrometheusDisableDefaultRules bool,
 	inClusterPrometheusDisableDefaultScrapingConfigs bool,
 	inClusterPrometheusScrapingConfigsFile string,
+	inClusterPrometheusRemoteWriteConfigsFile string,
 	externalURL string,
 	keycloakFacade keycloak.Facade,
 	oidcCAFile string,
@@ -109,16 +111,17 @@ func NewTemplateData(
 		inClusterPrometheusDisableDefaultRules: inClusterPrometheusDisableDefaultRules,
 		inClusterPrometheusDisableDefaultScrapingConfigs: inClusterPrometheusDisableDefaultScrapingConfigs,
 		inClusterPrometheusScrapingConfigsFile:           inClusterPrometheusScrapingConfigsFile,
-		oidcCAFile:                                       oidcCAFile,
-		oidcIssuerURL:                                    oidcURL,
-		oidcIssuerClientID:                               oidcIssuerClientID,
-		ExternalURL:                                      externalURL,
-		KeycloakFacade:                                   keycloakFacade,
-		nodeLocalDNSCacheEnabled:                         nodeLocalDNSCacheEnabled,
-		kubermaticImage:                                  kubermaticImage,
-		etcdLauncherImage:                                etcdLauncherImage,
-		dnatControllerImage:                              dnatControllerImage,
-		supportsFailureDomainZoneAntiAffinity:            supportsFailureDomainZoneAntiAffinity,
+		inClusterPrometheusRemoteWriteConfigsFile:        inClusterPrometheusRemoteWriteConfigsFile,
+		oidcCAFile:                            oidcCAFile,
+		oidcIssuerURL:                         oidcURL,
+		oidcIssuerClientID:                    oidcIssuerClientID,
+		ExternalURL:                           externalURL,
+		KeycloakFacade:                        keycloakFacade,
+		nodeLocalDNSCacheEnabled:              nodeLocalDNSCacheEnabled,
+		kubermaticImage:                       kubermaticImage,
+		etcdLauncherImage:                     etcdLauncherImage,
+		dnatControllerImage:                   dnatControllerImage,
+		supportsFailureDomainZoneAntiAffinity: supportsFailureDomainZoneAntiAffinity,
 	}
 }
 
@@ -217,6 +220,11 @@ func (d *TemplateData) InClusterPrometheusDisableDefaultScrapingConfigs() bool {
 // InClusterPrometheusScrapingConfigsFile returns inClusterPrometheusScrapingConfigsFile
 func (d *TemplateData) InClusterPrometheusScrapingConfigsFile() string {
 	return d.inClusterPrometheusScrapingConfigsFile
+}
+
+// InClusterPrometheusRemoteWriteConfigsFile returns inClusterPrometheusRemoteWriteConfigsFile
+func (d *TemplateData) InClusterPrometheusRemoteWriteConfigsFile() string {
+	return d.inClusterPrometheusRemoteWriteConfigsFile
 }
 
 // NodeAccessNetwork returns the node access network
