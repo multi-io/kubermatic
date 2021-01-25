@@ -81,6 +81,7 @@ type Reconciler struct {
 	inClusterPrometheusDisableDefaultRules           bool
 	inClusterPrometheusDisableDefaultScrapingConfigs bool
 	inClusterPrometheusScrapingConfigsFile           string
+	inClusterPrometheusRemoteWriteConfigsFile        string
 	dockerPullConfigJSON                             []byte
 	// Annotation prefix to discover user cluster resources
 	// example: kubermatic.io -> kubermatic.io/path,kubermatic.io/port
@@ -109,6 +110,7 @@ func Add(
 	inClusterPrometheusDisableDefaultRules bool,
 	inClusterPrometheusDisableDefaultScrapingConfigs bool,
 	inClusterPrometheusScrapingConfigsFile string,
+	inClusterPrometheusRemoteWriteConfigsFile string,
 	dockerPullConfigJSON []byte,
 	concurrentClusterUpdates int,
 
@@ -134,6 +136,7 @@ func Add(
 		inClusterPrometheusDisableDefaultRules:           inClusterPrometheusDisableDefaultRules,
 		inClusterPrometheusDisableDefaultScrapingConfigs: inClusterPrometheusDisableDefaultScrapingConfigs,
 		inClusterPrometheusScrapingConfigsFile:           inClusterPrometheusScrapingConfigsFile,
+		inClusterPrometheusRemoteWriteConfigsFile:        inClusterPrometheusRemoteWriteConfigsFile,
 		dockerPullConfigJSON:                             dockerPullConfigJSON,
 		concurrentClusterUpdates:                         concurrentClusterUpdates,
 		seedGetter:                                       seedGetter,

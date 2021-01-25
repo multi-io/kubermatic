@@ -483,6 +483,7 @@ func getTemplateData(version *kubermaticversion.Version) (*resources.TemplateDat
 		false,
 		"",
 		"",
+		"",
 		nil,
 		"",
 		"",

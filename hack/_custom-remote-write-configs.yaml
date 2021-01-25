@@ -1,0 +1,10 @@
+- basic_auth:
+    password: <password>
+    username: metakube-dev
+  queue_config:
+    capacity: 5000
+    max_backoff: 5m
+    max_samples_per_send: 1000
+    max_shards: 20
+    min_backoff: 1s
+  url: https://cortex-metakube.mcloud-stage.syseleven.net/api/prom/push

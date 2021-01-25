@@ -50,11 +50,12 @@ type customizationData struct {
 }
 
 type configTemplateData struct {
-	TemplateData          interface{}
-	APIServerHost         string
-	EtcdTLSConfig         string
-	ApiserverTLSConfig    string
-	CustomScrapingConfigs string
+	TemplateData             interface{}
+	APIServerHost            string
+	EtcdTLSConfig            string
+	ApiserverTLSConfig       string
+	CustomScrapingConfigs    string
+	CustomRemoteWriteConfigs string
 }
 
 // ConfigMapCreator returns a ConfigMapCreator containing the prometheus config for the supplied data
@@ -108,13 +109,20 @@ func ConfigMapCreator(data *resources.TemplateData) reconciling.NamedConfigMapCr
 				return nil, fmt.Errorf("failed to encode apiserver TLS config as YAML: %v", err)
 			}
 
+			customRemoteWriteConfigsFile := data.InClusterPrometheusRemoteWriteConfigsFile()
+			customRemoteWriteConfigs, err := loadTemplatedFile(customRemoteWriteConfigsFile, customData)
+			if err != nil {
+				return nil, fmt.Errorf("failed to load custom remote write configs file %s: %v", customRemoteWriteConfigsFile, err)
+			}
+
 			// prepare config template
 			configData := &configTemplateData{
-				TemplateData:          data,
-				APIServerHost:         customData.APIServerHost,
-				CustomScrapingConfigs: customScrapingConfigs,
-				EtcdTLSConfig:         strings.TrimSpace(string(etcdTLSYaml)),
-				ApiserverTLSConfig:    strings.TrimSpace(string(apiserverTLSYaml)),
+				TemplateData:             data,
+				APIServerHost:            customData.APIServerHost,
+				CustomScrapingConfigs:    customScrapingConfigs,
+				EtcdTLSConfig:            strings.TrimSpace(string(etcdTLSYaml)),
+				ApiserverTLSConfig:       strings.TrimSpace(string(apiserverTLSYaml)),
+				CustomRemoteWriteConfigs: customRemoteWriteConfigs,
 			}
 
 			config, err := renderTemplate(prometheusConfig, configData)
@@ -395,6 +403,13 @@ scrape_configs:
 #######################################################################
 # custom scraping configurations
 
+{{ . }}
+{{- end }}
+
+{{- with .CustomRemoteWriteConfigs }}
+#######################################################################
+# custom remote write configurations
+remote_write:
 {{ . }}
 {{- end }}
 `

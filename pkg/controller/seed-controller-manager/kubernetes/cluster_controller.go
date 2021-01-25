@@ -88,6 +88,7 @@ type Reconciler struct {
 	inClusterPrometheusDisableDefaultRules           bool
 	inClusterPrometheusDisableDefaultScrapingConfigs bool
 	inClusterPrometheusScrapingConfigsFile           string
+	inClusterPrometheusRemoteWriteConfigsFile        string
 	monitoringEnvironmentLabel                       string
 	monitoringScrapeAnnotationPrefix                 string
 	dockerPullConfigJSON                             []byte
@@ -125,6 +126,7 @@ func Add(
 	inClusterPrometheusDisableDefaultRules bool,
 	inClusterPrometheusDisableDefaultScrapingConfigs bool,
 	inClusterPrometheusScrapingConfigsFile string,
+	inClusterPrometheusRemoteWriteConfigsFile string,
 	dockerPullConfigJSON []byte,
 	nodeLocalDNSCacheEnabled bool,
 	concurrentClusterUpdates int,
@@ -154,6 +156,7 @@ func Add(
 		inClusterPrometheusDisableDefaultRules: inClusterPrometheusDisableDefaultRules,
 		inClusterPrometheusDisableDefaultScrapingConfigs: inClusterPrometheusDisableDefaultScrapingConfigs,
 		inClusterPrometheusScrapingConfigsFile:           inClusterPrometheusScrapingConfigsFile,
+		inClusterPrometheusRemoteWriteConfigsFile:        inClusterPrometheusRemoteWriteConfigsFile,
 		monitoringEnvironmentLabel:                       monitoringEnvironmentLabel,
 		monitoringScrapeAnnotationPrefix:                 monitoringScrapeAnnotationPrefix,
 		dockerPullConfigJSON:                             dockerPullConfigJSON,

@@ -297,6 +297,17 @@ kubermatic:
   clusterNamespacePrometheus: {}
 #  clusterNamespacePrometheus:
 #    disableDefaultScrapingConfigs: true
+#    remoteWriteConfigs:
+#    - url: https://cortex-metakube.mcloud-stage.syseleven.net/api/prom/push
+#      basic_auth:
+#        username: "metakube-dev"
+#        password: "${cortex_password}"
+#      queue_config:
+#        capacity: 5000
+#        max_shards: 20
+#        max_samples_per_send: 1000
+#        min_backoff: 1s
+#        max_backoff: 5m
 #    scrapingConfigs:
 #    - job_name: 'schnitzel'
 #      kubernetes_sd_configs:

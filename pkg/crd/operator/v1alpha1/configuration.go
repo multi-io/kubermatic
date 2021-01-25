@@ -196,6 +196,10 @@ type KubermaticUserClusterMonitoringConfiguration struct {
 	// YAML-formatted string containing an array of scrape configurations as documented
 	// on https://prometheus.io/docs/prometheus/2.14/configuration/configuration/#scrape_config.
 	CustomScrapingConfigs string `json:"customScrapingConfigs,omitempty"`
+	// CustomRemoteWriteConfigs can be used to inject custom remote_write configs. This must be a
+	// YAML-formatted string containing an array of remote_write configurations as documented
+	// on https://prometheus.io/docs/prometheus/2.14/configuration/configuration/#remote_write.
+	CustomRemoteWriteConfigs string `json:"customRemoteWriteConfigs,omitempty"`
 	// ScrapeAnnotationPrefix (if set) is used to make the in-cluster Prometheus scrape pods
 	// inside the user clusters.
 	ScrapeAnnotationPrefix string `json:"scrapeAnnotationPrefix,omitempty"`
