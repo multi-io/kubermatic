@@ -107,7 +107,7 @@ if [[ "${DEBUG}" == "true" ]]; then
       ${SYS11_OPTIONS} \
       -monitoring-scrape-annotation-prefix=monitoring.metakube.de \
       -namespace=kubermatic \
-      -worker-name=${KUBERMATIC_WORKERNAME} \
+      ${WORKER_OPTION} \
       -external-url=${EXTERNAL_URL} \
       -logtostderr=1 \
       -log-debug=1 \
@@ -141,7 +141,7 @@ else
       ${SYS11_OPTIONS} \
       -monitoring-scrape-annotation-prefix=monitoring.metakube.de \
       -namespace=kubermatic \
-      -worker-name=${KUBERMATIC_WORKERNAME} \
+      ${WORKER_OPTION} \
       -external-url=${EXTERNAL_URL} \
       -logtostderr=1 \
       -log-debug=1 \
