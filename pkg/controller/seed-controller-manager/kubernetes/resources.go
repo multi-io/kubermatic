@@ -370,6 +370,7 @@ func GetConfigMapCreators(data *resources.TemplateData) []reconciling.NamedConfi
 		clusterproxy.ConfigMapCreator(data),
 		scheduler.ConfigMapCreator(data),
 		apiserver.AuditConfigMapCreator(),
+		apiserver.AdmissionControlCreator(data),
 	}
 }
 

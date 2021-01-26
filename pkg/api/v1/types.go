@@ -690,6 +690,16 @@ type ClusterSpec struct {
 	// If active the PodNodeSelector admission plugin is configured at the apiserver
 	UsePodNodeSelectorAdmissionPlugin bool `json:"usePodNodeSelectorAdmissionPlugin,omitempty"`
 
+	// PodNodeSelectorAdmissionPluginConfig provides the configuration for the PodNodeSelector.
+	// It's used by the backend to create a configuration file for this plugin.
+	// The key:value from the map is converted to the namespace:<node-selectors-labels> in the file.
+	// The format in a file:
+	// podNodeSelectorPluginConfig:
+	//  clusterDefaultNodeSelector: <node-selectors-labels>
+	//  namespace1: <node-selectors-labels>
+	//  namespace2: <node-selectors-labels>
+	PodNodeSelectorAdmissionPluginConfig map[string]string `json:"podNodeSelectorAdmissionPluginConfig,omitempty"`
+
 	// Additional Admission Controller plugins
 	AdmissionPlugins []string `json:"admissionPlugins,omitempty"`
 
@@ -704,17 +714,18 @@ type ClusterSpec struct {
 // that will be returned in the API responses (see: PublicCloudSpec struct).
 func (cs *ClusterSpec) MarshalJSON() ([]byte, error) {
 	ret, err := json.Marshal(struct {
-		Cloud                               PublicCloudSpec                        `json:"cloud"`
-		ClusterNetwork                      kubermaticv1.ClusterNetworkingConfig   `json:"clusterNetwork,omitempty"`
-		MachineNetworks                     []kubermaticv1.MachineNetworkingConfig `json:"machineNetworks,omitempty"`
-		Version                             ksemver.Semver                         `json:"version"`
-		OIDC                                kubermaticv1.OIDCSettings              `json:"oidc"`
-		Sys11Auth                           kubermaticv1.Sys11AuthSettings         `json:"sys11auth,omitempty"`
-		UpdateWindow                        *kubermaticv1.UpdateWindow             `json:"updateWindow,omitempty"`
-		UsePodSecurityPolicyAdmissionPlugin bool                                   `json:"usePodSecurityPolicyAdmissionPlugin,omitempty"`
-		UsePodNodeSelectorAdmissionPlugin   bool                                   `json:"usePodNodeSelectorAdmissionPlugin,omitempty"`
-		AuditLogging                        *kubermaticv1.AuditLoggingSettings     `json:"auditLogging,omitempty"`
-		AdmissionPlugins                    []string                               `json:"admissionPlugins,omitempty"`
+		Cloud                                PublicCloudSpec                        `json:"cloud"`
+		ClusterNetwork                       kubermaticv1.ClusterNetworkingConfig   `json:"clusterNetwork,omitempty"`
+		MachineNetworks                      []kubermaticv1.MachineNetworkingConfig `json:"machineNetworks,omitempty"`
+		Version                              ksemver.Semver                         `json:"version"`
+		OIDC                                 kubermaticv1.OIDCSettings              `json:"oidc"`
+		Sys11Auth                            kubermaticv1.Sys11AuthSettings         `json:"sys11auth,omitempty"`
+		UpdateWindow                         *kubermaticv1.UpdateWindow             `json:"updateWindow,omitempty"`
+		UsePodSecurityPolicyAdmissionPlugin  bool                                   `json:"usePodSecurityPolicyAdmissionPlugin,omitempty"`
+		UsePodNodeSelectorAdmissionPlugin    bool                                   `json:"usePodNodeSelectorAdmissionPlugin,omitempty"`
+		AuditLogging                         *kubermaticv1.AuditLoggingSettings     `json:"auditLogging,omitempty"`
+		AdmissionPlugins                     []string                               `json:"admissionPlugins,omitempty"`
+		PodNodeSelectorAdmissionPluginConfig map[string]string                      `json:"podNodeSelectorAdmissionPluginConfig,omitempty"`
 	}{
 		Cloud: PublicCloudSpec{
 			DatacenterName: cs.Cloud.DatacenterName,
@@ -731,16 +742,17 @@ func (cs *ClusterSpec) MarshalJSON() ([]byte, error) {
 			Kubevirt:       newPublicKubevirtCloudSpec(cs.Cloud.Kubevirt),
 			Alibaba:        newPublicAlibabaCloudSpec(cs.Cloud.Alibaba),
 		},
-		Version:                             cs.Version,
-		ClusterNetwork:                      cs.ClusterNetwork,
-		MachineNetworks:                     cs.MachineNetworks,
-		OIDC:                                cs.OIDC,
-		Sys11Auth:                           cs.Sys11Auth,
-		UpdateWindow:                        cs.UpdateWindow,
-		UsePodSecurityPolicyAdmissionPlugin: cs.UsePodSecurityPolicyAdmissionPlugin,
-		UsePodNodeSelectorAdmissionPlugin:   cs.UsePodNodeSelectorAdmissionPlugin,
-		AuditLogging:                        cs.AuditLogging,
-		AdmissionPlugins:                    cs.AdmissionPlugins,
+		Version:                              cs.Version,
+		ClusterNetwork:                       cs.ClusterNetwork,
+		MachineNetworks:                      cs.MachineNetworks,
+		OIDC:                                 cs.OIDC,
+		Sys11Auth:                            cs.Sys11Auth,
+		UpdateWindow:                         cs.UpdateWindow,
+		UsePodSecurityPolicyAdmissionPlugin:  cs.UsePodSecurityPolicyAdmissionPlugin,
+		UsePodNodeSelectorAdmissionPlugin:    cs.UsePodNodeSelectorAdmissionPlugin,
+		AuditLogging:                         cs.AuditLogging,
+		AdmissionPlugins:                     cs.AdmissionPlugins,
+		PodNodeSelectorAdmissionPluginConfig: cs.PodNodeSelectorAdmissionPluginConfig,
 	})
 
 	return ret, err

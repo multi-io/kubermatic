@@ -267,7 +267,7 @@ func getApiserverFlags(data *resources.TemplateData, etcdEndpoints []string, ena
 		admissionPlugins.Insert("PodSecurityPolicy")
 	}
 	if data.Cluster().Spec.UsePodNodeSelectorAdmissionPlugin {
-		admissionPlugins.Insert("PodNodeSelector")
+		admissionPlugins.Insert(resources.PodNodeSelectorAdmissionPlugin)
 	}
 
 	admissionPlugins.Insert(data.Cluster().Spec.AdmissionPlugins...)
@@ -287,6 +287,7 @@ func getApiserverFlags(data *resources.TemplateData, etcdEndpoints []string, ena
 		"--etcd-keyfile", "/etc/etcd/pki/client/apiserver-etcd-client.key",
 		"--storage-backend", "etcd3",
 		"--enable-admission-plugins", strings.Join(admissionPlugins.List(), ","),
+		"--admission-control-config-file", "/etc/kubernetes/adm-control/admission-control.yaml",
 		"--authorization-mode", "Node,RBAC",
 		"--external-hostname", data.Cluster().Address.ExternalName,
 		"--token-auth-file", "/etc/kubernetes/tokens/tokens.csv",
@@ -437,6 +438,11 @@ func getVolumeMounts() []corev1.VolumeMount {
 			MountPath: "/var/log/kubernetes/audit",
 			ReadOnly:  false,
 		},
+		{
+			Name:      resources.AdmissionControlConfigMapName,
+			MountPath: "/etc/kubernetes/adm-control",
+			ReadOnly:  true,
+		},
 	}, resources.GetHostCACertVolumeMounts()...)
 }
 
@@ -553,6 +559,16 @@ func getVolumes() []corev1.Volume {
 			Name: resources.AuditLogVolumeName,
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		},
+		{
+			Name: resources.AdmissionControlConfigMapName,
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: resources.AdmissionControlConfigMapName,
+					},
+				},
 			},
 		},
 	}, resources.GetHostCACertVolumes()...)

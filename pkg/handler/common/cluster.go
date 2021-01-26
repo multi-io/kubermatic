@@ -378,6 +378,7 @@ func PatchEndpoint(ctx context.Context, userInfoGetter provider.UserInfoGetter, 
 	newInternalCluster.Spec.Openshift = patchedCluster.Spec.Openshift
 	newInternalCluster.Spec.Sys11Auth = patchedCluster.Spec.Sys11Auth
 	newInternalCluster.Spec.UpdateWindow = patchedCluster.Spec.UpdateWindow
+	newInternalCluster.Spec.PodNodeSelectorAdmissionPluginConfig = patchedCluster.Spec.PodNodeSelectorAdmissionPluginConfig
 
 	incompatibleKubelets, err := common.CheckClusterVersionSkew(ctx, userInfoGetter, clusterProvider, newInternalCluster, projectID)
 	if err != nil {
@@ -706,17 +707,18 @@ func convertInternalClusterToExternal(internalCluster *kubermaticv1.Cluster, fil
 		Labels:          internalCluster.Labels,
 		InheritedLabels: internalCluster.Status.InheritedLabels,
 		Spec: apiv1.ClusterSpec{
-			Cloud:                               internalCluster.Spec.Cloud,
-			Version:                             internalCluster.Spec.Version,
-			MachineNetworks:                     internalCluster.Spec.MachineNetworks,
-			ClusterNetwork:                      internalCluster.Spec.ClusterNetwork,
-			OIDC:                                internalCluster.Spec.OIDC,
-			Sys11Auth:                           internalCluster.Spec.Sys11Auth,
-			UpdateWindow:                        internalCluster.Spec.UpdateWindow,
-			AuditLogging:                        internalCluster.Spec.AuditLogging,
-			UsePodSecurityPolicyAdmissionPlugin: internalCluster.Spec.UsePodSecurityPolicyAdmissionPlugin,
-			UsePodNodeSelectorAdmissionPlugin:   internalCluster.Spec.UsePodNodeSelectorAdmissionPlugin,
-			AdmissionPlugins:                    internalCluster.Spec.AdmissionPlugins,
+			Cloud:                                internalCluster.Spec.Cloud,
+			Version:                              internalCluster.Spec.Version,
+			MachineNetworks:                      internalCluster.Spec.MachineNetworks,
+			ClusterNetwork:                       internalCluster.Spec.ClusterNetwork,
+			OIDC:                                 internalCluster.Spec.OIDC,
+			Sys11Auth:                            internalCluster.Spec.Sys11Auth,
+			UpdateWindow:                         internalCluster.Spec.UpdateWindow,
+			AuditLogging:                         internalCluster.Spec.AuditLogging,
+			UsePodSecurityPolicyAdmissionPlugin:  internalCluster.Spec.UsePodSecurityPolicyAdmissionPlugin,
+			UsePodNodeSelectorAdmissionPlugin:    internalCluster.Spec.UsePodNodeSelectorAdmissionPlugin,
+			AdmissionPlugins:                     internalCluster.Spec.AdmissionPlugins,
+			PodNodeSelectorAdmissionPluginConfig: internalCluster.Spec.PodNodeSelectorAdmissionPluginConfig,
 		},
 		Status: apiv1.ClusterStatus{
 			Version: internalCluster.Spec.Version,
