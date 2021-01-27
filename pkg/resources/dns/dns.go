@@ -147,6 +147,14 @@ func DeploymentCreator(data deploymentCreatorData) reconciling.NamedDeploymentCr
 
 			dep.Spec.Template.Spec.Affinity = resources.HostnameAntiAffinity(resources.DNSResolverDeploymentName, data.Cluster().Name)
 
+			// Run even on nodes where our node problem detector found a problem
+			dep.Spec.Template.Spec.Tolerations = []corev1.Toleration{
+				{
+					Key:      "node.syseleven.de/not-ready",
+					Operator: corev1.TolerationOpExists,
+				},
+			}
+
 			return dep, nil
 		}
 	}
