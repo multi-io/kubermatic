@@ -115,9 +115,6 @@ func openStackDeploymentCreator(data *resources.TemplateData) reconciling.NamedD
 					VolumeMounts: osCloudProviderMounts,
 				},
 			}
-			if data.Cluster().Spec.Version.Minor() == 18 {
-				dep.Spec.Template.Spec.Containers[1].Image = data.ImageRegistry(resources.RegistryDocker) + "/k8scloudprovider/openstack-cloud-controller-manager:v1.19.2"
-			}
 			defResourceRequirements := map[string]*corev1.ResourceRequirements{
 				osName:              osResourceRequirements.DeepCopy(),
 				openvpnSidecar.Name: openvpnSidecar.Resources.DeepCopy(),
@@ -183,11 +180,13 @@ func getOSVersion(version semver.Semver) (string, error) {
 	case 17:
 		return "1.17.0", nil
 	case 18:
-		return "1.18.0", nil
+		// Use cloud-controller 1.19.3 for all clusters with kubernetes version
+		// 1.18.x. This enables the use of rwx (with some limitations).
+		return "1.19.3", nil
 	case 19:
-		return "1.19.2", nil
+		return "1.19.3", nil
 	default:
-		return "1.19.2", nil
+		return "1.19.3", nil
 	}
 }
 
@@ -229,8 +228,6 @@ func isOTC(dc *kubermaticv1.DatacenterSpecOpenstack) bool {
 // This is not called for now, but it's here so we can use it later to automagically
 // enable external cloud controller support for supported versions.
 func OpenStackCloudControllerSupported(version semver.Semver) bool {
-	if _, err := getOSVersion(version); err != nil {
-		return false
-	}
-	return true
+	_, err := getOSVersion(version)
+	return err == nil
 }
