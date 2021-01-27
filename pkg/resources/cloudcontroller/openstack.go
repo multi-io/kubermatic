@@ -180,13 +180,13 @@ func getOSVersion(version semver.Semver) (string, error) {
 	case 17:
 		return "1.17.0", nil
 	case 18:
-		// Use cloud-controller 1.19.3 for all clusters with kubernetes version
+		// Use cloud-controller 1.19.2 for all clusters with kubernetes version
 		// 1.18.x. This enables the use of rwx (with some limitations).
-		return "1.19.3", nil
+		return "1.19.2", nil
 	case 19:
-		return "1.19.3", nil
+		return "1.19.2", nil
 	default:
-		return "1.19.3", nil
+		return "1.19.2", nil
 	}
 }
 
