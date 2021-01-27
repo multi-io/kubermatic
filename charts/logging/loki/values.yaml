@@ -1,0 +1,106 @@
+# Copyright 2020 The Kubermatic Kubernetes Platform contributors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+loki:
+  affinity: {}
+  # podAntiAffinity:
+  #   requiredDuringSchedulingIgnoredDuringExecution:
+  #   - labelSelector:
+  #       matchExpressions:
+  #       - key: app
+  #         operator: In
+  #         values:
+  #         - loki
+  #     topologyKey: "kubernetes.io/hostname"
+
+  # enable tracing for debug, need install jaeger and specify right jaeger_agent_host
+  tracing:
+    jaegerAgentHost:
+
+  config:
+    auth_enabled: false
+    ingester:
+      chunk_idle_period: 3m
+      chunk_block_size: 262144
+      chunk_retain_period: 1m
+      lifecycler:
+        ring:
+          kvstore:
+            store: inmemory
+          replication_factor: 1
+
+    limits_config:
+      enforce_metric_name: false
+      reject_old_samples: true
+      reject_old_samples_max_age: 144h
+    schema_config:
+      configs:
+      - from: 2018-04-15
+        store: boltdb
+        object_store: filesystem
+        schema: v9
+        index:
+          prefix: index_
+          period: 144h
+    server:
+      http_listen_port: 3100
+    storage_config:
+      boltdb:
+        directory: /data/loki/index
+      filesystem:
+        directory: /data/loki/chunks
+    chunk_store_config:
+      max_look_back_period: 720h
+    table_manager:
+      retention_deletes_enabled: true
+      retention_period: 720h
+
+  image:
+    repository: docker.io/grafana/loki
+    tag: 1.6.1
+    pullPolicy: IfNotPresent
+
+  ## The app name of loki clients
+  client: {}
+    # name:
+
+  nodeSelector: {}
+
+  persistence:
+    size: 15Gi
+    storageClassName: kubermatic-fast
+
+  podLabels: {}
+
+  replicas: 1
+
+  resources:
+   limits:
+     cpu: "1"
+     memory: 700Mi
+   requests:
+     cpu: 300m
+     memory: 256Mi
+
+  service:
+    type: ClusterIP
+    nodePort:
+    port: 3100
+    annotations: {}
+    labels: {}
+
+  tolerations: []
+
+  updateStrategy:
+    type: RollingUpdate

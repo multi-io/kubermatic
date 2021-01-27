@@ -27,12 +27,13 @@ spec:
       labels:
         role: controller-manager
         version: v1
+        app.kubernetes.io/name: kubermatic-seed-controller-manager
       annotations:
         prometheus.io/scrape: 'true'
         prometheus.io/port: '8085'
         kubermatic.io/chart: kubermatic
         fluentbit.io/parser: glog
-        checksum/tls: {{ include (print $.Template.BasePath "/seed-validating-webhook.yaml") . | sha256sum }}
+        checksum/tls: {{ include (print $.Template.BasePath "/seed-webhooks.yaml") . | sha256sum }}
         checksum/master-files: {{ include (print $.Template.BasePath "/master-files-secret.yaml") . | sha256sum }}
         checksum/datecenters: {{ include (print $.Template.BasePath "/datacenter-yaml-secret.yaml") . | sha256sum }}
         checksum/backup-container-configmap: {{ include (print $.Template.BasePath "/backup-container-configmap.yaml") . | sha256sum }}
@@ -43,6 +44,13 @@ spec:
         {{- if .Values.kubermatic.clusterNamespacePrometheus.scrapingConfigs }}
         checksum/prometheus-scraping-configs: {{ include (print $.Template.BasePath "/clusterns-prometheus-scraping-configs-configmap.yaml") . | sha256sum }}
         {{- end }}
+        {{- if .Values.kubermatic.clusterNamespacePrometheus.remoteWriteConfigs }}
+        checksum/prometheus-remote-write-configs: {{ include (print $.Template.BasePath "/clusterns-prometheus-remote-write-configs-configmap.yaml") . | sha256sum }}
+        {{- end }}
+        {{- if .Values.keycloak }}
+        checksum/keycloak-credentials: {{ include (print $.Template.BasePath "/keycloak-credentials-yaml-secret.yaml") . | sha256sum }}
+        {{- end }}
+        fluentbit.io/parser: glog
     spec:
       serviceAccountName: kubermatic
       initContainers:
@@ -103,6 +111,7 @@ spec:
         {{- end }}
         - -nodeport-range={{ .Values.kubermatic.controller.nodeportRange }}
         - -docker-pull-config-json-file=/opt/docker/.dockerconfigjson
+        - -keycloak-cache-expiry={{ .Values.kubermatic.controller.keycloakCacheExpiry }}
         {{- if regexMatch ".*OpenIDAuthPlugin=true.*" (default "" .Values.kubermatic.controller.featureGates) }}
         # the following flags enable oidc auth plugin on kube-API servers
         {{- if .Values.kubermatic.auth.caBundle }}
@@ -124,6 +133,12 @@ spec:
         {{- end }}
         {{- if .Values.kubermatic.clusterNamespacePrometheus.scrapingConfigs }}
         - -in-cluster-prometheus-scraping-configs-file=/opt/incluster-prometheus-scraping-configs/_custom-scraping-configs.yaml
+        {{- end }}
+        {{- if .Values.kubermatic.clusterNamespacePrometheus.remoteWriteConfigs }}
+        - -in-cluster-prometheus-remote-write-configs-file=/opt/incluster-prometheus-remote-write-configs/_custom-remote-write-configs.yaml
+        {{- end }}
+        {{- if .Values.kubermatic.monitoringEnvironmentLabel }}
+        - -monitoring-environment-label={{ .Values.kubermatic.monitoringEnvironmentLabel }}
         {{- end }}
         {{- if .Values.kubermatic.monitoringScrapeAnnotationPrefix }}
         - -monitoring-scrape-annotation-prefix={{ .Values.kubermatic.monitoringScrapeAnnotationPrefix }}
@@ -148,6 +163,9 @@ spec:
         - -namespace=$(NAMESPACE)
         - -seed-admissionwebhook-cert-file=/opt/seed-webhook-serving-cert/serverCert.pem
         - -seed-admissionwebhook-key-file=/opt/seed-webhook-serving-cert/serverKey.pem
+        {{- if .Values.kubermatic.defaultComponentSettings }}
+        - -default-component-settings=/opt/cluster-default-component-settings/config.yaml
+        {{- end }}
         {{- if .Values.kubermatic.apiserverEndpointReconcilingDisabled }}
         - -apiserver-reconciling-disabled-by-default=true
         {{- else }}
@@ -166,6 +184,11 @@ spec:
           containerPort: 8085
           protocol: TCP
         volumeMounts:
+        {{- if .Values.kubermatic.defaultComponentSettings }}
+        - name: cluster-component-settings
+          mountPath: "/opt/cluster-default-component-settings/"
+          readOnly: true
+        {{- end }}
         {{- if .Values.kubermatic.auth.caBundle }}
         - name: dex-ca
           mountPath: "/opt/dex-ca/"
@@ -198,13 +221,30 @@ spec:
           mountPath: "/opt/incluster-prometheus-scraping-configs/"
           readOnly: true
         {{- end }}
+        {{- if .Values.kubermatic.clusterNamespacePrometheus.remoteWriteConfigs }}
+        - name: in-cluster-prometheus-remote-write-configs-file
+          mountPath: "/opt/incluster-prometheus-remote-write-configs/"
+          readOnly: true
+        {{- end }}
         - name: seed-webhook-serving-cert
           mountPath: /opt/seed-webhook-serving-cert
+        {{- if .Values.kubermatic.controller.envSecrets }}
+        envFrom:
+        {{- range .Values.kubermatic.controller.envSecrets }}
+        - secretRef:
+            name: {{.}}
+        {{- end }}
+        {{- end }}
         resources:
 {{ toYaml .Values.kubermatic.controller.resources | indent 10 }}
       imagePullSecrets:
       - name: dockercfg
       volumes:
+      {{- if .Values.kubermatic.defaultComponentSettings }}
+      - name: cluster-component-settings
+        configMap:
+          name: default-component-settings
+      {{- end }}
       {{- if .Values.kubermatic.auth.caBundle }}
       - name: dex-ca
         secret:
@@ -235,6 +275,11 @@ spec:
       - name: in-cluster-prometheus-scraping-configs-file
         configMap:
           name: clusterns-prometheus-scraping-configs
+      {{- end }}
+      {{- if .Values.kubermatic.clusterNamespacePrometheus.remoteWriteConfigs }}
+      - name: in-cluster-prometheus-remote-write-configs-file
+        configMap:
+          name: clusterns-prometheus-remote-write-configs
       {{- end }}
       - name: seed-webhook-serving-cert
         secret:

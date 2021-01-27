@@ -1,200 +1,156 @@
 stages:
-- check
+- init
+- compile
 - test
-- build
 - release
 
 variables:
   GO_VERSION: "1.14.9"
-  KUBERMATIC_EDITION: ce
+  KUBERMATIC_EDITION: ee
+  GO111MODULE: "on"
+  KUBERMATICCOMMIT: "${CI_COMMIT_TAG}"
 
-before_script:
-- mkdir -p /go/src/github.com/kubermatic/
-- cp -r $PWD /go/src/github.com/kubermatic/kubermatic
-- cd /go/src/github.com/kubermatic/kubermatic
-
-dep:
-  stage: check
-  image:
-    name: metalmatze/dep:0.5.0
-    entrypoint: ['']
-  script:
-  - cd api
-  - dep ensure -v
-  - '[[ -z "$(git diff)" ]]'
-
-gofmt:
-  stage: check
+default:
   image: golang:${GO_VERSION}
+  before_script:
+  - mkdir -p /go/src/k8c.io
+  - cp -r $PWD /go/src/k8c.io/kubermatic
+  - cd /go/src/k8c.io/kubermatic
+  cache:
+    key: go-mod-cache-dir
+    paths:
+      - /go/pkg/mod
+      - vendor
+
+go-mod-vendor:
+  stage: init
   script:
-  - cd api
-  - make gofmt
+  - go mod download
+  - go mod vendor
+  - cp -r vendor ${CI_PROJECT_DIR}/vendor
+
+build-kubermatic:
+  stage: compile
+  script:
+  - make build
+  - cp -r _build ${CI_PROJECT_DIR}/_build
+  artifacts:
+    paths:
+    - _build
+  variables:
+    GOCACHE: ${CI_PROJECT_DIR}/vendor/cache
+  needs: ["go-mod-vendor"]
+
+build-dnatcontroller:
+  stage: compile
+  script:
+  - cd cmd/kubeletdnat-controller
+  - go mod vendor
+  - make build
+  - cp -r _build ${CI_PROJECT_DIR}/cmd/kubeletdnat-controller/_build
+  artifacts:
+    paths:
+      - cmd/kubeletdnat-controller/_build
+  needs: ["go-mod-vendor"]
+
+build-nodeport-proxy:
+  stage: compile
+  script:
+    - cd cmd/nodeport-proxy
+    - go mod vendor
+    - make build
+    - cp -r _build ${CI_PROJECT_DIR}/cmd/nodeport-proxy/_build
+  artifacts:
+    paths:
+      - cmd/nodeport-proxy/_build
+  needs: ["go-mod-vendor"]
 
 lint-docker:
-  stage: check
-
+  stage: test
   image: hadolint/hadolint:latest-debian
-
   script:
-    - hadolint api/Dockerfile
+    - hadolint Dockerfile
 
 verify-codegen:
-  stage: check
-  image: golang:${GO_VERSION}
+  stage: test
   script:
+  - go mod vendor
   - apt-get update && apt-get install -y --no-install-recommends bzr
-  - cd api
   - ./hack/verify-codegen.sh
-
-#verify-api-client:
-#  stage: check
-#  image: golang:${GO_VERSION}
-#  script:
-#    - cd api
-#    - GO111MODULE=on ./hack/verify-api-client.sh
-
-license-validation:
-  stage: check
-  image: metalmatze/wwhrd:1.9
-  script:
-  - cd api
-  - wwhrd check -f ../allowed_licensed.yaml
+  needs: ["go-mod-vendor"]
 
 lint:
-  stage: check
+  stage: test
   image: golangci/golangci-lint:v1.30.0
   script:
-  - cd api
   - export KUBERMATIC_EDITION=ee
   - make lint
   variables:
-    GOLANGCI_LINT_CACHE: ${CI_PROJECT_DIR}/api/vendor/linter-cache
-    GOCACHE: ${CI_PROJECT_DIR}/api/vendor/cache
+    GOLANGCI_LINT_CACHE: ${CI_PROJECT_DIR}/vendor/linter-cache
+    GOCACHE: ${CI_PROJECT_DIR}/vendor/cache
   cache:
     key: lintercache
     paths:
-      - api/vendor/linter-cache
-      - api/vendor/cache
+      - vendor/linter-cache
+      - vendor/cache
+  needs: ["go-mod-vendor"]
 
 verify-swagger-spec:
-  stage: check
-  image: golang:1.12.9
+  stage: test
   script:
-  - cd api
+  - go mod vendor
   - ./hack/verify-swagger.sh
+  needs: ["go-mod-vendor"]
 
 test-go:
   stage: test
-  image: golang:${GO_VERSION}
   script:
-  - cd api
-  - CGO_ENABLED=1 go test -tags "unit ${KUBERMATIC_EDITION}" -race ./...
+  - go mod vendor
+  - CGO_ENABLED=1 go test -tags "unit,${KUBERMATIC_EDITION}" -race ./pkg/... ./cmd/... ./codegen/...
   variables:
-    GOCACHE: ${CI_PROJECT_DIR}/api/vendor/cache
-  cache:
-    key: test-go-cache
-    paths:
-      - api/vendor/cache
+    GOCACHE: ${CI_PROJECT_DIR}/vendor/cache
+  needs: ["go-mod-vendor"]
 
 test-cloud:
   stage: test
-  image: golang:${GO_VERSION}
   script:
-  - cd api
+  - go mod vendor
   - go test -tags "cloud ${KUBERMATIC_EDITION}" -run nope ./pkg/test/e2e/api/...
   variables:
-    GOCACHE: ${CI_PROJECT_DIR}/api/vendor/cache
-  cache:
-    key: test-cloud-cache
-    paths:
-      - api/vendor/cache
+    GOCACHE: ${CI_PROJECT_DIR}/vendor/cache
+  needs: ["go-mod-vendor"]
 
 test-create:
   stage: test
-  image: golang:${GO_VERSION}
   script:
-  - cd api
+  - go mod vendor
   - go test -tags "create ${KUBERMATIC_EDITION}" -run nope ./pkg/test/e2e/api/...
   variables:
-    GOCACHE: ${CI_PROJECT_DIR}/api/vendor/cache
-  cache:
-    key: test-create-cache
-    paths:
-      - api/vendor/cache
+    GOCACHE: ${CI_PROJECT_DIR}/vendor/cache
+  needs: ["go-mod-vendor"]
 
 test-e2e:
   stage: test
-  image: golang:${GO_VERSION}
   script:
-  - cd api
+  - go mod vendor
   - go test -tags "e2e ${KUBERMATIC_EDITION}" -run nope ./pkg/test/e2e/api/...
   variables:
-    GOCACHE: ${CI_PROJECT_DIR}/api/vendor/cache
-  cache:
-    key: test-e2e-cache
-    paths:
-      - api/vendor/cache
+    GOCACHE: ${CI_PROJECT_DIR}/vendor/cache
+  needs: ["go-mod-vendor"]
 
 test-integration:
   stage: test
-  image: golang:${GO_VERSION}
   script:
-  - cd api
-  - go test -tags "integration ${KUBERMATIC_EDITION}" -run nope ./...
+  - go mod vendor
+  - go test -tags "integration,$(KUBERMATIC_EDITION)" -run nope ./pkg/... ./cmd/... ./codegen/...
   variables:
-    GOCACHE: ${CI_PROJECT_DIR}/api/vendor/cache
-  cache:
-    key: test-integration-cache
-    paths:
-      - api/vendor/cache
-
-build-kubermatic:
-  stage: build
-  image: golang:${GO_VERSION}
-  script:
-  - cd api
-  - export KUBERMATIC_EDITION=ee
-  - KUBERMATICCOMMIT=$CI_COMMIT_TAG make build
-  - cp -r _build ${CI_PROJECT_DIR}/api/_build
-  artifacts:
-    paths:
-    - api/_build
-  variables:
-    GOCACHE: ${CI_PROJECT_DIR}/api/vendor/cache
-  cache:
-    key: build-kubermatic
-    paths:
-      - api/vendor/cache
-
-build-dnatcontroller:
-  stage: build
-  image: golang:${GO_VERSION}
-  script:
-    - cd api/cmd/kubeletdnat-controller
-    - export KUBERMATIC_EDITION=ee
-    - make build
-    - cp -r _build ${CI_PROJECT_DIR}/api/cmd/kubeletdnat-controller/_build
-  artifacts:
-    paths:
-      - api/cmd/kubeletdnat-controller/_build
-
-build-etcd-launcher:
-  stage: build
-  image: golang:${GO_VERSION}
-  script:
-    - cd api/cmd/etcd-launcher
-    - export KUBERMATIC_EDITION=ee
-    - GOOS=$(go env GOOS) CGO_ENABLED=0 go build -o ./_build/etcd-launcher .
-    - cp -r _build ${CI_PROJECT_DIR}/api/cmd/etcd-launcher/_build
-  artifacts:
-    paths:
-      - api/cmd/etcd-launcher/_build
+    GOCACHE: ${CI_PROJECT_DIR}/vendor/cache
+  needs: ["go-mod-vendor"]
 
 docker-release-kubermatic:
   stage: release
   image: docker:latest
   script:
-  - cd api
   - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
   - docker login -u sys11kubermatic -p $DOCKER_PASSWORD
   - docker build --tag syseleven/kubermatic:$CI_COMMIT_TAG --tag $CI_REGISTRY_IMAGE:$CI_COMMIT_TAG --tag $CI_REGISTRY_IMAGE:latest .
@@ -202,32 +158,82 @@ docker-release-kubermatic:
   - docker push $CI_REGISTRY_IMAGE:latest
   - docker push syseleven/kubermatic:$CI_COMMIT_TAG
   dependencies:
+  - test-cloud
+  - test-create
+  - test-e2e
+  - test-integration
   - build-kubermatic
   only:
   - tags
+  needs:
+  - test-cloud
+  - test-create
+  - test-e2e
+  - test-integration
+  - verify-swagger-spec
+  - verify-codegen
+  - build-kubermatic
 
 docker-release-dnatcontroller:
   stage: release
   image: docker:latest
   script:
-    - cd api/cmd/kubeletdnat-controller
+    - cd cmd/kubeletdnat-controller
     - docker login -u sys11kubermatic -p $DOCKER_PASSWORD
     - docker build --tag syseleven/kubeletdnat-controller:$CI_COMMIT_TAG .
     - docker push syseleven/kubeletdnat-controller:$CI_COMMIT_TAG
   dependencies:
+    - test-cloud
+    - test-create
+    - test-e2e
+    - test-integration
     - build-dnatcontroller
   only:
     - tags
+  needs:
+  - test-cloud
+  - test-create
+  - test-e2e
+  - test-integration
+  - verify-swagger-spec
+  - verify-codegen
+  - build-dnatcontroller
 
 docker-release-etcd-launcher:
   stage: release
   image: docker:latest
   script:
-    - cd api/cmd/etcd-launcher
     - docker login -u sys11kubermatic -p $DOCKER_PASSWORD
-    - docker build --tag syseleven/etcd-launcher:$CI_COMMIT_TAG .
+    - docker build --tag syseleven/etcd-launcher:$CI_COMMIT_TAG -f ./cmd/etcd-launcher/Dockerfile .
     - docker push syseleven/etcd-launcher:$CI_COMMIT_TAG
   dependencies:
-    - build-etcd-launcher
+    - test-cloud
+    - test-create
+    - test-e2e
+    - test-integration
+    - build-kubermatic
   only:
     - tags
+  needs:
+  - test-cloud
+  - test-create
+  - test-e2e
+  - test-integration
+  - verify-swagger-spec
+  - verify-codegen
+  - build-kubermatic
+
+docker-release-nodeport-proxy:
+  stage: release
+  image: docker:latest
+  script:
+    - cd cmd/nodeport-proxy
+    - docker login -u sys11kubermatic -p $DOCKER_PASSWORD
+    - docker build --tag syseleven/nodeport-proxy:$CI_COMMIT_TAG .
+    - docker push syseleven/nodeport-proxy:$CI_COMMIT_TAG
+  dependencies:
+    - build-nodeport-proxy
+  only:
+    - tags
+  needs:
+    - build-nodeport-proxy

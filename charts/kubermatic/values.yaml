@@ -33,6 +33,8 @@ kubermatic:
   domain: ""
   # base64 encoded kubeconfig which gives admin access to all seed clusters
   kubeconfig: ""
+  # environment label which will be added to all prometheus scraped resources. Default: ''
+  monitoringEnvironmentLabel: ""
   # The prefix for monitoring annotations in the user cluster. Default: monitoring.kubermatic.io -> monitoring.kubermatic.io/scrape, monitoring.kubermatic.io/path
   monitoringScrapeAnnotationPrefix: ""
   # The location from which to pull the Kubermatic docker image
@@ -55,6 +57,19 @@ kubermatic:
   schedulerDefaultReplicas: "1"
   maxParallelReconcile: "10"
 
+  # The default cluster components settings.
+  # Can be overriden on a per-cluster basis by setting .Spec.ComponentsOverride.
+  defaultComponentSettings:
+    apiserver:
+      replicas: 2
+      endpointReconcilingDisabled: false
+    controllerManager:
+      replicas: 1
+    scheduler:
+      replicas: 1
+    etcd:
+      replicas: 3
+
   # Whether to disable reconciling for the apiserver endpoints
   apiserverEndpointReconcilingDisabled: false
 
@@ -63,6 +78,9 @@ kubermatic:
 
   # Whether to load the presets from CRDs dynamically during runtime
   dynamicPresets: false
+
+  # Resource Usage Collector basic AuthToken
+  resourceUsageCollectorAuthToken: ""
 
   # helm hooks/checks
   checks:
@@ -95,6 +113,8 @@ kubermatic:
     #   If enabled the cluster-controller will enable the VerticalPodAutoscaler for all control plane components
     # - EtcdDataCorruptionChecks
     #   If enabled the all etcd clusters will be started with --experimental-initial-corrupt-check=true --experimental-corrupt-check-time=10m
+    # - EtcdLauncher
+    #   If enabled will apply the cluster level etcd-launcher feature flag on all clusters, unless it's explicitly disabled at the cluster level
     # For example:
     # featureGates: "OpenIDAuthPlugin=true,VerticalPodAutoscaler=true"
     featureGates: ""
@@ -133,6 +153,7 @@ kubermatic:
         cpu: 500m
         memory: 1Gi
     workerCount: 4
+    keycloakCacheExpiry: 2h
     affinity:
       nodeAffinity:
         preferredDuringSchedulingIgnoredDuringExecution:
@@ -276,6 +297,17 @@ kubermatic:
   clusterNamespacePrometheus: {}
 #  clusterNamespacePrometheus:
 #    disableDefaultScrapingConfigs: true
+#    remoteWriteConfigs:
+#    - url: https://cortex-metakube.mcloud-stage.syseleven.net/api/prom/push
+#      basic_auth:
+#        username: "metakube-dev"
+#        password: "${cortex_password}"
+#      queue_config:
+#        capacity: 5000
+#        max_shards: 20
+#        max_samples_per_send: 1000
+#        min_backoff: 1s
+#        max_backoff: 5m
 #    scrapingConfigs:
 #    - job_name: 'schnitzel'
 #      kubernetes_sd_configs:

@@ -75,6 +75,9 @@ spec:
         # EnforceAuditLogging enforces audit logging on every cluster within the DC,
         # ignoring cluster-specific settings.
         enforceAuditLogging: false
+        # EnforcePodSecurityPolicy enforces pod security policy plugin on every clusters within the DC,
+        # ignoring cluster-specific settings
+        enforcePodSecurityPolicy: false
         gcp:
           # Region to use, for example "europe-west3", for a full list of regions see
           # https://cloud.google.com/compute/docs/regions-zones/
@@ -144,7 +147,9 @@ spec:
           cluster: ""
           # The name of the datacenter to use.
           datacenter: ""
-          # The name of the datastore to use.
+          # The default Datastore to be used for provisioning volumes using storage
+          # classes/dynamic provisioning and for storing virtual machine files in
+          # case no `Datastore` or `DatastoreCluster` is provided at Cluster level.
           datastore: ""
           # Endpoint URL to use, including protocol, for example "https://vcenter.example.com".
           endpoint: ""
