@@ -124,6 +124,9 @@ spec:
           readOnly: true
       imagePullSecrets:
       - name: dockercfg
+      tolerations:
+      - key: node.syseleven.de/not-ready
+        operator: Exists
       volumes:
       - configMap:
           name: dns-resolver
