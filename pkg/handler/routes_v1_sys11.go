@@ -42,32 +42,8 @@ func (r Routing) RegisterV1SysEleven(mux *mux.Router) {
 		Handler(r.listOpenstackQuotaLimitsNoCredentials())
 
 	mux.Methods(http.MethodGet).
-		Path("/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/oidckubeconfig").
-		Handler(r.getOidcClusterKubeconfig())
-
-	mux.Methods(http.MethodGet).
 		Path("/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/kubeloginkubeconfig").
 		Handler(r.getKubeLoginClusterKubeconfig())
-
-	mux.Methods(http.MethodPost).
-		Path("/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/addons").
-		Handler(r.createAddon())
-
-	mux.Methods(http.MethodGet).
-		Path("/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/addons").
-		Handler(r.listAddons())
-
-	mux.Methods(http.MethodGet).
-		Path("/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/addons/{addon_id}").
-		Handler(r.getAddon())
-
-	mux.Methods(http.MethodPatch).
-		Path("/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/addons/{addon_id}").
-		Handler(r.patchAddon())
-
-	mux.Methods(http.MethodDelete).
-		Path("/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/addons/{addon_id}").
-		Handler(r.deleteAddon())
 
 	mux.Methods(http.MethodPost).
 		Path("/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/ndrequests").
