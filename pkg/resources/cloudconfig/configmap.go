@@ -152,8 +152,6 @@ func CloudConfig(
 		}
 		if cluster.Spec.Version.Minor() >= 18 {
 			openstackCloudConfig.LoadBalancer = openstack.LoadBalancerOpts{
-				// NetworkID for the ext-net floating-network
-				FloatingNetworkID: "8bb661f5-76b9-45f1-9ef9-eeffcd025fe4",
 				CreateMonitor:     true,
 				MonitorDelay:      ini.Duration{Duration: 60 * time.Second},
 				MonitorTimeout:    ini.Duration{Duration: 30 * time.Second},
