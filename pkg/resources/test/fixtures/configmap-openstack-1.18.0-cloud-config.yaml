@@ -14,7 +14,7 @@ data:
     [LoadBalancer]
     lb-version = "v2"
     subnet-id = ""
-    floating-network-id = "8bb661f5-76b9-45f1-9ef9-eeffcd025fe4"
+    floating-network-id = ""
     lb-method = "ROUND_ROBIN"
     lb-provider = ""
     create-monitor = true
