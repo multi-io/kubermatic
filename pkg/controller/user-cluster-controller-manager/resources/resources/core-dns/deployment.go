@@ -103,19 +103,8 @@ func DeploymentCreator() reconciling.NamedDeploymentCreatorGetter {
 			tolerations := getTolerations()
 			dep.Spec.Template.Spec.Tolerations = tolerations
 
-			// TODO(furkhat): after autoscaler resource.
-			// affinity:
-			//   podAntiAffinity:
-			//     preferredDuringSchedulingIgnoredDuringExecution:
-			//     - podAffinityTerm:
-			//         labelSelector:
-			//           matchExpressions:
-			//           - key: k8s-app
-			//             operator: In
-			//             values:
-			//             - kube-dns
-			//         topologyKey: kubernetes.io/hostname
-			//       weight: 100
+			affinity := getAffinity()
+			dep.Spec.Template.Spec.Affinity = affinity
 			// Sys11 end
 
 			dep.Spec.Template.Spec.Containers = getContainers()
@@ -150,7 +139,7 @@ func getContainers() []corev1.Container {
 	return []corev1.Container{
 		{
 			Name:            resources.CoreDNSDeploymentName,
-			Image:           fmt.Sprintf("%s/coredns/coredns:1.3.1", resources.RegistryDocker),
+			Image:           fmt.Sprintf("%s/coredns/coredns:1.7.1", resources.RegistryDocker),
 			ImagePullPolicy: corev1.PullIfNotPresent,
 
 			Args: []string{"-conf", "/etc/coredns/Corefile"},
@@ -280,6 +269,30 @@ func getTolerations() []corev1.Toleration {
 			Key:      sys11nodereadiness.NotReadyTaintKey,
 			Effect:   corev1.TaintEffectNoSchedule,
 			Operator: corev1.TolerationOpExists,
+		},
+	}
+}
+
+func getAffinity() *corev1.Affinity {
+	return &corev1.Affinity{
+		PodAntiAffinity: &corev1.PodAntiAffinity{
+			PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+				{
+					Weight: 100,
+					PodAffinityTerm: corev1.PodAffinityTerm{
+						TopologyKey: "kubernetes.io/hostname",
+						LabelSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      resources.AppLabelKey,
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{resources.CoreDNSDeploymentName},
+								},
+							},
+						},
+					},
+				},
+			},
 		},
 	}
 }

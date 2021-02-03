@@ -66,6 +66,7 @@ func Add(
 	namespace string,
 	cloudProviderName string,
 	clusterURL *url.URL,
+	clusterDNSDomain string,
 	openvpnServerPort int,
 	registerReconciledCheck func(name string, check healthcheck.Check),
 	cloudCredentialSecretTemplate *corev1.Secret,
@@ -78,6 +79,7 @@ func Add(
 		rLock:                         &sync.Mutex{},
 		namespace:                     namespace,
 		clusterURL:                    clusterURL,
+		clusterDNSDomain:              clusterDNSDomain,
 		openvpnServerPort:             openvpnServerPort,
 		cloudCredentialSecretTemplate: cloudCredentialSecretTemplate,
 		log:                           log,
@@ -218,6 +220,7 @@ type reconciler struct {
 	cache                         cache.Cache
 	namespace                     string
 	clusterURL                    *url.URL
+	clusterDNSDomain              string
 	openvpnServerPort             int
 	platform                      string
 	cloudCredentialSecretTemplate *corev1.Secret

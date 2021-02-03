@@ -42,6 +42,11 @@ if echo $CLUSTER_RAW|grep -i aws -q; then
   ARGS="$ARGS -cloud-provider-name=aws"
 fi
 
+dns_domain="$(echo $CLUSTER_RAW | jq -r .spec.clusterNetwork.dnsDomain)"
+if [[ -n "$dns_domain" && "$dns_domain" != "cluster.local" && "$dns_domain" != "null" ]]; then
+  ARGS="$ARGS -cluster-dns-domain=$dns_domain"
+fi
+
 if [[ "${DEBUG}" == "true" ]]; then
     GOTOOLFLAGS="-v -gcflags='all=-N -l'" make -C ${SRC_DIR} user-cluster-controller-manager
 else
