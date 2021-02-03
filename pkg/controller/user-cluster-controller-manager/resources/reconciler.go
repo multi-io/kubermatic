@@ -609,6 +609,10 @@ func (r *reconciler) reconcileDeployments(ctx context.Context) error {
 	// 	return fmt.Errorf("failed to reconcile Deployments in namespace %s: %v", kubernetesdashboard.Namespace, err)
 	// }
 
+	kubeSystemCreators := []reconciling.NamedDeploymentCreatorGetter{
+		coredns.DeploymentCreator(r.clusterSemVer),
+	}
+
 	dnsAutescalerCreators := []reconciling.NamedDeploymentCreatorGetter{dnsautoscaler.DeploymentCreator()}
 	if err := reconciling.ReconcileDeployments(ctx, dnsAutescalerCreators, metav1.NamespaceSystem, r.Client); err != nil {
 		return fmt.Errorf("failed to reconcile dns autoscaler Deployment in namespace %s: %v", metav1.NamespaceSystem, err)

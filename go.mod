@@ -9,6 +9,7 @@ require (
 	github.com/Azure/go-autorest/autorest/azure/auth v0.4.2
 	github.com/Azure/go-autorest/autorest/to v0.3.0
 	github.com/Masterminds/semver v1.4.2
+	github.com/Masterminds/semver/v3 v3.1.1
 	github.com/Masterminds/sprig v2.17.1+incompatible
 	github.com/aliyun/alibaba-cloud-sdk-go v0.0.0-20190828035149-111b102694f9
 	github.com/apoydence/onpar v0.0.0-20200406201722-06f95a1c68e8 // indirect
@@ -47,7 +48,6 @@ require (
 	github.com/iancoleman/strcase v0.0.0-20190422225806-e506e3ef7365
 	github.com/imdario/mergo v0.3.10 // indirect
 	github.com/jetstack/cert-manager v0.11.0
-	github.com/kubermatic/kubermatic v2.14.7+incompatible // indirect
 	github.com/kubermatic/machine-controller v1.13.2
 	github.com/minio/minio-go v6.0.14+incompatible
 	github.com/nelsam/hel v0.0.0-20200611165952-2d829bae0c66 // indirect
@@ -69,7 +69,6 @@ require (
 	go.etcd.io/etcd/v3 v3.3.0-rc.0.0.20200728214110-6c81b20ec8de
 	go.uber.org/zap v1.15.0
 	golang.org/x/crypto v0.0.0-20200728195943-123391ffb6de
-	golang.org/x/net v0.0.0-20200707034311-ab3426394381 // indirect
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
 	golang.org/x/sys v0.0.0-20200819171115-d785dc25833f // indirect
 	golang.org/x/time v0.0.0-20200630173020-3af7569d3a1e // indirect
