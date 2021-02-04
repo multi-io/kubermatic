@@ -137,7 +137,7 @@ func DeploymentCreator(data deploymentCreatorData) reconciling.NamedDeploymentCr
 				*openvpnSidecar,
 				{
 					Name:  resources.DNSResolverDeploymentName,
-					Image: data.ImageRegistry(resources.RegistryK8SGCR) + "/coredns:" + coreDNSVersion,
+					Image: data.ImageRegistry(resources.RegistrySys11Scr) + "/coredns/coredns:" + coreDNSVersion,
 					Args:  []string{"-conf", "/etc/coredns/Corefile"},
 					VolumeMounts: []corev1.VolumeMount{
 						{
