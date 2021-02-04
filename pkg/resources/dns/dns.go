@@ -49,14 +49,15 @@ var (
 
 const DefaultCoreDNSVesion = "1.6.5"
 
-// source: https://github.com/kubernetes/kubernetes/blob/vX.YY.0/cmd/kubeadm/app/constants/constants.go
+// original source: https://github.com/kubernetes/kubernetes/blob/vX.YY.0/cmd/kubeadm/app/constants/constants.go
 // CoreDNSVersion constant
+// 1.6.7 and lower may be problematic; see https://github.com/coredns/coredns/issues/3860#issuecomment-628012938
 var kubernetesTocorednsVersionsMapping = map[string]string{
 	"1.21": "1.8.0",
-	"1.20": "1.7.0",
-	"1.19": "1.7.0",
-	"1.18": "1.6.7",  // TODO 1.6.7 may be problematic; see https://github.com/coredns/coredns/issues/3860#issuecomment-628012938
-	"1.17": "1.6.5",
+	"1.20": "1.7.1",
+	"1.19": "1.7.1",
+	"1.18": "1.7.1",
+	"1.17": "1.7.1",
 }
 
 func GetCoreDNSVersion(kubernetesVersion *semver.Version) string {
