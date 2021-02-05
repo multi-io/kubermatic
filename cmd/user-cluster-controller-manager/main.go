@@ -65,6 +65,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 )
 
+const (
+	defaultClusterDNSDomain = "cluster.local"
+)
+
 type controllerRunOptions struct {
 	metricsListenAddr             string
 	healthListenAddr              string
@@ -73,6 +77,7 @@ type controllerRunOptions struct {
 	networks                      networkFlags
 	namespace                     string
 	clusterURL                    string
+	clusterDNSDomain              string
 	openvpnServerPort             int
 	overwriteRegistry             string
 	cloudProviderName             string
@@ -101,6 +106,7 @@ func main() {
 	flag.Var(&runOp.networks, "ipam-controller-network", "The networks from which the ipam controller should allocate IPs for machines (e.g.: .--ipam-controller-network=10.0.0.0/16,10.0.0.1,8.8.8.8 --ipam-controller-network=192.168.5.0/24,192.168.5.1,1.1.1.1,8.8.4.4)")
 	flag.StringVar(&runOp.namespace, "namespace", "", "Namespace in which the cluster is running in")
 	flag.StringVar(&runOp.clusterURL, "cluster-url", "", "Cluster URL")
+	flag.StringVar(&runOp.clusterDNSDomain, "cluster-dns-domain", "", "Cluster DNS domain")
 	flag.StringVar(&runOp.dnsClusterIP, "dns-cluster-ip", "", "KubeDNS service IP for the cluster")
 	flag.IntVar(&runOp.openvpnServerPort, "openvpn-server-port", 0, "OpenVPN server port")
 	flag.StringVar(&runOp.overwriteRegistry, "overwrite-registry", "", "registry to use for all images")
@@ -134,6 +140,9 @@ func main() {
 	clusterURL, err := url.Parse(runOp.clusterURL)
 	if err != nil {
 		log.Fatalw("Failed parsing clusterURL", zap.Error(err))
+	}
+	if runOp.clusterDNSDomain == "" {
+		runOp.clusterDNSDomain = defaultClusterDNSDomain
 	}
 	if runOp.openvpnServerPort == 0 {
 		log.Fatal("-openvpn-server-port must be set")
@@ -223,6 +232,7 @@ func main() {
 		runOp.namespace,
 		runOp.cloudProviderName,
 		clusterURL,
+		runOp.clusterDNSDomain,
 		runOp.openvpnServerPort,
 		healthHandler.AddReadinessCheck,
 		cloudCredentialSecretTemplate,

@@ -464,7 +464,7 @@ func (r *reconciler) reconcileConfigMaps(ctx context.Context, data reconcileData
 		creators = append(creators, openshift.ControlplaneConfigCreator(r.platform))
 	} else {
 		creators = append(creators, []reconciling.NamedConfigMapCreatorGetter{
-			coredns.ConfigMapCreator(),
+			coredns.ConfigMapCreator(r.clusterDNSDomain),
 			dnsautoscaler.ConfigMapCreator(),
 			nodelocaldns.ConfigMapCreator(r.dnsClusterIP),
 		}...)
@@ -618,7 +618,7 @@ func (r *reconciler) reconcileDeployments(ctx context.Context) error {
 	// to make sure we won't recreate coredns when replicas number changed we query
 	// and set current replicas number. We can do that through modifiers.
 	doNotReconcilesOnReplicaChangeModifier := reconciling.SetRunningReplicasNumberIfExistsWrapper(ctx, r.Client)
-	corednsCreators := []reconciling.NamedDeploymentCreatorGetter{coredns.DeploymentCreator()}
+	corednsCreators := []reconciling.NamedDeploymentCreatorGetter{coredns.DeploymentCreator(r.clusterSemVer)}
 	if err := reconciling.ReconcileDeployments(ctx, corednsCreators, metav1.NamespaceSystem, r.Client, doNotReconcilesOnReplicaChangeModifier); err != nil {
 		return fmt.Errorf("failed to reconcile coredns Deployment in namespace %s: %v", metav1.NamespaceSystem, err)
 	}

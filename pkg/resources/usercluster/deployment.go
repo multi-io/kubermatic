@@ -132,6 +132,10 @@ func DeploymentCreator(data userclusterControllerData, openshift bool) reconcili
 				"-owner-email", data.Cluster().Status.UserEmail,
 			}, getNetworkArgs(data)...)
 
+			if data.Cluster().Spec.ClusterNetwork.DNSDomain != "" {
+				args = append(args, "-cluster-dns-domain", data.Cluster().Spec.ClusterNetwork.DNSDomain)
+			}
+
 			if openshiftConsoleCallbackURI := data.Cluster().Address.OpenshiftConsoleCallBack; openshiftConsoleCallbackURI != "" {
 				args = append(args, "-openshift-console-callback-uri", openshiftConsoleCallbackURI)
 			}

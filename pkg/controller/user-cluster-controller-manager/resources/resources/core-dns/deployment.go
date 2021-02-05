@@ -19,18 +19,20 @@ package coredns
 import (
 	"fmt"
 
+	"github.com/Masterminds/semver/v3"
+
 	sys11nodereadiness "k8c.io/kubermatic/v2/pkg/controller/sys11-node-readiness"
 	"k8c.io/kubermatic/v2/pkg/resources"
+	"k8c.io/kubermatic/v2/pkg/resources/dns"
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
-	"k8s.io/utils/pointer"
-
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/pointer"
 )
 
 const (
@@ -59,7 +61,7 @@ var (
 )
 
 // DeploymentCreator returns the function to create and update the CoreDNS deployment
-func DeploymentCreator() reconciling.NamedDeploymentCreatorGetter {
+func DeploymentCreator(kubernetesVersion *semver.Version) reconciling.NamedDeploymentCreatorGetter {
 	return func() (string, reconciling.DeploymentCreator) {
 		return resources.CoreDNSDeploymentName, func(dep *appsv1.Deployment) (*appsv1.Deployment, error) {
 			dep.Name = resources.CoreDNSDeploymentName
@@ -103,22 +105,11 @@ func DeploymentCreator() reconciling.NamedDeploymentCreatorGetter {
 			tolerations := getTolerations()
 			dep.Spec.Template.Spec.Tolerations = tolerations
 
-			// TODO(furkhat): after autoscaler resource.
-			// affinity:
-			//   podAntiAffinity:
-			//     preferredDuringSchedulingIgnoredDuringExecution:
-			//     - podAffinityTerm:
-			//         labelSelector:
-			//           matchExpressions:
-			//           - key: k8s-app
-			//             operator: In
-			//             values:
-			//             - kube-dns
-			//         topologyKey: kubernetes.io/hostname
-			//       weight: 100
+			affinity := getAffinity()
+			dep.Spec.Template.Spec.Affinity = affinity
 			// Sys11 end
 
-			dep.Spec.Template.Spec.Containers = getContainers()
+			dep.Spec.Template.Spec.Containers = getContainers(kubernetesVersion)
 			err := resources.SetResourceRequirements(dep.Spec.Template.Spec.Containers, defaultResourceRequirements, nil, dep.Annotations)
 			if err != nil {
 				return nil, fmt.Errorf("failed to set resource requirements: %v", err)
@@ -146,11 +137,12 @@ func PodDisruptionBudgetCreator() reconciling.NamedPodDisruptionBudgetCreatorGet
 	}
 }
 
-func getContainers() []corev1.Container {
+func getContainers(clusterVersion *semver.Version) []corev1.Container {
+	coreDNSVersion := dns.GetCoreDNSVersion(clusterVersion)
 	return []corev1.Container{
 		{
 			Name:            resources.CoreDNSDeploymentName,
-			Image:           fmt.Sprintf("%s/coredns/coredns:1.3.1", resources.RegistryDocker),
+			Image:           fmt.Sprintf("%s/coredns/coredns:%s", resources.RegistrySys11Scr, coreDNSVersion),
 			ImagePullPolicy: corev1.PullIfNotPresent,
 
 			Args: []string{"-conf", "/etc/coredns/Corefile"},
@@ -280,6 +272,30 @@ func getTolerations() []corev1.Toleration {
 			Key:      sys11nodereadiness.NotReadyTaintKey,
 			Effect:   corev1.TaintEffectNoSchedule,
 			Operator: corev1.TolerationOpExists,
+		},
+	}
+}
+
+func getAffinity() *corev1.Affinity {
+	return &corev1.Affinity{
+		PodAntiAffinity: &corev1.PodAntiAffinity{
+			PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+				{
+					Weight: 100,
+					PodAffinityTerm: corev1.PodAffinityTerm{
+						TopologyKey: "kubernetes.io/hostname",
+						LabelSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      resources.AppLabelKey,
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{resources.CoreDNSDeploymentName},
+								},
+							},
+						},
+					},
+				},
+			},
 		},
 	}
 }

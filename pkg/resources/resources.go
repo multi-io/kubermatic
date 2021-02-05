@@ -357,6 +357,8 @@ const (
 	RegistryDocker = "docker.io"
 	// RegistryQuay defines the image registry from coreos/redhat - quay
 	RegistryQuay = "quay.io"
+	// RegistrySys11Scr defined image registry for SysEleven's Harbor-based SCR (source code repo)
+	RegistrySys11Scr = "scr.syseleven.de"
 
 	// TopologyKeyHostname defines the topology key for the node hostname
 	TopologyKeyHostname = "kubernetes.io/hostname"

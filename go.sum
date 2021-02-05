@@ -86,6 +86,8 @@ github.com/Jeffail/gabs v1.1.1/go.mod h1:6xMvQMK4k33lb7GUUpaAPh6nKMmemQeg5d4gn7/
 github.com/Knetic/govaluate v3.0.1-0.20171022003610-9aa49832a739+incompatible/go.mod h1:r7JcOSlj0wfOMncg0iLm8Leh48TZaKVeNIfJntJ2wa0=
 github.com/Masterminds/semver v1.4.2 h1:WBLTQ37jOCzSLtXNdoo8bNM8876KhNqOKvrlGITgsTc=
 github.com/Masterminds/semver v1.4.2/go.mod h1:MB6lktGJrhw8PrUyiEoblNEGEQ+RzHPF078ddwwvV3Y=
+github.com/Masterminds/semver/v3 v3.1.1 h1:hLg3sBzpNErnxhQtUy/mmLR2I9foDujNK030IGemrRc=
+github.com/Masterminds/semver/v3 v3.1.1/go.mod h1:VPu/7SZ7ePZ3QOrcuXROw5FAcLl4a0cBrbBpGY/8hQs=
 github.com/Masterminds/sprig v2.15.0+incompatible/go.mod h1:y6hNFY5UBTIWBxnzTeuNhlNS5hqE0NB0E6fgfo2Br3o=
 github.com/Masterminds/sprig v2.17.1+incompatible h1:PChbxFGKTWsg9IWh+pSZRCSj3zQkVpL6Hd9uWsFwxtc=
 github.com/Masterminds/sprig v2.17.1+incompatible/go.mod h1:y6hNFY5UBTIWBxnzTeuNhlNS5hqE0NB0E6fgfo2Br3o=
@@ -716,11 +718,6 @@ github.com/kr/pty v1.1.8/go.mod h1:O1sed60cT9XZ5uDucP5qwvh+TE3NnUj51EiZO/lmSfw=
 github.com/kr/text v0.1.0/go.mod h1:4Jbv+DJW3UT/LiOwJeYQe1efqtUx/iVham/4vfdArNI=
 github.com/kr/text v0.2.0 h1:5Nx0Ya0ZqY2ygV366QzturHI13Jq95ApcVaJBhpS+AY=
 github.com/kr/text v0.2.0/go.mod h1:eLer722TekiGuMkidMxC/pM04lWEeraHUUmBw8l2grE=
-github.com/kubermatic/kubermatic v1.2.1 h1:1p4FsrRiCQG17sZ48xR900s6ISNVFu/Lug5QUEp5HSY=
-github.com/kubermatic/kubermatic v2.14.7+incompatible h1:b8PurjlyCnn3XRqVF/qjYLzI6g8jdKwKlMdF+8tz3IM=
-github.com/kubermatic/kubermatic v2.14.7+incompatible/go.mod h1:3VI6HzFrG2gOBMoMfY1hVyL2tqY1oXXLCBzVd1pBUPs=
-github.com/kubermatic/machine-controller v1.13.2 h1:75xIDPZfPjMG+0XE1Sd4VMt/TaQs+kfr9SPY3pyGhPM=
-github.com/kubermatic/machine-controller v1.13.2/go.mod h1:1DRgTSfay/QpxfPko8S3z4Q3appkiUl+CtfQaiIdHuQ=
 github.com/kylelemons/godebug v0.0.0-20170820004349-d65d576e9348/go.mod h1:B69LEHPfb2qLo0BaaOLcbitczOKLWTsrBG9LczfCD4k=
 github.com/lib/pq v1.0.0/go.mod h1:5WUZQaWbwv1U+lTReE5YruASi9Al49XbQIvNi/34Woo=
 github.com/lightstep/lightstep-tracer-common/golang/gogo v0.0.0-20190605223551-bc2310a04743/go.mod h1:qklhhLq1aX+mtWk9cPHPzaBjWImj5ULL6C7HFJtXQMM=
@@ -1544,8 +1541,6 @@ honnef.co/go/tools v0.0.0-20190523083050-ea95bdfd59fc/go.mod h1:rf3lG4BRIbNafJWh
 honnef.co/go/tools v0.0.1-2019.2.2/go.mod h1:a3bituU0lyd329TUQxRnasdCoJDkEUEAqEt0JzvZhAg=
 honnef.co/go/tools v0.0.1-2019.2.3 h1:3JgtbtFHMiCmsznwGVTUWbgGov+pVqnlf1dEJTNAXeM=
 honnef.co/go/tools v0.0.1-2019.2.3/go.mod h1:a3bituU0lyd329TUQxRnasdCoJDkEUEAqEt0JzvZhAg=
-k8c.io/kubermatic v1.2.1 h1:+m4t51jnMLgXQUjOLSIriW8S1h6r0Ca8Pa6TyQkxKLk=
-k8c.io/kubermatic v2.14.5+incompatible h1:tFcqUHwBIE+H9Qpc41Y2YxTsUcMO2yYFHG1e8aUV+DA=
 k8s.io/api v0.19.0 h1:XyrFIJqTYZJ2DU7FBE/bSPz7b1HvbVBuBf07oeo6eTc=
 k8s.io/api v0.19.0/go.mod h1:I1K45XlvTrDjmj5LoM5LuP/KYrhWbjUKT/SoPG0qTjw=
 k8s.io/apiextensions-apiserver v0.19.0 h1:jlY13lvZp+0p9fRX2khHFdiT9PYzT7zUrANz6R1NKtY=
@@ -1621,7 +1616,6 @@ k8s.io/utils v0.0.0-20200731180307-f00132d28269/go.mod h1:jPW/WVKK9YHAvNhRxK0md/
 knative.dev/caching v0.0.0-20190719140829-2032732871ff/go.mod h1:dHXFU6CGlLlbzaWc32g80cR92iuBSpsslDNBWI8C7eg=
 knative.dev/eventing-contrib v0.6.1-0.20190723221543-5ce18048c08b/go.mod h1:SnXZgSGgMSMLNFTwTnpaOH7hXDzTFtw0J8OmHflNx3g=
 knative.dev/pkg v0.0.0-20191111150521-6d806b998379/go.mod h1:pgODObA1dTyhNoFxPZTTjNWfx6F0aKsKzn+vaT9XO/Q=
-kubevirt.io/client-go v0.28.0/go.mod h1:1ooQZUI8b9A8CcCRvpekF6Llf66drzK76C57tya6kLI=
 kubevirt.io/client-go v0.30.0/go.mod h1:JY7hQq+SUT0aLvleXrW/+28fDfZ6BPe4E6f8FyC8jkY=
 kubevirt.io/containerized-data-importer v1.10.6/go.mod h1:qF594BtRRkruyrqLwt3zbLCWdPIQNs1qWh4LR1cOzy0=
 launchpad.net/gocheck v0.0.0-20140225173054-000000000087 h1:Izowp2XBH6Ya6rv+hqbceQyw/gSGoXfH/UPoTGduL54=
