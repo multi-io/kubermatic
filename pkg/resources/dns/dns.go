@@ -47,7 +47,7 @@ var (
 	}
 )
 
-const DefaultCoreDNSVesion = "1.6.5"
+const DefaultCoreDNSVesion = "1.7.1"
 
 // original source: https://github.com/kubernetes/kubernetes/blob/vX.YY.0/cmd/kubeadm/app/constants/constants.go
 // CoreDNSVersion constant
