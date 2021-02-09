@@ -64,7 +64,7 @@ func GetSysElevenOidcKubeconfigEndpoint(projectProvider provider.ProjectProvider
 		if req.UseUniqueNames {
 			return getKubeconfigWithUniqueName(project, cluster, oidcClientCfg, "oidc")
 		}
-		return &encodeKubeConifgResponse{clientCfg: oidcClientCfg, filePrefix: "oidc"}, nil
+		return &encodeKubeConfigResponse{clientCfg: oidcClientCfg, filePrefix: "oidc"}, nil
 	}
 }
 
@@ -122,7 +122,7 @@ func GetKubeLoginKubeconfigEndpoint(projectProvider provider.ProjectProvider, us
 		if req.UseUniqueNames {
 			return getKubeconfigWithUniqueName(project, cluster, kubeloginClientCfg, "kubelogin")
 		}
-		return &encodeKubeConifgResponse{clientCfg: kubeloginClientCfg, filePrefix: "kubelogin"}, nil
+		return &encodeKubeConfigResponse{clientCfg: kubeloginClientCfg, filePrefix: "kubelogin"}, nil
 	}
 }
 
@@ -131,7 +131,7 @@ func getKubeconfigWithUniqueName(project *v1.Project, cluster *v1.Cluster, clien
 	if err != nil {
 		return nil, kcerrors.NewBadRequest("failed to replace default names in kubelogin kubeconfig: %v", err)
 	}
-	return &encodeKubeConifgResponse{
+	return &encodeKubeConfigResponse{
 		clientCfg:   kubeloginClientCfg,
 		filePrefix:  filePrefix,
 		clusterName: fmt.Sprintf("%s-%s", project.Spec.Name, cluster.Spec.HumanReadableName),
