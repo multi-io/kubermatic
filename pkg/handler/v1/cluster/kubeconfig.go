@@ -77,7 +77,7 @@ func GetAdminKubeconfigEndpoint(projectProvider provider.ProjectProvider, privil
 			if err != nil {
 				return nil, common.KubernetesErrorToHTTPError(err)
 			}
-			return &encodeKubeConifgResponse{clientCfg: adminClientCfg, filePrefix: filePrefix}, nil
+			return makeEncodeKubeconfigResponse(adminClientCfg, cluster, project, req.UseUniqueNames, filePrefix)
 		}
 
 		userInfo, err := userInfoGetter(ctx, req.ProjectID)
@@ -94,21 +94,25 @@ func GetAdminKubeconfigEndpoint(projectProvider provider.ProjectProvider, privil
 			return nil, common.KubernetesErrorToHTTPError(err)
 		}
 
-		if req.UseUniqueNames {
-			adminClientCfg, err = NoDefaultsKubeconfig(adminClientCfg, "admin", cluster, project)
-			if err != nil {
-				return nil, kcerrors.NewBadRequest("failed to replace default names in admin kubeconfig: %v", err)
-			}
+		return makeEncodeKubeconfigResponse(adminClientCfg, cluster, project, req.UseUniqueNames, filePrefix)
+	}
+}
 
-			return &encodeKubeConifgResponse{
-				clientCfg:   adminClientCfg,
-				filePrefix:  "admin",
-				clusterName: fmt.Sprintf("%s-%s", project.Spec.Name, cluster.Spec.HumanReadableName),
-			}, nil
+func makeEncodeKubeconfigResponse(cfg *clientcmdapi.Config, cls *kubermaticv1.Cluster, prj *kubermaticv1.Project, humanReadable bool, filePrefix string) (*encodeKubeConfigResponse, error) {
+	if humanReadable {
+		cfg, err := NoDefaultsKubeconfig(cfg, "admin", cls, prj)
+		if err != nil {
+			return nil, kcerrors.NewBadRequest("failed to replace default names in admin kubeconfig: %v", err)
 		}
 
-		return &encodeKubeConifgResponse{clientCfg: adminClientCfg, filePrefix: filePrefix}, nil
+		return &encodeKubeConfigResponse{
+			clientCfg:   cfg,
+			filePrefix:  "admin",
+			clusterName: fmt.Sprintf("%s-%s", prj.Spec.Name, cls.Spec.HumanReadableName),
+		}, nil
 	}
+
+	return &encodeKubeConfigResponse{clientCfg: cfg, filePrefix: filePrefix}, nil
 }
 
 func GetOidcKubeconfigEndpoint(projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, userInfoGetter provider.UserInfoGetter) endpoint.Endpoint {
@@ -141,7 +145,7 @@ func GetOidcKubeconfigEndpoint(projectProvider provider.ProjectProvider, privile
 		adminClientCfg.AuthInfos = map[string]*clientcmdapi.AuthInfo{}
 		adminClientCfg.AuthInfos["default"] = clientCmdAuth
 
-		return &encodeKubeConifgResponse{clientCfg: adminClientCfg, filePrefix: "oidc"}, nil
+		return &encodeKubeConfigResponse{clientCfg: adminClientCfg, filePrefix: "oidc"}, nil
 	}
 }
 
@@ -305,14 +309,14 @@ func CreateOIDCKubeconfigEndpoint(projectProvider provider.ProjectProvider, priv
 	}
 }
 
-type encodeKubeConifgResponse struct {
+type encodeKubeConfigResponse struct {
 	clientCfg   *clientcmdapi.Config
 	filePrefix  string
 	clusterName string
 }
 
 func EncodeKubeconfig(c context.Context, w http.ResponseWriter, response interface{}) (err error) {
-	rsp := response.(*encodeKubeConifgResponse)
+	rsp := response.(*encodeKubeConfigResponse)
 	cfg := rsp.clientCfg
 	filename := "kubeconfig"
 
@@ -362,7 +366,7 @@ func EncodeOIDCKubeconfig(c context.Context, w http.ResponseWriter, response int
 		if err != nil {
 			return fmt.Errorf("the cookie can't be removed, err = %v", err)
 		}
-		return EncodeKubeconfig(c, w, &encodeKubeConifgResponse{clientCfg: rsp.oidcKubeConfig})
+		return EncodeKubeconfig(c, w, &encodeKubeConfigResponse{clientCfg: rsp.oidcKubeConfig})
 	}
 
 	// handles initialPhase
