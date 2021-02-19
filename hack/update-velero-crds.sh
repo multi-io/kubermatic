@@ -19,10 +19,25 @@ set -euo pipefail
 cd $(dirname $0)/..
 source hack/lib.sh
 
-cd charts/backup/velero/
+containerize ./hack/update-velero-crds.sh
 
-version=$(velero version --client-only | grep Version | cut -d' ' -f2)
-crds=$(velero install --crds-only --dry-run -o json | jq -c '.items[]')
+velero=velero
+if ! [ -x "$(command -v $velero)" ]; then
+  version=v1.5.2
+  url="https://github.com/vmware-tanzu/velero/releases/download/$version/velero-$version-linux-amd64.tar.gz"
+  velero=/tmp/velero
+
+	echodate "Downloading Velero $version..."
+  wget -O- "$url" | tar xzOf - velero-$version-linux-amd64/velero > $velero
+  chmod +x $velero
+	echodate "Done!"
+fi
+
+cd charts/backup/velero/
+mkdir -p crd
+
+version=$($velero version --client-only | grep Version | cut -d' ' -f2)
+crds=$($velero install --crds-only --dry-run -o json | jq -c '.items[]')
 
 while IFS= read -r crd; do
   name=$(echo "$crd" | jq -r '.spec.names.plural')

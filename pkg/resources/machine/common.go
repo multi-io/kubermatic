@@ -23,6 +23,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 
 	alibaba "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/alibaba/types"
+	anexia "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/anexia/types"
 	aws "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/aws/types"
 	azure "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/azure/types"
 	digitalocean "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/digitalocean/types"
@@ -39,6 +40,7 @@ import (
 	"github.com/kubermatic/machine-controller/pkg/userdata/rhel"
 	"github.com/kubermatic/machine-controller/pkg/userdata/sles"
 	"github.com/kubermatic/machine-controller/pkg/userdata/ubuntu"
+
 	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 
@@ -194,17 +196,19 @@ func getVSphereProviderSpec(c *kubermaticv1.Cluster, nodeSpec apiv1.NodeSpec, dc
 
 func getOpenstackProviderSpec(c *kubermaticv1.Cluster, nodeSpec apiv1.NodeSpec, dc *kubermaticv1.Datacenter) (*runtime.RawExtension, error) {
 	config := openstack.RawConfig{
-		Image:                 providerconfig.ConfigVarString{Value: nodeSpec.Cloud.Openstack.Image},
-		Flavor:                providerconfig.ConfigVarString{Value: nodeSpec.Cloud.Openstack.Flavor},
-		AvailabilityZone:      providerconfig.ConfigVarString{Value: dc.Spec.Openstack.AvailabilityZone},
-		Region:                providerconfig.ConfigVarString{Value: dc.Spec.Openstack.Region},
-		IdentityEndpoint:      providerconfig.ConfigVarString{Value: dc.Spec.Openstack.AuthURL},
-		Network:               providerconfig.ConfigVarString{Value: c.Spec.Cloud.Openstack.Network},
-		Subnet:                providerconfig.ConfigVarString{Value: c.Spec.Cloud.Openstack.SubnetID},
-		SecurityGroups:        []providerconfig.ConfigVarString{{Value: c.Spec.Cloud.Openstack.SecurityGroups}},
+		Image:                     providerconfig.ConfigVarString{Value: nodeSpec.Cloud.Openstack.Image},
+		Flavor:                    providerconfig.ConfigVarString{Value: nodeSpec.Cloud.Openstack.Flavor},
+		AvailabilityZone:          providerconfig.ConfigVarString{Value: dc.Spec.Openstack.AvailabilityZone},
+		Region:                    providerconfig.ConfigVarString{Value: dc.Spec.Openstack.Region},
+		IdentityEndpoint:          providerconfig.ConfigVarString{Value: dc.Spec.Openstack.AuthURL},
+		Network:                   providerconfig.ConfigVarString{Value: c.Spec.Cloud.Openstack.Network},
+		Subnet:                    providerconfig.ConfigVarString{Value: c.Spec.Cloud.Openstack.SubnetID},
+		SecurityGroups:            []providerconfig.ConfigVarString{{Value: c.Spec.Cloud.Openstack.SecurityGroups}},
 		NodeVolumeAttachLimit: dc.Spec.Openstack.NodeVolumeAttachLimit,
 		// Sys11: Set soft-anti-affinity server group name to be set on machines as schedule hint
 		ServerGroupID: providerconfig.ConfigVarString{Value: c.Spec.Cloud.Openstack.ServerGroupID},
+		InstanceReadyCheckPeriod:  providerconfig.ConfigVarString{Value: nodeSpec.Cloud.Openstack.InstanceReadyCheckPeriod},
+		InstanceReadyCheckTimeout: providerconfig.ConfigVarString{Value: nodeSpec.Cloud.Openstack.InstanceReadyCheckTimeout},
 	}
 
 	if nodeSpec.Cloud.Openstack.UseFloatingIP || dc.Spec.Openstack.EnforceFloatingIP {
@@ -361,7 +365,7 @@ func getGCPProviderSpec(c *kubermaticv1.Cluster, nodeSpec apiv1.NodeSpec, dc *ku
 	return ext, nil
 }
 
-func getKubevirtProviderSpec(nodeSpec apiv1.NodeSpec) (*runtime.RawExtension, error) {
+func getKubevirtProviderSpec(nodeSpec apiv1.NodeSpec, dc *kubermaticv1.Datacenter) (*runtime.RawExtension, error) {
 	config := kubevirt.RawConfig{
 		CPUs:             providerconfig.ConfigVarString{Value: nodeSpec.Cloud.Kubevirt.CPUs},
 		PVCSize:          providerconfig.ConfigVarString{Value: nodeSpec.Cloud.Kubevirt.PVCSize},
@@ -369,6 +373,8 @@ func getKubevirtProviderSpec(nodeSpec apiv1.NodeSpec) (*runtime.RawExtension, er
 		SourceURL:        providerconfig.ConfigVarString{Value: nodeSpec.Cloud.Kubevirt.SourceURL},
 		Namespace:        providerconfig.ConfigVarString{Value: nodeSpec.Cloud.Kubevirt.Namespace},
 		Memory:           providerconfig.ConfigVarString{Value: nodeSpec.Cloud.Kubevirt.Memory},
+		DNSPolicy:        providerconfig.ConfigVarString{Value: dc.Spec.Kubevirt.DNSPolicy},
+		DNSConfig:        dc.Spec.Kubevirt.DNSConfig,
 	}
 
 	ext := &runtime.RawExtension{}
@@ -395,6 +401,26 @@ func getAlibabaProviderSpec(c *kubermaticv1.Cluster, nodeSpec apiv1.NodeSpec, dc
 	config.Labels = map[string]string{}
 	for key, value := range nodeSpec.Cloud.Alibaba.Labels {
 		config.Labels[key] = value
+	}
+
+	ext := &runtime.RawExtension{}
+	b, err := json.Marshal(config)
+	if err != nil {
+		return nil, err
+	}
+
+	ext.Raw = b
+	return ext, nil
+}
+
+func getAnexiaProviderSpec(nodeSpec apiv1.NodeSpec, dc *kubermaticv1.Datacenter) (*runtime.RawExtension, error) {
+	config := anexia.RawConfig{
+		VlanID:     providerconfig.ConfigVarString{Value: nodeSpec.Cloud.Anexia.VlanID},
+		TemplateID: providerconfig.ConfigVarString{Value: nodeSpec.Cloud.Anexia.TemplateID},
+		CPUs:       nodeSpec.Cloud.Anexia.CPUs,
+		Memory:     int(nodeSpec.Cloud.Anexia.Memory),
+		DiskSize:   int(nodeSpec.Cloud.Anexia.DiskSize),
+		LocationID: providerconfig.ConfigVarString{Value: dc.Spec.Anexia.LocationID},
 	}
 
 	ext := &runtime.RawExtension{}
@@ -494,6 +520,13 @@ func getFlatcarOperatingSystemSpec(nodeSpec apiv1.NodeSpec) (*runtime.RawExtensi
 		// We manage Flatcar updates via the CoreOS update operator which requires locksmithd
 		// to be disabled: https://github.com/coreos/container-linux-update-operator#design
 		DisableLocksmithD: true,
+
+		ProvisioningUtility: flatcar.Ignition,
+	}
+	// set cloud init only for anexia and aws(due to the userdata size limit on aws, ignition increases the size drastically).
+	// This should be temporary until the new operating system manager is added to KKP.
+	if nodeSpec.Cloud.Anexia != nil || nodeSpec.Cloud.AWS != nil {
+		config.ProvisioningUtility = flatcar.CloudInit
 	}
 
 	ext := &runtime.RawExtension{}

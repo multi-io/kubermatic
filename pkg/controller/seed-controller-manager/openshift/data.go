@@ -31,6 +31,7 @@ import (
 	"k8c.io/kubermatic/v2/pkg/provider"
 	kubernetesresources "k8c.io/kubermatic/v2/pkg/resources"
 	"k8c.io/kubermatic/v2/pkg/resources/certificates/triple"
+	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 
 	corev1 "k8s.io/api/core/v1"
@@ -57,6 +58,7 @@ type openshiftData struct {
 	supportsFailureDomainZoneAntiAffinity bool
 	externalURL                           string
 	seed                                  *kubermaticv1.Seed
+	versions                              kubermatic.Versions
 }
 
 func (od *openshiftData) DC() *kubermaticv1.Datacenter {
@@ -239,7 +241,7 @@ func (od *openshiftData) EtcdDiskSize() resource.Quantity {
 }
 
 // EtcdLauncherImage returns the etcd launcher image and tag.
-func (od *openshiftData) EtcdLauncherImage() (string, string) {
+func (od *openshiftData) EtcdLauncherImage() string {
 	imageSplit := strings.Split(od.etcdLauncherImage, "/")
 	var registry, imageWithoutRegistry string
 	if len(imageSplit) != 3 {
@@ -251,9 +253,28 @@ func (od *openshiftData) EtcdLauncherImage() (string, string) {
 	}
 	s := strings.Split(imageWithoutRegistry, ":")
 	if len(s) == 2 {
-		return fmt.Sprint(od.ImageRegistry(registry), "/", s[0]), s[1]
+		return fmt.Sprint(od.ImageRegistry(registry), "/", s[0])
 	}
-	return fmt.Sprint(od.ImageRegistry(registry), "/", imageWithoutRegistry), ""
+	return fmt.Sprint(od.ImageRegistry(registry), "/", imageWithoutRegistry)
+}
+
+func (od *openshiftData) EtcdLauncherTag() string {
+	imageSplit := strings.Split(od.etcdLauncherImage, "/")
+	var imageWithoutRegistry string
+	if len(imageSplit) != 3 {
+		imageWithoutRegistry = strings.Join(imageSplit, "/")
+	} else {
+		imageWithoutRegistry = strings.Join(imageSplit[1:], "/")
+	}
+	s := strings.Split(imageWithoutRegistry, ":")
+	if len(s) == 2 {
+		return s[1]
+	}
+	return od.versions.Kubermatic
+}
+
+func (od *openshiftData) NodePortProxyTag() string {
+	return od.versions.Kubermatic
 }
 
 // Openshift has its own DNS cache, so this is always false
@@ -274,6 +295,10 @@ func (od *openshiftData) KubermaticAPIImage() string {
 	return od.ImageRegistry(registry) + "/" + imageWithoutRegistry
 }
 
+func (od *openshiftData) KubermaticDockerTag() string {
+	return od.versions.Kubermatic
+}
+
 func (od *openshiftData) GetGlobalSecretKeySelectorValue(configVar *providerconfig.GlobalSecretKeySelector, key string) (string, error) {
 	return provider.SecretKeySelectorValueFuncFactory(context.Background(), od.client)(configVar, key)
 }
@@ -289,6 +314,10 @@ func (od *openshiftData) DNATControllerImage() string {
 		imageWithoutRegistry = strings.Join(dnatControllerImageSplit[1:], "/")
 	}
 	return od.ImageRegistry(registry) + "/" + imageWithoutRegistry
+}
+
+func (od *openshiftData) DNATControllerTag() string {
+	return od.versions.Kubermatic
 }
 
 func (od *openshiftData) SupportsFailureDomainZoneAntiAffinity() bool {

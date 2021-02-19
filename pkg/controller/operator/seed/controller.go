@@ -28,8 +28,9 @@ import (
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	operatorv1alpha1 "k8c.io/kubermatic/v2/pkg/crd/operator/v1alpha1"
 	"k8c.io/kubermatic/v2/pkg/provider"
+	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 
-	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
@@ -76,7 +77,7 @@ func Add(
 		seedRecorders:  map[string]record.EventRecorder{},
 		seedsGetter:    seedsGetter,
 		workerName:     workerName,
-		versions:       common.NewDefaultVersions(),
+		versions:       kubermatic.NewDefaultVersions(),
 	}
 
 	ctrlOpts := controller.Options{
@@ -168,7 +169,7 @@ func createSeedWatches(controller controller.Controller, seedName string, seedMa
 
 	globalTypesToWatch := []runtime.Object{
 		&rbacv1.ClusterRoleBinding{},
-		&admissionregistrationv1beta1.ValidatingWebhookConfiguration{},
+		&admissionregistrationv1.ValidatingWebhookConfiguration{},
 	}
 
 	for _, t := range globalTypesToWatch {

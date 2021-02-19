@@ -31,16 +31,20 @@ import (
 	"time"
 
 	ver "github.com/Masterminds/semver/v3"
+	constrainttemplatev1beta1 "github.com/open-policy-agent/frameworks/constraint/pkg/apis/templates/v1beta1"
+	gatekeeperconfigv1alpha1 "github.com/open-policy-agent/gatekeeper/apis/config/v1alpha1"
 	prometheusapi "github.com/prometheus/client_golang/api"
 
 	clusterv1alpha1 "github.com/kubermatic/machine-controller/pkg/apis/cluster/v1alpha1"
 	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
+	apiv2 "k8c.io/kubermatic/v2/pkg/api/v2"
 	k8cuserclusterclient "k8c.io/kubermatic/v2/pkg/cluster/client"
 	"k8c.io/kubermatic/v2/pkg/controller/master-controller-manager/rbac"
 	kubermaticfakeclentset "k8c.io/kubermatic/v2/pkg/crd/client/clientset/versioned/fake"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/handler/auth"
 	"k8c.io/kubermatic/v2/pkg/keycloak"
+	handlercommon "k8c.io/kubermatic/v2/pkg/handler/common"
 	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
 	"k8c.io/kubermatic/v2/pkg/provider"
 	"k8c.io/kubermatic/v2/pkg/provider/kubernetes"
@@ -48,14 +52,18 @@ import (
 	"k8c.io/kubermatic/v2/pkg/semver"
 	"k8c.io/kubermatic/v2/pkg/serviceaccount"
 	"k8c.io/kubermatic/v2/pkg/version"
+	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 	"k8c.io/kubermatic/v2/pkg/watcher"
 	kuberneteswatcher "k8c.io/kubermatic/v2/pkg/watcher/kubernetes"
 
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	apiextensionv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	k8sjson "k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
 	kubernetesclientset "k8s.io/client-go/kubernetes"
 	fakerestclient "k8s.io/client-go/kubernetes/fake"
@@ -76,6 +84,14 @@ func init() {
 	}
 	if err := v1beta1.AddToScheme(scheme.Scheme); err != nil {
 		kubermaticlog.Logger.Fatalw("failed to register scheme v1beta1", "error", err)
+	}
+
+	if err := apiextensionv1beta1.SchemeBuilder.AddToScheme(scheme.Scheme); err != nil {
+		kubermaticlog.Logger.Fatalw("failed to register scheme apiextension", "error", err)
+	}
+
+	if err := gatekeeperconfigv1alpha1.SchemeBuilder.AddToScheme(scheme.Scheme); err != nil {
+		kubermaticlog.Logger.Fatalw("failed to register scheme apiextension", "error", err)
 	}
 }
 
@@ -171,7 +187,12 @@ type newRoutingFunc func(
 	settingsWatcher watcher.SettingsWatcher,
 	userWatcher watcher.UserWatcher,
 	externalClusterProvider provider.ExternalClusterProvider,
-	privilegedExternalClusterProvider provider.PrivilegedExternalClusterProvider) http.Handler
+	privilegedExternalClusterProvider provider.PrivilegedExternalClusterProvider,
+	constraintTemplateProvider provider.ConstraintTemplateProvider,
+	constraintProvider provider.ConstraintProvider,
+	privilegedConstraintProvider provider.PrivilegedConstraintProvider,
+	kubermaticVersions kubermatic.Versions,
+) http.Handler
 
 func initTestEndpoint(user apiv1.User, seedsGetter provider.SeedsGetter, kubeObjects, machineObjects, kubermaticObjects []runtime.Object, versions []*version.Version, updates []*version.Update, routingFunc newRoutingFunc) (http.Handler, *ClientsSets, error) {
 	if seedsGetter == nil {
@@ -247,6 +268,7 @@ func initTestEndpoint(user apiv1.User, seedsGetter provider.SeedsGetter, kubeObj
 		return nil, nil, err
 	}
 
+	kubermaticVersions := kubermatic.NewFakeVersions()
 	fUserClusterConnection := &fakeUserClusterConnection{fakeClient}
 	clusterProvider := kubernetes.NewClusterProvider(
 		&restclient.Config{},
@@ -257,6 +279,7 @@ func initTestEndpoint(user apiv1.User, seedsGetter provider.SeedsGetter, kubeObj
 		fakeClient,
 		kubernetesClient,
 		false,
+		kubermaticVersions,
 	)
 	clusterProviders := map[string]provider.ClusterProvider{"us-central1": clusterProvider}
 	clusterProviderGetter := func(seed *kubermaticv1.Seed) (provider.ClusterProvider, error) {
@@ -304,6 +327,24 @@ func initTestEndpoint(user apiv1.User, seedsGetter provider.SeedsGetter, kubeObj
 	}
 	fakeExternalClusterProvider := &FakeExternalClusterProvider{
 		Provider:   externalClusterProvider,
+		FakeClient: fakeClient,
+	}
+
+	constraintTemplateProvider, err := kubernetes.NewConstraintTemplateProvider(fakeImpersonationClient, fakeClient)
+	if err != nil {
+		return nil, nil, err
+	}
+	fakeConstraintTemplateProvider := &FakeConstraintTemplateProvider{
+		Provider:   constraintTemplateProvider,
+		FakeClient: fakeClient,
+	}
+
+	constraintProvider, err := kubernetes.NewConstraintProvider(fakeImpersonationClient, fakeClient)
+	if err != nil {
+		return nil, nil, err
+	}
+	fakeConstraintProvider := &FakeConstraintProvider{
+		Provider:   constraintProvider,
 		FakeClient: fakeClient,
 	}
 
@@ -362,6 +403,10 @@ func initTestEndpoint(user apiv1.User, seedsGetter provider.SeedsGetter, kubeObj
 		userWatcher,
 		fakeExternalClusterProvider,
 		externalClusterProvider,
+		fakeConstraintTemplateProvider,
+		fakeConstraintProvider,
+		constraintProvider,
+		kubermaticVersions,
 	)
 
 	return mainRouter, &ClientsSets{kubermaticClient, fakeClient, kubernetesClient, tokenAuth, tokenGenerator}, nil
@@ -490,7 +535,7 @@ type fakeUserClusterConnection struct {
 	fakeDynamicClient ctrlruntimeclient.Client
 }
 
-func (f *fakeUserClusterConnection) GetClient(_ *kubermaticv1.Cluster, _ ...k8cuserclusterclient.ConfigOption) (ctrlruntimeclient.Client, error) {
+func (f *fakeUserClusterConnection) GetClient(_ context.Context, _ *kubermaticv1.Cluster, _ ...k8cuserclusterclient.ConfigOption) (ctrlruntimeclient.Client, error) {
 	return f.fakeDynamicClient, nil
 }
 
@@ -1182,4 +1227,250 @@ func GenDefaultExternalClusterNode() (*corev1.Node, error) {
 			},
 		},
 	}, nil
+}
+
+func GenDefaultConstraintTemplate(name string) apiv2.ConstraintTemplate {
+	return apiv2.ConstraintTemplate{
+		Name: name,
+		Spec: constrainttemplatev1beta1.ConstraintTemplateSpec{
+			CRD: constrainttemplatev1beta1.CRD{
+				Spec: constrainttemplatev1beta1.CRDSpec{
+					Names: constrainttemplatev1beta1.Names{
+						Kind:       "labelconstraint",
+						ShortNames: []string{"lc"},
+					},
+				},
+			},
+			Targets: []constrainttemplatev1beta1.Target{
+				{
+					Target: "admission.k8s.gatekeeper.sh",
+					Rego: `
+		package k8srequiredlabels
+
+        deny[{"msg": msg, "details": {"missing_labels": missing}}] {
+          provided := {label | input.review.object.metadata.labels[label]}
+          required := {label | label := input.parameters.labels[_]}
+          missing := required - provided
+          count(missing) > 0
+          msg := sprintf("you must provide labels: %v", [missing])
+        }`,
+				},
+			},
+		},
+	}
+}
+
+func GenAdminUser(name, email string, isAdmin bool) *kubermaticv1.User {
+	user := GenUser("", name, email)
+	user.Spec.IsAdmin = isAdmin
+	return user
+}
+
+func GenConstraintTemplate(name string) *kubermaticv1.ConstraintTemplate {
+	ct := &kubermaticv1.ConstraintTemplate{}
+	ct.Name = name
+	ct.Spec = constrainttemplatev1beta1.ConstraintTemplateSpec{
+		CRD: constrainttemplatev1beta1.CRD{
+			Spec: constrainttemplatev1beta1.CRDSpec{
+				Names: constrainttemplatev1beta1.Names{
+					Kind:       "labelconstraint",
+					ShortNames: []string{"lc"},
+				},
+			},
+		},
+		Targets: []constrainttemplatev1beta1.Target{
+			{
+				Target: "admission.k8s.gatekeeper.sh",
+				Rego: `
+		package k8srequiredlabels
+
+        deny[{"msg": msg, "details": {"missing_labels": missing}}] {
+          provided := {label | input.review.object.metadata.labels[label]}
+          required := {label | label := input.parameters.labels[_]}
+          missing := required - provided
+          count(missing) > 0
+          msg := sprintf("you must provide labels: %v", [missing])
+        }`,
+			},
+		},
+	}
+
+	return ct
+}
+
+func GenDefaultRole(name, namespace string) *rbacv1.Role {
+	return &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Labels:    map[string]string{handlercommon.UserClusterComponentKey: handlercommon.UserClusterRoleComponentValue},
+			Namespace: namespace,
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				Verbs:     []string{"get"},
+				APIGroups: []string{""},
+				Resources: []string{"pod"},
+			},
+		},
+	}
+}
+
+func GenDefaultClusterRole(name string) *rbacv1.ClusterRole {
+	return &rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   name,
+			Labels: map[string]string{handlercommon.UserClusterComponentKey: handlercommon.UserClusterRoleComponentValue},
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				Verbs:     []string{"get", "list"},
+				APIGroups: []string{""},
+				Resources: []string{"pod"},
+			},
+		},
+	}
+}
+
+func GenDefaultRoleBinding(name, namespace, roleID, userEmail string) *rbacv1.RoleBinding {
+	return &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Labels:    map[string]string{handlercommon.UserClusterComponentKey: handlercommon.UserClusterBindingComponentValue},
+			Namespace: namespace,
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind: "User",
+				Name: userEmail,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			Name: roleID,
+		},
+	}
+}
+
+func GenDefaultGroupRoleBinding(name, namespace, roleID, group string) *rbacv1.RoleBinding {
+	return &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Labels:    map[string]string{handlercommon.UserClusterComponentKey: handlercommon.UserClusterBindingComponentValue},
+			Namespace: namespace,
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind: "Group",
+				Name: group,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			Name: roleID,
+		},
+	}
+}
+
+func GenDefaultClusterRoleBinding(name, roleID, userEmail string) *rbacv1.ClusterRoleBinding {
+	return &rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   name,
+			Labels: map[string]string{handlercommon.UserClusterComponentKey: handlercommon.UserClusterBindingComponentValue},
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind: "User",
+				Name: userEmail,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			Name: roleID,
+		},
+	}
+}
+
+func GenDefaultGroupClusterRoleBinding(name, roleID, group string) *rbacv1.ClusterRoleBinding {
+	return &rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   name,
+			Labels: map[string]string{handlercommon.UserClusterComponentKey: handlercommon.UserClusterBindingComponentValue},
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind: "Group",
+				Name: group,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			Name: roleID,
+		},
+	}
+}
+
+func RegisterScheme(builder runtime.SchemeBuilder) error {
+	return builder.AddToScheme(scheme.Scheme)
+}
+
+func CreateRawVariables(t *testing.T, in map[string]interface{}) *runtime.RawExtension {
+	result := &runtime.RawExtension{}
+	raw, err := k8sjson.Marshal(in)
+	if err != nil {
+		t.Fatalf("failed to marshal external Variables: %v", err)
+	}
+	result.Raw = raw
+	return result
+}
+
+func GenConstraint(name, namespace, kind string) *kubermaticv1.Constraint {
+	ct := &kubermaticv1.Constraint{}
+	ct.Kind = kubermaticv1.ConstraintKind
+	ct.APIVersion = kubermaticv1.SchemeGroupVersion.String()
+	ct.Name = name
+	ct.Namespace = namespace
+	ct.Spec = kubermaticv1.ConstraintSpec{
+		ConstraintType: kind,
+		Match: kubermaticv1.Match{
+			Kinds: []kubermaticv1.Kind{
+				{Kinds: []string{"namespace"}, APIGroups: []string{""}},
+			},
+		},
+		Parameters: kubermaticv1.Parameters{
+			RawJSON: `{"labels":["gatekeeper","opa"]}`,
+		},
+	}
+
+	return ct
+}
+
+func GenDefaultAPIConstraint(name, kind string) apiv2.Constraint {
+	return apiv2.Constraint{
+		Name: name,
+		Spec: kubermaticv1.ConstraintSpec{
+			ConstraintType: kind,
+			Match: kubermaticv1.Match{
+				Kinds: []kubermaticv1.Kind{
+					{Kinds: []string{"namespace"}, APIGroups: []string{""}},
+				},
+			},
+			Parameters: kubermaticv1.Parameters{
+				RawJSON: `{"labels":["gatekeeper","opa"]}`,
+			},
+		},
+		Status: &apiv2.ConstraintStatus{
+			Enforcement:    "true",
+			AuditTimestamp: "2019-05-11T01:46:13Z",
+			Violations: []apiv2.Violation{
+				{
+					EnforcementAction: "deny",
+					Kind:              "Namespace",
+					Message:           "'you must provide labels: {\"gatekeeper\"}'",
+					Name:              "default",
+				},
+				{
+					EnforcementAction: "deny",
+					Kind:              "Namespace",
+					Message:           "'you must provide labels: {\"gatekeeper\"}'",
+					Name:              "gatekeeper",
+				},
+			},
+		},
+	}
 }

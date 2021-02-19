@@ -33,6 +33,12 @@ import (
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const (
+	// TODO(irozzo) This should not be hardcoded to allow choosing
+	// different one in case of clashes.
+	tunnelingAgentIP = "192.168.30.10"
+)
+
 type lookupFunction func(host string) ([]net.IP, error)
 
 type ModifiersBuilder struct {
@@ -95,7 +101,7 @@ func (m *ModifiersBuilder) Build(ctx context.Context) ([]func(*kubermaticv1.Clus
 	}
 
 	frontProxyLoadBalancerServiceIP := ""
-	if m.cluster.Spec.ExposeStrategy == corev1.ServiceTypeLoadBalancer {
+	if m.cluster.Spec.ExposeStrategy == kubermaticv1.ExposeStrategyLoadBalancer {
 		frontProxyLoadBalancerService := &corev1.Service{}
 		nn := types.NamespacedName{Namespace: m.cluster.Status.NamespaceName, Name: resources.FrontLoadBalancerServiceName}
 		if err := m.client.Get(ctx, nn, frontProxyLoadBalancerService); err != nil {
@@ -113,7 +119,7 @@ func (m *ModifiersBuilder) Build(ctx context.Context) ([]func(*kubermaticv1.Clus
 
 	// External Name
 	externalName := ""
-	if m.cluster.Spec.ExposeStrategy == corev1.ServiceTypeLoadBalancer {
+	if m.cluster.Spec.ExposeStrategy == kubermaticv1.ExposeStrategyLoadBalancer {
 		externalName = frontProxyLoadBalancerServiceIP
 	} else {
 		externalName = fmt.Sprintf("%s.%s.%s", m.cluster.Name, subdomain, m.externalURL)
@@ -137,15 +143,21 @@ func (m *ModifiersBuilder) Build(ctx context.Context) ([]func(*kubermaticv1.Clus
 
 	// IP
 	ip := ""
-	if m.cluster.Spec.ExposeStrategy == corev1.ServiceTypeLoadBalancer {
+	switch m.cluster.Spec.ExposeStrategy {
+	case kubermaticv1.ExposeStrategyLoadBalancer:
 		ip = frontProxyLoadBalancerServiceIP
-	} else {
+	case kubermaticv1.ExposeStrategyNodePort:
 		var err error
 		// Always lookup IP address, in case it changes (IP's on AWS LB's change)
 		ip, err = m.getExternalIPv4(externalName)
 		if err != nil {
 			return nil, err
 		}
+	case kubermaticv1.ExposeStrategyTunneling:
+		// When using the Tunneling expose strategy the IP address advertised
+		// by the KAS corresponds to the one at which the tunneling agent binds
+		// to.
+		ip = tunnelingAgentIP
 	}
 	if m.cluster.Address.IP != ip {
 		modifiers = append(modifiers, func(c *kubermaticv1.Cluster) {
@@ -165,7 +177,14 @@ func (m *ModifiersBuilder) Build(ctx context.Context) ([]func(*kubermaticv1.Clus
 
 	// Port
 	port := service.Spec.Ports[0].NodePort
-	if m.cluster.Address.Port != port {
+
+	// Use the nodeport value for KAS secure port when strategy is NodePort or
+	// LoadBalancer. This is because the same service will be accessed both
+	// locally and passing from nodeport proxy.
+	if (m.cluster.Spec.ExposeStrategy == kubermaticv1.ExposeStrategyNodePort ||
+		m.cluster.Spec.ExposeStrategy == kubermaticv1.ExposeStrategyLoadBalancer) &&
+		m.cluster.Address.Port != port {
+
 		modifiers = append(modifiers, func(c *kubermaticv1.Cluster) {
 			c.Address.Port = port
 		})
@@ -210,7 +229,7 @@ func (m *ModifiersBuilder) getExternalIPv4(hostname string) (string, error) {
 		return "", fmt.Errorf("no ip addresses found for %s: %v", hostname, err)
 	}
 
-	// Just one ipv4
+	//Just one ipv4
 	if len(ips) > 1 {
 		m.log.Debugw("Lookup returned multiple ipv4 addresses. Picking the first one after sorting", "hostname", hostname, "foundAddresses", ips, "pickedAddress", ips[0])
 	}

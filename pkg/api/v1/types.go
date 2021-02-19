@@ -18,10 +18,13 @@ package v1
 
 import (
 	"encoding/json"
+	"fmt"
+	"strings"
 
 	"github.com/Masterminds/semver/v3"
 
 	"github.com/kubermatic/machine-controller/pkg/apis/cluster/v1alpha1"
+	"github.com/kubermatic/machine-controller/pkg/userdata/flatcar"
 	"k8c.io/kubermatic/v2/pkg/controller/master-controller-manager/rbac"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	ksemver "k8c.io/kubermatic/v2/pkg/semver"
@@ -72,6 +75,7 @@ type DatacenterSpec struct {
 	VSphere      *kubermaticv1.DatacenterSpecVSphere      `json:"vsphere,omitempty"`
 	Kubevirt     *kubermaticv1.DatacenterSpecKubevirt     `json:"kubevirt,omitempty"`
 	Alibaba      *kubermaticv1.DatacenterSpecAlibaba      `json:"alibaba,omitempty"`
+	Anexia       *kubermaticv1.DatacenterSpecAnexia       `json:"anexia,omitempty"`
 
 	//nolint:staticcheck
 	//lint:ignore SA5008 omitgenyaml is used by the example-yaml-generator
@@ -150,6 +154,12 @@ type AWSSubnet struct {
 type AWSTag struct {
 	Key   string `json:"key"`
 	Value string `json:"value"`
+}
+
+// AWSSecurityGroupList represents an array of AWS Security Group.
+// swagger:model AWSSecurityGroupList
+type AWSSecurityGroupList struct {
+	IDs []string `json:"ids,omitempty"`
 }
 
 // AWSVPCList represents an array of AWS VPC's.
@@ -308,6 +318,36 @@ type DigitaloceanSize struct {
 	VCPUs        int      `json:"vcpus"`
 	Disk         int      `json:"disk"`
 	Regions      []string `json:"regions"`
+}
+
+// AzureSubnetsList is the object representing the subnets for vms in azure cloud provider
+// swagger:model AzureSubnetsList
+type AzureSubnetsList struct {
+	Subnets []string `json:"subnets"`
+}
+
+// AzureVirtualNetworksList is the object representing the virtual network for vms in azure cloud provider
+// swagger:model AzureVirtualNetworksList
+type AzureVirtualNetworksList struct {
+	VirtualNetworks []string `json:"virtualNetworks"`
+}
+
+// AzureRouteTablesList is the object representing the route tables for vms in azure cloud provider
+// swagger:model AzureRouteTablesList
+type AzureRouteTablesList struct {
+	RouteTables []string `json:"routeTables"`
+}
+
+// AzureSecurityGroupsList is the object representing the security groups for vms in azure cloud provider
+// swagger:model AzureSecurityGroupsList
+type AzureSecurityGroupsList struct {
+	SecurityGroups []string `json:"securityGroups"`
+}
+
+// AzureResourceGroupsList is the object representing the resource groups for vms in azure cloud provider
+// swagger:model AzureResourceGroupsList
+type AzureResourceGroupsList struct {
+	ResourceGroups []string `json:"resourceGroups"`
 }
 
 // AzureAvailabilityZonesList is the object representing the availability zones for vms in azure cloud provider
@@ -690,6 +730,13 @@ type ClusterSpec struct {
 	// If active the PodNodeSelector admission plugin is configured at the apiserver
 	UsePodNodeSelectorAdmissionPlugin bool `json:"usePodNodeSelectorAdmissionPlugin,omitempty"`
 
+	// EnableUserSSHKeyAgent control whether the UserSSHKeyAgent will be deployed in the user cluster or not.
+	// If it was enabled, the agent will be deployed and used to sync the user ssh keys, that the user attach
+	// to the created cluster. If the agent was disabled, it won't be deployed in the user cluster, thus after
+	// the cluster creation any attached ssh keys won't be synced to the worker nodes. Once the agent is enabled/disabled
+	// it cannot be changed after the cluster is being created.
+	EnableUserSSHKeyAgent *bool `json:"enableUserSSHKeyAgent,omitempty"`
+
 	// PodNodeSelectorAdmissionPluginConfig provides the configuration for the PodNodeSelector.
 	// It's used by the backend to create a configuration file for this plugin.
 	// The key:value from the map is converted to the namespace:<node-selectors-labels> in the file.
@@ -706,8 +753,16 @@ type ClusterSpec struct {
 	// AuditLogging
 	AuditLogging *kubermaticv1.AuditLoggingSettings `json:"auditLogging,omitempty"`
 
+	// ServiceAccount contains service account related settings for the kube-apiserver of user cluster.
+	ServiceAccount *kubermaticv1.ServiceAccountSettings `json:"serviceAccount,omitempty"`
+
 	// Openshift holds all openshift-specific settings
 	Openshift *kubermaticv1.Openshift `json:"openshift,omitempty"`
+
+	// OPAIntegration is a preview feature that enables OPA integration with Kubermatic for the cluster.
+	// Enabling it causes gatekeeper and its resources to be deployed on the user cluster.
+	// By default it is disabled.
+	OPAIntegration *kubermaticv1.OPAIntegrationSettings `json:"opaIntegration,omitempty"`
 }
 
 // MarshalJSON marshals ClusterSpec object into JSON. It is overwritten to control data
@@ -723,9 +778,11 @@ func (cs *ClusterSpec) MarshalJSON() ([]byte, error) {
 		UpdateWindow                         *kubermaticv1.UpdateWindow             `json:"updateWindow,omitempty"`
 		UsePodSecurityPolicyAdmissionPlugin  bool                                   `json:"usePodSecurityPolicyAdmissionPlugin,omitempty"`
 		UsePodNodeSelectorAdmissionPlugin    bool                                   `json:"usePodNodeSelectorAdmissionPlugin,omitempty"`
+		EnableUserSSHKeyAgent                *bool                                  `json:"enableUserSSHKeyAgent,omitempty"`
 		AuditLogging                         *kubermaticv1.AuditLoggingSettings     `json:"auditLogging,omitempty"`
 		AdmissionPlugins                     []string                               `json:"admissionPlugins,omitempty"`
 		PodNodeSelectorAdmissionPluginConfig map[string]string                      `json:"podNodeSelectorAdmissionPluginConfig,omitempty"`
+		ServiceAccount                       *kubermaticv1.ServiceAccountSettings   `json:"serviceAccount,omitempty"`
 	}{
 		Cloud: PublicCloudSpec{
 			DatacenterName: cs.Cloud.DatacenterName,
@@ -741,6 +798,7 @@ func (cs *ClusterSpec) MarshalJSON() ([]byte, error) {
 			GCP:            newPublicGCPCloudSpec(cs.Cloud.GCP),
 			Kubevirt:       newPublicKubevirtCloudSpec(cs.Cloud.Kubevirt),
 			Alibaba:        newPublicAlibabaCloudSpec(cs.Cloud.Alibaba),
+			Anexia:         newPublicAnexiaCloudSpec(cs.Cloud.Anexia),
 		},
 		Version:                              cs.Version,
 		ClusterNetwork:                       cs.ClusterNetwork,
@@ -750,9 +808,11 @@ func (cs *ClusterSpec) MarshalJSON() ([]byte, error) {
 		UpdateWindow:                         cs.UpdateWindow,
 		UsePodSecurityPolicyAdmissionPlugin:  cs.UsePodSecurityPolicyAdmissionPlugin,
 		UsePodNodeSelectorAdmissionPlugin:    cs.UsePodNodeSelectorAdmissionPlugin,
+		EnableUserSSHKeyAgent:                cs.EnableUserSSHKeyAgent,
 		AuditLogging:                         cs.AuditLogging,
 		AdmissionPlugins:                     cs.AdmissionPlugins,
 		PodNodeSelectorAdmissionPluginConfig: cs.PodNodeSelectorAdmissionPluginConfig,
+		ServiceAccount:                       cs.ServiceAccount,
 	})
 
 	return ret, err
@@ -774,6 +834,7 @@ type PublicCloudSpec struct {
 	GCP            *PublicGCPCloudSpec          `json:"gcp,omitempty"`
 	Kubevirt       *PublicKubevirtCloudSpec     `json:"kubevirt,omitempty"`
 	Alibaba        *PublicAlibabaCloudSpec      `json:"alibaba,omitempty"`
+	Anexia         *PublicAnexiaCloudSpec       `json:"anexia,omitempty"`
 }
 
 // PublicFakeCloudSpec is a public counterpart of apiv1.FakeCloudSpec.
@@ -928,6 +989,17 @@ func newPublicAlibabaCloudSpec(internal *kubermaticv1.AlibabaCloudSpec) (public 
 	return &PublicAlibabaCloudSpec{}
 }
 
+// PublicAnexiaCloudSpec is a public counterpart of apiv1.AnexiaCloudSpec.
+type PublicAnexiaCloudSpec struct{}
+
+func newPublicAnexiaCloudSpec(internal *kubermaticv1.AnexiaCloudSpec) (public *PublicAnexiaCloudSpec) {
+	if internal == nil {
+		return nil
+	}
+
+	return &PublicAnexiaCloudSpec{}
+}
+
 // ClusterStatus defines the cluster status
 type ClusterStatus struct {
 	// Version actual version of the kubernetes master components
@@ -1005,6 +1077,7 @@ type NodeCloudSpec struct {
 	GCP          *GCPNodeSpec          `json:"gcp,omitempty"`
 	Kubevirt     *KubevirtNodeSpec     `json:"kubevirt,omitempty"`
 	Alibaba      *AlibabaNodeSpec      `json:"alibaba,omitempty"`
+	Anexia       *AnexiaNodeSpec       `json:"anexia,omitempty"`
 }
 
 // UbuntuSpec ubuntu specific settings
@@ -1032,6 +1105,10 @@ type ContainerLinuxSpec struct {
 type FlatcarSpec struct {
 	// disable flatcar linux auto-update feature
 	DisableAutoUpdate bool `json:"disableAutoUpdate"`
+
+	// ProvisioningUtility specifies the type of provisioning utility, allowed values are cloud-init and ignition.
+	// Defaults to ignition.
+	flatcar.ProvisioningUtility `json:"provisioningUtility,omitempty"`
 }
 
 // SLESSpec contains SLES specific settings
@@ -1110,12 +1187,61 @@ type DigitaloceanNodeSpec struct {
 	Tags []string `json:"tags"`
 }
 
+func (spec *DigitaloceanNodeSpec) MarshalJSON() ([]byte, error) {
+	missing := make([]string, 0)
+
+	if len(spec.Size) == 0 {
+		missing = append(missing, "size")
+	}
+
+	if len(missing) > 0 {
+		return []byte{}, fmt.Errorf("missing or invalid required parameter(s): %s", strings.Join(missing, ", "))
+	}
+
+	// Inlined anonymous mirror structure to allow usage of real marshal after validation
+	res := struct {
+		Size       string   `json:"size"`
+		Backups    bool     `json:"backups"`
+		IPv6       bool     `json:"ipv6"`
+		Monitoring bool     `json:"monitoring"`
+		Tags       []string `json:"tags"`
+	}{
+		Size:       spec.Size,
+		Backups:    spec.Backups,
+		IPv6:       spec.IPv6,
+		Monitoring: spec.Monitoring,
+		Tags:       spec.Tags,
+	}
+
+	return json.Marshal(&res)
+}
+
 // HetznerNodeSpec Hetzner node settings
 // swagger:model HetznerNodeSpec
 type HetznerNodeSpec struct {
 	// server type
 	// required: true
 	Type string `json:"type"`
+}
+
+func (spec *HetznerNodeSpec) MarshalJSON() ([]byte, error) {
+	missing := make([]string, 0)
+
+	if len(spec.Type) == 0 {
+		missing = append(missing, "type")
+	}
+
+	if len(missing) > 0 {
+		return []byte{}, fmt.Errorf("missing or invalid required parameter(s): %s", strings.Join(missing, ", "))
+	}
+
+	res := struct {
+		Type string `json:"type"`
+	}{
+		Type: spec.Type,
+	}
+
+	return json.Marshal(&res)
 }
 
 // AzureNodeSpec describes settings for an Azure node
@@ -1138,8 +1264,42 @@ type AzureNodeSpec struct {
 	DataDiskSize int32 `json:"dataDiskSize"`
 	// Zones represents the availability zones for azure vms
 	// required: false
-	Zones   []string `json:"zones"`
-	ImageID string   `json:"imageID"`
+	Zones []string `json:"zones"`
+	// ImageID represents the ID of the image that should be used to run the node
+	// required: false
+	ImageID string `json:"imageID"`
+}
+
+func (spec *AzureNodeSpec) MarshalJSON() ([]byte, error) {
+	missing := make([]string, 0)
+
+	if len(spec.Size) == 0 {
+		missing = append(missing, "size")
+	}
+
+	if len(missing) > 0 {
+		return []byte{}, fmt.Errorf("missing or invalid required parameter(s): %s", strings.Join(missing, ", "))
+	}
+
+	res := struct {
+		Size           string            `json:"size"`
+		AssignPublicIP bool              `json:"assignPublicIP"`
+		Tags           map[string]string `json:"tags,omitempty"`
+		OSDiskSize     int32             `json:"osDiskSize"`
+		DataDiskSize   int32             `json:"dataDiskSize"`
+		Zones          []string          `json:"zones"`
+		ImageID        string            `json:"imageID"`
+	}{
+		Size:           spec.Size,
+		AssignPublicIP: spec.AssignPublicIP,
+		Tags:           spec.Tags,
+		OSDiskSize:     spec.OSDiskSize,
+		DataDiskSize:   spec.DataDiskSize,
+		Zones:          spec.Zones,
+		ImageID:        spec.ImageID,
+	}
+
+	return json.Marshal(&res)
 }
 
 // VSphereNodeSpec VSphere node settings
@@ -1149,6 +1309,44 @@ type VSphereNodeSpec struct {
 	Memory     int    `json:"memory"`
 	DiskSizeGB *int64 `json:"diskSizeGB,omitempty"`
 	Template   string `json:"template"`
+}
+
+func (spec *VSphereNodeSpec) MarshalJSON() ([]byte, error) {
+	missing := make([]string, 0)
+
+	if spec.CPUs < 1 {
+		missing = append(missing, "cpus")
+	}
+
+	if spec.Memory < 1 {
+		missing = append(missing, "memory")
+	}
+
+	if spec.DiskSizeGB == nil || spec.DiskSizeGB != nil && *spec.DiskSizeGB < 1 {
+		missing = append(missing, "diskSizeGB")
+	}
+
+	if len(spec.Template) == 0 {
+		missing = append(missing, "template")
+	}
+
+	if len(missing) > 0 {
+		return []byte{}, fmt.Errorf("missing or invalid required parameter(s): %s", strings.Join(missing, ", "))
+	}
+
+	res := struct {
+		CPUs       int    `json:"cpus"`
+		Memory     int    `json:"memory"`
+		DiskSizeGB *int64 `json:"diskSizeGB,omitempty"`
+		Template   string `json:"template"`
+	}{
+		CPUs:       spec.CPUs,
+		Memory:     spec.Memory,
+		DiskSizeGB: spec.DiskSizeGB,
+		Template:   spec.Template,
+	}
+
+	return json.Marshal(&res)
 }
 
 // OpenstackNodeSpec openstack node settings
@@ -1172,6 +1370,50 @@ type OpenstackNodeSpec struct {
 	// if not set, the default AZ from the Datacenter spec will be used
 	// required: false
 	AvailabilityZone string `json:"availabilityZone"`
+	// Period of time to check for instance ready status
+	// required: false
+	InstanceReadyCheckPeriod string `json:"instanceReadyCheckPeriod"`
+	// Max time to wait for the instance to be ready
+	// required: false
+	InstanceReadyCheckTimeout string `json:"instanceReadyCheckTimeout"`
+}
+
+func (spec *OpenstackNodeSpec) MarshalJSON() ([]byte, error) {
+	missing := make([]string, 0)
+
+	if len(spec.Flavor) == 0 {
+		missing = append(missing, "flavor")
+	}
+
+	if len(spec.Image) == 0 {
+		missing = append(missing, "image")
+	}
+
+	if len(missing) > 0 {
+		return []byte{}, fmt.Errorf("missing or invalid required parameter(s): %s", strings.Join(missing, ", "))
+	}
+
+	res := struct {
+		Flavor                    string            `json:"flavor"`
+		Image                     string            `json:"image"`
+		Tags                      map[string]string `json:"tags,omitempty"`
+		UseFloatingIP             bool              `json:"useFloatingIP,omitempty"`
+		RootDiskSizeGB            *int              `json:"diskSize"`
+		AvailabilityZone          string            `json:"availabilityZone"`
+		InstanceReadyCheckPeriod  string            `json:"instanceReadyCheckPeriod"`
+		InstanceReadyCheckTimeout string            `json:"instanceReadyCheckTimeout"`
+	}{
+		Flavor:                    spec.Flavor,
+		Image:                     spec.Image,
+		Tags:                      spec.Tags,
+		UseFloatingIP:             spec.UseFloatingIP,
+		RootDiskSizeGB:            spec.RootDiskSizeGB,
+		AvailabilityZone:          spec.AvailabilityZone,
+		InstanceReadyCheckPeriod:  spec.InstanceReadyCheckPeriod,
+		InstanceReadyCheckTimeout: spec.InstanceReadyCheckTimeout,
+	}
+
+	return json.Marshal(&res)
 }
 
 // AWSNodeSpec aws specific node settings
@@ -1190,7 +1432,7 @@ type AWSNodeSpec struct {
 	AMI string `json:"ami"`
 	// additional instance tags
 	Tags map[string]string `json:"tags"`
-	// Availiability zone in which to place the node. It is coupled with the subnet to which the node will belong.
+	// Availability zone in which to place the node. It is coupled with the subnet to which the node will belong.
 	AvailabilityZone string `json:"availabilityZone"`
 	// The VPC subnet to which the node shall be connected.
 	SubnetID string `json:"subnetID"`
@@ -1198,6 +1440,48 @@ type AWSNodeSpec struct {
 	// assigned during launch overriding a possible setting in the used AWS subnet.
 	// required: false
 	AssignPublicIP *bool `json:"assignPublicIP"`
+}
+
+func (spec *AWSNodeSpec) MarshalJSON() ([]byte, error) {
+	missing := make([]string, 0)
+
+	if len(spec.InstanceType) == 0 {
+		missing = append(missing, "instanceType")
+	}
+
+	if spec.VolumeSize < 1 {
+		missing = append(missing, "diskSize")
+	}
+
+	if len(spec.VolumeType) == 0 {
+		missing = append(missing, "volumeType")
+	}
+
+	if len(missing) > 0 {
+		return []byte{}, fmt.Errorf("missing or invalid required parameter(s): %s", strings.Join(missing, ", "))
+	}
+
+	res := struct {
+		InstanceType     string            `json:"instanceType"`
+		VolumeSize       int64             `json:"diskSize"`
+		VolumeType       string            `json:"volumeType"`
+		AMI              string            `json:"ami"`
+		Tags             map[string]string `json:"tags"`
+		AvailabilityZone string            `json:"availabilityZone"`
+		SubnetID         string            `json:"subnetID"`
+		AssignPublicIP   *bool             `json:"assignPublicIP"`
+	}{
+		InstanceType:     spec.InstanceType,
+		VolumeSize:       spec.VolumeSize,
+		VolumeType:       spec.VolumeType,
+		AMI:              spec.AMI,
+		Tags:             spec.Tags,
+		AvailabilityZone: spec.AvailabilityZone,
+		SubnetID:         spec.SubnetID,
+		AssignPublicIP:   spec.AssignPublicIP,
+	}
+
+	return json.Marshal(&res)
 }
 
 // PacketNodeSpec specifies packet specific node settings
@@ -1211,6 +1495,28 @@ type PacketNodeSpec struct {
 	Tags []string `json:"tags"`
 }
 
+func (spec *PacketNodeSpec) MarshalJSON() ([]byte, error) {
+	missing := make([]string, 0)
+
+	if len(spec.InstanceType) == 0 {
+		missing = append(missing, "instanceType")
+	}
+
+	if len(missing) > 0 {
+		return []byte{}, fmt.Errorf("missing or invalid required parameter(s): %s", strings.Join(missing, ", "))
+	}
+
+	res := struct {
+		InstanceType string   `json:"instanceType"`
+		Tags         []string `json:"tags"`
+	}{
+		InstanceType: spec.InstanceType,
+		Tags:         spec.Tags,
+	}
+
+	return json.Marshal(&res)
+}
+
 // GCPNodeSpec gcp specific node settings
 // swagger:model GCPNodeSpec
 type GCPNodeSpec struct {
@@ -1222,6 +1528,52 @@ type GCPNodeSpec struct {
 	Labels      map[string]string `json:"labels"`
 	Tags        []string          `json:"tags"`
 	CustomImage string            `json:"customImage"`
+}
+
+func (spec *GCPNodeSpec) MarshalJSON() ([]byte, error) {
+	missing := make([]string, 0)
+
+	if len(spec.Zone) == 0 {
+		missing = append(missing, "zone")
+	}
+
+	if spec.DiskSize < 1 {
+		missing = append(missing, "diskSize")
+	}
+
+	if len(spec.MachineType) == 0 {
+		missing = append(missing, "machineType")
+	}
+
+	if len(spec.DiskType) == 0 {
+		missing = append(missing, "diskType")
+	}
+
+	if len(missing) > 0 {
+		return []byte{}, fmt.Errorf("missing or invalid required parameter(s): %s", strings.Join(missing, ", "))
+	}
+
+	res := struct {
+		Zone        string            `json:"zone"`
+		MachineType string            `json:"machineType"`
+		DiskSize    int64             `json:"diskSize"`
+		DiskType    string            `json:"diskType"`
+		Preemptible bool              `json:"preemptible"`
+		Labels      map[string]string `json:"labels"`
+		Tags        []string          `json:"tags"`
+		CustomImage string            `json:"customImage"`
+	}{
+		Zone:        spec.Zone,
+		MachineType: spec.MachineType,
+		DiskSize:    spec.DiskSize,
+		DiskType:    spec.DiskType,
+		Preemptible: spec.Preemptible,
+		Labels:      spec.Labels,
+		Tags:        spec.Tags,
+		CustomImage: spec.CustomImage,
+	}
+
+	return json.Marshal(&res)
 }
 
 // KubevirtNodeSpec kubevirt specific node settings
@@ -1247,6 +1599,56 @@ type KubevirtNodeSpec struct {
 	PVCSize string `json:"pvcSize"`
 }
 
+func (spec *KubevirtNodeSpec) MarshalJSON() ([]byte, error) {
+	missing := make([]string, 0)
+
+	if len(spec.CPUs) == 0 {
+		missing = append(missing, "cpus")
+	}
+
+	if len(spec.Memory) == 0 {
+		missing = append(missing, "memory")
+	}
+
+	if len(spec.Namespace) == 0 {
+		missing = append(missing, "namespace")
+	}
+
+	if len(spec.SourceURL) == 0 {
+		missing = append(missing, "sourceURL")
+	}
+
+	if len(spec.StorageClassName) == 0 {
+		missing = append(missing, "storageClassName")
+	}
+
+	if len(spec.PVCSize) == 0 {
+		missing = append(missing, "pvcSize")
+	}
+
+	if len(missing) > 0 {
+		return []byte{}, fmt.Errorf("missing or invalid required parameter(s): %s", strings.Join(missing, ", "))
+	}
+
+	res := struct {
+		CPUs             string `json:"cpus"`
+		Memory           string `json:"memory"`
+		Namespace        string `json:"namespace"`
+		SourceURL        string `json:"sourceURL"`
+		StorageClassName string `json:"storageClassName"`
+		PVCSize          string `json:"pvcSize"`
+	}{
+		CPUs:             spec.CPUs,
+		Memory:           spec.Memory,
+		Namespace:        spec.Namespace,
+		SourceURL:        spec.SourceURL,
+		StorageClassName: spec.StorageClassName,
+		PVCSize:          spec.PVCSize,
+	}
+
+	return json.Marshal(&res)
+}
+
 // AlibabaNodeSpec alibaba specific node settings
 // swagger:model AlibabaNodeSpec
 type AlibabaNodeSpec struct {
@@ -1257,6 +1659,122 @@ type AlibabaNodeSpec struct {
 	InternetMaxBandwidthOut string            `json:"internetMaxBandwidthOut"`
 	Labels                  map[string]string `json:"labels"`
 	ZoneID                  string            `json:"zoneID"`
+}
+
+func (spec *AlibabaNodeSpec) MarshalJSON() ([]byte, error) {
+	missing := make([]string, 0)
+
+	if len(spec.InstanceType) == 0 {
+		missing = append(missing, "instanceType")
+	}
+
+	if len(spec.DiskSize) == 0 {
+		missing = append(missing, "diskSize")
+	}
+
+	if len(spec.DiskType) == 0 {
+		missing = append(missing, "diskType")
+	}
+
+	if len(spec.VSwitchID) == 0 {
+		missing = append(missing, "vSwitchID")
+	}
+
+	if len(spec.InternetMaxBandwidthOut) == 0 {
+		missing = append(missing, "internetMaxBandwidthOut")
+	}
+
+	if len(spec.ZoneID) == 0 {
+		missing = append(missing, "zoneID")
+	}
+
+	if len(missing) > 0 {
+		return []byte{}, fmt.Errorf("missing or invalid required parameter(s): %s", strings.Join(missing, ", "))
+	}
+
+	res := struct {
+		InstanceType            string            `json:"instanceType"`
+		DiskSize                string            `json:"diskSize"`
+		DiskType                string            `json:"diskType"`
+		VSwitchID               string            `json:"vSwitchID"`
+		InternetMaxBandwidthOut string            `json:"internetMaxBandwidthOut"`
+		Labels                  map[string]string `json:"labels"`
+		ZoneID                  string            `json:"zoneID"`
+	}{
+		InstanceType:            spec.InstanceType,
+		VSwitchID:               spec.VSwitchID,
+		DiskSize:                spec.DiskSize,
+		DiskType:                spec.DiskType,
+		InternetMaxBandwidthOut: spec.InternetMaxBandwidthOut,
+		Labels:                  spec.Labels,
+		ZoneID:                  spec.ZoneID,
+	}
+
+	return json.Marshal(&res)
+}
+
+// AnexiaNodeSpec anexia specific node settings
+// swagger:model AnexiaNodeSpec
+type AnexiaNodeSpec struct {
+	// VlanID Instance vlanID
+	// required: true
+	VlanID string `json:"vlanID"`
+	// TemplateID instance template
+	// required: true
+	TemplateID string `json:"templateID"`
+	// CPUs states how many cpus the node will have.
+	// required: true
+	CPUs int `json:"cpus"`
+	// Memory states the memory that node will have.
+	// required: true
+	Memory int64 `json:"memory"`
+	// DiskSize states the disk size that node will have.
+	// required: true
+	DiskSize int64 `json:"diskSize"`
+}
+
+func (spec *AnexiaNodeSpec) MarshalJSON() ([]byte, error) {
+	missing := make([]string, 0)
+
+	if len(spec.VlanID) == 0 {
+		missing = append(missing, "vlanID")
+	}
+
+	if spec.CPUs < 1 {
+		missing = append(missing, "cpus")
+	}
+
+	if spec.Memory < 1 {
+		missing = append(missing, "memory")
+	}
+
+	if spec.DiskSize < 1 {
+		missing = append(missing, "diskSize")
+	}
+
+	if len(spec.TemplateID) == 0 {
+		missing = append(missing, "templateID")
+	}
+
+	if len(missing) > 0 {
+		return []byte{}, fmt.Errorf("missing or invalid required parameter(s): %s", strings.Join(missing, ", "))
+	}
+
+	res := struct {
+		VlanID     string `json:"vlanID"`
+		TemplateID string `json:"templateID"`
+		CPUs       int    `json:"cpus"`
+		Memory     int64  `json:"memory"`
+		DiskSize   int64  `json:"diskSize"`
+	}{
+		VlanID:     spec.VlanID,
+		TemplateID: spec.TemplateID,
+		DiskSize:   spec.DiskSize,
+		CPUs:       spec.CPUs,
+		Memory:     spec.Memory,
+	}
+
+	return json.Marshal(&res)
 }
 
 // NodeResources cpu and memory of a node
@@ -1574,7 +2092,7 @@ type SeedSpec struct {
 	// worker nodes in user clusters. However, proxy settings on nodes take precedence.
 	ProxySettings *kubermaticv1.ProxySettings `json:"proxy_settings,omitempty"`
 	// Optional: ExposeStrategy explicitly sets the expose strategy for this seed cluster, if not set, the default provided by the master is used.
-	ExposeStrategy corev1.ServiceType `json:"expose_strategy,omitempty"`
+	ExposeStrategy kubermaticv1.ExposeStrategy `json:"expose_strategy,omitempty"`
 }
 
 // swagger:model SeedNamesList
@@ -1607,6 +2125,12 @@ const (
 	EtcdBackupConfigCleanupFinalizer = "kubermatic.io/cleanup-etcdbackupconfigs"
 	// ExternalClusterKubeconfigCleanupFinalizer indicates that secrets for kubeconfig still need cleanup
 	ExternalClusterKubeconfigCleanupFinalizer = "kubermatic.io/cleanup-kubeconfig-secret"
+	// GatekeeperConstraintTemplateCleanupFinalizer indicates that synced gatekeeper Constraint Templates on user cluster need cleanup
+	GatekeeperConstraintTemplateCleanupFinalizer = "kubermatic.io/cleanup-gatekeeper-constraint-templates"
+	// GatekeeperSeedConstraintTemplateCleanupFinalizer indicates that synced gatekeeper Constraint Templates on seed clusters need cleanup
+	GatekeeperSeedConstraintTemplateCleanupFinalizer = "kubermatic.io/cleanup-gatekeeper-master-constraint-templates"
+	// GatekeeperConstraintCleanupFinalizer indicates that gatkeeper constraints on the user cluster need cleanup
+	GatekeeperConstraintCleanupFinalizer = "kubermatic.io/cleanup-gatekeeper-constraints"
 )
 
 func ToInternalClusterType(externalClusterType string) kubermaticv1.ClusterType {
@@ -1618,3 +2142,7 @@ func ToInternalClusterType(externalClusterType string) kubermaticv1.ClusterType 
 	}
 	return kubermaticv1.ClusterTypeAll
 }
+
+const (
+	InitialMachineDeploymentRequestAnnotation = "kubermatic.io/initial-machinedeployment-request"
+)

@@ -22,10 +22,11 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
-	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
 	"net"
 	"net/http"
 	"time"
+
+	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
 
 	"github.com/coreos/go-oidc"
 	"golang.org/x/oauth2"
@@ -134,7 +135,7 @@ func (o *OpenIDClient) Extract(rq *http.Request) (string, error) {
 	return o.tokenExtractor.Extract(rq)
 }
 
-// Verify parses a raw ID Token, verifies it's been signed by the provider, preforms
+// Verify parses a raw ID Token, verifies it's been signed by the provider, performs
 // any additional checks depending on the Config, and returns the payload as TokenClaims.
 func (o *OpenIDClient) Verify(ctx context.Context, token string) (TokenClaims, error) {
 	if token == "" {
@@ -238,7 +239,7 @@ func (e headerBearerTokenExtractor) Extract(r *http.Request) (string, error) {
 	if len(header) < 7 {
 		return "", fmt.Errorf("haven't found a Bearer token in the %s header", e.name)
 	}
-	// strip BEARER/bearer/Bearer prefix
+	//strip BEARER/bearer/Bearer prefix
 	return header[7:], nil
 }
 

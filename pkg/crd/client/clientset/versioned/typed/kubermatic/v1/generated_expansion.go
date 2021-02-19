@@ -8,6 +8,10 @@ type AddonConfigExpansion interface{}
 
 type ClusterExpansion interface{}
 
+type ConstraintExpansion interface{}
+
+type ConstraintTemplateExpansion interface{}
+
 type EtcdBackupConfigExpansion interface{}
 
 type EtcdRestoreExpansion interface{}

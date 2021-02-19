@@ -17,10 +17,11 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"fmt"
 
 	"k8c.io/kubermatic/v2/pkg/semver"
-	apimodels "k8c.io/kubermatic/v2/pkg/test/e2e/api/utils/apiclient/models"
+	apimodels "k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/models"
 )
 
 // Returns a matrix of (version x operating system)
@@ -86,7 +87,7 @@ func (s *openStackScenario) Cluster(secrets secrets) *apimodels.CreateClusterSpe
 	}
 }
 
-func (s *openStackScenario) NodeDeployments(num int, _ secrets) ([]apimodels.NodeDeployment, error) {
+func (s *openStackScenario) NodeDeployments(_ context.Context, num int, _ secrets) ([]apimodels.NodeDeployment, error) {
 	osName := getOSNameFromSpec(s.nodeOsSpec)
 	image := "kubermatic-e2e-" + osName
 	flavor := "m1.small"
@@ -99,8 +100,10 @@ func (s *openStackScenario) NodeDeployments(num int, _ secrets) ([]apimodels.Nod
 				Template: &apimodels.NodeSpec{
 					Cloud: &apimodels.NodeCloudSpec{
 						Openstack: &apimodels.OpenstackNodeSpec{
-							Flavor: &flavor,
-							Image:  &image,
+							Flavor:                    &flavor,
+							Image:                     &image,
+							InstanceReadyCheckPeriod:  "5s",
+							InstanceReadyCheckTimeout: "2m",
 						},
 					},
 					Versions: &apimodels.NodeVersionInfo{

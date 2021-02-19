@@ -32,9 +32,11 @@ import (
 	"go.uber.org/zap"
 
 	clusterv1alpha1 "github.com/kubermatic/machine-controller/pkg/apis/cluster/v1alpha1"
-	cmdutil "k8c.io/kubermatic/v2/cmd/util"
+
 	sys11nodereadiness "k8c.io/kubermatic/v2/pkg/controller/sys11-node-readiness"
+
 	clusterrolelabeler "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/cluster-role-labeler"
+	constraintsyncer "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/constraint-syncer"
 	containerlinux "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/container-linux"
 	"k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/flatcar"
 	"k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/ipam"
@@ -51,6 +53,8 @@ import (
 	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
 	"k8c.io/kubermatic/v2/pkg/pprof"
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
+	"k8c.io/kubermatic/v2/pkg/util/cli"
+	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -89,6 +93,8 @@ type controllerRunOptions struct {
 	updateWindowStart             string
 	updateWindowLength            string
 	dnsClusterIP                  string
+	opaIntegration                bool
+	useSSHKeyAgent                bool
 }
 
 func main() {
@@ -118,12 +124,15 @@ func main() {
 	flag.StringVar(&runOp.ownerEmail, "owner-email", "", "An email address of the user who created the cluster. Used as default subject for the admin cluster role binding")
 	flag.StringVar(&runOp.updateWindowStart, "update-window-start", "", "The start time of the update window, e.g. 02:00")
 	flag.StringVar(&runOp.updateWindowLength, "update-window-length", "", "The length of the update window, e.g. 1h")
+	flag.BoolVar(&runOp.opaIntegration, "opa-integration", false, "Enable OPA integration in user cluster")
+	flag.BoolVar(&runOp.useSSHKeyAgent, "enable-ssh-key-agent", false, "Enable UserSSHKeyAgent integration in user cluster")
 	flag.Parse()
 
 	rawLog := kubermaticlog.New(logOpts.Debug, logOpts.Format)
 	log := rawLog.Sugar()
 
-	cmdutil.Hello(log, "User-Cluster Controller-Manager", logOpts.Debug)
+	versions := kubermatic.NewDefaultVersions()
+	cli.Hello(log, "User-Cluster Controller-Manager", logOpts.Debug, &versions)
 
 	if runOp.ownerEmail == "" {
 		log.Fatal("-owner-email must be set")
@@ -238,6 +247,9 @@ func main() {
 		cloudCredentialSecretTemplate,
 		runOp.openshiftConsoleCallbackURI,
 		runOp.dnsClusterIP,
+		runOp.opaIntegration,
+		versions,
+		runOp.useSSHKeyAgent,
 		log,
 	); err != nil {
 		log.Fatalw("Failed to register user cluster controller", zap.Error(err))
@@ -325,6 +337,13 @@ func main() {
 		log.Fatalw("Failed to register ownerbindingcreator controller", zap.Error(err))
 	}
 	log.Info("Registered ownerbindingcreator controller")
+
+	if runOp.opaIntegration {
+		if err := constraintsyncer.Add(ctx, log, seedMgr, mgr, runOp.namespace); err != nil {
+			log.Fatalw("Failed to register constraintsyncer controller", zap.Error(err))
+		}
+		log.Info("Registered constraintsyncer controller")
+	}
 
 	// This group is forever waiting in a goroutine for signals to stop
 	{

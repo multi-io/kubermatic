@@ -28,6 +28,7 @@ import (
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	kubermaticv1helper "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1/helper"
 	"k8c.io/kubermatic/v2/pkg/provider"
+	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -54,7 +55,7 @@ const (
 
 // userClusterConnectionProvider offers functions to retrieve clients for the given user clusters
 type userClusterConnectionProvider interface {
-	GetClient(*kubermaticv1.Cluster, ...k8cuserclusterclient.ConfigOption) (ctrlruntimeclient.Client, error)
+	GetClient(context.Context, *kubermaticv1.Cluster, ...k8cuserclusterclient.ConfigOption) (ctrlruntimeclient.Client, error)
 }
 
 // Features describes the enabled features for the monitoring controller
@@ -65,12 +66,11 @@ type Features struct {
 // Reconciler stores all components required for monitoring
 type Reconciler struct {
 	ctrlruntimeclient.Client
+
 	userClusterConnProvider userClusterConnectionProvider
 	workerName              string
-
-	log *zap.SugaredLogger
-
-	recorder record.EventRecorder
+	log                     *zap.SugaredLogger
+	recorder                record.EventRecorder
 
 	seedGetter                                       provider.SeedGetter
 	overwriteRegistry                                string
@@ -89,6 +89,7 @@ type Reconciler struct {
 	concurrentClusterUpdates         int
 
 	features Features
+	versions kubermatic.Versions
 }
 
 // Add creates a new Monitoring controller that is responsible for
@@ -115,17 +116,17 @@ func Add(
 	concurrentClusterUpdates int,
 
 	features Features,
+	versions kubermatic.Versions,
 ) error {
 	log = log.Named(ControllerName)
 
 	reconciler := &Reconciler{
-		Client:                  mgr.GetClient(),
+		Client: mgr.GetClient(),
+
 		userClusterConnProvider: userClusterConnProvider,
 		workerName:              workerName,
-
-		log: log,
-
-		recorder: mgr.GetEventRecorderFor(ControllerName),
+		log:                     log,
+		recorder:                mgr.GetEventRecorderFor(ControllerName),
 
 		overwriteRegistry:                                overwriteRegistry,
 		nodePortRange:                                    nodePortRange,
@@ -142,6 +143,7 @@ func Add(
 		seedGetter:                                       seedGetter,
 
 		features: features,
+		versions: versions,
 	}
 
 	ctrlOptions := controller.Options{Reconciler: reconciler, MaxConcurrentReconciles: numWorkers}
@@ -210,6 +212,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 		r.Client,
 		r.workerName,
 		cluster,
+		r.versions,
 		kubermaticv1.ClusterConditionMonitoringControllerReconcilingSuccess,
 		func() (*reconcile.Result, error) {
 			// only reconcile this cluster if there are not yet too many updates running

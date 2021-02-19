@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"text/template"
 
-	"github.com/Masterminds/sprig"
+	"github.com/Masterminds/sprig/v3"
 
 	providerconfig "github.com/kubermatic/machine-controller/pkg/providerconfig/types"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
@@ -341,9 +341,9 @@ func kubeControllerManagerArgs(openshiftConfigPath, kubeconfigPath, caCertPath, 
 		fmt.Sprintf("--client-ca-file=%s", caCertPath),
 		fmt.Sprintf("--requestheader-client-ca-file=%s", aggregatorCACertPath),
 		"-v=2",
-		// Used for metrics only, we can use a self-signed cert for now
-		// fmt.Sprintf("--tls-private-key=%s", servingKey)
-		// fmt.Sprintf("--tls-cert-file=%s", servingCert),
+		//Used for metrics only, we can use a self-signed cert for now
+		//fmt.Sprintf("--tls-private-key=%s", servingKey)
+		//fmt.Sprintf("--tls-cert-file=%s", servingCert),
 	}
 }
 

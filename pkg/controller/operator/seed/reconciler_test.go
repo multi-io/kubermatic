@@ -28,9 +28,10 @@ import (
 	operatorv1alpha1 "k8c.io/kubermatic/v2/pkg/crd/operator/v1alpha1"
 	"k8c.io/kubermatic/v2/pkg/kubernetes"
 	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
+	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 
 	certmanagerv1alpha2 "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1alpha2"
-	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -219,7 +220,7 @@ func TestBasicReconciling(t *testing.T) {
 					return errors.New("Seed should have ClusterRoleBindings, but has none")
 				}
 
-				hooks := admissionregistrationv1beta1.ValidatingWebhookConfigurationList{}
+				hooks := admissionregistrationv1.ValidatingWebhookConfigurationList{}
 				must(t, seedClient.List(reconciler.ctx, &hooks))
 				if len(hooks.Items) == 0 {
 					return errors.New("Seed should have ValidatingWebhookConfigurations, but has none")
@@ -245,7 +246,7 @@ func TestBasicReconciling(t *testing.T) {
 					return fmt.Errorf("Seed should have no ClusterRoleBindings left over, but has %d", length)
 				}
 
-				hooks = admissionregistrationv1beta1.ValidatingWebhookConfigurationList{}
+				hooks = admissionregistrationv1.ValidatingWebhookConfigurationList{}
 				must(t, seedClient.List(reconciler.ctx, &hooks))
 				if length := len(hooks.Items); length > 0 {
 					return fmt.Errorf("Seed should have no ValidatingWebhookConfigurations left over, but has %d", length)
@@ -451,7 +452,7 @@ func createTestReconciler(allSeeds map[string]*kubermaticv1.Seed, cfg *operatorv
 	masterClient := ctrlruntimefakeclient.NewFakeClient(masterObjects...)
 	masterRecorder := record.NewFakeRecorder(999)
 
-	versions := common.NewDefaultVersions()
+	versions := kubermatic.NewDefaultVersions()
 	versions.Kubermatic = "latest"
 	versions.UI = "latest"
 

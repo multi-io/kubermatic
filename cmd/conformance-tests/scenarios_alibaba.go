@@ -17,10 +17,11 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"fmt"
 
 	"k8c.io/kubermatic/v2/pkg/semver"
-	apimodels "k8c.io/kubermatic/v2/pkg/test/e2e/api/utils/apiclient/models"
+	apimodels "k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/models"
 )
 
 const alibabaDC = "alibaba-eu-central-1a"
@@ -74,7 +75,7 @@ func (s *alibabaScenario) Cluster(secrets secrets) *apimodels.CreateClusterSpec 
 	}
 }
 
-func (s *alibabaScenario) NodeDeployments(num int, secrets secrets) ([]apimodels.NodeDeployment, error) {
+func (s *alibabaScenario) NodeDeployments(_ context.Context, num int, secrets secrets) ([]apimodels.NodeDeployment, error) {
 	return []apimodels.NodeDeployment{
 		{
 			Spec: &apimodels.NodeDeploymentSpec{

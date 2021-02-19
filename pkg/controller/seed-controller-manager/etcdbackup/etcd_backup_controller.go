@@ -37,6 +37,7 @@ import (
 	"k8c.io/kubermatic/v2/pkg/resources/etcd"
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 	errors2 "k8c.io/kubermatic/v2/pkg/util/errors"
+	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -109,6 +110,7 @@ type Reconciler struct {
 	clock                clock.Clock
 	randStringGenerator  func() string
 	recorder             record.EventRecorder
+	versions             kubermatic.Versions
 }
 
 // Add creates a new Backup controller that is responsible for
@@ -122,6 +124,7 @@ func Add(
 	deleteContainer *corev1.Container,
 	cleanupContainer *corev1.Container,
 	backupContainerImage string,
+	v kubermatic.Versions,
 ) error {
 	log = log.Named(ControllerName)
 	client := mgr.GetClient()
@@ -143,6 +146,7 @@ func Add(
 		randStringGenerator: func() string {
 			return rand.String(10)
 		},
+		versions: v,
 	}
 
 	ctrlOptions := controller.Options{
@@ -188,6 +192,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 		r.Client,
 		r.workerName,
 		cluster,
+		r.versions,
 		kubermaticv1.ClusterConditionBackupControllerReconcilingSuccess,
 		func() (*reconcile.Result, error) {
 			return r.reconcile(ctx, log, backupConfig, cluster)

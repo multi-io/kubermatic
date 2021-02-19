@@ -88,7 +88,7 @@ type SeedSpec struct {
 	// worker nodes in user clusters. However, proxy settings on nodes take precedence.
 	ProxySettings *ProxySettings `json:"proxy_settings,omitempty"`
 	// Optional: ExposeStrategy explicitly sets the expose strategy for this seed cluster, if not set, the default provided by the master is used.
-	ExposeStrategy corev1.ServiceType `json:"expose_strategy,omitempty"`
+	ExposeStrategy ExposeStrategy `json:"expose_strategy,omitempty"`
 }
 
 type NodeportProxyConfig struct {
@@ -146,6 +146,7 @@ type DatacenterSpec struct {
 	GCP          *DatacenterSpecGCP          `json:"gcp,omitempty"`
 	Kubevirt     *DatacenterSpecKubevirt     `json:"kubevirt,omitempty"`
 	Alibaba      *DatacenterSpecAlibaba      `json:"alibaba,omitempty"`
+	Anexia       *DatacenterSpecAnexia       `json:"anexia,omitempty"`
 
 	//nolint:staticcheck
 	//lint:ignore SA5008 omitgenyaml is used by the example-yaml-generator
@@ -239,15 +240,20 @@ type DatacenterSpecVSphere struct {
 	DefaultDatastore string `json:"datastore"`
 	// The name of the datacenter to use.
 	Datacenter string `json:"datacenter"`
-	// The name of the Kubernetes cluster to use.
+	// Optional: The name of the vSphere cluster to use.
+	// Cluster is deprecated and may be removed in future releases as it is
+	// currently ignored.
+	// The cluster hosting the VMs will be the same VM used as a template is
+	// located.
 	Cluster string `json:"cluster"`
 	// Optional: The root path for cluster specific VM folders. Each cluster gets its own
 	// folder below the root folder. Must be the FQDN (for example
 	// "/datacenter-1/vm/all-kubermatic-vms-in-here") and defaults to the root VM
 	// folder: "/datacenter-1/vm"
 	RootPath string `json:"root_path"`
-	// A list of templates to use for a given operating system. You must define at
-	// least one template.
+	// A list of VM templates to use for a given operating system. You must
+	// define at least one template.
+	// See: https://github.com/kubermatic/machine-controller/blob/master/docs/vsphere.md#template-vms-preparation
 	Templates ImageList `json:"templates"`
 
 	// Optional: Infra management user is the user that will be used for everything
@@ -302,6 +308,14 @@ type DatacenterSpecFake struct {
 
 // DatacenterSpecKubevirt describes a kubevirt datacenter.
 type DatacenterSpecKubevirt struct {
+	// DNSPolicy represents the dns policy for the pod. Valid values are 'ClusterFirstWithHostNet', 'ClusterFirst',
+	//'Default' or 'None'. Defaults to "ClusterFirst". DNS parameters given in DNSConfig will be merged with the
+	// policy selected with DNSPolicy.
+	DNSPolicy string `json:"dns_policy,omitempty"`
+
+	// DNSConfig represents the DNS parameters of a pod. Parameters specified here will be merged to the generated DNS
+	// configuration based on DNSPolicy.
+	DNSConfig *corev1.PodDNSConfig `json:"dns_config,omitempty"`
 }
 
 // DatacenterSpecAlibaba describes a alibaba datacenter.
@@ -309,6 +323,12 @@ type DatacenterSpecAlibaba struct {
 	// Region to use, for a full list of regions see
 	// https://www.alibabacloud.com/help/doc-detail/40654.htm
 	Region string `json:"region"`
+}
+
+// DatacenterSpecAnexia describes a anexia datacenter.
+type DatacenterSpecAnexia struct {
+	// LocationID the location of the region
+	LocationID string `json:"location_id"`
 }
 
 type ProxyValue string

@@ -24,8 +24,10 @@ import (
 	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/addon"
 	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/addoninstaller"
 	cloudcontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/cloud"
+	constrainttemplatecontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/constraint-template-controller"
 	etcdbackupcontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/etcdbackup"
 	etcdrestorecontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/etcdrestore"
+	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/initialmachinedeployment"
 	kubernetescontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/kubernetes"
 	localstoragepvwatcher "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/localstorage-pvwatcher"
 	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/monitoring"
@@ -60,6 +62,8 @@ var AllControllers = map[string]controllerCreator{
 	rancher.ControllerName:                        createRancherController,
 	pvwatcher.ControllerName:                      createPvWatcherController,
 	localstoragepvwatcher.ControllerName:          createLocalStoragePVController,
+	constrainttemplatecontroller.ControllerName:   createConstraintTemplateController,
+	initialmachinedeployment.ControllerName:       createInitialMachineDeploymentController,
 }
 
 type controllerCreator func(*controllerContext) error
@@ -80,6 +84,7 @@ func createSeedConditionUpToDateController(ctrlCtx *controllerContext) error {
 		ctrlCtx.mgr,
 		ctrlCtx.runOptions.workerCount,
 		ctrlCtx.runOptions.workerName,
+		ctrlCtx.versions,
 	)
 }
 
@@ -90,6 +95,7 @@ func createCloudController(ctrlCtx *controllerContext) error {
 		ctrlCtx.runOptions.workerCount,
 		ctrlCtx.seedGetter,
 		ctrlCtx.runOptions.workerName,
+		ctrlCtx.versions,
 	); err != nil {
 		return fmt.Errorf("failed to add cloud controller to mgr: %v", err)
 	}
@@ -116,14 +122,14 @@ func createOpenshiftController(ctrlCtx *controllerContext) error {
 			EtcdDataCorruptionChecks: ctrlCtx.runOptions.featureGates.Enabled(features.EtcdDataCorruptionChecks),
 			VPA:                      ctrlCtx.runOptions.featureGates.Enabled(features.VerticalPodAutoscaler),
 		},
-		ctrlCtx.runOptions.concurrentClusterUpdate); err != nil {
+		ctrlCtx.runOptions.concurrentClusterUpdate,
+		ctrlCtx.versions); err != nil {
 		return fmt.Errorf("failed to add openshift controller to mgr: %v", err)
 	}
 	return nil
 }
 
 func createKubernetesController(ctrlCtx *controllerContext) error {
-
 	return kubernetescontroller.Add(
 		ctrlCtx.mgr,
 		ctrlCtx.log,
@@ -159,6 +165,7 @@ func createKubernetesController(ctrlCtx *controllerContext) error {
 			KubernetesOIDCAuthentication: ctrlCtx.runOptions.featureGates.Enabled(features.OpenIDAuthPlugin),
 			EtcdLauncher:                 ctrlCtx.runOptions.featureGates.Enabled(features.EtcdLauncher),
 		},
+		ctrlCtx.versions,
 	)
 }
 
@@ -190,6 +197,7 @@ func createEtcdBackupController(ctrlCtx *controllerContext) error {
 		deleteContainer,
 		cleanupContainer,
 		ctrlCtx.runOptions.backupContainerImage,
+		ctrlCtx.versions,
 	)
 }
 
@@ -225,6 +233,7 @@ func createEtcdRestoreController(ctrlCtx *controllerContext) error {
 		ctrlCtx.log,
 		ctrlCtx.runOptions.workerCount,
 		ctrlCtx.runOptions.workerName,
+		ctrlCtx.versions,
 	)
 }
 
@@ -252,6 +261,7 @@ func createMonitoringController(ctrlCtx *controllerContext) error {
 		monitoring.Features{
 			VPA: ctrlCtx.runOptions.featureGates.Enabled(features.VerticalPodAutoscaler),
 		},
+		ctrlCtx.versions,
 	)
 }
 
@@ -285,8 +295,15 @@ func createUpdateController(ctrlCtx *controllerContext) error {
 		return fmt.Errorf("failed to create update manager: %v", err)
 	}
 
-	return updatecontroller.Add(ctrlCtx.mgr, ctrlCtx.runOptions.workerCount, ctrlCtx.runOptions.workerName, updateManager,
-		ctrlCtx.clientProvider, ctrlCtx.log)
+	return updatecontroller.Add(
+		ctrlCtx.mgr,
+		ctrlCtx.runOptions.workerCount,
+		ctrlCtx.runOptions.workerName,
+		updateManager,
+		ctrlCtx.clientProvider,
+		ctrlCtx.log,
+		ctrlCtx.versions,
+	)
 }
 
 func createAddonController(ctrlCtx *controllerContext) error {
@@ -311,6 +328,7 @@ func createAddonController(ctrlCtx *controllerContext) error {
 		ctrlCtx.clientProvider,
 		ctrlCtx.runOptions.externalURL,
 		ctrlCtx.seedGetter,
+		ctrlCtx.versions,
 	)
 }
 
@@ -321,14 +339,18 @@ func createAddonInstallerController(ctrlCtx *controllerContext) error {
 		ctrlCtx.runOptions.workerCount,
 		ctrlCtx.runOptions.workerName,
 		ctrlCtx.runOptions.kubernetesAddons,
-		ctrlCtx.runOptions.openshiftAddons)
+		ctrlCtx.runOptions.openshiftAddons,
+		ctrlCtx.versions,
+	)
 }
 
 func createRancherController(ctrlCtx *controllerContext) error {
 	return rancher.Add(
 		ctrlCtx.mgr,
 		ctrlCtx.log,
-		ctrlCtx.clientProvider)
+		ctrlCtx.clientProvider,
+		ctrlCtx.versions,
+	)
 }
 
 func createPvWatcherController(ctrlCtx *controllerContext) error {
@@ -336,8 +358,32 @@ func createPvWatcherController(ctrlCtx *controllerContext) error {
 		ctrlCtx.log,
 		ctrlCtx.mgr,
 		ctrlCtx.runOptions.workerCount,
-		ctrlCtx.runOptions.workerName)
+		ctrlCtx.runOptions.workerName,
+	)
+}
 
+func createConstraintTemplateController(ctrlCtx *controllerContext) error {
+	return constrainttemplatecontroller.Add(
+		ctrlCtx.ctx,
+		ctrlCtx.mgr,
+		ctrlCtx.clientProvider,
+		ctrlCtx.log,
+		ctrlCtx.runOptions.workerName,
+		ctrlCtx.runOptions.workerCount,
+	)
+}
+
+func createInitialMachineDeploymentController(ctrlCtx *controllerContext) error {
+	return initialmachinedeployment.Add(
+		ctrlCtx.ctx,
+		ctrlCtx.mgr,
+		ctrlCtx.runOptions.workerCount,
+		ctrlCtx.runOptions.workerName,
+		ctrlCtx.seedGetter,
+		ctrlCtx.clientProvider,
+		ctrlCtx.log,
+		ctrlCtx.versions,
+	)
 }
 
 func createLocalStoragePVController(ctrlCtx *controllerContext) error {

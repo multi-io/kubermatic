@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"regexp"
 
-	"k8c.io/kubermatic/v2/pkg/resources"
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
+	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -31,6 +31,7 @@ import (
 
 const (
 	daemonSetName = "user-ssh-keys-agent"
+	dockerImage   = "quay.io/kubermatic/user-ssh-keys-agent"
 )
 
 var (
@@ -38,7 +39,7 @@ var (
 	hostPathType            = corev1.HostPathDirectoryOrCreate
 )
 
-func DaemonSetCreator() reconciling.NamedDaemonSetCreatorGetter {
+func DaemonSetCreator(versions kubermatic.Versions) reconciling.NamedDaemonSetCreatorGetter {
 	return func() (string, reconciling.DaemonSetCreator) {
 		return daemonSetName, func(ds *appsv1.DaemonSet) (*appsv1.DaemonSet, error) {
 			ds.Spec.UpdateStrategy = appsv1.DaemonSetUpdateStrategy{
@@ -54,13 +55,13 @@ func DaemonSetCreator() reconciling.NamedDaemonSetCreatorGetter {
 			ds.Spec.Template.Spec.ServiceAccountName = serviceAccountName
 
 			re := regexp.MustCompile(`-sys11-.*`)
-			version := re.ReplaceAllString(resources.KUBERMATICCOMMIT, "")
+			version := re.ReplaceAllString(versions.Kubermatic, "")
 
 			ds.Spec.Template.Spec.Containers = []corev1.Container{
 				{
 					Name:            daemonSetName,
 					ImagePullPolicy: corev1.PullAlways,
-					Image:           fmt.Sprintf("quay.io/kubermatic/user-ssh-keys-agent:%s", version),
+					Image:           fmt.Sprintf("%s:%s", dockerImage, version),
 					Command:         []string{fmt.Sprintf("/usr/local/bin/%v", daemonSetName)},
 					VolumeMounts: []corev1.VolumeMount{
 						{

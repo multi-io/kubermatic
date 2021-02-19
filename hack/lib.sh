@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 # Copyright 2020 The Kubermatic Kubernetes Platform contributors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -11,6 +13,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+### Contains commonly used functions for the other scripts.
 
 # Required for signal propagation to work so
 # the cleanup trap gets executed when a script
@@ -55,7 +59,8 @@ actual_retry() {
 }
 
 echodate() {
-  echo "[$(date -Is)]" "$@"
+  # do not use -Is to keep this compatible with macOS
+  echo "[$(date +%Y-%m-%dT%H:%M:%S%:z)]" "$@"
 }
 
 write_junit() {
@@ -83,6 +88,27 @@ write_junit() {
     </testsuite>
 </testsuites>
 EOF
+}
+
+containerize() {
+  local cmd="$1"
+  local image="${CONTAINERIZE_IMAGE:-quay.io/kubermatic/util:1.4.1}"
+  local gocache="${CONTAINERIZE_GOCACHE:-/tmp/.gocache}"
+
+  if ! [ -f /.dockerenv ]; then
+    echodate "Running $cmd in a Docker container using $image..."
+
+    exec docker run \
+      -v $PWD:/go/src/k8c.io/kubermatic \
+      -w /go/src/k8c.io/kubermatic \
+      -e "GOCACHE=$gocache" \
+      -u "$(id -u):$(id -g)" \
+      --rm \
+      -it \
+      $image $cmd $@
+
+    exit $?
+  fi
 }
 
 ensure_github_host_pubkey() {
@@ -266,14 +292,14 @@ check_all_deployments_ready() {
   local deployments
   deployments=$(kubectl -n $namespace get deployments -o json)
 
-  if [ $(jq '.items | length' <<< $deployments) -eq 0 ]; then
+  if [ $(echo "$deployments" | jq '.items | length') -eq 0 ]; then
     echodate "No Deployments created yet."
     return 1
   fi
 
   # check that all Deployments are ready
   local unready
-  unready=$(jq -r '[.items[] | select(.spec.replicas > 0) | select (.status.availableReplicas < .spec.replicas) | .metadata.name] | @tsv' <<< $deployments)
+  unready=$(echo "$deployments" | jq -r '[.items[] | select(.spec.replicas > 0) | select (.status.availableReplicas < .spec.replicas) | .metadata.name] | @tsv')
   if [ -n "$unready" ]; then
     echodate "Not all Deployments have finished rolling out, namely: $unready"
     return 1
@@ -282,7 +308,7 @@ check_all_deployments_ready() {
   return 0
 }
 
-function cleanup_kubermatic_clusters_in_kind {
+cleanup_kubermatic_clusters_in_kind() {
   # Tolerate errors and just continue
   set +e
   # Clean up clusters
@@ -294,3 +320,25 @@ function cleanup_kubermatic_clusters_in_kind {
   pkill -P $$
   set -e
 }
+
+start_docker_daemon() {
+  # Start Docker daemon
+  echodate "Starting Docker"
+  dockerd > /tmp/docker.log 2>&1 &
+  echodate "Started Docker successfully"
+
+  function docker_logs {
+    if [[ $? -ne 0 ]]; then
+      echodate "Printing Docker logs"
+      cat /tmp/docker.log
+      echodate "Done printing Docker logs"
+    fi
+  }
+  appendTrap docker_logs EXIT
+
+  # Wait for Docker to start
+  echodate "Waiting for Docker"
+  retry 5 docker stats --no-stream
+  echodate "Docker became ready"
+}
+

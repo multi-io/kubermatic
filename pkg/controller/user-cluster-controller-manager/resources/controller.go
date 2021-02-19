@@ -30,8 +30,9 @@ import (
 
 	"k8c.io/kubermatic/v2/pkg/resources"
 	"k8c.io/kubermatic/v2/pkg/resources/certificates/triple"
+	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 
-	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -73,6 +74,9 @@ func Add(
 	cloudCredentialSecretTemplate *corev1.Secret,
 	openshiftConsoleCallbackURI string,
 	dnsClusterIP string,
+	opaIntegration bool,
+	versions kubermatic.Versions,
+	userSSHKeyAgent bool,
 	log *zap.SugaredLogger) error {
 	r := &reconciler{
 		openshift:                     openshift,
@@ -87,6 +91,9 @@ func Add(
 		platform:                      cloudProviderName,
 		openshiftConsoleCallbackURI:   openshiftConsoleCallbackURI,
 		dnsClusterIP:                  dnsClusterIP,
+		opaIntegration:                opaIntegration,
+		userSSHKeyAgent:               userSSHKeyAgent,
+		versions:                      versions,
 	}
 
 	var err error
@@ -153,7 +160,8 @@ func Add(
 		&rbacv1.RoleBinding{},
 		&rbacv1.ClusterRole{},
 		&rbacv1.ClusterRoleBinding{},
-		&admissionregistrationv1beta1.MutatingWebhookConfiguration{},
+		&admissionregistrationv1.MutatingWebhookConfiguration{},
+		&admissionregistrationv1.ValidatingWebhookConfiguration{},
 		&apiextensionsv1beta1.CustomResourceDefinition{},
 	}
 
@@ -233,6 +241,9 @@ type reconciler struct {
 	cloudCredentialSecretTemplate *corev1.Secret
 	openshiftConsoleCallbackURI   string
 	dnsClusterIP                  string
+	opaIntegration                bool
+	userSSHKeyAgent               bool
+	versions                      kubermatic.Versions
 
 	rLock                      *sync.Mutex
 	reconciledSuccessfullyOnce bool

@@ -19,7 +19,9 @@ package hack
 import (
 	"net/http"
 
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	v2 "k8c.io/kubermatic/v2/pkg/handler/v2"
+	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 
 	"github.com/gorilla/mux"
 	prometheusapi "github.com/prometheus/client_golang/api"
@@ -37,7 +39,6 @@ import (
 	"k8c.io/kubermatic/v2/pkg/version"
 	"k8c.io/kubermatic/v2/pkg/watcher"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -79,7 +80,11 @@ func NewTestRouting(
 	settingsWatcher watcher.SettingsWatcher,
 	userWatcher watcher.UserWatcher,
 	externalClusterProvider provider.ExternalClusterProvider,
-	privilegedExternalClusterProvider provider.PrivilegedExternalClusterProvider) http.Handler {
+	privilegedExternalClusterProvider provider.PrivilegedExternalClusterProvider,
+	constraintTemplateProvider provider.ConstraintTemplateProvider,
+	constraintProvider provider.ConstraintProvider,
+	privilegedConstraintProvider provider.PrivilegedConstraintProvider,
+	kubermaticVersions kubermatic.Versions) http.Handler {
 
 	updateManager := version.New(versions, updates)
 
@@ -113,7 +118,7 @@ func NewTestRouting(
 		SATokenGenerator:                      saTokenGenerator,
 		EventRecorderProvider:                 eventRecorderProvider,
 		KeycloakFacade:                        keycloakFacade,
-		ExposeStrategy:                        corev1.ServiceTypeNodePort,
+		ExposeStrategy:                        kubermaticv1.ExposeStrategyNodePort,
 		AccessibleAddons:                      sets.String{},
 		UserInfoGetter:                        userInfoGetter,
 		SettingsProvider:                      settingsProvider,
@@ -123,6 +128,10 @@ func NewTestRouting(
 		UserWatcher:                           userWatcher,
 		ExternalClusterProvider:               externalClusterProvider,
 		PrivilegedExternalClusterProvider:     privilegedExternalClusterProvider,
+		ConstraintTemplateProvider:            constraintTemplateProvider,
+		ConstraintProvider:                    constraintProvider,
+		PrivilegedConstraintProvider:          privilegedConstraintProvider,
+		Versions:                              kubermaticVersions,
 	}
 
 	r := handler.NewRouting(routingParams)

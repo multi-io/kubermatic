@@ -49,7 +49,7 @@ const (
 	DefaultSeedControllerMgrReplicas              = 1
 	DefaultMasterControllerMgrReplicas            = 1
 	DefaultAPIServerReplicas                      = 2
-	DefaultExposeStrategy                         = operatorv1alpha1.NodePortStrategy
+	DefaultExposeStrategy                         = kubermaticv1.ExposeStrategyNodePort
 	DefaultVPARecommenderDockerRepository         = "gcr.io/google_containers/vpa-recommender"
 	DefaultVPAUpdaterDockerRepository             = "gcr.io/google_containers/vpa-updater"
 	DefaultVPAAdmissionControllerDockerRepository = "gcr.io/google_containers/vpa-admission-controller"
@@ -64,6 +64,7 @@ const (
 
 var (
 	DefaultAccessibleAddons = []string{
+		"cluster-autoscaler",
 		"node-exporter",
 		"gatekeeper",
 	}
@@ -187,21 +188,25 @@ var (
 	}
 
 	DefaultKubernetesVersioning = operatorv1alpha1.KubermaticVersioningConfiguration{
-		Default: semver.MustParse("v1.18.10"),
+		Default: semver.MustParse("v1.19.3"),
 		Versions: []*semver.Version{
 			// Kubernetes 1.17
 			semver.MustParse("v1.17.9"),
 			semver.MustParse("v1.17.11"),
 			semver.MustParse("v1.17.12"),
 			semver.MustParse("v1.17.13"),
+			semver.MustParse("v1.17.16"),
 			// Kubernetes 1.18
 			semver.MustParse("v1.18.6"),
 			semver.MustParse("v1.18.8"),
 			semver.MustParse("v1.18.10"),
+			semver.MustParse("v1.18.14"),
 			// Kubernetes 1.19
 			semver.MustParse("v1.19.0"),
 			semver.MustParse("v1.19.2"),
 			semver.MustParse("v1.19.3"),
+			// Kubernetes 1.20
+			semver.MustParse("v1.20.2"),
 		},
 		Updates: []operatorv1alpha1.Update{
 			{
@@ -272,6 +277,18 @@ var (
 				// Allow to change to any patch version
 				From: "1.19.*",
 				To:   "1.19.*",
+			},
+			{
+				// Allow to next minor release
+				From: "1.19.*",
+				To:   "1.20.*",
+			},
+
+			// ======= 1.20 =======
+			{
+				// Allow to change to any patch version
+				From: "1.20.*",
+				To:   "1.20.*",
 			},
 		},
 	}
@@ -459,11 +476,15 @@ func DefaultConfiguration(config *operatorv1alpha1.KubermaticConfiguration, logg
 		return copy, err
 	}
 
-	if err := defaultDockerRepo(&copy.Spec.UserCluster.KubermaticDockerRepository, resources.DefaultKubermaticImage, "userCluster.addons.kubermaticDockerRepository", logger); err != nil {
+	if err := defaultDockerRepo(&copy.Spec.UserCluster.KubermaticDockerRepository, resources.DefaultKubermaticImage, "userCluster.kubermaticDockerRepository", logger); err != nil {
 		return copy, err
 	}
 
-	if err := defaultDockerRepo(&copy.Spec.UserCluster.DNATControllerDockerRepository, resources.DefaultDNATControllerImage, "userCluster.addons.dnatControllerDockerRepository", logger); err != nil {
+	if err := defaultDockerRepo(&copy.Spec.UserCluster.DNATControllerDockerRepository, resources.DefaultDNATControllerImage, "userCluster.dnatControllerDockerRepository", logger); err != nil {
+		return copy, err
+	}
+
+	if err := defaultDockerRepo(&copy.Spec.UserCluster.EtcdLauncherDockerRepository, resources.DefaultEtcdLauncherImage, "userCluster.etcdLauncher.DockerRepository", logger); err != nil {
 		return copy, err
 	}
 

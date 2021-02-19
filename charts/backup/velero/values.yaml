@@ -18,7 +18,7 @@ velero:
   # that also contains the restic binary
   image:
     repository: docker.io/velero/velero
-    tag: v1.4.2
+    tag: v1.5.2
     pullPolicy: IfNotPresent
 
   # CLI flags to pass to velero server; note that the two flags
@@ -115,7 +115,7 @@ velero:
   #    config:
   #      region: eu-west-1
 
-  # glob expressions to find schedule defitions
+  # glob expressions to find schedule definitions
   schedulesPath: schedules/*
 
   # Only kube2iam: change the AWS_ACCOUNT_ID and HEPTIO_VELERO_ROLE_NAME

@@ -105,7 +105,6 @@ func CloudConfig(
 		}
 
 	case cloud.Azure != nil:
-		vnetResourceGroup := cloud.Azure.ResourceGroup
 		azureCloudConfig := &azure.CloudConfig{
 			Cloud:                      "AZUREPUBLICCLOUD",
 			TenantID:                   credentials.Azure.TenantID,
@@ -119,7 +118,7 @@ func CloudConfig(
 			RouteTableName:             cloud.Azure.RouteTableName,
 			SecurityGroupName:          cloud.Azure.SecurityGroup,
 			PrimaryAvailabilitySetName: cloud.Azure.AvailabilitySet,
-			VnetResourceGroup:          &vnetResourceGroup,
+			VnetResourceGroup:          cloud.Azure.ResourceGroup,
 			UseInstanceMetadata:        false,
 		}
 		cloudConfig, err = azure.CloudConfigToString(azureCloudConfig)
@@ -181,7 +180,7 @@ func CloudConfig(
 		sam := map[string]string{}
 		err = json.Unmarshal(b, &sam)
 		if err != nil {
-			return "", fmt.Errorf("failed unmarshalling service account: %v", err)
+			return "", fmt.Errorf("failed unmarshaling service account: %v", err)
 		}
 		projectID := sam["project_id"]
 		if projectID == "" {

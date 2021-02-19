@@ -35,14 +35,12 @@ import (
 	"k8c.io/kubermatic/v2/pkg/semver"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/diff"
-	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/metrics/pkg/apis/metrics/v1beta1"
+	"k8s.io/utils/pointer"
 )
 
 const fakeDC = "fake-dc"
@@ -61,7 +59,7 @@ func TestDeleteClusterEndpoint(t *testing.T) {
 		ExpectedListClusterKeysStatus int
 	}{
 		{
-			Name:             "scenario 1: tests deletion of a cluster and its dependant resources",
+			Name:             "scenario 1: tests deletion of a cluster and its dependent resources",
 			Body:             ``,
 			ExpectedResponse: `{}`,
 			HTTPStatus:       http.StatusOK,
@@ -649,7 +647,7 @@ func TestAssignSSHKeyToClusterEndpoint(t *testing.T) {
 			res := httptest.NewRecorder()
 			var kubermaticObj []runtime.Object
 			kubermaticObj = append(kubermaticObj, tc.ExistingKubermaticObjs...)
-			ep, clientsSets, err := test.CreateTestEndpointAndGetClients(*tc.ExistingAPIUser, nil, []runtime.Object{}, []runtime.Object{}, kubermaticObj, nil, nil, hack.NewTestRouting)
+			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, []runtime.Object{}, kubermaticObj, nil, nil, hack.NewTestRouting)
 			if err != nil {
 				t.Fatalf("failed to create test endpoint due to %v", err)
 			}
@@ -661,31 +659,6 @@ func TestAssignSSHKeyToClusterEndpoint(t *testing.T) {
 			}
 
 			test.CompareWithResult(t, res, tc.ExpectedResponse)
-
-			kubermaticClient := clientsSets.FakeKubermaticClient
-			validatedActions := 0
-			if tc.HTTPStatus == http.StatusCreated {
-				for _, action := range kubermaticClient.Actions() {
-					if action.Matches("update", "usersshkeies") {
-						updateAction, ok := action.(clienttesting.CreateAction)
-						if !ok {
-							t.Fatalf("unexpected action %#v", action)
-						}
-						for _, expectedSSHKey := range tc.ExpectedSSHKeys {
-							sshKeyFromAction := updateAction.GetObject().(*kubermaticv1.UserSSHKey)
-							if sshKeyFromAction.Name == expectedSSHKey.Name {
-								validatedActions++
-								if !equality.Semantic.DeepEqual(updateAction.GetObject().(*kubermaticv1.UserSSHKey), expectedSSHKey) {
-									t.Fatalf("%v", diff.ObjectDiff(expectedSSHKey, updateAction.GetObject().(*kubermaticv1.UserSSHKey)))
-								}
-							}
-						}
-					}
-				}
-				if validatedActions != len(tc.ExpectedSSHKeys) {
-					t.Fatalf("not all update actions were validated, expected to validate %d but validated only %d", len(tc.ExpectedSSHKeys), validatedActions)
-				}
-			}
 		})
 	}
 }
@@ -717,7 +690,7 @@ func TestCreateClusterEndpoint(t *testing.T) {
 		{
 			Name:             "scenario 2: cluster is created when valid spec and ssh key are passed",
 			Body:             `{"cluster":{"name":"keen-snyder","spec":{"version":"1.15.0","cloud":{"fake":{"token":"dummy_token"},"dc":"fake-dc"}}}}`,
-			ExpectedResponse: `{"id":"%s","name":"keen-snyder","creationTimestamp":"0001-01-01T00:00:00Z","type":"kubernetes","spec":{"cloud":{"dc":"fake-dc","fake":{}},"clusterNetwork":{"services":{},"pods":{}},"version":"1.15.0","oidc":{},"sys11auth":{}},"status":{"version":"1.15.0","url":""}}`,
+			ExpectedResponse: `{"id":"%s","name":"keen-snyder","creationTimestamp":"0001-01-01T00:00:00Z","type":"kubernetes","spec":{"cloud":{"dc":"fake-dc","fake":{}},"clusterNetwork":{"services":{},"pods":{}},"version":"1.15.0","oidc":{},"sys11auth":{},"enableUserSSHKeyAgent":true},"status":{"version":"1.15.0","url":""}}`,
 			RewriteClusterID: true,
 			HTTPStatus:       http.StatusCreated,
 			ProjectToSync:    test.GenDefaultProject().Name,
@@ -775,7 +748,7 @@ func TestCreateClusterEndpoint(t *testing.T) {
 		{
 			Name:                   "scenario 5: openShift cluster is created",
 			Body:                   `{"cluster":{"name":"keen-snyder","type":"openshift","spec":{"version":"4.1.0","openshift":{"imagePullSecret": "some-secret"},"cloud":{"fake":{"token":"dummy_token"},"dc":"fake-dc"}}}}`,
-			ExpectedResponse:       `{"id":"%s","name":"keen-snyder","creationTimestamp":"0001-01-01T00:00:00Z","type":"openshift","spec":{"cloud":{"dc":"fake-dc","fake":{}},"clusterNetwork":{"services":{},"pods":{}},"version":"4.1.0","oidc":{},"sys11auth":{}},"status":{"version":"4.1.0","url":""}}`,
+			ExpectedResponse:       `{"id":"%s","name":"keen-snyder","creationTimestamp":"0001-01-01T00:00:00Z","type":"openshift","spec":{"cloud":{"dc":"fake-dc","fake":{}},"clusterNetwork":{"services":{},"pods":{}},"version":"4.1.0","oidc":{},"sys11auth":{},"enableUserSSHKeyAgent":true},"status":{"version":"4.1.0","url":""}}`,
 			RewriteClusterID:       true,
 			HTTPStatus:             http.StatusCreated,
 			ProjectToSync:          test.GenDefaultProject().Name,
@@ -786,7 +759,7 @@ func TestCreateClusterEndpoint(t *testing.T) {
 		{
 			Name:                   "scenario 6: openShift cluster is created with existing custom credential",
 			Body:                   `{"cluster":{"name":"keen-snyder","type":"openshift","credential":"fake","spec":{"version":"4.1.0","openshift":{"imagePullSecret": "some-secret"},"cloud":{"fake":{},"dc":"fake-dc"}}}}`,
-			ExpectedResponse:       `{"id":"%s","name":"keen-snyder","creationTimestamp":"0001-01-01T00:00:00Z","type":"openshift","spec":{"cloud":{"dc":"fake-dc","fake":{}},"clusterNetwork":{"services":{},"pods":{}},"version":"4.1.0","oidc":{},"sys11auth":{}},"status":{"version":"4.1.0","url":""}}`,
+			ExpectedResponse:       `{"id":"%s","name":"keen-snyder","creationTimestamp":"0001-01-01T00:00:00Z","type":"openshift","spec":{"cloud":{"dc":"fake-dc","fake":{}},"clusterNetwork":{"services":{},"pods":{}},"version":"4.1.0","oidc":{},"sys11auth":{},"enableUserSSHKeyAgent":true},"status":{"version":"4.1.0","url":""}}`,
 			RewriteClusterID:       true,
 			HTTPStatus:             http.StatusCreated,
 			ProjectToSync:          test.GenDefaultProject().Name,
@@ -797,7 +770,7 @@ func TestCreateClusterEndpoint(t *testing.T) {
 		{
 			Name:                   "scenario 7: custom credential doesn't exist for Fake cloud provider",
 			Body:                   `{"cluster":{"name":"keen-snyder","type":"openshift","credential":"default","spec":{"version":"4.1.0","cloud":{"fake":{},"dc":"fake-dc"}}}}`,
-			ExpectedResponse:       `{"error":{"code":400,"message":"invalid credentials: missing preset 'default' for the user 'bob@acme.com'"}}`,
+			ExpectedResponse:       `{"error":{"code":400,"message":"invalid credentials: preset.kubermatic.k8s.io \"default\" not found"}}`,
 			HTTPStatus:             http.StatusBadRequest,
 			ProjectToSync:          test.GenDefaultProject().Name,
 			ExistingKubermaticObjs: test.GenDefaultKubermaticObjects(test.GenDefaultSettings()),
@@ -835,7 +808,7 @@ func TestCreateClusterEndpoint(t *testing.T) {
 		{
 			Name:             "scenario 10a: create a cluster in email-restricted datacenter, to which the user does have access - legacy single domain restriction with requiredEmailDomains",
 			Body:             `{"cluster":{"name":"keen-snyder","spec":{"version":"1.15.0","cloud":{"fake":{"token":"dummy_token"},"dc":"restricted-fake-dc"}}}}`,
-			ExpectedResponse: `{"id":"%s","name":"keen-snyder","creationTimestamp":"0001-01-01T00:00:00Z","type":"kubernetes","spec":{"cloud":{"dc":"restricted-fake-dc","fake":{}},"clusterNetwork":{"services":{},"pods":{}},"version":"1.15.0","oidc":{},"sys11auth":{}},"status":{"version":"1.15.0","url":""}}`,
+			ExpectedResponse: `{"id":"%s","name":"keen-snyder","creationTimestamp":"0001-01-01T00:00:00Z","type":"kubernetes","spec":{"cloud":{"dc":"restricted-fake-dc","fake":{}},"clusterNetwork":{"services":{},"pods":{}},"version":"1.15.0","oidc":{},"sys11auth":{},"enableUserSSHKeyAgent":true},"status":{"version":"1.15.0","url":""}}`,
 			RewriteClusterID: true,
 			HTTPStatus:       http.StatusCreated,
 			ProjectToSync:    test.GenDefaultProject().Name,
@@ -848,7 +821,7 @@ func TestCreateClusterEndpoint(t *testing.T) {
 		{
 			Name:             "scenario 10b: create a cluster in email-restricted datacenter, to which the user does have access - domain array restriction with `requiredEmailDomains`",
 			Body:             `{"cluster":{"name":"keen-snyder","spec":{"version":"1.15.0","cloud":{"fake":{"token":"dummy_token"},"dc":"restricted-fake-dc2"}}}}`,
-			ExpectedResponse: `{"id":"%s","name":"keen-snyder","creationTimestamp":"0001-01-01T00:00:00Z","type":"kubernetes","spec":{"cloud":{"dc":"restricted-fake-dc2","fake":{}},"clusterNetwork":{"services":{},"pods":{}},"version":"1.15.0","oidc":{},"sys11auth":{}},"status":{"version":"1.15.0","url":""}}`,
+			ExpectedResponse: `{"id":"%s","name":"keen-snyder","creationTimestamp":"0001-01-01T00:00:00Z","type":"kubernetes","spec":{"cloud":{"dc":"restricted-fake-dc2","fake":{}},"clusterNetwork":{"services":{},"pods":{}},"version":"1.15.0","oidc":{},"sys11auth":{},"enableUserSSHKeyAgent":true},"status":{"version":"1.15.0","url":""}}`,
 			RewriteClusterID: true,
 			HTTPStatus:       http.StatusCreated,
 			ProjectToSync:    test.GenDefaultProject().Name,
@@ -861,7 +834,7 @@ func TestCreateClusterEndpoint(t *testing.T) {
 		{
 			Name:             "scenario 11: create a cluster in audit-logging-enforced datacenter, without explicitly enabling audit logging",
 			Body:             `{"cluster":{"name":"keen-snyder","spec":{"version":"1.15.0","cloud":{"fake":{"token":"dummy_token"},"dc":"audited-dc"}}}}`,
-			ExpectedResponse: `{"id":"%s","name":"keen-snyder","creationTimestamp":"0001-01-01T00:00:00Z","type":"kubernetes","spec":{"cloud":{"dc":"audited-dc","fake":{}},"clusterNetwork":{"services":{},"pods":{}},"version":"1.15.0","oidc":{},"sys11auth":{},"auditLogging":{"enabled":true}},"status":{"version":"1.15.0","url":""}}`,
+			ExpectedResponse: `{"id":"%s","name":"keen-snyder","creationTimestamp":"0001-01-01T00:00:00Z","type":"kubernetes","spec":{"cloud":{"dc":"audited-dc","fake":{}},"clusterNetwork":{"services":{},"pods":{}},"version":"1.15.0","oidc":{},"sys11auth":{},"enableUserSSHKeyAgent":true,"auditLogging":{"enabled":true}},"status":{"version":"1.15.0","url":""}}`,
 			RewriteClusterID: true,
 			HTTPStatus:       http.StatusCreated,
 			ProjectToSync:    test.GenDefaultProject().Name,
@@ -874,7 +847,7 @@ func TestCreateClusterEndpoint(t *testing.T) {
 		{
 			Name:             "scenario 12: the admin user can create cluster for any project",
 			Body:             `{"cluster":{"name":"keen-snyder","spec":{"version":"1.15.0","cloud":{"fake":{"token":"dummy_token"},"dc":"fake-dc"}}}}`,
-			ExpectedResponse: `{"id":"%s","name":"keen-snyder","creationTimestamp":"0001-01-01T00:00:00Z","type":"kubernetes","spec":{"cloud":{"dc":"fake-dc","fake":{}},"clusterNetwork":{"services":{},"pods":{}},"version":"1.15.0","oidc":{},"sys11auth":{}},"status":{"version":"1.15.0","url":""}}`,
+			ExpectedResponse: `{"id":"%s","name":"keen-snyder","creationTimestamp":"0001-01-01T00:00:00Z","type":"kubernetes","spec":{"cloud":{"dc":"fake-dc","fake":{}},"clusterNetwork":{"services":{},"pods":{}},"version":"1.15.0","oidc":{},"sys11auth":{},"enableUserSSHKeyAgent":true},"status":{"version":"1.15.0","url":""}}`,
 			RewriteClusterID: true,
 			HTTPStatus:       http.StatusCreated,
 			ProjectToSync:    test.GenDefaultProject().Name,
@@ -1105,7 +1078,7 @@ func TestPatchCluster(t *testing.T) {
 		{
 			Name:             "scenario 1: update the cluster version",
 			Body:             `{"spec":{"version":"1.2.3"}}`,
-			ExpectedResponse: `{"id":"keen-snyder","name":"clusterAbc","creationTimestamp":"2013-02-03T19:54:00Z","type":"kubernetes","spec":{"cloud":{"dc":"fake-dc","fake":{}},"clusterNetwork":{"services":{},"pods":{}},"version":"1.2.3","oidc":{},"sys11auth":{}},"status":{"version":"1.2.3","url":"https://w225mx4z66.asia-east1-a-1.cloud.kubermatic.io:31885"}}`,
+			ExpectedResponse: `{"id":"keen-snyder","name":"clusterAbc","creationTimestamp":"2013-02-03T19:54:00Z","type":"kubernetes","spec":{"cloud":{"dc":"fake-dc","fake":{}},"clusterNetwork":{"services":{},"pods":{}},"version":"1.2.3","oidc":{},"sys11auth":{},"enableUserSSHKeyAgent":false},"status":{"version":"1.2.3","url":"https://w225mx4z66.asia-east1-a-1.cloud.kubermatic.io:31885"}}`,
 			cluster:          "keen-snyder",
 			HTTPStatus:       http.StatusOK,
 			project:          test.GenDefaultProject().Name,
@@ -1130,9 +1103,9 @@ func TestPatchCluster(t *testing.T) {
 		},
 		// scenario 3
 		{
-			Name:             "scenario 3: tried to update cluser with older but compatible nodes",
+			Name:             "scenario 3: tried to update cluster with older but compatible nodes",
 			Body:             `{"spec":{"version":"9.11.3"}}`, // kubelet is 9.9.9, maximum compatible master is 9.11.x
-			ExpectedResponse: `{"id":"keen-snyder","name":"clusterAbc","creationTimestamp":"2013-02-03T19:54:00Z","type":"kubernetes","spec":{"cloud":{"dc":"fake-dc","fake":{}},"clusterNetwork":{"services":{},"pods":{}},"version":"9.11.3","oidc":{},"sys11auth":{}},"status":{"version":"9.11.3","url":"https://w225mx4z66.asia-east1-a-1.cloud.kubermatic.io:31885"}}`,
+			ExpectedResponse: `{"id":"keen-snyder","name":"clusterAbc","creationTimestamp":"2013-02-03T19:54:00Z","type":"kubernetes","spec":{"cloud":{"dc":"fake-dc","fake":{}},"clusterNetwork":{"services":{},"pods":{}},"version":"9.11.3","oidc":{},"sys11auth":{},"enableUserSSHKeyAgent":false},"status":{"version":"9.11.3","url":"https://w225mx4z66.asia-east1-a-1.cloud.kubermatic.io:31885"}}`,
 			cluster:          "keen-snyder",
 			HTTPStatus:       http.StatusOK,
 			project:          test.GenDefaultProject().Name,
@@ -1151,7 +1124,7 @@ func TestPatchCluster(t *testing.T) {
 		},
 		// scenario 4
 		{
-			Name:             "scenario 4: tried to update cluser with old nodes",
+			Name:             "scenario 4: tried to update cluster with old nodes",
 			Body:             `{"spec":{"version":"9.12.3"}}`, // kubelet is 9.9.9, maximum compatible master is 9.11.x
 			ExpectedResponse: `{"error":{"code":400,"message":"Cluster contains nodes running the following incompatible kubelet versions: [9.9.9]. Upgrade your nodes before you upgrade the cluster."}}`,
 			cluster:          "keen-snyder",
@@ -1172,7 +1145,7 @@ func TestPatchCluster(t *testing.T) {
 		},
 		// scenario 5
 		{
-			Name:             "scenario 5: tried to downgrade cluser to version older than its nodes",
+			Name:             "scenario 5: tried to downgrade cluster to version older than its nodes",
 			Body:             `{"spec":{"version":"9.8.12"}}`, // kubelet is 9.9.9, cluster cannot be older
 			ExpectedResponse: `{"error":{"code":400,"message":"Cluster contains nodes running the following incompatible kubelet versions: [9.9.9]. Upgrade your nodes before you upgrade the cluster."}}`,
 			cluster:          "keen-snyder",
@@ -1195,7 +1168,7 @@ func TestPatchCluster(t *testing.T) {
 		{
 			Name:             "scenario 6: the admin John can update Bob's cluster version",
 			Body:             `{"spec":{"version":"1.2.3"}}`,
-			ExpectedResponse: `{"id":"keen-snyder","name":"clusterAbc","creationTimestamp":"2013-02-03T19:54:00Z","type":"kubernetes","spec":{"cloud":{"dc":"fake-dc","fake":{}},"clusterNetwork":{"services":{},"pods":{}},"version":"1.2.3","oidc":{},"sys11auth":{}},"status":{"version":"1.2.3","url":"https://w225mx4z66.asia-east1-a-1.cloud.kubermatic.io:31885"}}`,
+			ExpectedResponse: `{"id":"keen-snyder","name":"clusterAbc","creationTimestamp":"2013-02-03T19:54:00Z","type":"kubernetes","spec":{"cloud":{"dc":"fake-dc","fake":{}},"clusterNetwork":{"services":{},"pods":{}},"version":"1.2.3","oidc":{},"sys11auth":{},"enableUserSSHKeyAgent":false},"status":{"version":"1.2.3","url":"https://w225mx4z66.asia-east1-a-1.cloud.kubermatic.io:31885"}}`,
 			cluster:          "keen-snyder",
 			HTTPStatus:       http.StatusOK,
 			project:          test.GenDefaultProject().Name,
@@ -1267,7 +1240,7 @@ func TestGetCluster(t *testing.T) {
 		{
 			Name:             "scenario 1: gets cluster with the given name that belongs to the given project",
 			Body:             ``,
-			ExpectedResponse: `{"id":"defClusterID","name":"defClusterName","creationTimestamp":"2013-02-03T19:54:00Z","type":"kubernetes","spec":{"cloud":{"dc":"FakeDatacenter","fake":{}},"clusterNetwork":{"services":{},"pods":{}},"version":"9.9.9","oidc":{},"sys11auth":{}},"status":{"version":"9.9.9","url":"https://w225mx4z66.asia-east1-a-1.cloud.kubermatic.io:31885"}}`,
+			ExpectedResponse: `{"id":"defClusterID","name":"defClusterName","creationTimestamp":"2013-02-03T19:54:00Z","type":"kubernetes","spec":{"cloud":{"dc":"FakeDatacenter","fake":{}},"clusterNetwork":{"services":{},"pods":{}},"version":"9.9.9","oidc":{},"sys11auth":{},"enableUserSSHKeyAgent":false},"status":{"version":"9.9.9","url":"https://w225mx4z66.asia-east1-a-1.cloud.kubermatic.io:31885"}}`,
 			ClusterToGet:     test.GenDefaultCluster().Name,
 			HTTPStatus:       http.StatusOK,
 			ExistingKubermaticObjs: test.GenDefaultKubermaticObjects(
@@ -1280,7 +1253,7 @@ func TestGetCluster(t *testing.T) {
 		{
 			Name:             "scenario 2: gets cluster for Openstack and no sensitive data (credentials) are returned",
 			Body:             ``,
-			ExpectedResponse: `{"id":"defClusterID","name":"defClusterName","creationTimestamp":"2013-02-03T19:54:00Z","type":"kubernetes","spec":{"cloud":{"dc":"OpenstackDatacenter","openstack":{"floatingIpPool":"floatingIPPool","tenant":"tenant","domain":"domain","network":"network","securityGroups":"securityGroups","routerID":"routerID","subnetID":"subnetID"}},"clusterNetwork":{"services":{},"pods":{}},"version":"9.9.9","oidc":{},"sys11auth":{}},"status":{"version":"9.9.9","url":"https://w225mx4z66.asia-east1-a-1.cloud.kubermatic.io:31885"}}`,
+			ExpectedResponse: `{"id":"defClusterID","name":"defClusterName","creationTimestamp":"2013-02-03T19:54:00Z","type":"kubernetes","spec":{"cloud":{"dc":"OpenstackDatacenter","openstack":{"floatingIpPool":"floatingIPPool","tenant":"tenant","domain":"domain","network":"network","securityGroups":"securityGroups","routerID":"routerID","subnetID":"subnetID"}},"clusterNetwork":{"services":{},"pods":{}},"version":"9.9.9","oidc":{},"sys11auth":{},"enableUserSSHKeyAgent":false},"status":{"version":"9.9.9","url":"https://w225mx4z66.asia-east1-a-1.cloud.kubermatic.io:31885"}}`,
 			ClusterToGet:     test.GenDefaultCluster().Name,
 			HTTPStatus:       http.StatusOK,
 			ExistingKubermaticObjs: test.GenDefaultKubermaticObjects(
@@ -1293,7 +1266,7 @@ func TestGetCluster(t *testing.T) {
 		{
 			Name:             "scenario 3: the admin John can get Bob's cluster",
 			Body:             ``,
-			ExpectedResponse: `{"id":"defClusterID","name":"defClusterName","creationTimestamp":"2013-02-03T19:54:00Z","type":"kubernetes","spec":{"cloud":{"dc":"OpenstackDatacenter","openstack":{"floatingIpPool":"floatingIPPool","tenant":"tenant","domain":"domain","network":"network","securityGroups":"securityGroups","routerID":"routerID","subnetID":"subnetID"}},"clusterNetwork":{"services":{},"pods":{}},"version":"9.9.9","oidc":{},"sys11auth":{}},"status":{"version":"9.9.9","url":"https://w225mx4z66.asia-east1-a-1.cloud.kubermatic.io:31885"}}`,
+			ExpectedResponse: `{"id":"defClusterID","name":"defClusterName","creationTimestamp":"2013-02-03T19:54:00Z","type":"kubernetes","spec":{"cloud":{"dc":"OpenstackDatacenter","openstack":{"floatingIpPool":"floatingIPPool","tenant":"tenant","domain":"domain","network":"network","securityGroups":"securityGroups","routerID":"routerID","subnetID":"subnetID"}},"clusterNetwork":{"services":{},"pods":{}},"version":"9.9.9","oidc":{},"sys11auth":{},"enableUserSSHKeyAgent":false},"status":{"version":"9.9.9","url":"https://w225mx4z66.asia-east1-a-1.cloud.kubermatic.io:31885"}}`,
 			ClusterToGet:     test.GenDefaultCluster().Name,
 			HTTPStatus:       http.StatusOK,
 			ExistingKubermaticObjs: test.GenDefaultKubermaticObjects(
@@ -1365,7 +1338,8 @@ func TestListClusters(t *testing.T) {
 							DatacenterName: "FakeDatacenter",
 							Fake:           &kubermaticv1.FakeCloudSpec{},
 						},
-						Version: *semver.NewSemverOrDie("9.9.9"),
+						Version:               *semver.NewSemverOrDie("9.9.9"),
+						EnableUserSSHKeyAgent: pointer.BoolPtr(false),
 					},
 					Status: apiv1.ClusterStatus{
 						Version: *semver.NewSemverOrDie("9.9.9"),
@@ -1384,7 +1358,8 @@ func TestListClusters(t *testing.T) {
 							DatacenterName: "FakeDatacenter",
 							Fake:           &kubermaticv1.FakeCloudSpec{},
 						},
-						Version: *semver.NewSemverOrDie("9.9.9"),
+						Version:               *semver.NewSemverOrDie("9.9.9"),
+						EnableUserSSHKeyAgent: pointer.BoolPtr(false),
 					},
 					Status: apiv1.ClusterStatus{
 						Version: *semver.NewSemverOrDie("9.9.9"),
@@ -1411,7 +1386,8 @@ func TestListClusters(t *testing.T) {
 								Tenant:         "tenant",
 							},
 						},
-						Version: *semver.NewSemverOrDie("9.9.9"),
+						Version:               *semver.NewSemverOrDie("9.9.9"),
+						EnableUserSSHKeyAgent: pointer.BoolPtr(false),
 					},
 					Status: apiv1.ClusterStatus{
 						Version: *semver.NewSemverOrDie("9.9.9"),
@@ -1443,7 +1419,8 @@ func TestListClusters(t *testing.T) {
 							DatacenterName: "FakeDatacenter",
 							Fake:           &kubermaticv1.FakeCloudSpec{},
 						},
-						Version: *semver.NewSemverOrDie("9.9.9"),
+						Version:               *semver.NewSemverOrDie("9.9.9"),
+						EnableUserSSHKeyAgent: pointer.BoolPtr(false),
 					},
 					Status: apiv1.ClusterStatus{
 						Version: *semver.NewSemverOrDie("9.9.9"),
@@ -1462,7 +1439,8 @@ func TestListClusters(t *testing.T) {
 							DatacenterName: "FakeDatacenter",
 							Fake:           &kubermaticv1.FakeCloudSpec{},
 						},
-						Version: *semver.NewSemverOrDie("9.9.9"),
+						Version:               *semver.NewSemverOrDie("9.9.9"),
+						EnableUserSSHKeyAgent: pointer.BoolPtr(false),
 					},
 					Status: apiv1.ClusterStatus{
 						Version: *semver.NewSemverOrDie("9.9.9"),
@@ -1489,7 +1467,8 @@ func TestListClusters(t *testing.T) {
 								Tenant:         "tenant",
 							},
 						},
-						Version: *semver.NewSemverOrDie("9.9.9"),
+						Version:               *semver.NewSemverOrDie("9.9.9"),
+						EnableUserSSHKeyAgent: pointer.BoolPtr(false),
 					},
 					Status: apiv1.ClusterStatus{
 						Version: *semver.NewSemverOrDie("9.9.9"),
@@ -1561,7 +1540,8 @@ func TestListClustersForProject(t *testing.T) {
 							DatacenterName: "FakeDatacenter",
 							Fake:           &kubermaticv1.FakeCloudSpec{},
 						},
-						Version: *semver.NewSemverOrDie("9.9.9"),
+						Version:               *semver.NewSemverOrDie("9.9.9"),
+						EnableUserSSHKeyAgent: pointer.BoolPtr(false),
 					},
 					Status: apiv1.ClusterStatus{
 						Version: *semver.NewSemverOrDie("9.9.9"),
@@ -1588,7 +1568,8 @@ func TestListClustersForProject(t *testing.T) {
 								Tenant:         "tenant",
 							},
 						},
-						Version: *semver.NewSemverOrDie("9.9.9"),
+						Version:               *semver.NewSemverOrDie("9.9.9"),
+						EnableUserSSHKeyAgent: pointer.BoolPtr(false),
 					},
 					Status: apiv1.ClusterStatus{
 						Version: *semver.NewSemverOrDie("9.9.9"),
@@ -1619,7 +1600,8 @@ func TestListClustersForProject(t *testing.T) {
 							DatacenterName: "FakeDatacenter",
 							Fake:           &kubermaticv1.FakeCloudSpec{},
 						},
-						Version: *semver.NewSemverOrDie("9.9.9"),
+						Version:               *semver.NewSemverOrDie("9.9.9"),
+						EnableUserSSHKeyAgent: pointer.BoolPtr(false),
 					},
 					Status: apiv1.ClusterStatus{
 						Version: *semver.NewSemverOrDie("9.9.9"),
@@ -1646,7 +1628,8 @@ func TestListClustersForProject(t *testing.T) {
 								Tenant:         "tenant",
 							},
 						},
-						Version: *semver.NewSemverOrDie("9.9.9"),
+						EnableUserSSHKeyAgent: pointer.BoolPtr(false),
+						Version:               *semver.NewSemverOrDie("9.9.9"),
 					},
 					Status: apiv1.ClusterStatus{
 						Version: *semver.NewSemverOrDie("9.9.9"),

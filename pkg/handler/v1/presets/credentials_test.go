@@ -107,8 +107,8 @@ func TestCredentialEndpoint(t *testing.T) {
 					Spec: kubermaticv1.PresetSpec{
 						RequiredEmailDomain: test.RequiredEmailDomain,
 						AWS: &kubermaticv1.AWS{
-							AccessKeyID: "a",
-							Datacenter:  "b",
+							PresetProvider: kubermaticv1.PresetProvider{Datacenter: "b"},
+							AccessKeyID:    "a",
 						},
 					},
 				},
@@ -119,8 +119,8 @@ func TestCredentialEndpoint(t *testing.T) {
 					Spec: kubermaticv1.PresetSpec{
 						RequiredEmailDomain: test.RequiredEmailDomain,
 						AWS: &kubermaticv1.AWS{
-							AccessKeyID: "a",
-							Datacenter:  "a",
+							PresetProvider: kubermaticv1.PresetProvider{Datacenter: "a"},
+							AccessKeyID:    "a",
 						},
 					},
 				},
@@ -141,8 +141,8 @@ func TestCredentialEndpoint(t *testing.T) {
 					Spec: kubermaticv1.PresetSpec{
 						RequiredEmailDomain: test.RequiredEmailDomain,
 						AWS: &kubermaticv1.AWS{
-							AccessKeyID: "a",
-							Datacenter:  "b",
+							PresetProvider: kubermaticv1.PresetProvider{Datacenter: "b"},
+							AccessKeyID:    "a",
 						},
 					},
 				},
@@ -153,8 +153,8 @@ func TestCredentialEndpoint(t *testing.T) {
 					Spec: kubermaticv1.PresetSpec{
 						RequiredEmailDomain: test.RequiredEmailDomain,
 						AWS: &kubermaticv1.AWS{
-							AccessKeyID: "a",
-							Datacenter:  "a",
+							PresetProvider: kubermaticv1.PresetProvider{Datacenter: "a"},
+							AccessKeyID:    "a",
 						},
 					},
 				},
@@ -216,7 +216,7 @@ func TestCredentialEndpoint(t *testing.T) {
 					Spec: kubermaticv1.PresetSpec{
 						RequiredEmailDomain: test.RequiredEmailDomain,
 						Digitalocean: &kubermaticv1.Digitalocean{
-							Token: "toke",
+							Token: "took",
 						},
 					},
 				},
@@ -358,6 +358,25 @@ func TestCredentialEndpoint(t *testing.T) {
 			},
 			httpStatus:       http.StatusOK,
 			expectedResponse: `{"names":["first", "second"]}`,
+		},
+		{
+			name:     "test list of credential names for Anexia",
+			provider: "anexia",
+			credentials: []runtime.Object{
+				&kubermaticv1.Preset{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "anexia-first",
+					},
+					Spec: kubermaticv1.PresetSpec{
+						RequiredEmailDomain: test.RequiredEmailDomain,
+						Anexia: &kubermaticv1.Anexia{
+							Token: "token",
+						},
+					},
+				},
+			},
+			httpStatus:       http.StatusOK,
+			expectedResponse: `{"names":["anexia-first"]}`,
 		},
 		{
 			name:       "test no existing provider",

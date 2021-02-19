@@ -61,6 +61,7 @@ type userclusterControllerData interface {
 	Cluster() *kubermaticv1.Cluster
 	GetOpenVPNServerPort() (int32, error)
 	KubermaticAPIImage() string
+	KubermaticDockerTag() string
 	GetKubernetesCloudProviderName() string
 	CloudCredentialSecretTemplate() ([]byte, error)
 }
@@ -130,6 +131,8 @@ func DeploymentCreator(data userclusterControllerData, openshift bool) reconcili
 				"-version", data.Cluster().Spec.Version.String(),
 				"-cloud-provider-name", data.GetKubernetesCloudProviderName(),
 				"-owner-email", data.Cluster().Status.UserEmail,
+				fmt.Sprintf("-enable-ssh-key-agent=%t", data.Cluster().Spec.EnableUserSSHKeyAgent),
+				fmt.Sprintf("-opa-integration=%t", data.Cluster().Spec.OPAIntegration != nil && data.Cluster().Spec.OPAIntegration.Enabled),
 			}, getNetworkArgs(data)...)
 
 			if data.Cluster().Spec.ClusterNetwork.DNSDomain != "" {
@@ -146,7 +149,7 @@ func DeploymentCreator(data userclusterControllerData, openshift bool) reconcili
 
 			labelArgsValue, err := getLabelsArgValue(data.Cluster())
 			if err != nil {
-				return nil, fmt.Errorf("faild to get label args value: %v", err)
+				return nil, fmt.Errorf("failed to get label args value: %v", err)
 			}
 			if labelArgsValue != "" {
 				args = append(args, "-node-labels", labelArgsValue)
@@ -164,7 +167,7 @@ func DeploymentCreator(data userclusterControllerData, openshift bool) reconcili
 			dep.Spec.Template.Spec.Containers = []corev1.Container{
 				{
 					Name:    name,
-					Image:   data.KubermaticAPIImage() + ":" + resources.KUBERMATICCOMMIT,
+					Image:   data.KubermaticAPIImage() + ":" + data.KubermaticDockerTag(),
 					Command: []string{"/usr/local/bin/user-cluster-controller-manager"},
 					Args:    args,
 					Env: []corev1.EnvVar{

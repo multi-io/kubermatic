@@ -15,7 +15,7 @@
 prometheus:
   image:
     repository: quay.io/prometheus/prometheus
-    tag: v2.20.1
+    tag: v2.23.0
     pullPolicy: IfNotPresent
 
   host: ''
@@ -76,7 +76,7 @@ prometheus:
 
   # The list of rule files to load; if you use the `volumes`
   # directive below to mount your own ConfigMap or Secret into
-  # Prometheus, you will want to extend this list to laod your
+  # Prometheus, you will want to extend this list to load your
   # own rule files. You can remove the predefined path to
   # effectively disable the stock recordings and alerts.
   ruleFiles:
@@ -131,7 +131,7 @@ prometheus:
     enabled: false
     image:
       repository: quay.io/thanos/thanos
-      tag: v0.11.0
+      tag: v0.17.2
 
     store:
       replicas: 2

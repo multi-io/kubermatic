@@ -49,12 +49,6 @@ import (
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// KUBERMATICCOMMIT is a magic variable containing the git commit hash of the current (as in currently executing) kubermatic api. It gets fed by Makefile as an ldflag.
-var KUBERMATICCOMMIT string
-
-// KUBERMATICGITTAG is a magic variable containing the output of `git describe` for the current (as in currently executing) kubermatic api. It gets fed by Makefile as an ldflag.
-var KUBERMATICGITTAG = "manual_build"
-
 const (
 	RancherStatefulSetName              = "rancher-server"
 	RancherServerServiceAccountName     = "rancher-server-sa"
@@ -104,6 +98,10 @@ const (
 	MetricsScraperDeploymentName = "dashboard-metrics-scraper"
 	// MetricsScraperServiceName is the name of dashboard-metrics-scraper service
 	MetricsScraperServiceName = "dashboard-metrics-scraper"
+	// GatekeeperControllerDeploymentName is the name of the gatekeeper controller deployment
+	GatekeeperControllerDeploymentName = "gatekeeper-controller-manager"
+	// GatekeeperAuditDeploymentName is the name of the gatekeeper audit deployment
+	GatekeeperAuditDeploymentName = "gatekeeper-audit"
 
 	// PrometheusStatefulSetName is the name for the prometheus StatefulSet
 	PrometheusStatefulSetName = "prometheus"
@@ -131,6 +129,8 @@ const (
 	OpenVPNServerServiceName = "openvpn-server"
 	// MachineControllerWebhookServiceName is the name of the machine-controller webhook service
 	MachineControllerWebhookServiceName = "machine-controller-webhook"
+	//GatekeeperWebhookServiceName is the name of the gatekeeper webhook service
+	GatekeeperWebhookServiceName = "gatekeeper-webhook-service"
 
 	// MetricsServerAPIServiceName is the name for the metrics-server APIService
 	MetricsServerAPIServiceName = "v1beta1.metrics.k8s.io"
@@ -167,6 +167,8 @@ const (
 	ClusterAutoscalerKubeconfigSecretName = "cluster-autoscaler-kubeconfig"
 	// KubernetesDashboardKubeconfigSecretName is the name of the kubeconfig secret user for Kubernetes Dashboard
 	KubernetesDashboardKubeconfigSecretName = "kubernetes-dashboard-kubeconfig"
+	// GatekeeperWebhookServerCertSecretName is the name of the gatekeeper webhook cert secret name
+	GatekeeperWebhookServerCertSecretName = "gatekeeper-webhook-server-cert"
 
 	// ImagePullSecretName specifies the name of the dockercfg secret used to access the private repo.
 	ImagePullSecretName = "dockercfg"
@@ -203,7 +205,7 @@ const (
 	DexCASecretName = "dex-ca"
 	// DexCAFileName is the name of Dex CA bundle file
 	DexCAFileName = "caBundle.pem"
-	// GoogleServiceAccountSecretName is the name of the secret that contains the Google Service Acccount.
+	// GoogleServiceAccountSecretName is the name of the secret that contains the Google Service Account.
 	GoogleServiceAccountSecretName = "google-service-account"
 	// GoogleServiceAccountVolumeName is the name of the volume containing the Google Service Account secret.
 	GoogleServiceAccountVolumeName = "google-service-account-volume"
@@ -235,7 +237,7 @@ const (
 	OpenVPNClientConfigsConfigMapName = "openvpn-client-configs"
 	// OpenVPNClientConfigConfigMapName is the name for the ConfigMap containing the OpenVPN client config used by the client inside the user cluster
 	OpenVPNClientConfigConfigMapName = "openvpn-client-config"
-	// ClusterInfoConfigMapName is the name for the ConfigMap containing the cluster-info used by the bootstrap token machanism
+	//ClusterInfoConfigMapName is the name for the ConfigMap containing the cluster-info used by the bootstrap token mechanism
 	ClusterInfoConfigMapName = "cluster-info"
 	// PrometheusConfigConfigMapName is the name for the configmap containing the prometheus config
 	PrometheusConfigConfigMapName = "prometheus"
@@ -243,7 +245,7 @@ const (
 	ClusterProxyConfigConfigMapName = "clusterproxy"
 	// AuditConfigMapName is the name for the configmap that contains the content of the file that will be passed to the apiserver with the flag "--audit-policy-file".
 	AuditConfigMapName = "audit-config"
-	// AdmissionControlConfigMapName is the name for the configmap that contains the Admission Controller config file
+	//AdmissionControlConfigMapName is the name for the configmap that contains the Admission Controller config file
 	AdmissionControlConfigMapName = "adm-control"
 
 	// PrometheusServiceAccountName is the name for the Prometheus serviceaccount
@@ -255,7 +257,14 @@ const (
 	// PrometheusRoleBindingName is the name for the Prometheus rolebinding
 	PrometheusRoleBindingName = "prometheus"
 
-	// CloudControllerManagerRoleBindingName is the name for the cloud controller manager rolebinding.
+	//GatekeeperRoleName is the name for the Gatekeeper role
+	GatekeeperRoleName = "gatekeeper-manager-role"
+	//GatekeeperRoleBindingName is the name for the Gatekeeper rolebinding
+	GatekeeperRoleBindingName = "gatekeeper-manager-rolebinding"
+	//GatekeeperServiceAccountName is the name for the Gatekeeper service account
+	GatekeeperServiceAccountName = "gatekeeper-admin"
+
+	//CloudControllerManagerRoleBindingName is the name for the cloud controller manager rolebinding.
 	CloudControllerManagerRoleBindingName = "cloud-controller-manager"
 
 	// MachineControllerCertUsername is the name of the user coming from kubeconfig cert
@@ -334,6 +343,8 @@ const (
 
 	// KubermaticNamespace is the main kubermatic namespace
 	KubermaticNamespace = "kubermatic"
+	// GatekeeperNamespace is the main gatkeeper namespace where the gatekeeper config is stored
+	GatekeeperNamespace = "gatekeeper-system"
 
 	// DefaultOwnerReadOnlyMode represents file mode with read permission for owner only
 	DefaultOwnerReadOnlyMode = 0400
@@ -375,10 +386,18 @@ const (
 	MachineDeploymentCRDName = "machinedeployments.cluster.k8s.io"
 	// ClusterCRDName defines the CRD name for cluster objects
 	ClusterCRDName = "clusters.cluster.k8s.io"
+	// GatekeeperConfigCRDName defines the CRD name for gatekeeper config objects
+	GatekeeperConfigCRDName = "configs.config.gatekeeper.sh"
+	// GatekeeperConstraintTemplateCRDName defines the CRD name for gatekeeper constraint template objects
+	GatekeeperConstraintTemplateCRDName = "constrainttemplates.templates.gatekeeper.sh"
 
 	// MachineControllerMutatingWebhookConfigurationName is the name of the machine-controllers mutating webhook
 	// configuration
 	MachineControllerMutatingWebhookConfigurationName = "machine-controller.kubermatic.io"
+
+	// GatekeeperValidatingWebhookConfigurationName is the name of the gatekeeper validating webhook
+	// configuration
+	GatekeeperValidatingWebhookConfigurationName = "gatekeeper-validating-webhook-configuration"
 
 	// InternalUserClusterAdminKubeconfigSecretName is the name of the secret containing an admin kubeconfig that can only be used from
 	// within the seed cluster
@@ -418,10 +437,10 @@ const (
 	TokensSecretKey = "tokens.csv"
 	// ViewersTokenSecretKey viewersToken
 	ViewerTokenSecretKey = "viewerToken"
-	// OpenVPNCACertKey cert.pem, must match CACertSecretKey, otherwise getClusterCAFromLister doesnt work as it has
+	// OpenVPNCACertKey cert.pem, must match CACertSecretKey, otherwise getClusterCAFromLister doesn't work as it has
 	// the key hardcoded
 	OpenVPNCACertKey = CACertSecretKey
-	// OpenVPNCAKeyKey key.pem, must match CAKeySecretKey, otherwise getClusterCAFromLister doesnt work as it has
+	// OpenVPNCAKeyKey key.pem, must match CAKeySecretKey, otherwise getClusterCAFromLister doesn't work as it has
 	// the key hardcoded
 	OpenVPNCAKeyKey = CAKeySecretKey
 	// OpenVPNServerKeySecretKey server.key
@@ -521,6 +540,8 @@ const (
 	AlibabaAccessKeyID     = "accessKeyId"
 	AlibabaAccessKeySecret = "accessKeySecret"
 
+	AnexiaToken = "token"
+
 	UserSSHKeys = "usersshkeys"
 )
 
@@ -575,7 +596,7 @@ const (
 	EtcdClientKeyFile  = "/etc/etcd/pki/client/apiserver-etcd-client.key"
 )
 
-// ECDSAKeyPair is a ECDSA x509 certifcate and private key
+// ECDSAKeyPair is a ECDSA x509 certificate and private key
 type ECDSAKeyPair struct {
 	Key  *ecdsa.PrivateKey
 	Cert *x509.Certificate

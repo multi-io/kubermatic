@@ -52,8 +52,7 @@ var (
 
 const (
 	Name = "machine-controller"
-
-	tag = "v1.19.0-sys11-2"
+	Tag  = "v1.23.1-sys11-1"
 
 	NodeLocalDNSCacheAddress = "169.254.20.10"
 )
@@ -114,7 +113,7 @@ func DeploymentCreatorWithoutInitWrapper(data machinecontrollerData) reconciling
 				Annotations: map[string]string{
 					"prometheus.io/scrape": "true",
 					"prometheus.io/path":   "/metrics",
-					"prometheus.io/port":   "8085",
+					"prometheus.io/port":   "8080",
 				},
 			}
 
@@ -139,7 +138,7 @@ func DeploymentCreatorWithoutInitWrapper(data machinecontrollerData) reconciling
 			dep.Spec.Template.Spec.Containers = []corev1.Container{
 				{
 					Name:    Name,
-					Image:   data.ImageRegistry(resources.RegistryDocker) + "/syseleven/machine-controller:" + tag,
+					Image:   data.ImageRegistry(resources.RegistryDocker) + "/syseleven/machine-controller:" + Tag,
 					Command: []string{"/usr/local/bin/machine-controller"},
 					Args:    getFlags(clusterDNSIP, data.DC().Node, externalCloudProvider),
 					Env: append(envVars, corev1.EnvVar{
@@ -149,7 +148,7 @@ func DeploymentCreatorWithoutInitWrapper(data machinecontrollerData) reconciling
 					LivenessProbe: &corev1.Probe{
 						Handler: corev1.Handler{
 							HTTPGet: &corev1.HTTPGetAction{
-								Path:   "/ready",
+								Path:   "/readyz",
 								Port:   intstr.FromInt(8085),
 								Scheme: corev1.URISchemeHTTP,
 							},
@@ -240,6 +239,9 @@ func getEnvVars(data machinecontrollerData) ([]corev1.EnvVar, error) {
 		vars = append(vars, corev1.EnvVar{Name: "ALIBABA_ACCESS_KEY_ID", Value: credentials.Alibaba.AccessKeyID})
 		vars = append(vars, corev1.EnvVar{Name: "ALIBABA_ACCESS_KEY_SECRET", Value: credentials.Alibaba.AccessKeySecret})
 	}
+	if data.Cluster().Spec.Cloud.Anexia != nil {
+		vars = append(vars, corev1.EnvVar{Name: "ANEXIA_TOKEN", Value: credentials.Anexia.Token})
+	}
 	vars = append(vars, resources.GetHTTPProxyEnvVarsFromSeed(data.Seed(), data.Cluster().Address.InternalName)...)
 	return vars, nil
 }
@@ -251,7 +253,8 @@ func getFlags(clusterDNSIP string, nodeSettings *kubermaticv1.NodeSettings, exte
 		"-v", "4",
 		"-node-max-log-size", "100M",
 		"-cluster-dns", clusterDNSIP,
-		"-internal-listen-address", "0.0.0.0:8085",
+		"-health-probe-address", "0.0.0.0:8085",
+		"-metrics-address", "0.0.0.0:8080",
 	}
 
 	if nodeSettings != nil {

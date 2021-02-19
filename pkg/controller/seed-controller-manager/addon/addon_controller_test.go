@@ -132,11 +132,11 @@ var (
 
 type fakeKubeconfigProvider struct{}
 
-func (f *fakeKubeconfigProvider) GetAdminKubeconfig(c *kubermaticv1.Cluster) ([]byte, error) {
+func (f *fakeKubeconfigProvider) GetAdminKubeconfig(_ context.Context, c *kubermaticv1.Cluster) ([]byte, error) {
 	return []byte("foo"), nil
 }
 
-func (f *fakeKubeconfigProvider) GetClient(c *kubermaticv1.Cluster, options ...clusterclient.ConfigOption) (ctrlruntimeclient.Client, error) {
+func (f *fakeKubeconfigProvider) GetClient(_ context.Context, c *kubermaticv1.Cluster, options ...clusterclient.ConfigOption) (ctrlruntimeclient.Client, error) {
 	return nil, errors.New("not implemented")
 }
 
@@ -215,6 +215,7 @@ func TestController_getAddonKubeDNStManifests(t *testing.T) {
 	}
 
 	log := kubermaticlog.New(true, kubermaticlog.FormatConsole).Sugar()
+	ctx := context.Background()
 
 	controller := &Reconciler{
 		kubernetesAddonDir: addonDir,
@@ -222,7 +223,7 @@ func TestController_getAddonKubeDNStManifests(t *testing.T) {
 		externalURL:        "example.com",
 		seedGetter:         createSeedGetter(),
 	}
-	manifests, err := controller.getAddonManifests(log, addon, cluster)
+	manifests, err := controller.getAddonManifests(ctx, log, addon, cluster)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -240,7 +241,7 @@ func TestController_getAddonKubeDNStManifests(t *testing.T) {
 	}
 
 	cluster = setupTestCluster("172.25.0.0/16")
-	manifests, err = controller.getAddonManifests(log, addon, cluster)
+	manifests, err = controller.getAddonManifests(ctx, log, addon, cluster)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -280,7 +281,7 @@ func TestController_getExternalURLManifests(t *testing.T) {
 		externalURL:        externalURL,
 		seedGetter:         createSeedGetter(),
 	}
-	manifests, err := controller.getAddonManifests(log, addon, cluster)
+	manifests, err := controller.getAddonManifests(context.Background(), log, addon, cluster)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -335,7 +336,7 @@ func TestController_getAddonDeploymentManifests(t *testing.T) {
 		externalURL:        "example.com",
 		seedGetter:         createSeedGetter(),
 	}
-	manifests, err := controller.getAddonManifests(log, addon, cluster)
+	manifests, err := controller.getAddonManifests(context.Background(), log, addon, cluster)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -375,7 +376,7 @@ func TestController_getAddonDeploymentManifestsDefault(t *testing.T) {
 		externalURL:        "example.com",
 		seedGetter:         createSeedGetter(),
 	}
-	manifests, err := controller.getAddonManifests(log, addon, cluster)
+	manifests, err := controller.getAddonManifests(context.Background(), log, addon, cluster)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -421,7 +422,7 @@ func TestController_getAddonManifests(t *testing.T) {
 		externalURL:        "example.com",
 		seedGetter:         createSeedGetter(),
 	}
-	manifests, err := controller.getAddonManifests(log, addon, cluster)
+	manifests, err := controller.getAddonManifests(context.Background(), log, addon, cluster)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -494,7 +495,7 @@ func TestHugeManifest(t *testing.T) {
 		externalURL:        "example.com",
 		seedGetter:         createSeedGetter(),
 	}
-	if _, _, _, err := r.setupManifestInteraction(log, addon, cluster); err != nil {
+	if _, _, _, err := r.setupManifestInteraction(context.Background(), log, addon, cluster); err != nil {
 		t.Fatalf("failed to setup manifest interaction: %v", err)
 	}
 }

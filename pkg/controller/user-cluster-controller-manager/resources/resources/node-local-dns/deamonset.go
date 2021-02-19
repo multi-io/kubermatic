@@ -105,7 +105,7 @@ func DaemonSetCreator() reconciling.NamedDaemonSetCreatorGetter {
 					// Sys11 end
 					Name:            "node-cache",
 					ImagePullPolicy: corev1.PullAlways,
-					Image:           fmt.Sprintf("%s/google_containers/k8s-dns-node-cache:1.15.10", resources.RegistryGCR),
+					Image:           fmt.Sprintf("%s/k8s-dns-node-cache:1.15.10", resources.RegistryK8SGCR),
 					Args: []string{
 						"-localip",
 						"169.254.20.10",

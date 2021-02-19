@@ -40,6 +40,7 @@ import (
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 	ksemver "k8c.io/kubermatic/v2/pkg/semver"
 	"k8c.io/kubermatic/v2/pkg/version"
+	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
@@ -109,6 +110,9 @@ func TestLoadFiles(t *testing.T) {
 		},
 		{
 			Version: semver.MustParse("1.19.0"),
+		},
+		{
+			Version: semver.MustParse("1.20.0"),
 		},
 	}
 
@@ -205,6 +209,8 @@ func TestLoadFiles(t *testing.T) {
 		},
 	}
 
+	kubermaticVersions := kubermatic.NewFakeVersions()
+
 	for _, ver := range versions {
 		for prov, cloudspec := range clouds {
 			t.Run(fmt.Sprintf("resources-%s-%s", prov, ver.Version.String()), func(t *testing.T) {
@@ -217,7 +223,7 @@ func TestLoadFiles(t *testing.T) {
 						},
 					},
 					Spec: kubermaticv1.ClusterSpec{
-						ExposeStrategy: corev1.ServiceTypeLoadBalancer,
+						ExposeStrategy: kubermaticv1.ExposeStrategyLoadBalancer,
 						Cloud:          cloudspec,
 						Version:        *ksemver.NewSemverOrDie(ver.Version.String()),
 						ClusterNetwork: kubermaticv1.ClusterNetworkingConfig{
@@ -239,12 +245,16 @@ func TestLoadFiles(t *testing.T) {
 								Gateway: "192.168.1.1",
 							},
 						},
+						ServiceAccount: &kubermaticv1.ServiceAccountSettings{
+							TokenVolumeProjectionEnabled: true,
+						},
 					},
 					Address: kubermaticv1.ClusterAddress{
 						ExternalName: "jh8j81chn.europe-west3-c.dev.kubermatic.io",
 						IP:           "35.198.93.90",
 						AdminToken:   "6hzr76.u8txpkk4vhgmtgdp",
 						InternalName: "apiserver-external.cluster-de-test-01.svc.cluster.local.",
+						URL:          "https://jh8j81chn.europe-west3-c.dev.kubermatic.io:30000",
 						Port:         30000,
 					},
 					Status: kubermaticv1.ClusterStatus{
@@ -428,6 +438,20 @@ func TestLoadFiles(t *testing.T) {
 							Namespace:       cluster.Status.NamespaceName,
 						},
 					},
+					&corev1.Secret{
+						ObjectMeta: metav1.ObjectMeta{
+							ResourceVersion: "123456",
+							Name:            resources.GatekeeperWebhookServerCertSecretName,
+							Namespace:       cluster.Status.NamespaceName,
+						},
+					},
+					&corev1.Secret{
+						ObjectMeta: metav1.ObjectMeta{
+							ResourceVersion: "123456",
+							Name:            resources.AdminKubeconfigSecretName,
+							Namespace:       cluster.Status.NamespaceName,
+						},
+					},
 					&corev1.ConfigMap{
 						ObjectMeta: metav1.ObjectMeta{
 							ResourceVersion: "123456",
@@ -537,7 +561,7 @@ func TestLoadFiles(t *testing.T) {
 
 				tmpFile, err := ioutil.TempFile("", "kubermatic")
 				if err != nil {
-					t.Fatalf("couldnt create temp file, see: %v", err)
+					t.Fatalf("couldn't create temp file, see: %v", err)
 				}
 
 				tmpFilePath := tmpFile.Name()
@@ -549,7 +573,7 @@ func TestLoadFiles(t *testing.T) {
     - 'foo.bar:12345'
 `)
 				if err != nil {
-					t.Fatalf("couldnt write to temp file, see: %v", err)
+					t.Fatalf("couldn't write to temp file, see: %v", err)
 				}
 				defer (func() {
 					err = os.Remove(tmpFilePath)
@@ -592,7 +616,9 @@ func TestLoadFiles(t *testing.T) {
 					"quay.io/kubermatic/kubermatic",
 					"quay.io/kubermatic/etcd-launcher",
 					"quay.io/kubermatic/kubeletdnat-controller",
-					false)
+					false,
+					kubermaticVersions,
+				)
 
 				var deploymentCreators []reconciling.NamedDeploymentCreatorGetter
 				deploymentCreators = append(deploymentCreators, kubernetescontroller.GetDeploymentCreators(data, true)...)

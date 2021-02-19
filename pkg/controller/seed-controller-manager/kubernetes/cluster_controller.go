@@ -32,6 +32,7 @@ import (
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	kubermaticv1helper "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1/helper"
 	"k8c.io/kubermatic/v2/pkg/provider"
+	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
@@ -58,7 +59,7 @@ const (
 
 // userClusterConnectionProvider offers functions to retrieve clients for the given user clusters
 type userClusterConnectionProvider interface {
-	GetClient(*kubermaticv1.Cluster, ...k8cuserclusterclient.ConfigOption) (ctrlruntimeclient.Client, error)
+	GetClient(context.Context, *kubermaticv1.Cluster, ...k8cuserclusterclient.ConfigOption) (ctrlruntimeclient.Client, error)
 }
 
 type Features struct {
@@ -105,6 +106,7 @@ type Reconciler struct {
 	keycloakFacade keycloak.Facade
 
 	features Features
+	versions kubermatic.Versions
 }
 
 // NewController creates a cluster controller.
@@ -138,7 +140,8 @@ func Add(
 	keycloakFacade keycloak.Facade,
 	etcdLauncherImage string,
 	dnatControllerImage string,
-	features Features) error {
+	features Features,
+	versions kubermatic.Versions) error {
 
 	reconciler := &Reconciler{
 		log:                     log.Named(ControllerName),
@@ -176,6 +179,7 @@ func Add(
 		keycloakFacade: keycloakFacade,
 
 		features: features,
+		versions: versions,
 	}
 
 	c, err := controller.New(ControllerName, mgr, controller.Options{Reconciler: reconciler, MaxConcurrentReconciles: numWorkers})
@@ -234,6 +238,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 		r.Client,
 		r.workerName,
 		cluster,
+		r.versions,
 		kubermaticv1.ClusterConditionClusterControllerReconcilingSuccess,
 		func() (*reconcile.Result, error) {
 			// only reconcile this cluster if there are not yet too many updates running
@@ -270,7 +275,7 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, clus
 
 		// Defer getting the client to make sure we only request it if we actually need it
 		userClusterClientGetter := func() (ctrlruntimeclient.Client, error) {
-			client, err := r.userClusterConnProvider.GetClient(cluster)
+			client, err := r.userClusterConnProvider.GetClient(ctx, cluster)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get user cluster client: %v", err)
 			}

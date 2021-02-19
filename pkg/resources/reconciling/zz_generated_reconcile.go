@@ -10,12 +10,13 @@ import (
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	certmanagerv1alpha2 "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1alpha2"
+	gatekeeperv1beta1 "github.com/open-policy-agent/frameworks/constraint/pkg/apis/templates/v1beta1"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
-	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
-	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -620,7 +621,7 @@ func ReconcileCronJobs(ctx context.Context, namedGetters []NamedCronJobCreatorGe
 }
 
 // MutatingWebhookConfigurationCreator defines an interface to create/update MutatingWebhookConfigurations
-type MutatingWebhookConfigurationCreator = func(existing *admissionregistrationv1beta1.MutatingWebhookConfiguration) (*admissionregistrationv1beta1.MutatingWebhookConfiguration, error)
+type MutatingWebhookConfigurationCreator = func(existing *admissionregistrationv1.MutatingWebhookConfiguration) (*admissionregistrationv1.MutatingWebhookConfiguration, error)
 
 // NamedMutatingWebhookConfigurationCreatorGetter returns the name of the resource and the corresponding creator function
 type NamedMutatingWebhookConfigurationCreatorGetter = func() (name string, create MutatingWebhookConfigurationCreator)
@@ -630,9 +631,9 @@ type NamedMutatingWebhookConfigurationCreatorGetter = func() (name string, creat
 func MutatingWebhookConfigurationObjectWrapper(create MutatingWebhookConfigurationCreator) ObjectCreator {
 	return func(existing runtime.Object) (runtime.Object, error) {
 		if existing != nil {
-			return create(existing.(*admissionregistrationv1beta1.MutatingWebhookConfiguration))
+			return create(existing.(*admissionregistrationv1.MutatingWebhookConfiguration))
 		}
-		return create(&admissionregistrationv1beta1.MutatingWebhookConfiguration{})
+		return create(&admissionregistrationv1.MutatingWebhookConfiguration{})
 	}
 }
 
@@ -648,7 +649,7 @@ func ReconcileMutatingWebhookConfigurations(ctx context.Context, namedGetters []
 			createObject = objectModifier(createObject)
 		}
 
-		if err := EnsureNamedObject(ctx, types.NamespacedName{Namespace: namespace, Name: name}, createObject, client, &admissionregistrationv1beta1.MutatingWebhookConfiguration{}, false); err != nil {
+		if err := EnsureNamedObject(ctx, types.NamespacedName{Namespace: namespace, Name: name}, createObject, client, &admissionregistrationv1.MutatingWebhookConfiguration{}, false); err != nil {
 			return fmt.Errorf("failed to ensure MutatingWebhookConfiguration %s/%s: %v", namespace, name, err)
 		}
 	}
@@ -657,7 +658,7 @@ func ReconcileMutatingWebhookConfigurations(ctx context.Context, namedGetters []
 }
 
 // ValidatingWebhookConfigurationCreator defines an interface to create/update ValidatingWebhookConfigurations
-type ValidatingWebhookConfigurationCreator = func(existing *admissionregistrationv1beta1.ValidatingWebhookConfiguration) (*admissionregistrationv1beta1.ValidatingWebhookConfiguration, error)
+type ValidatingWebhookConfigurationCreator = func(existing *admissionregistrationv1.ValidatingWebhookConfiguration) (*admissionregistrationv1.ValidatingWebhookConfiguration, error)
 
 // NamedValidatingWebhookConfigurationCreatorGetter returns the name of the resource and the corresponding creator function
 type NamedValidatingWebhookConfigurationCreatorGetter = func() (name string, create ValidatingWebhookConfigurationCreator)
@@ -667,9 +668,9 @@ type NamedValidatingWebhookConfigurationCreatorGetter = func() (name string, cre
 func ValidatingWebhookConfigurationObjectWrapper(create ValidatingWebhookConfigurationCreator) ObjectCreator {
 	return func(existing runtime.Object) (runtime.Object, error) {
 		if existing != nil {
-			return create(existing.(*admissionregistrationv1beta1.ValidatingWebhookConfiguration))
+			return create(existing.(*admissionregistrationv1.ValidatingWebhookConfiguration))
 		}
-		return create(&admissionregistrationv1beta1.ValidatingWebhookConfiguration{})
+		return create(&admissionregistrationv1.ValidatingWebhookConfiguration{})
 	}
 }
 
@@ -685,7 +686,7 @@ func ReconcileValidatingWebhookConfigurations(ctx context.Context, namedGetters 
 			createObject = objectModifier(createObject)
 		}
 
-		if err := EnsureNamedObject(ctx, types.NamespacedName{Namespace: namespace, Name: name}, createObject, client, &admissionregistrationv1beta1.ValidatingWebhookConfiguration{}, false); err != nil {
+		if err := EnsureNamedObject(ctx, types.NamespacedName{Namespace: namespace, Name: name}, createObject, client, &admissionregistrationv1.ValidatingWebhookConfiguration{}, false); err != nil {
 			return fmt.Errorf("failed to ensure ValidatingWebhookConfiguration %s/%s: %v", namespace, name, err)
 		}
 	}
@@ -731,7 +732,7 @@ func ReconcileAPIServices(ctx context.Context, namedGetters []NamedAPIServiceCre
 }
 
 // IngressCreator defines an interface to create/update Ingresss
-type IngressCreator = func(existing *extensionsv1beta1.Ingress) (*extensionsv1beta1.Ingress, error)
+type IngressCreator = func(existing *networkingv1beta1.Ingress) (*networkingv1beta1.Ingress, error)
 
 // NamedIngressCreatorGetter returns the name of the resource and the corresponding creator function
 type NamedIngressCreatorGetter = func() (name string, create IngressCreator)
@@ -741,9 +742,9 @@ type NamedIngressCreatorGetter = func() (name string, create IngressCreator)
 func IngressObjectWrapper(create IngressCreator) ObjectCreator {
 	return func(existing runtime.Object) (runtime.Object, error) {
 		if existing != nil {
-			return create(existing.(*extensionsv1beta1.Ingress))
+			return create(existing.(*networkingv1beta1.Ingress))
 		}
-		return create(&extensionsv1beta1.Ingress{})
+		return create(&networkingv1beta1.Ingress{})
 	}
 }
 
@@ -759,7 +760,7 @@ func ReconcileIngresses(ctx context.Context, namedGetters []NamedIngressCreatorG
 			createObject = objectModifier(createObject)
 		}
 
-		if err := EnsureNamedObject(ctx, types.NamespacedName{Namespace: namespace, Name: name}, createObject, client, &extensionsv1beta1.Ingress{}, false); err != nil {
+		if err := EnsureNamedObject(ctx, types.NamespacedName{Namespace: namespace, Name: name}, createObject, client, &networkingv1beta1.Ingress{}, false); err != nil {
 			return fmt.Errorf("failed to ensure Ingress %s/%s: %v", namespace, name, err)
 		}
 	}
@@ -872,6 +873,80 @@ func ReconcileEtcdBackupConfigs(ctx context.Context, namedGetters []NamedEtcdBac
 
 		if err := EnsureNamedObject(ctx, types.NamespacedName{Namespace: namespace, Name: name}, createObject, client, &kubermaticv1.EtcdBackupConfig{}, false); err != nil {
 			return fmt.Errorf("failed to ensure EtcdBackupConfig %s/%s: %v", namespace, name, err)
+		}
+	}
+
+	return nil
+}
+
+// ConstraintTemplateCreator defines an interface to create/update ConstraintTemplates
+type ConstraintTemplateCreator = func(existing *gatekeeperv1beta1.ConstraintTemplate) (*gatekeeperv1beta1.ConstraintTemplate, error)
+
+// NamedConstraintTemplateCreatorGetter returns the name of the resource and the corresponding creator function
+type NamedConstraintTemplateCreatorGetter = func() (name string, create ConstraintTemplateCreator)
+
+// ConstraintTemplateObjectWrapper adds a wrapper so the ConstraintTemplateCreator matches ObjectCreator.
+// This is needed as Go does not support function interface matching.
+func ConstraintTemplateObjectWrapper(create ConstraintTemplateCreator) ObjectCreator {
+	return func(existing runtime.Object) (runtime.Object, error) {
+		if existing != nil {
+			return create(existing.(*gatekeeperv1beta1.ConstraintTemplate))
+		}
+		return create(&gatekeeperv1beta1.ConstraintTemplate{})
+	}
+}
+
+// ReconcileConstraintTemplates will create and update the ConstraintTemplates coming from the passed ConstraintTemplateCreator slice
+func ReconcileConstraintTemplates(ctx context.Context, namedGetters []NamedConstraintTemplateCreatorGetter, namespace string, client ctrlruntimeclient.Client, objectModifiers ...ObjectModifier) error {
+	for _, get := range namedGetters {
+		name, create := get()
+		createObject := ConstraintTemplateObjectWrapper(create)
+		createObject = createWithNamespace(createObject, namespace)
+		createObject = createWithName(createObject, name)
+
+		for _, objectModifier := range objectModifiers {
+			createObject = objectModifier(createObject)
+		}
+
+		if err := EnsureNamedObject(ctx, types.NamespacedName{Namespace: namespace, Name: name}, createObject, client, &gatekeeperv1beta1.ConstraintTemplate{}, false); err != nil {
+			return fmt.Errorf("failed to ensure ConstraintTemplate %s/%s: %v", namespace, name, err)
+		}
+	}
+
+	return nil
+}
+
+// KubermaticV1ConstraintTemplateCreator defines an interface to create/update ConstraintTemplates
+type KubermaticV1ConstraintTemplateCreator = func(existing *kubermaticv1.ConstraintTemplate) (*kubermaticv1.ConstraintTemplate, error)
+
+// NamedKubermaticV1ConstraintTemplateCreatorGetter returns the name of the resource and the corresponding creator function
+type NamedKubermaticV1ConstraintTemplateCreatorGetter = func() (name string, create KubermaticV1ConstraintTemplateCreator)
+
+// KubermaticV1ConstraintTemplateObjectWrapper adds a wrapper so the KubermaticV1ConstraintTemplateCreator matches ObjectCreator.
+// This is needed as Go does not support function interface matching.
+func KubermaticV1ConstraintTemplateObjectWrapper(create KubermaticV1ConstraintTemplateCreator) ObjectCreator {
+	return func(existing runtime.Object) (runtime.Object, error) {
+		if existing != nil {
+			return create(existing.(*kubermaticv1.ConstraintTemplate))
+		}
+		return create(&kubermaticv1.ConstraintTemplate{})
+	}
+}
+
+// ReconcileKubermaticV1ConstraintTemplates will create and update the KubermaticV1ConstraintTemplates coming from the passed KubermaticV1ConstraintTemplateCreator slice
+func ReconcileKubermaticV1ConstraintTemplates(ctx context.Context, namedGetters []NamedKubermaticV1ConstraintTemplateCreatorGetter, namespace string, client ctrlruntimeclient.Client, objectModifiers ...ObjectModifier) error {
+	for _, get := range namedGetters {
+		name, create := get()
+		createObject := KubermaticV1ConstraintTemplateObjectWrapper(create)
+		createObject = createWithNamespace(createObject, namespace)
+		createObject = createWithName(createObject, name)
+
+		for _, objectModifier := range objectModifiers {
+			createObject = objectModifier(createObject)
+		}
+
+		if err := EnsureNamedObject(ctx, types.NamespacedName{Namespace: namespace, Name: name}, createObject, client, &kubermaticv1.ConstraintTemplate{}, false); err != nil {
+			return fmt.Errorf("failed to ensure ConstraintTemplate %s/%s: %v", namespace, name, err)
 		}
 	}
 

@@ -64,6 +64,7 @@ type metricsServerData interface {
 	GetRootCA() (*triple.KeyPair, error)
 	ImageRegistry(string) string
 	DNATControllerImage() string
+	DNATControllerTag() string
 	NodeAccessNetwork() string
 }
 
@@ -73,8 +74,8 @@ func TLSServingCertSecretCreator(caGetter servingcerthelper.CAGetter) reconcilin
 	dnsName := "metrics-server.kube-system.svc"
 	return servingcerthelper.ServingCertSecretCreator(caGetter,
 		ServingCertSecretName,
-		// Must match whats configured in the apiservice in pkg/controller/usercluster/resources/metrics-server/external-name-service.go.
-		// Can unfortunately not have a trailing dot, as thats only allowed in Kube 1.16+
+		// Must match what's configured in the apiservice in pkg/controller/usercluster/resources/metrics-server/external-name-service.go.
+		// Can unfortunately not have a trailing dot, as that's only allowed in Kube 1.16+
 		dnsName,
 		[]string{dnsName},
 		nil)
@@ -119,7 +120,7 @@ func DeploymentCreator(data metricsServerData) reconciling.NamedDeploymentCreato
 			dep.Spec.Template.Spec.Containers = []corev1.Container{
 				{
 					Name:    name,
-					Image:   data.ImageRegistry(resources.RegistryGCR) + "/google_containers/metrics-server-amd64:" + tag,
+					Image:   data.ImageRegistry(resources.RegistryK8SGCR) + "/metrics-server-amd64:" + tag,
 					Command: []string{"/metrics-server"},
 					Args: []string{
 						"--kubeconfig", "/etc/kubernetes/kubeconfig/kubeconfig",

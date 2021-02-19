@@ -32,7 +32,7 @@ webhooks:
     service:
       name: seed-webhook
       namespace: {{ .Release.Namespace }}
-      path: '/'
+      path: /validate-kubermatic-k8s-io-seed
   failurePolicy: Fail
   name: seeds.kubermatic.io
   objectSelector:
@@ -97,7 +97,7 @@ webhooks:
     service:
       name: seed-clusters-webhook
       namespace: {{ .Release.Namespace }}
-      path: /default-components-settings
+      path: /mutate-kubermatic-k8s-io-cluster
   failurePolicy: Fail
   name: clusters.kubermatic.io
   objectSelector:

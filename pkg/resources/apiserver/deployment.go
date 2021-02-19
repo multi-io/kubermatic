@@ -18,6 +18,7 @@ package apiserver
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
@@ -252,6 +253,8 @@ func getApiserverFlags(data *resources.TemplateData, etcdEndpoints []string, ena
 		nodePortRange = defaultNodePortRange
 	}
 
+	cluster := data.Cluster()
+
 	admissionPlugins := sets.NewString(
 		"NamespaceLifecycle",
 		"LimitRanger",
@@ -263,38 +266,39 @@ func getApiserverFlags(data *resources.TemplateData, etcdEndpoints []string, ena
 		"Priority",
 		"ResourceQuota",
 	)
-	if data.Cluster().Spec.UsePodSecurityPolicyAdmissionPlugin {
+	if cluster.Spec.UsePodSecurityPolicyAdmissionPlugin {
 		admissionPlugins.Insert("PodSecurityPolicy")
 	}
-	if data.Cluster().Spec.UsePodNodeSelectorAdmissionPlugin {
+	if cluster.Spec.UsePodNodeSelectorAdmissionPlugin {
 		admissionPlugins.Insert(resources.PodNodeSelectorAdmissionPlugin)
 	}
 
-	admissionPlugins.Insert(data.Cluster().Spec.AdmissionPlugins...)
+	admissionPlugins.Insert(cluster.Spec.AdmissionPlugins...)
 
+	serviceAccountKeyFile := filepath.Join("/etc/kubernetes/service-account-key", resources.ServiceAccountKeySecretKey)
 	flags := []string{
 		// The advertise address is used as endpoint address for the kubernetes
 		// service in the default namespace of the user cluster.
-		"--advertise-address", data.Cluster().Address.IP,
+		"--advertise-address", cluster.Address.IP,
 		// The secure port is used as target port for the kubernetes service in
 		// the default namespace of the user cluster, we use the NodePort value
 		// for being able to access the apiserver from the usercluster side.
-		"--secure-port", fmt.Sprint(data.Cluster().Address.Port),
-		"--kubernetes-service-node-port", fmt.Sprint(data.Cluster().Address.Port),
+		"--secure-port", fmt.Sprint(cluster.Address.Port),
+		"--kubernetes-service-node-port", fmt.Sprint(cluster.Address.Port),
 		"--etcd-servers", strings.Join(etcdEndpoints, ","),
 		"--etcd-cafile", "/etc/etcd/pki/client/ca.crt",
-		"--etcd-certfile", "/etc/etcd/pki/client/apiserver-etcd-client.crt",
-		"--etcd-keyfile", "/etc/etcd/pki/client/apiserver-etcd-client.key",
+		"--etcd-certfile", filepath.Join("/etc/etcd/pki/client", resources.ApiserverEtcdClientCertificateCertSecretKey),
+		"--etcd-keyfile", filepath.Join("/etc/etcd/pki/client", resources.ApiserverEtcdClientCertificateKeySecretKey),
 		"--storage-backend", "etcd3",
 		"--enable-admission-plugins", strings.Join(admissionPlugins.List(), ","),
 		"--admission-control-config-file", "/etc/kubernetes/adm-control/admission-control.yaml",
 		"--authorization-mode", "Node,RBAC",
-		"--external-hostname", data.Cluster().Address.ExternalName,
+		"--external-hostname", cluster.Address.ExternalName,
 		"--token-auth-file", "/etc/kubernetes/tokens/tokens.csv",
 		"--enable-bootstrap-token-auth",
-		"--service-account-key-file", "/etc/kubernetes/service-account-key/sa.key",
+		"--service-account-key-file", serviceAccountKeyFile,
 		// There are efforts upstream adding support for multiple cidr's. Until that has landed, we'll take the first entry
-		"--service-cluster-ip-range", data.Cluster().Spec.ClusterNetwork.Services.CIDRBlocks[0],
+		"--service-cluster-ip-range", cluster.Spec.ClusterNetwork.Services.CIDRBlocks[0],
 		"--service-node-port-range", nodePortRange,
 		"--allow-privileged",
 		"--audit-log-maxage", "30",
@@ -323,7 +327,35 @@ func getApiserverFlags(data *resources.TemplateData, etcdEndpoints []string, ena
 		flags = append(flags, "--endpoint-reconciler-type=none")
 	}
 
-	if data.Cluster().Spec.Cloud.GCP != nil {
+	// enable service account signing key and issuer in Kubernetes 1.20 or when
+	// explicitly enabled in the cluster object
+	saConfig := cluster.Spec.ServiceAccount
+	if cluster.Spec.Version.Minor() >= 20 || (saConfig != nil && saConfig.TokenVolumeProjectionEnabled) {
+		var audiences []string
+
+		issuer := cluster.Address.URL
+		if saConfig != nil {
+			if saConfig.Issuer != "" {
+				issuer = saConfig.Issuer
+			}
+
+			if len(saConfig.APIAudiences) > 0 {
+				audiences = saConfig.APIAudiences
+			}
+		}
+
+		if len(audiences) == 0 {
+			audiences = []string{issuer}
+		}
+
+		flags = append(flags,
+			"--service-account-issuer", issuer,
+			"--service-account-signing-key-file", serviceAccountKeyFile,
+			"--api-audiences", strings.Join(audiences, ","),
+		)
+	}
+
+	if cluster.Spec.Cloud.GCP != nil {
 		flags = append(flags, "--kubelet-preferred-address-types", "InternalIP")
 	} else {
 		flags = append(flags, "--kubelet-preferred-address-types", "ExternalIP,InternalIP")
@@ -337,20 +369,20 @@ func getApiserverFlags(data *resources.TemplateData, etcdEndpoints []string, ena
 
 	var oidcSettings *kubermaticv1.OIDCSettings
 
-	if data.Cluster().Spec.Sys11Auth.Realm != "" {
-		settings, err := keycloak.Sys11AuthToOidcSettings(data.Cluster().Spec.Sys11Auth, keycloakFacade)
+	if cluster.Spec.Sys11Auth.Realm != "" {
+		settings, err := keycloak.Sys11AuthToOidcSettings(cluster.Spec.Sys11Auth, keycloakFacade)
 		if _, ok := err.(*keycloak.RealmNotFoundError); ok {
 			// TODO create event?
-			klog.Errorf("Cluster %s sys11 auth: realm not found: %s", data.Cluster().Name, data.Cluster().Spec.Sys11Auth.Realm)
+			klog.Errorf("Cluster %s sys11 auth: realm not found: %s", cluster.Name, cluster.Spec.Sys11Auth.Realm)
 		} else if _, ok := err.(*keycloak.ClientNotFoundError); ok {
 			// TODO create event?
-			klog.Errorf("Cluster %s sys11 auth: metakube-cluster client not found in realm", data.Cluster().Name)
+			klog.Errorf("Cluster %s sys11 auth: metakube-cluster client not found in realm", cluster.Name)
 		} else if err != nil {
 			return nil, err
 		}
 		oidcSettings = settings
-	} else if data.Cluster().Spec.OIDC.IssuerURL != "" && data.Cluster().Spec.OIDC.ClientID != "" {
-		oidcSettings = &data.Cluster().Spec.OIDC
+	} else if cluster.Spec.OIDC.IssuerURL != "" && cluster.Spec.OIDC.ClientID != "" {
+		oidcSettings = &cluster.Spec.OIDC
 	}
 
 	if oidcSettings != nil {
