@@ -19,6 +19,7 @@ package resources
 import (
 	"context"
 	"fmt"
+	"net"
 
 	openshiftresources "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/openshift/resources"
 	"k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/cloudcontroller"
@@ -27,6 +28,7 @@ import (
 	coredns "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/core-dns"
 	dnatcontroller "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/dnat-controller"
 	dnsautoscaler "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/dns-autoscaler"
+	envoyagent "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/envoy-agent"
 	"k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/gatekeeper"
 	kubestatemetrics "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/kube-state-metrics"
 	kubernetesdashboard "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/kubernetes-dashboard"
@@ -501,9 +503,33 @@ func (r *reconciler) reconcileConfigMaps(ctx context.Context, data reconcileData
 		return fmt.Errorf("failed to reconcile ConfigMaps in kube-public namespace: %v", err)
 	}
 
-	creators = []reconciling.NamedConfigMapCreatorGetter{
-		openvpn.ClientConfigConfigMapCreator(r.clusterURL.Hostname(), r.openvpnServerPort),
+	if len(r.tunnelingAgentIP) > 0 {
+		creators = []reconciling.NamedConfigMapCreatorGetter{
+			openvpn.ClientConfigConfigMapCreator(r.tunnelingAgentIP.String(), r.openvpnServerPort),
+			envoyagent.ConfigMapCreator(envoyagent.Config{
+				AdminPort: 9902,
+				ProxyHost: r.clusterURL.Hostname(),
+				ProxyPort: 8088,
+				Listeners: []envoyagent.Listener{
+					{
+						BindAddress: r.tunnelingAgentIP.String(),
+						BindPort:    r.openvpnServerPort,
+						Authority:   net.JoinHostPort(fmt.Sprintf("openvpn-server.%s.svc.cluster.local", r.namespace), "1194"),
+					},
+					{
+						BindAddress: r.tunnelingAgentIP.String(),
+						BindPort:    r.kasSecurePort,
+						Authority:   net.JoinHostPort(fmt.Sprintf("apiserver-external.%s.svc.cluster.local", r.namespace), "6443"),
+					},
+				},
+			}),
+		}
+	} else {
+		creators = []reconciling.NamedConfigMapCreatorGetter{
+			openvpn.ClientConfigConfigMapCreator(r.clusterURL.Hostname(), r.openvpnServerPort),
+		}
 	}
+
 	if r.openshift {
 		creators = append(creators, openshift.ControlplaneConfigCreator(r.platform))
 	} else {
@@ -572,6 +598,10 @@ func (r *reconciler) reconcileDaemonSet(ctx context.Context) error {
 
 	if !r.openshift {
 		dsCreators = append(dsCreators, nodelocaldns.DaemonSetCreator())
+	}
+
+	if len(r.tunnelingAgentIP) > 0 {
+		dsCreators = append(dsCreators, envoyagent.DaemonSetCreator(r.tunnelingAgentIP, r.versions))
 	}
 
 	if err := reconciling.ReconcileDaemonSets(ctx, dsCreators, metav1.NamespaceSystem, r.Client); err != nil {

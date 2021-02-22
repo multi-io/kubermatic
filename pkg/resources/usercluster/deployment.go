@@ -139,6 +139,11 @@ func DeploymentCreator(data userclusterControllerData, openshift bool) reconcili
 				args = append(args, "-cluster-dns-domain", data.Cluster().Spec.ClusterNetwork.DNSDomain)
 			}
 
+			if data.Cluster().Spec.ExposeStrategy == kubermaticv1.ExposeStrategyTunneling {
+				args = append(args, "-tunneling-agent-ip", data.Cluster().Address.IP)
+				args = append(args, "-kas-secure-port", fmt.Sprint(data.Cluster().Address.Port))
+			}
+
 			if openshiftConsoleCallbackURI := data.Cluster().Address.OpenshiftConsoleCallBack; openshiftConsoleCallbackURI != "" {
 				args = append(args, "-openshift-console-callback-uri", openshiftConsoleCallbackURI)
 			}

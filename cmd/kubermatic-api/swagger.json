@@ -15278,7 +15278,7 @@
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
     },
     "ConstraintTemplateSpec": {
-      "description": "ConstraintTemplateSpec defines the desired state of ConstraintTemplate",
+      "description": "ConstraintTemplateSpec is the object representing the gatekeeper constraint template spec and kubermatic related spec",
       "type": "object",
       "properties": {
         "crd": {
@@ -15292,7 +15292,7 @@
           "x-go-name": "Targets"
         }
       },
-      "x-go-package": "github.com/open-policy-agent/frameworks/constraint/pkg/apis/templates/v1beta1"
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
     },
     "ConstraintTemplateStatus": {
       "description": "ConstraintTemplateStatus defines the observed state of ConstraintTemplate",
@@ -17040,6 +17040,40 @@
         }
       },
       "x-go-package": "github.com/kubermatic/machine-controller/pkg/apis/cluster/v1alpha1"
+    },
+    "MachineDeploymentVMResourceQuota": {
+      "type": "object",
+      "properties": {
+        "enableGPU": {
+          "type": "boolean",
+          "x-go-name": "EnableGPU"
+        },
+        "maxCPU": {
+          "description": "Maximal number of vCPU",
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "MaxCPU"
+        },
+        "maxRAM": {
+          "description": "Maximum RAM size in GB",
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "MaxRAM"
+        },
+        "minCPU": {
+          "description": "Minimal number of vCPU",
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "MinCPU"
+        },
+        "minRAM": {
+          "description": "Minimal RAM size in GB",
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "MinRAM"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
     },
     "MachineNetworkingConfig": {
       "type": "object",
@@ -19026,7 +19060,7 @@
           "x-go-name": "APIAudiences"
         },
         "issuer": {
-          "description": "Issuer is the identifier of the service account token issuer\nIf this is not specified, it will be set to the default value kubernetes.default.svc",
+          "description": "Issuer is the identifier of the service account token issuer\nIf this is not specified, it will be set to the URL of apiserver by default",
           "type": "string",
           "x-go-name": "Issuer"
         },
@@ -19117,6 +19151,9 @@
         "enableOIDCKubeconfig": {
           "type": "boolean",
           "x-go-name": "EnableOIDCKubeconfig"
+        },
+        "machineDeploymentVMResourceQuota": {
+          "$ref": "#/definitions/MachineDeploymentVMResourceQuota"
         },
         "restrictProjectCreation": {
           "type": "boolean",

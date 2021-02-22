@@ -22,6 +22,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/url"
 	"path"
 	"strings"
@@ -37,12 +38,13 @@ import (
 	"k8c.io/kubermatic/v2/pkg/keycloak"
 	"k8c.io/kubermatic/v2/pkg/provider"
 	"k8c.io/kubermatic/v2/pkg/resources"
+	"k8c.io/kubermatic/v2/pkg/util/flagopts"
 	"k8c.io/kubermatic/v2/pkg/validation"
 	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/net"
+	knet "k8s.io/apimachinery/pkg/util/net"
 	certutil "k8s.io/client-go/util/cert"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/yaml"
@@ -100,11 +102,18 @@ type controllerRunOptions struct {
 	oidcIssuerClientID     string
 	oidcIssuerClientSecret string
 
+	// Used in the tunneling expose strategy
+	tunnelingAgentIP flagopts.IPValue
+
 	featureGates features.FeatureGate
 }
 
 func newControllerRunOptions() (controllerRunOptions, error) {
-	c := controllerRunOptions{featureGates: features.FeatureGate{}}
+	c := controllerRunOptions{
+		featureGates: features.FeatureGate{},
+		// Default IP used by tunneling agents
+		tunnelingAgentIP: flagopts.IPValue{IP: net.ParseIP("192.168.30.10")},
+	}
 	var rawEtcdDiskSize string
 	var defaultKubernetesAddonsList string
 	var defaultKubernetesAddonsFile string
@@ -161,6 +170,7 @@ func newControllerRunOptions() (controllerRunOptions, error) {
 	flag.IntVar(&c.concurrentClusterUpdate, "max-parallel-reconcile", 10, "The default number of resources updates per cluster")
 	flag.IntVar(&c.addonEnforceInterval, "addon-enforce-interval", 5, "Check and ensure default usercluster addons are deployed every interval in minutes. Set to 0 to disable.")
 	flag.StringVar(&c.defaultComponentSettings, "default-component-settings", "", "YAML file with default cluster component settings")
+	flag.Var(&c.tunnelingAgentIP, "tunneling-agent-ip", "The address used by the tunneling agents.")
 	c.validationWebhook.AddFlags(flag.CommandLine, true)
 	addFlags(flag.CommandLine)
 	flag.Parse()
@@ -246,7 +256,7 @@ func (o controllerRunOptions) validate() error {
 	}
 
 	// Validate node-port range
-	if _, err := net.ParsePortRange(o.nodePortRange); err != nil {
+	if _, err := knet.ParsePortRange(o.nodePortRange); err != nil {
 		return fmt.Errorf("failed to parse nodePortRange: %v", err)
 	}
 

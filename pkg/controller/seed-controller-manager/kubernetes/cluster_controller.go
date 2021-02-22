@@ -107,6 +107,8 @@ type Reconciler struct {
 
 	features Features
 	versions kubermatic.Versions
+
+	tunnelingAgentIP string
 }
 
 // NewController creates a cluster controller.
@@ -140,6 +142,9 @@ func Add(
 	keycloakFacade keycloak.Facade,
 	etcdLauncherImage string,
 	dnatControllerImage string,
+
+	tunnelingAgentIP string,
+
 	features Features,
 	versions kubermatic.Versions) error {
 
@@ -178,8 +183,9 @@ func Add(
 
 		keycloakFacade: keycloakFacade,
 
-		features: features,
-		versions: versions,
+		tunnelingAgentIP: tunnelingAgentIP,
+		features:         features,
+		versions:         versions,
 	}
 
 	c, err := controller.New(ControllerName, mgr, controller.Options{Reconciler: reconciler, MaxConcurrentReconciles: numWorkers})
