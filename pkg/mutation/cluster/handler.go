@@ -62,6 +62,9 @@ func (h *AdmissionHandler) Handle(ctx context.Context, req webhook.AdmissionRequ
 	if settings.Apiserver.EndpointReconcilingDisabled == nil {
 		settings.Apiserver.EndpointReconcilingDisabled = h.settings.Apiserver.EndpointReconcilingDisabled
 	}
+	if settings.Apiserver.NodePortRange == "" {
+		settings.Apiserver.NodePortRange = h.settings.Apiserver.NodePortRange
+	}
 	if settings.ControllerManager.Replicas == nil {
 		settings.ControllerManager.Replicas = h.settings.ControllerManager.Replicas
 	}

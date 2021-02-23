@@ -34,7 +34,7 @@ func TestNuberOfFields(t *testing.T) {
 		t.Fatalf("want kubermaticv1.ComponentSettings{}.NumField=%d, got %d", want, got)
 	}
 
-	if want, got := 2, reflect.ValueOf(settings.Apiserver).NumField(); want != got {
+	if want, got := 3, reflect.ValueOf(settings.Apiserver).NumField(); want != got {
 		t.Fatalf("want kubermaticv1.ComponentSettings{}.Apiserver.NumField=%d, got %d", want, got)
 	}
 	if want, got := 3, reflect.ValueOf(settings.Apiserver.DeploymentSettings).NumField(); want != got {
