@@ -169,6 +169,16 @@ func (td *TemplateDataBuilder) WithInClusterPrometheusRemoteWriteConfigsFile(fil
 	return td
 }
 
+func (td *TemplateDataBuilder) WithExternalURL(url string) *TemplateDataBuilder {
+	td.data.ExternalURL = url
+	return td
+}
+
+func (td *TemplateDataBuilder) WithKeycloakFacade(facade keycloak.Facade) *TemplateDataBuilder {
+	td.data.KeycloakFacade = facade
+	return td
+}
+
 func (td *TemplateDataBuilder) WithOIDCCAFile(file string) *TemplateDataBuilder {
 	td.data.oidcCAFile = file
 	return td
