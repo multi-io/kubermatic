@@ -285,7 +285,8 @@ func resizeEtcd(ctx context.Context, client ctrlruntimeclient.Client, cluster *k
 	}
 
 	return patchCluster(ctx, client, cluster, func(c *kubermaticv1.Cluster) error {
-		cluster.Spec.ComponentsOverride.Etcd.ClusterSize = size
+		n := int32(size)
+		cluster.Spec.ComponentsOverride.Etcd.Replicas = &n
 		return nil
 	})
 }
