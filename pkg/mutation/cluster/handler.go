@@ -40,6 +40,15 @@ func NewAdmissionHandler(client client.Client, defaults kubermaticv1.ComponentSe
 	}
 }
 
+func (h *AdmissionHandler) InjectDecoder(d *admission.Decoder) error {
+	h.decoder = d
+	return nil
+}
+
+func (h *AdmissionHandler) InjectLogger(l logr.Logger) error {
+	return nil
+}
+
 func (h *AdmissionHandler) Handle(ctx context.Context, req webhook.AdmissionRequest) webhook.AdmissionResponse {
 	cluster := &kubermaticv1.Cluster{}
 
