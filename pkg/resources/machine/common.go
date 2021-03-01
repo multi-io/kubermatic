@@ -196,17 +196,17 @@ func getVSphereProviderSpec(c *kubermaticv1.Cluster, nodeSpec apiv1.NodeSpec, dc
 
 func getOpenstackProviderSpec(c *kubermaticv1.Cluster, nodeSpec apiv1.NodeSpec, dc *kubermaticv1.Datacenter) (*runtime.RawExtension, error) {
 	config := openstack.RawConfig{
-		Image:                     providerconfig.ConfigVarString{Value: nodeSpec.Cloud.Openstack.Image},
-		Flavor:                    providerconfig.ConfigVarString{Value: nodeSpec.Cloud.Openstack.Flavor},
-		AvailabilityZone:          providerconfig.ConfigVarString{Value: dc.Spec.Openstack.AvailabilityZone},
-		Region:                    providerconfig.ConfigVarString{Value: dc.Spec.Openstack.Region},
-		IdentityEndpoint:          providerconfig.ConfigVarString{Value: dc.Spec.Openstack.AuthURL},
-		Network:                   providerconfig.ConfigVarString{Value: c.Spec.Cloud.Openstack.Network},
-		Subnet:                    providerconfig.ConfigVarString{Value: c.Spec.Cloud.Openstack.SubnetID},
-		SecurityGroups:            []providerconfig.ConfigVarString{{Value: c.Spec.Cloud.Openstack.SecurityGroups}},
+		Image:                 providerconfig.ConfigVarString{Value: nodeSpec.Cloud.Openstack.Image},
+		Flavor:                providerconfig.ConfigVarString{Value: nodeSpec.Cloud.Openstack.Flavor},
+		AvailabilityZone:      providerconfig.ConfigVarString{Value: dc.Spec.Openstack.AvailabilityZone},
+		Region:                providerconfig.ConfigVarString{Value: dc.Spec.Openstack.Region},
+		IdentityEndpoint:      providerconfig.ConfigVarString{Value: dc.Spec.Openstack.AuthURL},
+		Network:               providerconfig.ConfigVarString{Value: c.Spec.Cloud.Openstack.Network},
+		Subnet:                providerconfig.ConfigVarString{Value: c.Spec.Cloud.Openstack.SubnetID},
+		SecurityGroups:        []providerconfig.ConfigVarString{{Value: c.Spec.Cloud.Openstack.SecurityGroups}},
 		NodeVolumeAttachLimit: dc.Spec.Openstack.NodeVolumeAttachLimit,
 		// Sys11: Set soft-anti-affinity server group name to be set on machines as schedule hint
-		ServerGroupID: providerconfig.ConfigVarString{Value: c.Spec.Cloud.Openstack.ServerGroupID},
+		ServerGroupID:             providerconfig.ConfigVarString{Value: c.Spec.Cloud.Openstack.ServerGroupID},
 		InstanceReadyCheckPeriod:  providerconfig.ConfigVarString{Value: nodeSpec.Cloud.Openstack.InstanceReadyCheckPeriod},
 		InstanceReadyCheckTimeout: providerconfig.ConfigVarString{Value: nodeSpec.Cloud.Openstack.InstanceReadyCheckTimeout},
 	}

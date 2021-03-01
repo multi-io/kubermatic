@@ -339,7 +339,6 @@ func (r *Reconciler) reconcileAdmissionWebhooks(config *operatorv1alpha1.Kuberma
 		return fmt.Errorf("failed to reconcile mutating AdmissionWebhooks: %v", err)
 	}
 
-
 	creators := []reconciling.NamedValidatingWebhookConfigurationCreatorGetter{
 		common.SeedAdmissionWebhookCreator(config, r.Client),
 	}

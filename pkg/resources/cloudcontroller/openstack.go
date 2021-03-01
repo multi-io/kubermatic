@@ -183,7 +183,7 @@ func getOSVersion(version semver.Semver) (string, error) {
 	// 1.18.x. This enables the use of rwx (with some limitations).
 	// case 18:
 	// case 19:
-		return "1.19.2", nil
+	//	return "1.19.2", nil
 	default:
 		return "1.19.2", nil
 	}

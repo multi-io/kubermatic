@@ -83,7 +83,7 @@ func main() {
 	ctrllog.SetLogger(zapr.NewLogger(rawLog.WithOptions(zap.AddCallerSkip(1))))
 
 	if len(opt.namespace) == 0 {
-		log.Fatal("-namespace is a mandatory flag")
+		log.Panic("-namespace is a mandatory flag")
 	}
 
 	v := kubermatic.NewDefaultVersions()
@@ -95,29 +95,29 @@ func main() {
 		LeaderElectionID:   "operator.kubermatic.io",
 	})
 	if err != nil {
-		log.Fatalw("Failed to create Controller Manager instance: %v", err)
+		log.Panicw("Failed to create Controller Manager instance: %v", err)
 	}
 
 	if err := mgr.Add(pprofOpts); err != nil {
-		log.Fatalw("Failed to add pprof endpoint", zap.Error(err))
+		log.Panicw("Failed to add pprof endpoint", zap.Error(err))
 	}
 
 	if err := operatorv1alpha1.AddToScheme(mgr.GetScheme()); err != nil {
-		log.Fatalw("Failed to register scheme", zap.Stringer("api", operatorv1alpha1.SchemeGroupVersion), zap.Error(err))
+		log.Panicw("Failed to register scheme", zap.Stringer("api", operatorv1alpha1.SchemeGroupVersion), zap.Error(err))
 	}
 
 	seedsGetter, err := seedsGetterFactory(ctx, mgr.GetClient(), opt)
 	if err != nil {
-		log.Fatalw("Failed to construct seedsGetter", zap.Error(err))
+		log.Panicw("Failed to construct seedsGetter", zap.Error(err))
 	}
 
 	seedKubeconfigGetter, err := provider.SeedKubeconfigGetterFactory(ctx, mgr.GetClient())
 	if err != nil {
-		log.Fatalw("Failed to construct seedKubeconfigGetter", zap.Error(err))
+		log.Panicw("Failed to construct seedKubeconfigGetter", zap.Error(err))
 	}
 
 	if err := masterctrl.Add(ctx, mgr, log, opt.namespace, opt.workerCount, opt.workerName); err != nil {
-		log.Fatalw("Failed to add operator-master controller", zap.Error(err))
+		log.Panicw("Failed to add operator-master controller", zap.Error(err))
 	}
 
 	seedOperatorControllerFactory := func(ctx context.Context, mgr manager.Manager, seedManagerMap map[string]manager.Manager) (string, error) {
@@ -134,10 +134,10 @@ func main() {
 	}
 
 	if err := seedcontrollerlifecycle.Add(ctx, log, mgr, opt.namespace, seedsGetter, seedKubeconfigGetter, seedOperatorControllerFactory); err != nil {
-		log.Fatalw("Failed to create seed-lifecycle controller", zap.Error(err))
+		log.Panicw("Failed to create seed-lifecycle controller", zap.Error(err))
 	}
 
 	if err := mgr.Start(signals.SetupSignalHandler()); err != nil {
-		log.Fatalw("Cannot start manager", zap.Error(err))
+		log.Panicw("Cannot start manager", zap.Error(err))
 	}
 }
