@@ -139,6 +139,9 @@ type ClusterSpec struct {
 	AdmissionPlugins                     []string          `json:"admissionPlugins,omitempty"`
 
 	AuditLogging *AuditLoggingSettings `json:"auditLogging,omitempty"`
+
+	// ServiceAccount contains service account related settings for the kube-apiserver of user cluster.
+	ServiceAccount *ServiceAccountSettings `json:"serviceAccount,omitempty"`
 }
 
 type Sys11AuthSettings struct {
@@ -313,6 +316,16 @@ type OIDCSettings struct {
 
 type AuditLoggingSettings struct {
 	Enabled bool `json:"enabled,omitempty"`
+}
+
+type ServiceAccountSettings struct {
+	TokenVolumeProjectionEnabled bool `json:"tokenVolumeProjectionEnabled,omitempty"`
+	// Issuer is the identifier of the service account token issuer
+	// If this is not specified, it will be set to the default value kubernetes.default.svc
+	Issuer string `json:"issuer,omitempty"`
+	// APIAudiences are the Identifiers of the API
+	// If this is not specified, it will be set to a single element list containing the issuer URL
+	APIAudiences []string `json:"apiAudiences,omitempty"`
 }
 
 type ComponentSettings struct {
