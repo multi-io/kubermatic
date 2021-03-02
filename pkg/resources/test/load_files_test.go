@@ -110,6 +110,9 @@ func TestLoadFiles(t *testing.T) {
 		{
 			Version: semver.MustParse("1.19.0"),
 		},
+		{
+			Version: semver.MustParse("1.20.0"),
+		},
 	}
 
 	clouds := map[string]kubermaticv1.CloudSpec{
@@ -239,12 +242,16 @@ func TestLoadFiles(t *testing.T) {
 								Gateway: "192.168.1.1",
 							},
 						},
+						ServiceAccount: &kubermaticv1.ServiceAccountSettings{
+							TokenVolumeProjectionEnabled: true,
+						},
 					},
 					Address: kubermaticv1.ClusterAddress{
 						ExternalName: "jh8j81chn.europe-west3-c.dev.kubermatic.io",
 						IP:           "35.198.93.90",
 						AdminToken:   "6hzr76.u8txpkk4vhgmtgdp",
 						InternalName: "apiserver-external.cluster-de-test-01.svc.cluster.local.",
+						URL:          "https://jh8j81chn.europe-west3-c.dev.kubermatic.io:30000",
 						Port:         30000,
 					},
 					Status: kubermaticv1.ClusterStatus{

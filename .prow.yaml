@@ -13,6 +13,7 @@
 # limitations under the License.
 
 presubmits:
+
   #########################################################
   # unit tests
   #########################################################
@@ -73,7 +74,7 @@ presubmits:
       containers:
       - image: quay.io/kubermatic/util:1.4.1
         command:
-        - "./hack/verify-chart-versions.sh"
+        - "./hack/ci/verify-chart-versions.sh"
         resources:
           requests:
             memory: 128Mi
@@ -93,7 +94,7 @@ presubmits:
       preset-goproxy: "true"
     spec:
       containers:
-      - image: quay.io/kubermatic/go-docker:14.2-1806-0
+      - image: quay.io/kubermatic/go-docker:15.1-1903-1
         command:
         - "./hack/verify-kubermatic-chart.sh"
         resources:
@@ -137,7 +138,7 @@ presubmits:
       preset-goproxy: "true"
     spec:
       containers:
-      - image: quay.io/kubermatic/go-docker:14.2-1806-0
+      - image: quay.io/kubermatic/go-docker:15.1-1903-1
         command:
         - "./hack/verify-docs.sh"
         resources:
@@ -169,6 +170,22 @@ presubmits:
         - name: KUBERMATIC_EDITION
           value: ee
 
+  - name: pre-kubermatic-spellcheck
+    always_run: true
+    decorate: true
+    clone_uri: "ssh://git@github.com/kubermatic/kubermatic.git"
+    spec:
+      containers:
+      - image: quay.io/kubermatic/codespell:1.17.1
+        command:
+        - make
+        args:
+        - spellcheck
+        resources:
+          requests:
+            memory: 512Mi
+            cpu: 0.5
+
   - name: pre-kubermatic-dependencies
     run_if_changed: "^(cmd|codegen|hack|pkg|go.mod|go.sum)/"
     decorate: true
@@ -177,7 +194,7 @@ presubmits:
       preset-goproxy: "true"
     spec:
       containers:
-      - image: quay.io/kubermatic/go-docker:14.2-1806-0
+      - image: quay.io/kubermatic/go-docker:15.1-1903-1
         command:
         - make
         args:
@@ -274,7 +291,7 @@ presubmits:
       containers:
       - image: quay.io/kubermatic/promtool:2.7.0-3
         command:
-        - "./hack/verify-user-cluster-prometheus-configs.sh"
+        - "./hack/ci/verify-user-cluster-prometheus-configs.sh"
         env:
         - name: KUBERMATIC_EDITION
           value: ee
@@ -282,16 +299,16 @@ presubmits:
       - name: quay
 
   - name: pre-kubermatic-simulate-github-release
-    run_if_changed: "hack/ci/ci-github-release.sh"
+    run_if_changed: "hack/ci/github-release.sh"
     decorate: true
     clone_uri: "ssh://git@github.com/kubermatic/kubermatic.git"
     labels:
       preset-goproxy: "true"
     spec:
       containers:
-      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.21
+      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.23
         command:
-        - ./hack/ci/ci-test-github-release.sh
+        - ./hack/ci/test-github-release.sh
         resources:
           requests:
             memory: 1Gi
@@ -317,21 +334,21 @@ presubmits:
       preset-goproxy: "true"
     spec:
       containers:
-      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.21
+      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.23
         env:
         - name: KUBERMATIC_EDITION
           value: ee
         - name: VERSIONS_TO_TEST
-          value: "v1.17.13"
-        - name: EXCLUDE_DISTRIBUTIONS
-          value: "centos,ubuntu,coreos,rhel"
+          value: "v1.17.16"
+        - name: DISTRIBUTIONS
+          value: flatcar
         - name: SERVICE_ACCOUNT_KEY
           valueFrom:
             secretKeyRef:
               name: e2e-ci
               key: serviceAccountSigningKey
         command:
-        - "./hack/ci/ci-kind-e2e.sh"
+        - "./hack/ci/run-e2e-tests.sh"
         # docker-in-docker needs privileged mode
         securityContext:
           privileged: true
@@ -358,21 +375,21 @@ presubmits:
       preset-goproxy: "true"
     spec:
       containers:
-      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.21
+      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.23
         env:
         - name: KUBERMATIC_EDITION
           value: ee
         - name: VERSIONS_TO_TEST
-          value: "v1.18.10"
-        - name: EXCLUDE_DISTRIBUTIONS
-          value: "centos,ubuntu,coreos,rhel"
+          value: "v1.18.14"
+        - name: DISTRIBUTIONS
+          value: flatcar
         - name: SERVICE_ACCOUNT_KEY
           valueFrom:
             secretKeyRef:
               name: e2e-ci
               key: serviceAccountSigningKey
         command:
-        - "./hack/ci/ci-kind-e2e.sh"
+        - "./hack/ci/run-e2e-tests.sh"
         # docker-in-docker needs privileged mode
         securityContext:
           privileged: true
@@ -399,21 +416,21 @@ presubmits:
       preset-goproxy: "true"
     spec:
       containers:
-      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.21
+      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.22
         env:
         - name: KUBERMATIC_EDITION
           value: ee
         - name: VERSIONS_TO_TEST
           value: "v1.19.3"
-        - name: EXCLUDE_DISTRIBUTIONS
-          value: "centos,flatcar,coreos,rhel"
+        - name: DISTRIBUTIONS
+          value: ubuntu
         - name: SERVICE_ACCOUNT_KEY
           valueFrom:
             secretKeyRef:
               name: e2e-ci
               key: serviceAccountSigningKey
         command:
-        - "./hack/ci/ci-kind-e2e.sh"
+        - "./hack/ci/run-e2e-tests.sh"
         # docker-in-docker needs privileged mode
         securityContext:
           privileged: true
@@ -424,7 +441,7 @@ presubmits:
           limits:
             memory: 4Gi
 
-  - name: pre-kubermatic-e2e-aws-ubuntu-1.19-ce
+  - name: pre-kubermatic-e2e-aws-ubuntu-1.20
     decorate: true
     run_if_changed: "(cmd/|codegen/|hack/|pkg/|charts/kubermatic|addons/|.prow.yaml)"
     clone_uri: "ssh://git@github.com/kubermatic/kubermatic.git"
@@ -440,23 +457,64 @@ presubmits:
       preset-goproxy: "true"
     spec:
       containers:
-      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.21
+      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.23
+        env:
+        - name: KUBERMATIC_EDITION
+          value: ee
+        - name: VERSIONS_TO_TEST
+          value: "v1.20.2"
+        - name: DISTRIBUTIONS
+          value: ubuntu
+        - name: SERVICE_ACCOUNT_KEY
+          valueFrom:
+            secretKeyRef:
+              name: e2e-ci
+              key: serviceAccountSigningKey
+        command:
+        - "./hack/ci/run-e2e-tests.sh"
+        # docker-in-docker needs privileged mode
+        securityContext:
+          privileged: true
+        resources:
+          requests:
+            memory: 4Gi
+            cpu: 3.5
+          limits:
+            memory: 4Gi
+
+  - name: pre-kubermatic-e2e-aws-ubuntu-1.20-ce
+    decorate: true
+    run_if_changed: "(cmd/|codegen/|hack/|pkg/|charts/kubermatic|addons/|.prow.yaml)"
+    clone_uri: "ssh://git@github.com/kubermatic/kubermatic.git"
+    labels:
+      preset-aws: "true"
+      preset-docker-pull: "true"
+      preset-docker-push: "true"
+      preset-vault: "true"
+      preset-repo-ssh: "true"
+      preset-e2e-ssh: "true"
+      preset-kubeconfig-ci: "true"
+      preset-kind-volume-mounts: "true"
+      preset-goproxy: "true"
+    spec:
+      containers:
+      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.23
         env:
         - name: KUBERMATIC_EDITION
           value: "ce"
         - name: ONLY_TEST_CREATION
           value: "true"
         - name: VERSIONS_TO_TEST
-          value: "v1.19.3"
-        - name: EXCLUDE_DISTRIBUTIONS
-          value: "centos,flatcar,coreos,rhel"
+          value: "v1.20.2"
+        - name: DISTRIBUTIONS
+          value: ubuntu
         - name: SERVICE_ACCOUNT_KEY
           valueFrom:
             secretKeyRef:
               name: e2e-ci
               key: serviceAccountSigningKey
         command:
-        - "./hack/ci/ci-kind-e2e.sh"
+        - "./hack/ci/run-e2e-tests.sh"
         # docker-in-docker needs privileged mode
         securityContext:
           privileged: true
@@ -467,7 +525,7 @@ presubmits:
           limits:
             memory: 4Gi
 
-  - name: pre-kubermatic-e2e-aws-ubuntu-1.19-legacy
+  - name: pre-kubermatic-e2e-aws-ubuntu-1.20-legacy
     decorate: true
     run_if_changed: "(cmd/|codegen/|hack/|pkg/|charts/kubermatic|addons/|.prow.yaml)"
     clone_uri: "ssh://git@github.com/kubermatic/kubermatic.git"
@@ -483,7 +541,7 @@ presubmits:
       preset-goproxy: "true"
     spec:
       containers:
-      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.21
+      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.23
         env:
         - name: KUBERMATIC_EDITION
           value: "ee"
@@ -493,16 +551,16 @@ presubmits:
         - name: USE_LEGACY_HELM_CHART
           value: "true"
         - name: VERSIONS_TO_TEST
-          value: "v1.19.3"
-        - name: EXCLUDE_DISTRIBUTIONS
-          value: "centos,flatcar,coreos,rhel"
+          value: "v1.20.2"
+        - name: DISTRIBUTIONS
+          value: ubuntu
         - name: SERVICE_ACCOUNT_KEY
           valueFrom:
             secretKeyRef:
               name: e2e-ci
               key: serviceAccountSigningKey
         command:
-        - "./hack/ci/ci-kind-e2e.sh"
+        - "./hack/ci/run-e2e-tests.sh"
         # docker-in-docker needs privileged mode
         securityContext:
           privileged: true
@@ -517,7 +575,7 @@ presubmits:
   # # Extended Kubernetes Tests (various cloud providers, OS)
   # #########################################################
 
-  - name: pre-kubermatic-e2e-azure-ubuntu-1.19
+  - name: pre-kubermatic-e2e-azure-ubuntu-1.20
     decorate: true
     optional: true
     clone_uri: "ssh://git@github.com/kubermatic/kubermatic.git"
@@ -533,14 +591,14 @@ presubmits:
       preset-goproxy: "true"
     spec:
       containers:
-      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.21
+      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.23
         env:
         - name: KUBERMATIC_EDITION
           value: ee
         - name: VERSIONS_TO_TEST
-          value: "v1.19.3"
-        - name: EXCLUDE_DISTRIBUTIONS
-          value: "centos,coreos,flatcar,rhel"
+          value: "v1.20.2"
+        - name: DISTRIBUTIONS
+          value: ubuntu
         - name: PROVIDER
           value: "azure"
         - name: DEFAULT_TIMEOUT_MINUTES
@@ -551,7 +609,7 @@ presubmits:
               name: e2e-ci
               key: serviceAccountSigningKey
         command:
-        - "./hack/ci/ci-kind-e2e.sh"
+        - "./hack/ci/run-e2e-tests.sh"
         # docker-in-docker needs privileged mode
         securityContext:
           privileged: true
@@ -562,7 +620,7 @@ presubmits:
           limits:
             memory: 4Gi
 
-  - name: pre-kubermatic-e2e-gcp-ubuntu-1.19
+  - name: pre-kubermatic-e2e-gcp-ubuntu-1.20
     decorate: true
     always_run: false
     optional: true
@@ -579,23 +637,23 @@ presubmits:
       preset-goproxy: "true"
     spec:
       containers:
-      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.21
+      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.23
         env:
         - name: KUBERMATIC_EDITION
           value: ee
         - name: VERSIONS_TO_TEST
-          value: "v1.19.3"
+          value: "v1.20.2"
         - name: PROVIDER
           value: "gcp"
-        - name: EXCLUDE_DISTRIBUTIONS
-          value: "centos,coreos,flatcar,rhel"
+        - name: DISTRIBUTIONS
+          value: ubuntu
         - name: SERVICE_ACCOUNT_KEY
           valueFrom:
             secretKeyRef:
               name: e2e-ci
               key: serviceAccountSigningKey
         command:
-        - "./hack/ci/ci-kind-e2e.sh"
+        - "./hack/ci/run-e2e-tests.sh"
         # docker-in-docker needs privileged mode
         securityContext:
           privileged: true
@@ -606,7 +664,7 @@ presubmits:
           limits:
             memory: 4Gi
 
-  - name: pre-kubermatic-e2e-gcp-ubuntu-1.19-psp
+  - name: pre-kubermatic-e2e-gcp-ubuntu-1.20-psp
     decorate: true
     optional: true
     clone_uri: "ssh://git@github.com/kubermatic/kubermatic.git"
@@ -622,16 +680,16 @@ presubmits:
       preset-goproxy: "true"
     spec:
       containers:
-      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.21
+      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.23
         env:
         - name: KUBERMATIC_EDITION
           value: ee
         - name: VERSIONS_TO_TEST
-          value: "v1.19.3"
+          value: "v1.20.2"
         - name: PROVIDER
           value: "gcp"
-        - name: EXCLUDE_DISTRIBUTIONS
-          value: "centos,coreos,flatcar,rhel"
+        - name: DISTRIBUTIONS
+          value: ubuntu
         - name: KUBERMATIC_PSP_ENABLED
           value: "true"
         - name: ONLY_TEST_CREATION
@@ -642,7 +700,7 @@ presubmits:
               name: e2e-ci
               key: serviceAccountSigningKey
         command:
-        - "./hack/ci/ci-kind-e2e.sh"
+        - "./hack/ci/run-e2e-tests.sh"
         # docker-in-docker needs privileged mode
         securityContext:
           privileged: true
@@ -653,7 +711,7 @@ presubmits:
           limits:
             memory: 4Gi
 
-  - name: pre-kubermatic-e2e-do-centos-1.19
+  - name: pre-kubermatic-e2e-do-centos-1.20
     decorate: true
     always_run: false
     optional: true
@@ -670,14 +728,14 @@ presubmits:
       preset-goproxy: "true"
     spec:
       containers:
-      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.21
+      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.23
         env:
         - name: KUBERMATIC_EDITION
           value: ee
         - name: VERSIONS_TO_TEST
-          value: "v1.19.3"
-        - name: EXCLUDE_DISTRIBUTIONS
-          value: "ubuntu,coreos,flatcar,rhel"
+          value: "v1.20.2"
+        - name: DISTRIBUTIONS
+          value: centos
         - name: PROVIDER
           value: "digitalocean"
         - name: SERVICE_ACCOUNT_KEY
@@ -686,7 +744,7 @@ presubmits:
               name: e2e-ci
               key: serviceAccountSigningKey
         command:
-        - "./hack/ci/ci-kind-e2e.sh"
+        - "./hack/ci/run-e2e-tests.sh"
         # docker-in-docker needs privileged mode
         securityContext:
           privileged: true
@@ -697,7 +755,7 @@ presubmits:
           limits:
             memory: 4Gi
 
-  - name: pre-kubermatic-e2e-packet-ubuntu-1.19
+  - name: pre-kubermatic-e2e-packet-ubuntu-1.20
     decorate: true
     optional: true
     clone_uri: "ssh://git@github.com/kubermatic/kubermatic.git"
@@ -713,23 +771,23 @@ presubmits:
       preset-goproxy: "true"
     spec:
       containers:
-      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.21
+      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.23
         env:
         - name: KUBERMATIC_EDITION
           value: ee
         - name: VERSIONS_TO_TEST
-          value: "v1.19.3"
+          value: "v1.20.2"
         - name: PROVIDER
           value: "packet"
-        - name: EXCLUDE_DISTRIBUTIONS
-          value: "centos,coreos,flatcar,rhel"
+        - name: DISTRIBUTIONS
+          value: ubuntu
         - name: SERVICE_ACCOUNT_KEY
           valueFrom:
             secretKeyRef:
               name: e2e-ci
               key: serviceAccountSigningKey
         command:
-        - "./hack/ci/ci-kind-e2e.sh"
+        - "./hack/ci/run-e2e-tests.sh"
         # docker-in-docker needs privileged mode
         securityContext:
           privileged: true
@@ -740,7 +798,7 @@ presubmits:
           limits:
             memory: 4Gi
 
-  - name: pre-kubermatic-e2e-kubevirt-centos-1.19
+  - name: pre-kubermatic-e2e-kubevirt-centos-1.20
     decorate: true
     optional: true
     clone_uri: "ssh://git@github.com/kubermatic/kubermatic.git"
@@ -756,23 +814,23 @@ presubmits:
       preset-goproxy: "true"
     spec:
       containers:
-      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.21
+      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.23
         env:
         - name: KUBERMATIC_EDITION
           value: ee
         - name: VERSIONS_TO_TEST
-          value: "v1.19.3"
+          value: "v1.20.2"
         - name: PROVIDER
           value: "kubevirt"
-        - name: EXCLUDE_DISTRIBUTIONS
-          value: "ubuntu,coreos,flatcar,rhel"
+        - name: DISTRIBUTIONS
+          value: centos
         - name: SERVICE_ACCOUNT_KEY
           valueFrom:
             secretKeyRef:
               name: e2e-ci
               key: serviceAccountSigningKey
         command:
-        - "./hack/ci/ci-kind-e2e.sh"
+        - "./hack/ci/run-e2e-tests.sh"
         # docker-in-docker needs privileged mode
         securityContext:
           privileged: true
@@ -783,7 +841,7 @@ presubmits:
           limits:
             memory: 4Gi
 
-  - name: pre-kubermatic-e2e-hetzner-ubuntu-1.19
+  - name: pre-kubermatic-e2e-hetzner-ubuntu-1.20
     decorate: true
     optional: true
     clone_uri: "ssh://git@github.com/kubermatic/kubermatic.git"
@@ -799,17 +857,16 @@ presubmits:
       preset-goproxy: "true"
     spec:
       containers:
-      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.21
+      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.23
         env:
         - name: KUBERMATIC_EDITION
           value: ee
         - name: VERSIONS_TO_TEST
-          value: "v1.19.3"
+          value: "v1.20.2"
         - name: PROVIDER
           value: "hetzner"
-        # Hetzner doesn't support coreos
-        - name: EXCLUDE_DISTRIBUTIONS
-          value: "centos,coreos,flatcar,rhel"
+        - name: DISTRIBUTIONS
+          value: ubuntu
         - name: DEFAULT_TIMEOUT_MINUTES
           value: "20"
         - name: SERVICE_ACCOUNT_KEY
@@ -818,7 +875,7 @@ presubmits:
               name: e2e-ci
               key: serviceAccountSigningKey
         command:
-        - "./hack/ci/ci-kind-e2e.sh"
+        - "./hack/ci/run-e2e-tests.sh"
         # docker-in-docker needs privileged mode
         securityContext:
           privileged: true
@@ -829,7 +886,7 @@ presubmits:
           limits:
             memory: 4Gi
 
-  - name: pre-kubermatic-e2e-openstack-ubuntu-1.19
+  - name: pre-kubermatic-e2e-openstack-ubuntu-1.20
     decorate: true
     optional: true
     clone_uri: "ssh://git@github.com/kubermatic/kubermatic.git"
@@ -845,16 +902,16 @@ presubmits:
       preset-goproxy: "true"
     spec:
       containers:
-      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.21
+      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.23
         env:
         - name: KUBERMATIC_EDITION
           value: ee
         - name: VERSIONS_TO_TEST
-          value: "v1.19.3"
+          value: "v1.20.2"
         - name: PROVIDER
           value: "openstack"
-        - name: EXCLUDE_DISTRIBUTIONS
-          value: "centos,coreos,flatcar,rhel"
+        - name: DISTRIBUTIONS
+          value: ubuntu
         - name: DEFAULT_TIMEOUT_MINUTES
           value: "20"
         - name: SERVICE_ACCOUNT_KEY
@@ -863,7 +920,7 @@ presubmits:
               name: e2e-ci
               key: serviceAccountSigningKey
         command:
-        - "./hack/ci/ci-kind-e2e.sh"
+        - "./hack/ci/run-e2e-tests.sh"
         # docker-in-docker needs privileged mode
         securityContext:
           privileged: true
@@ -874,7 +931,7 @@ presubmits:
           limits:
             memory: 4Gi
 
-  - name: pre-kubermatic-e2e-openstack-centos-1.19
+  - name: pre-kubermatic-e2e-openstack-centos-1.20
     decorate: true
     optional: true
     clone_uri: "ssh://git@github.com/kubermatic/kubermatic.git"
@@ -890,25 +947,25 @@ presubmits:
       preset-goproxy: "true"
     spec:
       containers:
-      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.21
+      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.23
         env:
         - name: KUBERMATIC_EDITION
           value: ee
         - name: VERSIONS_TO_TEST
-          value: "v1.19.3"
+          value: "v1.20.2"
         - name: PROVIDER
           value: "openstack"
         - name: DEFAULT_TIMEOUT_MINUTES
           value: "20"
-        - name: EXCLUDE_DISTRIBUTIONS
-          value: "coreos,ubuntu,flatcar,rhel"
+        - name: DISTRIBUTIONS
+          value: centos
         - name: SERVICE_ACCOUNT_KEY
           valueFrom:
             secretKeyRef:
               name: e2e-ci
               key: serviceAccountSigningKey
         command:
-        - "./hack/ci/ci-kind-e2e.sh"
+        - "./hack/ci/run-e2e-tests.sh"
         # docker-in-docker needs privileged mode
         securityContext:
           privileged: true
@@ -919,7 +976,7 @@ presubmits:
           limits:
             memory: 4Gi
 
-  - name: pre-kubermatic-e2e-vsphere-ubuntu-1.19
+  - name: pre-kubermatic-e2e-vsphere-ubuntu-1.20
     decorate: true
     run_if_changed: "pkg/provider/cloud/vsphere"
     clone_uri: "ssh://git@github.com/kubermatic/kubermatic.git"
@@ -935,23 +992,23 @@ presubmits:
       preset-goproxy: "true"
     spec:
       containers:
-      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.21
+      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.23
         env:
         - name: KUBERMATIC_EDITION
           value: ee
         - name: VERSIONS_TO_TEST
-          value: "v1.19.3"
+          value: "v1.20.2"
         - name: PROVIDER
           value: "vsphere"
-        - name: EXCLUDE_DISTRIBUTIONS
-          value: "centos,coreos,flatcar,rhel"
+        - name: DISTRIBUTIONS
+          value: ubuntu
         - name: SERVICE_ACCOUNT_KEY
           valueFrom:
             secretKeyRef:
               name: e2e-ci
               key: serviceAccountSigningKey
         command:
-        - "./hack/ci/ci-kind-e2e.sh"
+        - "./hack/ci/run-e2e-tests.sh"
         # docker-in-docker needs privileged mode
         securityContext:
           privileged: true
@@ -962,7 +1019,7 @@ presubmits:
           limits:
             memory: 4Gi
 
-  - name: pre-kubermatic-e2e-vsphere-ubuntu-1.19-customfolder
+  - name: pre-kubermatic-e2e-vsphere-ubuntu-1.20-customfolder
     decorate: true
     optional: true
     run_if_changed: "pkg/provider/cloud/vsphere"
@@ -979,16 +1036,16 @@ presubmits:
       preset-goproxy: "true"
     spec:
       containers:
-      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.21
+      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.23
         env:
         - name: KUBERMATIC_EDITION
           value: ee
         - name: VERSIONS_TO_TEST
-          value: "v1.19.3"
+          value: "v1.20.2"
         - name: PROVIDER
           value: "vsphere"
-        - name: EXCLUDE_DISTRIBUTIONS
-          value: "centos,coreos,flatcar,rhel"
+        - name: DISTRIBUTIONS
+          value: ubuntu
         - name: SCENARIO_OPTIONS
           value: "custom-folder"
         - name: SERVICE_ACCOUNT_KEY
@@ -997,7 +1054,7 @@ presubmits:
               name: e2e-ci
               key: serviceAccountSigningKey
         command:
-        - "./hack/ci/ci-kind-e2e.sh"
+        - "./hack/ci/run-e2e-tests.sh"
         # docker-in-docker needs privileged mode
         securityContext:
           privileged: true
@@ -1008,7 +1065,7 @@ presubmits:
           limits:
             memory: 4Gi
 
-  - name: pre-kubermatic-e2e-vsphere-ubuntu-1.19-datastore-cluster
+  - name: pre-kubermatic-e2e-vsphere-ubuntu-1.20-datastore-cluster
     decorate: true
     optional: true
     run_if_changed: "pkg/provider/cloud/vsphere"
@@ -1025,16 +1082,16 @@ presubmits:
       preset-goproxy: "true"
     spec:
       containers:
-      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.21
+      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.23
         env:
         - name: KUBERMATIC_EDITION
           value: ee
         - name: VERSIONS_TO_TEST
-          value: "v1.19.3"
+          value: "v1.20.2"
         - name: PROVIDER
           value: "vsphere"
-        - name: EXCLUDE_DISTRIBUTIONS
-          value: "centos,coreos,flatcar,rhel"
+        - name: DISTRIBUTIONS
+          value: ubuntu
         - name: SCENARIO_OPTIONS
           value: "datastore-cluster"
         - name: SERVICE_ACCOUNT_KEY
@@ -1043,7 +1100,7 @@ presubmits:
               name: e2e-ci
               key: serviceAccountSigningKey
         command:
-        - "./hack/ci/ci-kind-e2e.sh"
+        - "./hack/ci/run-e2e-tests.sh"
         # docker-in-docker needs privileged mode
         securityContext:
           privileged: true
@@ -1061,7 +1118,6 @@ presubmits:
   - name: pre-kubermatic-e2e-aws-openshift-4.1
     decorate: true
     optional: true
-    run_if_changed: "openshift_addons/"
     clone_uri: "ssh://git@github.com/kubermatic/kubermatic.git"
     labels:
       preset-aws: "true"
@@ -1077,13 +1133,13 @@ presubmits:
       preset-goproxy: "true"
     spec:
       containers:
-      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.21
+      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.23
         env:
         - name: KUBERMATIC_EDITION
           value: ee
         - name: OPENSHIFT
           value: "true"
-        - name: OPENSHIFT_VERSION
+        - name: VERSIONS_TO_TEST
           value: "4.1.18"
         - name: SERVICE_ACCOUNT_KEY
           valueFrom:
@@ -1091,7 +1147,7 @@ presubmits:
               name: e2e-ci
               key: serviceAccountSigningKey
         command:
-        - "./hack/ci/ci-kind-e2e.sh"
+        - "./hack/ci/run-e2e-tests.sh"
         # docker-in-docker needs privileged mode
         securityContext:
           privileged: true
@@ -1123,10 +1179,10 @@ presubmits:
       preset-goproxy: "true"
     spec:
       containers:
-      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.21
+      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.23
         imagePullPolicy: Always
         command:
-        - "./hack/ci/ci-run-api-e2e.sh"
+        - "./hack/ci/run-api-e2e.sh"
         env:
         - name: VERSION_TO_TEST
           value: v1.18.10
@@ -1148,6 +1204,79 @@ presubmits:
               key: serviceAccountSigningKey
 
   #########################################################
+  # etcd-launcher e2e tests
+  #########################################################
+
+  - name: pre-kubermatic-etcd-launcher-e2e
+    run_if_changed: "(cmd/etcd-launcher/|pkg/|.prow.yaml)"
+    decorate: true
+    clone_uri: "ssh://git@github.com/kubermatic/kubermatic.git"
+    labels:
+      preset-digitalocean: "true"
+      preset-kubeconfig-ci: "true"
+      preset-docker-pull: "true"
+      preset-docker-push: "true"
+      preset-kind-volume-mounts: "true"
+      preset-vault: "true"
+      preset-goproxy: "true"
+    spec:
+      containers:
+      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.23
+        command:
+        - "./hack/ci/run-etcd-launcher-tests.sh"
+        env:
+        - name: VERSION_TO_TEST
+          value: v1.20.2
+        - name: KUBERMATIC_EDITION
+          value: ee
+        - name: SERVICE_ACCOUNT_KEY
+          valueFrom:
+            secretKeyRef:
+              name: e2e-ci
+              key: serviceAccountSigningKey
+        securityContext:
+          privileged: true
+        resources:
+          requests:
+            memory: 4Gi
+            cpu: 2
+          limits:
+            memory: 6Gi
+
+  #########################################################
+  # NodePort Proxy e2e tests
+  #########################################################
+
+  - name: pre-kubermatic-nodeport-proxy-e2e
+    run_if_changed: "(cmd/nodeport-proxy/|pkg/controller/operator/seed/nodeportproxy/|pkg/controller/nodeport-proxy|.prow.yaml)"
+    decorate: true
+    clone_uri: "ssh://git@github.com/kubermatic/kubermatic.git"
+    labels:
+      preset-docker-pull: "true"
+      preset-docker-push: "true"
+      preset-kind-volume-mounts: "true"
+      preset-goproxy: "true"
+    spec:
+      containers:
+      - image: quay.io/kubermatic/e2e-kind:with-conformance-tests-v1.0.23
+        imagePullPolicy: Always
+        command:
+        - make
+        args:
+        - run-nodeport-proxy-e2e-test-in-kind
+        env:
+        - name: KIND_NODE_VERSION
+          value: v1.19.1
+        securityContext:
+          privileged: true
+        resources:
+          requests:
+            memory: 4Gi
+            cpu: 2
+          limits:
+            memory: 6Gi
+
+  #########################################################
   # misc
   #########################################################
 
@@ -1162,9 +1291,9 @@ presubmits:
       preset-goproxy: "true"
     spec:
       containers:
-      - image: quay.io/kubermatic/go-docker:14.2-1806-0
+      - image: quay.io/kubermatic/go-docker:15.1-1903-1
         command:
-        - "./hack/ci/ci-run-offline-test.sh"
+        - "./hack/ci/run-offline-test.sh"
         # docker-in-docker needs privileged mode
         securityContext:
           privileged: true
@@ -1182,7 +1311,7 @@ presubmits:
     # * hack: Contains all the deployment scripting
     # * charts/kubermatic: Contains the chart
     # * pkg/crd/kubermatic/v1: Contains the Seed and Datacenter types, if
-    #   this gets out of sync with whats in the secrets repo, we fail because we use
+    #   this gets out of sync with what's in the secrets repo, we fail because we use
     #   yaml.UnmarshalStrict
     run_if_changed: "(hack|charts/kubermatic|pkg/crd/kubermatic/v1)"
     clone_uri: "ssh://git@github.com/kubermatic/kubermatic.git"
@@ -1195,9 +1324,9 @@ presubmits:
       preset-goproxy: "true"
     spec:
       containers:
-      - image: quay.io/kubermatic/go-docker:14.2-1806-0
+      - image: quay.io/kubermatic/go-docker:15.1-1903-1
         command:
-        - ./hack/ci/ci-deploy-ci-kubermatic-io.sh
+        - ./hack/ci/deploy-ci-kubermatic-io.sh
         env:
         - name: KUBERMATIC_EDITION
           value: ee
@@ -1222,7 +1351,7 @@ presubmits:
       preset-goproxy: "true"
     spec:
       containers:
-      - image: quay.io/kubermatic/integration-tests:3-1
+      - image: quay.io/kubermatic/integration-tests:4-1
         command:
         - make
         args:
