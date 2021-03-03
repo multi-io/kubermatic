@@ -67,7 +67,7 @@ func OpenstackQuotaLimitEndpoint(seedsGetter provider.SeedsGetter, presetsProvid
 func OpenstackImageNoCredentialsEndpoint(projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, seedsGetter provider.SeedsGetter, userInfoGetter provider.UserInfoGetter) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(OpenstackNoCredentialsReq)
-		return handlercommon.OpenstackQuotaLimitNoCredentialsEndpoint(ctx, req.ProjectID, req.ClusterID, projectProvider, privilegedProjectProvider, seedsGetter, userInfoGetter)
+		return handlercommon.OpenstackImageNoCredentialsEndpoint(ctx, req.ProjectID, req.ClusterID, projectProvider, privilegedProjectProvider, seedsGetter, userInfoGetter)
 	}
 }
 
