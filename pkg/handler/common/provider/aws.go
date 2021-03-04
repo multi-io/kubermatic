@@ -229,6 +229,9 @@ func AWSSizes(region string) (apiv1.AWSSizeList, error) {
 
 	sizes := apiv1.AWSSizeList{}
 	for _, i := range *data {
+		if !contains(i.Arch, "x86_64") {
+			continue
+		}
 		// TODO: Make the check below more generic, working for all the providers. It is needed as the pods
 		//  with memory under 2 GB will be full with required pods like kube-proxy, CNI etc.
 		if i.Memory >= 2 {
@@ -254,4 +257,13 @@ func AWSSizes(region string) (apiv1.AWSSizeList, error) {
 	}
 
 	return sizes, nil
+}
+
+func contains(a []string, s string) bool {
+	for _, i := range a {
+		if i == s {
+			return true
+		}
+	}
+	return false
 }
