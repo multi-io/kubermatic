@@ -2149,4 +2149,9 @@ func ToInternalClusterType(externalClusterType string) kubermaticv1.ClusterType 
 
 const (
 	InitialMachineDeploymentRequestAnnotation = "kubermatic.io/initial-machinedeployment-request"
+
+	AutoscalerLegacyMinSizeAnnotation = "cluster-autoscaler/min-size"
+	AutoscalerLegacyMaxSizeAnnotation = "cluster-autoscaler/max-size"
+	AutoscalerMinSizeAnnotation       = "cluster.k8s.io/cluster-api-autoscaler-node-group-min-size"
+	AutoscalerMaxSizeAnnotation       = "cluster.k8s.io/cluster-api-autoscaler-node-group-max-size"
 )

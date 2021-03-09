@@ -157,8 +157,10 @@ func outputMachineDeployment(md *clusterv1alpha1.MachineDeployment) (*apiv1.Node
 		}
 	}
 
-	minReplicas, _ := strconv.ParseInt(md.Annotations["cluster-autoscaler/min-size"], 10, 32)
-	maxReplicas, _ := strconv.ParseInt(md.Annotations["cluster-autoscaler/max-size"], 10, 32)
+	minReplicas, maxReplicas, err := getMinAndMaxReplicas(md)
+	if err != nil {
+		return nil, err
+	}
 
 	hasDynamicConfig := md.Spec.Template.Spec.ConfigSource != nil
 
@@ -187,6 +189,38 @@ func outputMachineDeployment(md *clusterv1alpha1.MachineDeployment) (*apiv1.Node
 		},
 		Status: md.Status,
 	}, nil
+}
+
+func getMinAndMaxReplicas(md *clusterv1alpha1.MachineDeployment) (int32, int32, error) {
+	var minReplicas int32
+	if min, ok := md.Annotations[apiv1.AutoscalerMinSizeAnnotation]; ok && min != "" {
+		minInt, err := strconv.ParseInt(min, 10, 32)
+		if err != nil {
+			return 0, 0, fmt.Errorf("failed to read autoscaler min size annotation: %v", err)
+		}
+		minReplicas = int32(minInt)
+	} else if min, ok := md.Annotations[apiv1.AutoscalerLegacyMinSizeAnnotation]; ok && min != "" {
+		minInt, err := strconv.ParseInt(min, 10, 32)
+		if err != nil {
+			return 0, 0, fmt.Errorf("failed to read autoscaler legacy min size annotation: %v", err)
+		}
+		minReplicas = int32(minInt)
+	}
+	var maxReplicas int32
+	if max, ok := md.Annotations[apiv1.AutoscalerMaxSizeAnnotation]; ok && max != "" {
+		maxInt, err := strconv.ParseInt(max, 10, 32)
+		if err != nil {
+			return 0, 0, fmt.Errorf("failed to read autoscaler max size annotation: %v", err)
+		}
+		maxReplicas = int32(maxInt)
+	} else if max, ok := md.Annotations[apiv1.AutoscalerLegacyMaxSizeAnnotation]; ok && max != "" {
+		maxInt, err := strconv.ParseInt(max, 10, 32)
+		if err != nil {
+			return 0, 0, fmt.Errorf("failed to read autoscaler legacy max size annotation: %v", err)
+		}
+		maxReplicas = int32(maxInt)
+	}
+	return minReplicas, maxReplicas, nil
 }
 
 func DeleteMachineNode(ctx context.Context, userInfoGetter provider.UserInfoGetter, projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, projectID, clusterID, machineID string) (interface{}, error) {

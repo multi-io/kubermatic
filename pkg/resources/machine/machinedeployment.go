@@ -88,11 +88,15 @@ func Deployment(c *kubermaticv1.Cluster, nd *apiv1.NodeDeployment, dc *kubermati
 		if md.Annotations == nil {
 			md.Annotations = map[string]string{}
 		}
-		md.Annotations["cluster-autoscaler/min-size"] = strconv.Itoa(int(nd.Spec.MinReplicas))
-		md.Annotations["cluster-autoscaler/max-size"] = strconv.Itoa(int(nd.Spec.MaxReplicas))
+		md.Annotations[apiv1.AutoscalerMinSizeAnnotation] = strconv.Itoa(int(nd.Spec.MinReplicas))
+		md.Annotations[apiv1.AutoscalerMaxSizeAnnotation] = strconv.Itoa(int(nd.Spec.MaxReplicas))
+		md.Annotations[apiv1.AutoscalerLegacyMinSizeAnnotation] = strconv.Itoa(int(nd.Spec.MinReplicas))
+		md.Annotations[apiv1.AutoscalerLegacyMaxSizeAnnotation] = strconv.Itoa(int(nd.Spec.MaxReplicas))
 	} else if md.Annotations != nil {
-		delete(md.Annotations, "cluster-autoscaler/min-size")
-		delete(md.Annotations, "cluster-autoscaler/max-size")
+		delete(md.Annotations, apiv1.AutoscalerMinSizeAnnotation)
+		delete(md.Annotations, apiv1.AutoscalerMaxSizeAnnotation)
+		delete(md.Annotations, apiv1.AutoscalerLegacyMinSizeAnnotation)
+		delete(md.Annotations, apiv1.AutoscalerLegacyMaxSizeAnnotation)
 	}
 
 	md.Spec.Template.Spec.Versions.Kubelet = nd.Spec.Template.Versions.Kubelet
