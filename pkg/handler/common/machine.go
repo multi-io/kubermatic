@@ -173,8 +173,8 @@ func outputMachineDeployment(md *clusterv1alpha1.MachineDeployment) (*apiv1.Node
 		},
 		Spec: apiv1.NodeDeploymentSpec{
 			Replicas:    *md.Spec.Replicas,
-			MinReplicas: int32(minReplicas),
-			MaxReplicas: int32(maxReplicas),
+			MinReplicas: minReplicas,
+			MaxReplicas: maxReplicas,
 			Template: apiv1.NodeSpec{
 				Labels: label.FilterLabels(label.NodeDeploymentResourceType, md.Spec.Template.Spec.Labels),
 				Taints: taints,
