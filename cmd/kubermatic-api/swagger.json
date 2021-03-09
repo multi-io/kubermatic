@@ -15670,6 +15670,11 @@
           "description": "Optional: Detailed location of the datacenter, like \"Hamburg\" or \"Datacenter 7\".\nFor informational purposes only.",
           "type": "string",
           "x-go-name": "Location"
+        },
+        "network": {
+          "description": "Network is the pre-existing Hetzner network in which the machines are running.\nWhile machines can be in multiple networks, a single one must be chosen for the\nHCloud CCM to work.",
+          "type": "string",
+          "x-go-name": "Network"
         }
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
@@ -16422,7 +16427,13 @@
         "credentialsReference": {
           "$ref": "#/definitions/GlobalSecretKeySelector"
         },
+        "network": {
+          "description": "Network is the pre-existing Hetzner network in which the machines are running.\nWhile machines can be in multiple networks, a single one must be chosen for the\nHCloud CCM to work.\nIf this is empty, the network configured on the datacenter will be used.",
+          "type": "string",
+          "x-go-name": "Network"
+        },
         "token": {
+          "description": "Token is used to authenticate with the Hetzner cloud API.",
           "type": "string",
           "x-go-name": "Token"
         }
@@ -16436,6 +16447,11 @@
         "type"
       ],
       "properties": {
+        "network": {
+          "description": "network name",
+          "type": "string",
+          "x-go-name": "Network"
+        },
         "type": {
           "description": "server type",
           "type": "string",
@@ -17735,8 +17751,15 @@
       "type": "object",
       "properties": {
         "enabled": {
+          "description": "Enabled is the flag for enabling OPA integration",
           "type": "boolean",
           "x-go-name": "Enabled"
+        },
+        "webhookTimeoutSeconds": {
+          "description": "WebhookTimeout is the timeout that is set for the gatekeeper validating webhook admission review calls.\nBy default 10 seconds.",
+          "type": "integer",
+          "format": "int32",
+          "x-go-name": "WebhookTimeoutSeconds"
         }
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"

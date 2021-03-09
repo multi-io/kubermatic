@@ -1183,14 +1183,14 @@ func (r *testRunner) getGinkgoRuns(
 			ginkgoFocus:   `\[Conformance\]`,
 			ginkgoSkip:    ginkgoSkipParallel,
 			parallelTests: int(nodeNumberTotal) * 3,
-			timeout:       30 * time.Minute,
+			timeout:       60 * time.Minute,
 		},
 		{
 			name:          "serial",
 			ginkgoFocus:   `\[Serial\].*\[Conformance\]`,
 			ginkgoSkip:    `should not cause race condition when used for configmap`,
 			parallelTests: 1,
-			timeout:       30 * time.Minute,
+			timeout:       60 * time.Minute,
 		},
 	}
 	versionRoot := path.Join(repoRoot, MajorMinor)
@@ -1359,16 +1359,15 @@ func supportsStorage(cluster *kubermaticv1.Cluster) bool {
 		cluster.Spec.Cloud.Azure != nil ||
 		cluster.Spec.Cloud.AWS != nil ||
 		cluster.Spec.Cloud.VSphere != nil ||
-		cluster.Spec.Cloud.GCP != nil
-
-	// Currently broken, see https://github.com/kubermatic/kubermatic/issues/3312
-	// cluster.Spec.Cloud.Hetzner != nil
+		cluster.Spec.Cloud.GCP != nil ||
+		cluster.Spec.Cloud.Hetzner != nil
 }
 
 func supportsLBs(cluster *kubermaticv1.Cluster) bool {
 	return cluster.Spec.Cloud.Azure != nil ||
 		cluster.Spec.Cloud.AWS != nil ||
-		cluster.Spec.Cloud.GCP != nil
+		cluster.Spec.Cloud.GCP != nil ||
+		(cluster.Spec.Cloud.Hetzner != nil && cluster.Spec.Version.Minor() >= 18)
 }
 
 func (r *testRunner) printAllControlPlaneLogs(ctx context.Context, log *zap.SugaredLogger, clusterName string) {
