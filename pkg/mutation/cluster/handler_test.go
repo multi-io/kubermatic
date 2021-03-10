@@ -41,12 +41,28 @@ func TestNuberOfFields(t *testing.T) {
 		t.Fatalf("want kubermaticv1.ComponentSettings{}.Apiserver.DeploymentSettings.NumField=%d, got %d", want, got)
 	}
 
-	if want, got := 3, reflect.ValueOf(settings.ControllerManager).NumField(); want != got {
+	if want, got := 2, reflect.ValueOf(settings.ControllerManager).NumField(); want != got {
 		t.Fatalf("want kubermaticv1.ComponentSettings{}.ControllerManager.NumField=%d, got %d", want, got)
 	}
 
-	if want, got := 3, reflect.ValueOf(settings.Scheduler).NumField(); want != got {
+	if want, got := 3, reflect.ValueOf(settings.ControllerManager.DeploymentSettings).NumField(); want != got {
+		t.Fatalf("want kubermaticv1.ComponentSettings{}.ControllerManager.DeploymentSettings.NumField=%d, got %d", want, got)
+	}
+
+	if want, got := 3, reflect.ValueOf(settings.ControllerManager.LeaderElectionSettings).NumField(); want != got {
+		t.Fatalf("want kubermaticv1.ComponentSettings{}.ControllerManager.LeaderElectionSettings.NumField=%d, got %d", want, got)
+	}
+
+	if want, got := 2, reflect.ValueOf(settings.Scheduler).NumField(); want != got {
 		t.Fatalf("want kubermaticv1.ComponentSettings{}.Scheduler.NumField=%d, got %d", want, got)
+	}
+
+	if want, got := 3, reflect.ValueOf(settings.Scheduler.DeploymentSettings).NumField(); want != got {
+		t.Fatalf("want kubermaticv1.ComponentSettings{}.Scheduler.DeploymentSettings.NumField=%d, got %d", want, got)
+	}
+
+	if want, got := 3, reflect.ValueOf(settings.Scheduler.LeaderElectionSettings).NumField(); want != got {
+		t.Fatalf("want kubermaticv1.ComponentSettings{}.Scheduler.LeaderElectionSettings.NumField=%d, got %d", want, got)
 	}
 
 	if want, got := 3, reflect.ValueOf(settings.Etcd).NumField(); want != got {

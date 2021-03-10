@@ -83,6 +83,15 @@ func (h *AdmissionHandler) Handle(ctx context.Context, req webhook.AdmissionRequ
 	if settings.ControllerManager.Tolerations == nil {
 		settings.ControllerManager.Tolerations = h.settings.ControllerManager.Tolerations
 	}
+	if settings.ControllerManager.LeaseDurationSeconds == nil {
+		settings.ControllerManager.LeaseDurationSeconds = h.settings.ControllerManager.LeaseDurationSeconds
+	}
+	if settings.ControllerManager.RenewDeadlineSeconds == nil {
+		settings.ControllerManager.RenewDeadlineSeconds = h.settings.ControllerManager.RenewDeadlineSeconds
+	}
+	if settings.ControllerManager.RetryPeriodSeconds == nil {
+		settings.ControllerManager.RetryPeriodSeconds = h.settings.ControllerManager.RetryPeriodSeconds
+	}
 	if settings.Scheduler.Replicas == nil {
 		settings.Scheduler.Replicas = h.settings.Scheduler.Replicas
 	}
@@ -91,6 +100,15 @@ func (h *AdmissionHandler) Handle(ctx context.Context, req webhook.AdmissionRequ
 	}
 	if settings.Scheduler.Tolerations == nil {
 		settings.Scheduler.Tolerations = h.settings.Scheduler.Tolerations
+	}
+	if settings.Scheduler.LeaseDurationSeconds == nil {
+		settings.Scheduler.LeaseDurationSeconds = h.settings.Scheduler.LeaseDurationSeconds
+	}
+	if settings.Scheduler.RenewDeadlineSeconds == nil {
+		settings.Scheduler.RenewDeadlineSeconds = h.settings.Scheduler.RenewDeadlineSeconds
+	}
+	if settings.Scheduler.RetryPeriodSeconds == nil {
+		settings.Scheduler.RetryPeriodSeconds = h.settings.Scheduler.RetryPeriodSeconds
 	}
 	if settings.Etcd.Replicas == nil {
 		settings.Etcd.Replicas = h.settings.Etcd.Replicas
