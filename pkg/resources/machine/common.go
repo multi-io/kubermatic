@@ -204,7 +204,9 @@ func getOpenstackProviderSpec(c *kubermaticv1.Cluster, nodeSpec apiv1.NodeSpec, 
 		SecurityGroups:        []providerconfig.ConfigVarString{{Value: c.Spec.Cloud.Openstack.SecurityGroups}},
 		NodeVolumeAttachLimit: dc.Spec.Openstack.NodeVolumeAttachLimit,
 		// Sys11: Set soft-anti-affinity server group name to be set on machines as schedule hint
-		ServerGroupID: providerconfig.ConfigVarString{Value: c.Spec.Cloud.Openstack.ServerGroupID},
+		ServerGroupID:             providerconfig.ConfigVarString{Value: c.Spec.Cloud.Openstack.ServerGroupID},
+		InstanceReadyCheckPeriod:  providerconfig.ConfigVarString{Value: "5s"},
+		InstanceReadyCheckTimeout: providerconfig.ConfigVarString{Value: "100s"},
 	}
 
 	if nodeSpec.Cloud.Openstack.UseFloatingIP || dc.Spec.Openstack.EnforceFloatingIP {
