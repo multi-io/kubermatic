@@ -29,7 +29,7 @@ import (
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 	"k8c.io/kubermatic/v2/pkg/validation/seed"
 
-	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -192,11 +192,11 @@ func SeedAdmissionWebhookName(cfg *operatorv1alpha1.KubermaticConfiguration) str
 
 func SeedAdmissionWebhookCreator(cfg *operatorv1alpha1.KubermaticConfiguration, client ctrlruntimeclient.Client) reconciling.NamedValidatingWebhookConfigurationCreatorGetter {
 	return func() (string, reconciling.ValidatingWebhookConfigurationCreator) {
-		return SeedAdmissionWebhookName(cfg), func(hook *admissionregistrationv1beta1.ValidatingWebhookConfiguration) (*admissionregistrationv1beta1.ValidatingWebhookConfiguration, error) {
-			matchPolicy := admissionregistrationv1beta1.Exact
-			failurePolicy := admissionregistrationv1beta1.Fail
-			sideEffects := admissionregistrationv1beta1.SideEffectClassUnknown
-			scope := admissionregistrationv1beta1.AllScopes
+		return SeedAdmissionWebhookName(cfg), func(hook *admissionregistrationv1.ValidatingWebhookConfiguration) (*admissionregistrationv1.ValidatingWebhookConfiguration, error) {
+			matchPolicy := admissionregistrationv1.Exact
+			failurePolicy := admissionregistrationv1.Fail
+			sideEffects := admissionregistrationv1.SideEffectClassUnknown
+			scope := admissionregistrationv1.AllScopes
 
 			ca, err := seedWebhookCABundle(cfg, client)
 			if err != nil {
@@ -204,17 +204,17 @@ func SeedAdmissionWebhookCreator(cfg *operatorv1alpha1.KubermaticConfiguration, 
 			}
 
 			path := seed.ValidateSeedPath
-			hook.Webhooks = []admissionregistrationv1beta1.ValidatingWebhook{
+			hook.Webhooks = []admissionregistrationv1.ValidatingWebhook{
 				{
 					Name:                    "seeds.kubermatic.io", // this should be a FQDN
-					AdmissionReviewVersions: []string{admissionregistrationv1beta1.SchemeGroupVersion.Version},
+					AdmissionReviewVersions: []string{"v1beta1"},
 					MatchPolicy:             &matchPolicy,
 					FailurePolicy:           &failurePolicy,
 					SideEffects:             &sideEffects,
 					TimeoutSeconds:          pointer.Int32Ptr(30),
-					ClientConfig: admissionregistrationv1beta1.WebhookClientConfig{
+					ClientConfig: admissionregistrationv1.WebhookClientConfig{
 						CABundle: ca,
-						Service: &admissionregistrationv1beta1.ServiceReference{
+						Service: &admissionregistrationv1.ServiceReference{
 							Name:      seedWebhookServiceName,
 							Namespace: cfg.Namespace,
 							Port:      pointer.Int32Ptr(443),
@@ -227,16 +227,16 @@ func SeedAdmissionWebhookCreator(cfg *operatorv1alpha1.KubermaticConfiguration, 
 						},
 					},
 					ObjectSelector: &metav1.LabelSelector{},
-					Rules: []admissionregistrationv1beta1.RuleWithOperations{
+					Rules: []admissionregistrationv1.RuleWithOperations{
 						{
-							Rule: admissionregistrationv1beta1.Rule{
+							Rule: admissionregistrationv1.Rule{
 								APIGroups:   []string{kubermaticv1.GroupName},
 								APIVersions: []string{"*"},
 								Resources:   []string{"seeds"},
 								Scope:       &scope,
 							},
-							Operations: []admissionregistrationv1beta1.OperationType{
-								admissionregistrationv1beta1.OperationAll,
+							Operations: []admissionregistrationv1.OperationType{
+								admissionregistrationv1.OperationAll,
 							},
 						},
 					},
@@ -254,11 +254,11 @@ func ClustersMutatingAdmissionWebhookName(cfg *operatorv1alpha1.KubermaticConfig
 
 func ClustersMutatingAdmissionWebhookCreator(cfg *operatorv1alpha1.KubermaticConfiguration, client ctrlruntimeclient.Client) reconciling.NamedMutatingWebhookConfigurationCreatorGetter {
 	return func() (string, reconciling.MutatingWebhookConfigurationCreator) {
-		return ClustersMutatingAdmissionWebhookName(cfg), func(hook *admissionregistrationv1beta1.MutatingWebhookConfiguration) (*admissionregistrationv1beta1.MutatingWebhookConfiguration, error) {
-			matchPolicy := admissionregistrationv1beta1.Exact
-			failurePolicy := admissionregistrationv1beta1.Fail
-			sideEffects := admissionregistrationv1beta1.SideEffectClassUnknown
-			scope := admissionregistrationv1beta1.AllScopes
+		return ClustersMutatingAdmissionWebhookName(cfg), func(hook *admissionregistrationv1.MutatingWebhookConfiguration) (*admissionregistrationv1.MutatingWebhookConfiguration, error) {
+			matchPolicy := admissionregistrationv1.Exact
+			failurePolicy := admissionregistrationv1.Fail
+			sideEffects := admissionregistrationv1.SideEffectClassUnknown
+			scope := admissionregistrationv1.AllScopes
 
 			ca, err := seedWebhookCABundle(cfg, client)
 			if err != nil {
@@ -266,17 +266,17 @@ func ClustersMutatingAdmissionWebhookCreator(cfg *operatorv1alpha1.KubermaticCon
 			}
 
 			path := seed.MutateClustersPath
-			hook.Webhooks = []admissionregistrationv1beta1.MutatingWebhook{
+			hook.Webhooks = []admissionregistrationv1.MutatingWebhook{
 				{
 					Name:                    "clusters.kubermatic.io", // this should be a FQDN
-					AdmissionReviewVersions: []string{admissionregistrationv1beta1.SchemeGroupVersion.Version},
+					AdmissionReviewVersions: []string{admissionregistrationv1.SchemeGroupVersion.Version},
 					MatchPolicy:             &matchPolicy,
 					FailurePolicy:           &failurePolicy,
 					SideEffects:             &sideEffects,
 					TimeoutSeconds:          pointer.Int32Ptr(30),
-					ClientConfig: admissionregistrationv1beta1.WebhookClientConfig{
+					ClientConfig: admissionregistrationv1.WebhookClientConfig{
 						CABundle: ca,
-						Service: &admissionregistrationv1beta1.ServiceReference{
+						Service: &admissionregistrationv1.ServiceReference{
 							Name:      seedWebhookServiceName,
 							Namespace: cfg.Namespace,
 							Port:      pointer.Int32Ptr(443),
@@ -289,16 +289,16 @@ func ClustersMutatingAdmissionWebhookCreator(cfg *operatorv1alpha1.KubermaticCon
 						},
 					},
 					ObjectSelector: &metav1.LabelSelector{},
-					Rules: []admissionregistrationv1beta1.RuleWithOperations{
+					Rules: []admissionregistrationv1.RuleWithOperations{
 						{
-							Rule: admissionregistrationv1beta1.Rule{
+							Rule: admissionregistrationv1.Rule{
 								APIGroups:   []string{kubermaticv1.GroupName},
 								APIVersions: []string{"*"},
 								Resources:   []string{"clusters"},
 								Scope:       &scope,
 							},
-							Operations: []admissionregistrationv1beta1.OperationType{
-								admissionregistrationv1beta1.Create,
+							Operations: []admissionregistrationv1.OperationType{
+								admissionregistrationv1.Create,
 							},
 						},
 					},

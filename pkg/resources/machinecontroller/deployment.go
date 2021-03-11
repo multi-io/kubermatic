@@ -53,7 +53,7 @@ var (
 const (
 	Name = "machine-controller"
 
-	tag = "v1.19.0-sys11-2"
+	tag = "v1.24.4-sys11-1"
 
 	NodeLocalDNSCacheAddress = "169.254.20.10"
 )
@@ -114,7 +114,7 @@ func DeploymentCreatorWithoutInitWrapper(data machinecontrollerData) reconciling
 				Annotations: map[string]string{
 					"prometheus.io/scrape": "true",
 					"prometheus.io/path":   "/metrics",
-					"prometheus.io/port":   "8085",
+					"prometheus.io/port":   "8080",
 				},
 			}
 
@@ -149,7 +149,7 @@ func DeploymentCreatorWithoutInitWrapper(data machinecontrollerData) reconciling
 					LivenessProbe: &corev1.Probe{
 						Handler: corev1.Handler{
 							HTTPGet: &corev1.HTTPGetAction{
-								Path:   "/ready",
+								Path:   "/readyz",
 								Port:   intstr.FromInt(8085),
 								Scheme: corev1.URISchemeHTTP,
 							},
@@ -251,7 +251,8 @@ func getFlags(clusterDNSIP string, nodeSettings *kubermaticv1.NodeSettings, exte
 		"-v", "4",
 		"-node-max-log-size", "100M",
 		"-cluster-dns", clusterDNSIP,
-		"-internal-listen-address", "0.0.0.0:8085",
+		"-health-probe-address", "0.0.0.0:8085",
+		"-metrics-address", "0.0.0.0:8080",
 	}
 
 	if nodeSettings != nil {

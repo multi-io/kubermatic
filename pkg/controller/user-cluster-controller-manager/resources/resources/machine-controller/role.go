@@ -36,7 +36,7 @@ func KubeSystemRoleCreator() reconciling.NamedRoleCreatorGetter {
 			r.Rules = []rbacv1.PolicyRule{
 				{
 					APIGroups: []string{""},
-					Resources: []string{"secrets"},
+					Resources: []string{"secrets", "configmaps"},
 					Verbs: []string{
 						"create",
 						"update",
@@ -54,6 +54,11 @@ func KubeSystemRoleCreator() reconciling.NamedRoleCreatorGetter {
 					APIGroups: []string{""},
 					Resources: []string{"endpoints"},
 					Verbs:     []string{"create"},
+				},
+				{
+					APIGroups: []string{"coordination.k8s.io"},
+					Resources: []string{"leases"},
+					Verbs:     []string{"*"},
 				},
 			}
 			return r, nil
