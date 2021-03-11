@@ -101,7 +101,7 @@ func openStackDeploymentCreator(data *resources.TemplateData) reconciling.NamedD
 			dep.Spec.Template.Spec.Containers = []corev1.Container{
 				*openvpnSidecar,
 				{
-					Name:    osName,
+					Name:    ccmContainerName,
 					Image:   data.ImageRegistry(resources.RegistryDocker) + "/k8scloudprovider/openstack-cloud-controller-manager:v" + version,
 					Command: []string{"/bin/openstack-cloud-controller-manager"},
 					Args:    getOSFlags(data),
@@ -114,9 +114,10 @@ func openStackDeploymentCreator(data *resources.TemplateData) reconciling.NamedD
 			}
 
 			defResourceRequirements := map[string]*corev1.ResourceRequirements{
-				osName:              osResourceRequirements.DeepCopy(),
+				ccmContainerName:    osResourceRequirements.DeepCopy(),
 				openvpnSidecar.Name: openvpnSidecar.Resources.DeepCopy(),
 			}
+
 			err = resources.SetResourceRequirements(dep.Spec.Template.Spec.Containers, defResourceRequirements, nil, dep.Annotations)
 			if err != nil {
 				return nil, fmt.Errorf("failed to set resource requirements: %v", err)
