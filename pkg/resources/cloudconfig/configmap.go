@@ -105,7 +105,6 @@ func CloudConfig(
 		}
 
 	case cloud.Azure != nil:
-		vnetResourceGroup := cloud.Azure.ResourceGroup
 		azureCloudConfig := &azure.CloudConfig{
 			Cloud:                      "AZUREPUBLICCLOUD",
 			TenantID:                   credentials.Azure.TenantID,
@@ -119,7 +118,7 @@ func CloudConfig(
 			RouteTableName:             cloud.Azure.RouteTableName,
 			SecurityGroupName:          cloud.Azure.SecurityGroup,
 			PrimaryAvailabilitySetName: cloud.Azure.AvailabilitySet,
-			VnetResourceGroup:          &vnetResourceGroup,
+			VnetResourceGroup:          cloud.Azure.ResourceGroup,
 			UseInstanceMetadata:        false,
 		}
 		cloudConfig, err = azure.CloudConfigToString(azureCloudConfig)

@@ -28,7 +28,7 @@ import (
 	"k8c.io/kubermatic/v2/pkg/kubernetes"
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 
-	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -156,7 +156,7 @@ func (r *Reconciler) cleanupDeletedConfiguration(config *operatorv1alpha1.Kuberm
 		return fmt.Errorf("failed to clean up ClusterRoleBinding: %v", err)
 	}
 
-	if err := common.CleanupClusterResource(r, &admissionregistrationv1beta1.ValidatingWebhookConfiguration{}, common.SeedAdmissionWebhookName(config)); err != nil {
+	if err := common.CleanupClusterResource(r, &admissionregistrationv1.ValidatingWebhookConfiguration{}, common.SeedAdmissionWebhookName(config)); err != nil {
 		return fmt.Errorf("failed to clean up ValidatingWebhookConfiguration: %v", err)
 	}
 
