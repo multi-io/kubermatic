@@ -31,7 +31,7 @@ import (
 )
 
 const (
-	osName = "openstack-cloud-controller-manager"
+	OpenstackCCMDeploymentName = "openstack-cloud-controller-manager"
 )
 
 var (
@@ -49,17 +49,17 @@ var (
 
 func openStackDeploymentCreator(data *resources.TemplateData) reconciling.NamedDeploymentCreatorGetter {
 	return func() (string, reconciling.DeploymentCreator) {
-		return osName, func(dep *appsv1.Deployment) (*appsv1.Deployment, error) {
-			dep.Name = osName
-			dep.Labels = resources.BaseAppLabels(osName, nil)
+		return OpenstackCCMDeploymentName, func(dep *appsv1.Deployment) (*appsv1.Deployment, error) {
+			dep.Name = OpenstackCCMDeploymentName
+			dep.Labels = resources.BaseAppLabels(OpenstackCCMDeploymentName, nil)
 
 			dep.Spec.Replicas = resources.Int32(1)
 
 			dep.Spec.Selector = &metav1.LabelSelector{
-				MatchLabels: resources.BaseAppLabels(osName, nil),
+				MatchLabels: resources.BaseAppLabels(OpenstackCCMDeploymentName, nil),
 			}
 
-			podLabels, err := data.GetPodTemplateLabels(osName, dep.Spec.Template.Spec.Volumes, nil)
+			podLabels, err := data.GetPodTemplateLabels(OpenstackCCMDeploymentName, dep.Spec.Template.Spec.Volumes, nil)
 			if err != nil {
 				return nil, err
 			}
