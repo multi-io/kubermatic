@@ -17,7 +17,7 @@ LABEL maintainer="support@kubermatic.com"
 
 ENV KUBERMATIC_CHARTS_DIRECTORY=/opt/charts/
 
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+SHELL ["/bin/ash", "-o", "pipefail", "-c"]
 
 ADD https://storage.googleapis.com/kubernetes-release/release/v1.19.7/bin/linux/amd64/kubectl /usr/local/bin/kubectl
 RUN wget --progress=dot:giga -O- https://get.helm.sh/helm-v3.5.0-linux-amd64.tar.gz | tar xzOf - linux-amd64/helm > /usr/local/bin/helm
