@@ -1,6 +1,7 @@
 !handler/fixtures/*
 **/_build
 *.iml*
+*.orig
 *.private.env.json
 .DS_Store
 .cover
