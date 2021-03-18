@@ -342,7 +342,7 @@ func PatchAddonEndpoint(projectProvider provider.ProjectProvider, privilegedProj
 		if addon.Labels == nil {
 			addon.Labels = map[string]string{}
 		}
-		addon.Labels[addonEnsureLabelKey] = "false"
+		addon.Labels[addonEnsureLabelKey] = "true"
 		if req.Body.Spec.ContinuouslyReconcile {
 			addon.Labels[addonEnsureLabelKey] = trueFlag
 		}
