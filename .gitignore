@@ -2,6 +2,10 @@
 **/_build
 *.iml*
 *.orig
+*_BACKUP_*
+*_BASE_*
+*_REMOTE_*
+*_LOCAL_*
 *.private.env.json
 .DS_Store
 .cover

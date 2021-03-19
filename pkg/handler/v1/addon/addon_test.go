@@ -529,7 +529,8 @@ func TestCreatePatchGetAddon(t *testing.T) {
 					Name: "addon1",
 				},
 				Spec: apiv1.AddonSpec{
-					Variables: map[string]interface{}{"foo": "bar"},
+					Variables:             map[string]interface{}{"foo": "bar"},
+					ContinuouslyReconcile: true,
 				},
 			},
 			ExistingKubermaticObjs: []runtime.Object{
@@ -570,7 +571,8 @@ func TestCreatePatchGetAddon(t *testing.T) {
 					Name: "addon1",
 				},
 				Spec: apiv1.AddonSpec{
-					Variables: map[string]interface{}{"foo": "bar"},
+					Variables:             map[string]interface{}{"foo": "bar"},
+					ContinuouslyReconcile: true,
 				},
 			},
 			ExistingKubermaticObjs: []runtime.Object{

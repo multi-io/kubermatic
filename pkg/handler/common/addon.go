@@ -54,7 +54,7 @@ func PatchAddonEndpoint(ctx context.Context, userInfoGetter provider.UserInfoGet
 	if apiAddon.Labels == nil {
 		apiAddon.Labels = map[string]string{}
 	}
-	apiAddon.Labels[addonEnsureLabelKey] = "false"
+	apiAddon.Labels[addonEnsureLabelKey] = "true"
 	if addon.Spec.ContinuouslyReconcile {
 		apiAddon.Labels[addonEnsureLabelKey] = trueFlag
 	}

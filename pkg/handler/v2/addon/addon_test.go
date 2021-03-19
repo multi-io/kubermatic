@@ -527,7 +527,8 @@ func TestCreatePatchGetAddon(t *testing.T) {
 					Name: "addon1",
 				},
 				Spec: apiv1.AddonSpec{
-					Variables: map[string]interface{}{"foo": "bar"},
+					Variables:             map[string]interface{}{"foo": "bar"},
+					ContinuouslyReconcile: true, // Sys11 we want this always on
 				},
 			},
 			ExistingKubermaticObjs: []runtime.Object{
@@ -568,7 +569,8 @@ func TestCreatePatchGetAddon(t *testing.T) {
 					Name: "addon1",
 				},
 				Spec: apiv1.AddonSpec{
-					Variables: map[string]interface{}{"foo": "bar"},
+					Variables:             map[string]interface{}{"foo": "bar"},
+					ContinuouslyReconcile: true, // Sys11 we want this always on
 				},
 			},
 			ExistingKubermaticObjs: []runtime.Object{
@@ -599,7 +601,7 @@ func TestCreatePatchGetAddon(t *testing.T) {
 				"name": "addon1",
 				"spec": {
 					"variables": {"foo": "bar"},
-                    "continuouslyReconcile": true
+                                        "continuouslyReconcile": true
 				}
 			}`,
 			ExpectedPatchHTTPStatus: http.StatusOK,
