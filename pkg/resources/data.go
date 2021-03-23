@@ -607,7 +607,7 @@ func (d *TemplateData) KCMCloudControllersDeactivated() bool {
 
 func UnwrapCommand(container corev1.Container) (found bool, command httpproberapi.Command) {
 	for i, arg := range container.Args {
-		klog.Infof("unwrap command processing arg: %s", arg)
+		// klog.Infof("unwrap command processing arg: %s", arg)
 		if arg == "-command" && i < len(container.Args)-1 {
 			if err := json.Unmarshal([]byte(container.Args[i+1]), &command); err != nil {
 				return
@@ -620,9 +620,9 @@ func UnwrapCommand(container corev1.Container) (found bool, command httpproberap
 
 func getArgValue(args []string, argName string) (bool, string) {
 	for i, arg := range args {
-		klog.Infof("processing arg %s", arg)
+		// klog.Infof("processing arg %s", arg)
 		if arg == argName {
-			klog.Infof("found argument %s", argName)
+			// klog.Infof("found argument %s", argName)
 			if i >= len(args)-1 {
 				return false, ""
 			}
