@@ -808,7 +808,7 @@ items:
 - apiVersion: kubermatic.k8s.io/v1
   kind: Addon
   metadata:
-    name: storage-class
+    name: storage-class-v2
     labels:
       addons.kubermatic.io/ensure: true
 - apiVersion: kubermatic.k8s.io/v1
