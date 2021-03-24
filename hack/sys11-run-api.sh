@@ -59,7 +59,7 @@ if [[ "${DEBUG}" == "true" ]]; then
       -oidc-authenticator-client-id=metakube-dashboard \
       -oidc-skip-tls-verify=false \
       -service-account-signing-key="${SERVICE_ACCOUNT_SIGNING_KEY}" \
-      -accessible-addons dashboard,metakube-ark,metakube-autoscaler,metakube-backups,metakube-helm,metakube-ingress,metakube-monitoring,metakube-weave-scope,metakube-webterminal,metakube-vault \
+      -accessible-addons dashboard,metakube-ark,cluster-autoscaler,metakube-backups,metakube-helm,metakube-ingress,metakube-monitoring,metakube-weave-scope,metakube-webterminal,metakube-vault \
       -logtostderr \
       -v=8 $@
 else
@@ -77,7 +77,7 @@ else
       -oidc-authenticator-client-id=metakube-dashboard \
       -oidc-skip-tls-verify=false \
       -service-account-signing-key="${SERVICE_ACCOUNT_SIGNING_KEY}" \
-      -accessible-addons dashboard,metakube-ark,metakube-autoscaler,metakube-backups,metakube-helm,metakube-ingress,metakube-monitoring,metakube-weave-scope,metakube-webterminal,metakube-vault \
+      -accessible-addons dashboard,metakube-ark,cluster-autoscaler,metakube-backups,metakube-helm,metakube-ingress,metakube-monitoring,metakube-weave-scope,metakube-webterminal,metakube-vault \
       -logtostderr \
       -v=8 $@
 fi
