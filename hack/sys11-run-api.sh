@@ -38,6 +38,18 @@ else
     make -C ${SRC_DIR} KUBERMATIC_EDITION=${KUBERMATIC_EDITION} kubermatic-api
 fi
 
+case $KUBERMATIC_ENV in
+stage)
+  oidcUrl="https://keystone-oidc.app.syseleven-dbl1-1.stage.metakube.de"
+  ;;
+prod)
+  oidcUrl="https://keystone-oidc.app.syseleven-dbl1-1.metakube.syseleven.de"
+  ;;
+*)
+  oidcUrl="https://keystone-oidc.app.syseleven-dbl1-1.dev.metakube.de"
+  ;;
+esac
+
 # Please make sure to set -feature-gates=PrometheusEndpoint=true if you want to use that endpoint.
 
 # Please make sure to set -feature-gates=OIDCKubeCfgEndpoint=true if you want to use that endpoint.
@@ -55,7 +67,7 @@ if [[ "${DEBUG}" == "true" ]]; then
       -internal-address=127.0.0.1:18085 \
       -prometheus-url=http://localhost:9090 \
       -address=127.0.0.1:8080 \
-      -oidc-url=https://keystone-oidc.app.syseleven-dbl1-1.dev.metakube.de \
+      -oidc-url=$oidcUrl \
       -oidc-authenticator-client-id=metakube-dashboard \
       -oidc-skip-tls-verify=false \
       -service-account-signing-key="${SERVICE_ACCOUNT_SIGNING_KEY}" \
@@ -73,7 +85,7 @@ else
       -internal-address=127.0.0.1:18085 \
       -prometheus-url=http://localhost:9090 \
       -address=127.0.0.1:8080 \
-      -oidc-url=https://keystone-oidc.app.syseleven-dbl1-1.dev.metakube.de \
+      -oidc-url=$oidcUrl \
       -oidc-authenticator-client-id=metakube-dashboard \
       -oidc-skip-tls-verify=false \
       -service-account-signing-key="${SERVICE_ACCOUNT_SIGNING_KEY}" \
