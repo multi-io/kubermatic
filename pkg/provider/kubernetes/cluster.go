@@ -44,6 +44,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/client-go/util/retry"
 
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -348,9 +349,19 @@ func (p *ClusterProvider) RevokeViewerKubeconfig(c *kubermaticv1.Cluster) error 
 func (p *ClusterProvider) RevokeAdminKubeconfig(c *kubermaticv1.Cluster) error {
 	ctx := context.Background()
 	if !c.IsOpenshift() {
-		oldCluster := c.DeepCopy()
-		c.Address.AdminToken = kuberneteshelper.GenerateToken()
-		if err := p.GetSeedClusterAdminRuntimeClient().Patch(ctx, c, ctrlruntimeclient.MergeFrom(oldCluster)); err != nil {
+		client := p.GetSeedClusterAdminRuntimeClient()
+		err := retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
+			cluster := &kubermaticv1.Cluster{}
+			//Get latest version
+			if err := client.Get(ctx, types.NamespacedName{Name: c.Name}, cluster); err != nil {
+				return err
+			}
+			// Apply modifications
+			cluster.Address.AdminToken = kuberneteshelper.GenerateToken()
+			// Update the cluster
+			return client.Update(ctx, cluster)
+		})
+		if err != nil {
 			return fmt.Errorf("failed to patch cluster with new token: %v", err)
 		}
 		return nil

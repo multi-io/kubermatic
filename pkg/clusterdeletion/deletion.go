@@ -21,6 +21,8 @@ import (
 	"fmt"
 
 	"go.uber.org/zap"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 
 	kubermaticapiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
@@ -175,4 +177,19 @@ func (d *Deletion) cleanupInClusterResources(ctx context.Context, log *zap.Sugar
 	kuberneteshelper.RemoveFinalizer(cluster, kubermaticapiv1.InClusterCredentialsRequestsCleanupFinalizer)
 	kuberneteshelper.RemoveFinalizer(cluster, kubermaticapiv1.InClusterImageRegistryConfigCleanupFinalizer)
 	return d.seedClient.Patch(ctx, cluster, controllerruntimeclient.MergeFrom(oldCluster))
+}
+
+func (d *Deletion) updateCluster(ctx context.Context, cluster *kubermaticv1.Cluster, modify func(*kubermaticv1.Cluster)) error {
+	// Store it here because it may be unset later on if an update request failed
+	name := cluster.Name
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
+		//Get latest version
+		if err := d.seedClient.Get(ctx, types.NamespacedName{Name: name}, cluster); err != nil {
+			return err
+		}
+		// Apply modifications
+		modify(cluster)
+		// Update the cluster
+		return d.seedClient.Update(ctx, cluster)
+	})
 }

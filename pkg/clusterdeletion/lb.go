@@ -82,16 +82,14 @@ func (d *Deletion) cleanupLB(ctx context.Context, log *zap.SugaredLogger, userCl
 	// We only really know if a LoadBalancer(The cloud provider LB) is gone, until there has been an event stating that.
 	// The event contains the UID of the corresponding, deleted, service.
 	// Upstream changed that recently to use a finalizer - As soon as we only support Kubernetes versions above that, we can remove this
-	oldCluster := cluster.DeepCopy()
-	if cluster.Annotations == nil {
-		cluster.Annotations = map[string]string{}
-	}
-
-	set := parseStringSet(cluster.Annotations[deletedLBAnnotationName])
-	set.Insert(string(service.UID))
-	cluster.Annotations[deletedLBAnnotationName] = encodeStringSet(set)
-
-	if err := d.seedClient.Patch(ctx, cluster, controllerruntimeclient.MergeFrom(oldCluster)); err != nil {
+	if err := d.updateCluster(ctx, cluster, func(c *kubermaticv1.Cluster) {
+		if c.Annotations == nil {
+			c.Annotations = map[string]string{}
+		}
+		set := parseStringSet(cluster.Annotations[deletedLBAnnotationName])
+		set.Insert(string(service.UID))
+		c.Annotations[deletedLBAnnotationName] = encodeStringSet(set)
+	}); err != nil {
 		return fmt.Errorf("failed to update cluster when trying to add UID of deleted LoadBalancer: %v", err)
 	}
 
@@ -153,9 +151,12 @@ func (d *Deletion) checkIfAllLoadbalancersAreGone(ctx context.Context, cluster *
 		}
 	}
 
-	oldCluster := cluster.DeepCopy()
-	cluster.Annotations[deletedLBAnnotationName] = encodeStringSet(deletedLoadBalancers)
-	if err := d.seedClient.Patch(ctx, cluster, controllerruntimeclient.MergeFrom(oldCluster)); err != nil {
+	if err := d.updateCluster(ctx, cluster, func(c *kubermaticv1.Cluster) {
+		if c.Annotations == nil {
+			c.Annotations = make(map[string]string)
+		}
+		c.Annotations[deletedLBAnnotationName] = encodeStringSet(deletedLoadBalancers)
+	}); err != nil {
 		return false, fmt.Errorf("failed to update cluster: %v", err)
 	}
 
