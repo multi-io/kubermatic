@@ -313,7 +313,7 @@ func AzureSize(ctx context.Context, subscriptionID, clientID, clientSecret, tena
 	}
 
 	// prepare set of valid VM size types for container purpose
-	validVMSizeList := compute.PossibleContainerServiceVMSizeTypesValues()
+	validVMSizeList := compute.PossibleVirtualMachineSizeTypesValues()
 	validVMContainerSet := make(map[string]struct{}, len(validVMSizeList))
 	for _, s := range validVMSizeList {
 		validVMContainerSet[string(s)] = struct{}{}
