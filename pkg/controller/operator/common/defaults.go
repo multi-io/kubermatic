@@ -734,6 +734,12 @@ items:
 - apiVersion: kubermatic.k8s.io/v1
   kind: Addon
   metadata:
+    name: csi-driver
+    labels:
+      addons.kubermatic.io/ensure: true
+- apiVersion: kubermatic.k8s.io/v1
+  kind: Addon
+  metadata:
     name: kube-proxy
     labels:
       addons.kubermatic.io/ensure: true
