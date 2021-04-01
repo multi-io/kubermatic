@@ -15,7 +15,7 @@
 nodePortProxy:
   replicas: 3
   image:
-    repository: "quay.io/kubermatic/nodeport-proxy"
+    repository: "syseleven/nodeport-proxy"
     tag: "__KUBERMATIC_TAG__"
   envoy:
     image:
