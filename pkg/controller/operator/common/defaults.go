@@ -728,13 +728,7 @@ items:
 - apiVersion: kubermatic.k8s.io/v1
   kind: Addon
   metadata:
-    name: csi
-    labels:
-      addons.kubermatic.io/ensure: true
-- apiVersion: kubermatic.k8s.io/v1
-  kind: Addon
-  metadata:
-    name: csi-driver
+    name: csi-v2
     labels:
       addons.kubermatic.io/ensure: true
 - apiVersion: kubermatic.k8s.io/v1
