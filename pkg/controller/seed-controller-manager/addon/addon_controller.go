@@ -195,9 +195,9 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	}
 
 	cluster := &kubermaticv1.Cluster{}
-	if err := r.Get(ctx, types.NamespacedName{Name: addon.Spec.Cluster.Name}, cluster); err != nil {
+	if err := r.Get(ctx, types.NamespacedName{Name: addon.Spec.Cluster.Name}, cluster); err != nil || cluster.DeletionTimestamp != nil {
 		// If it's not a NotFound err, return it
-		if !kerrors.IsNotFound(err) {
+		if err != nil && !kerrors.IsNotFound(err) {
 			return reconcile.Result{}, err
 		}
 

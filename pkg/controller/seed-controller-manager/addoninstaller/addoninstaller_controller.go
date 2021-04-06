@@ -132,10 +132,13 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	cluster := &kubermaticv1.Cluster{}
 	if err := r.Get(ctx, request.NamespacedName, cluster); err != nil {
 		if kerrors.IsNotFound(err) {
-			log.Debug("Skipping because the cluster is already gone")
+			log.Debug("Skipping because the cluster is gone")
 			return reconcile.Result{}, nil
 		}
 		return reconcile.Result{}, err
+	}
+	if cluster.DeletionTimestamp != nil {
+		return reconcile.Result{}, nil
 	}
 
 	// Add a wrapping here so we can emit an event on error
