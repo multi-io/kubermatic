@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"strings"
 
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	k8cuserclusterclient "k8c.io/kubermatic/v2/pkg/cluster/client"
@@ -35,7 +36,6 @@ import (
 	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 
 	corev1 "k8s.io/api/core/v1"
-	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -354,6 +354,9 @@ func (p *ClusterProvider) RevokeAdminKubeconfig(c *kubermaticv1.Cluster) error {
 			cluster := &kubermaticv1.Cluster{}
 			//Get latest version
 			if err := client.Get(ctx, types.NamespacedName{Name: c.Name}, cluster); err != nil {
+				if kerrors.IsNotFound(err) {
+					return nil
+				}
 				return err
 			}
 			// Apply modifications

@@ -27,6 +27,7 @@ import (
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 
 	corev1 "k8s.io/api/core/v1"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -102,6 +103,9 @@ func (d *Deletion) cleanupLB(ctx context.Context, log *zap.SugaredLogger, userCl
 		}
 		return strings.Contains(latestCluster.Annotations[deletedLBAnnotationName], string(service.UID)), nil
 	}); err != nil {
+		if kerrors.IsNotFound(err) {
+			return nil
+		}
 		return fmt.Errorf("failed to wait for deletedLBAnnotation to appear in the lister: %v", err)
 	}
 

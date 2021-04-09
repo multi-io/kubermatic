@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"go.uber.org/zap"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 
@@ -185,6 +186,9 @@ func (d *Deletion) updateCluster(ctx context.Context, cluster *kubermaticv1.Clus
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		//Get latest version
 		if err := d.seedClient.Get(ctx, types.NamespacedName{Name: name}, cluster); err != nil {
+			if kerrors.IsNotFound(err) {
+				return nil
+			}
 			return err
 		}
 		// Apply modifications

@@ -303,6 +303,9 @@ func (r *Reconciler) updateCluster(ctx context.Context, cluster *kubermaticv1.Cl
 		//Get latest version
 		c := &kubermaticv1.Cluster{}
 		if err := r.Get(ctx, types.NamespacedName{Name: name}, c); err != nil {
+			if kerrors.IsNotFound(err) {
+				return nil
+			}
 			return err
 		}
 		// Apply modifications

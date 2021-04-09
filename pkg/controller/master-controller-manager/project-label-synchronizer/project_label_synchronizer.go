@@ -210,6 +210,9 @@ func (r *reconciler) updateCluster(name string, client ctrlruntimeclient.Client,
 	cluster := &kubermaticv1.Cluster{}
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		if err := client.Get(r.ctx, types.NamespacedName{Name: name}, cluster); err != nil {
+			if kerrors.IsNotFound(err) {
+				return nil
+			}
 			return err
 		}
 		modify(cluster)

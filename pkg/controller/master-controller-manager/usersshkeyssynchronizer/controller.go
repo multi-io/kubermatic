@@ -215,6 +215,9 @@ func (r *Reconciler) reconcile(log *zap.SugaredLogger, request reconcile.Request
 			//Get latest version
 			c := &kubermaticv1.Cluster{}
 			if err := r.client.Get(r.ctx, types.NamespacedName{Name: cluster.Name}, c); err != nil {
+				if kubeapierrors.IsNotFound(err) {
+					return nil
+				}
 				return err
 			}
 			kubernetes.AddFinalizer(c, UserSSHKeysClusterIDsCleanupFinalizer)

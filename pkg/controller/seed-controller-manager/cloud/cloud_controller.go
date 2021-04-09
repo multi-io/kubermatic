@@ -245,6 +245,9 @@ func (r *Reconciler) updateCluster(name string, modify func(*kubermaticv1.Cluste
 	cluster := &kubermaticv1.Cluster{}
 	return cluster, retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		if err := r.Get(context.Background(), types.NamespacedName{Name: name}, cluster); err != nil {
+			if kerrors.IsNotFound(err) {
+				return nil
+			}
 			return err
 		}
 		modify(cluster)

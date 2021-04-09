@@ -314,6 +314,9 @@ func (r *Reconciler) updateCluster(ctx context.Context, cluster *kubermaticv1.Cl
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		//Get latest version
 		if err := r.Get(ctx, types.NamespacedName{Name: name}, cluster); err != nil {
+			if kubeapierrors.IsNotFound(err) {
+				return nil
+			}
 			return err
 		}
 		// Apply modifications
