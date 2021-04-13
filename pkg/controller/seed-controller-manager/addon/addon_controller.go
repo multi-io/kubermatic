@@ -267,6 +267,11 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, addo
 	}
 
 	if addon.DeletionTimestamp != nil {
+		// call ensureIsInstalled to ensure that resources that might be missing in manifest but were
+		// created with previous version of that manifest are deleted.
+		if err := r.ensureIsInstalled(ctx, log, addon, cluster); err != nil {
+			return nil, fmt.Errorf("failed to deploy the addon manifests into the cluster: %v", err)
+		}
 		if err := r.cleanupManifests(ctx, log, addon, cluster); err != nil {
 			return nil, fmt.Errorf("failed to delete manifests from cluster: %v", err)
 		}
