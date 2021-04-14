@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"sync"
 	"time"
@@ -30,6 +31,7 @@ import (
 
 	"k8c.io/kubermatic/v2/pkg/resources"
 	"k8c.io/kubermatic/v2/pkg/resources/certificates/triple"
+	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -68,11 +70,17 @@ func Add(
 	cloudProviderName string,
 	clusterURL *url.URL,
 	clusterDNSDomain string,
-	openvpnServerPort int,
+	openvpnServerPort uint32,
+	kasSecurePort uint32,
+	tunnelingAgentIP net.IP,
 	registerReconciledCheck func(name string, check healthcheck.Check),
 	cloudCredentialSecretTemplate *corev1.Secret,
 	openshiftConsoleCallbackURI string,
 	dnsClusterIP string,
+	opaIntegration bool,
+	versions kubermatic.Versions,
+	userSSHKeyAgent bool,
+	opaWebhookTimeout int,
 	log *zap.SugaredLogger) error {
 	r := &reconciler{
 		openshift:                     openshift,
@@ -82,11 +90,17 @@ func Add(
 		clusterURL:                    clusterURL,
 		clusterDNSDomain:              clusterDNSDomain,
 		openvpnServerPort:             openvpnServerPort,
+		kasSecurePort:                 kasSecurePort,
+		tunnelingAgentIP:              tunnelingAgentIP,
 		cloudCredentialSecretTemplate: cloudCredentialSecretTemplate,
 		log:                           log,
 		platform:                      cloudProviderName,
 		openshiftConsoleCallbackURI:   openshiftConsoleCallbackURI,
 		dnsClusterIP:                  dnsClusterIP,
+		opaIntegration:                opaIntegration,
+		opaWebhookTimeout:             opaWebhookTimeout,
+		userSSHKeyAgent:               userSSHKeyAgent,
+		versions:                      versions,
 	}
 
 	var err error
@@ -229,11 +243,17 @@ type reconciler struct {
 	namespace                     string
 	clusterURL                    *url.URL
 	clusterDNSDomain              string
-	openvpnServerPort             int
+	openvpnServerPort             uint32
+	kasSecurePort                 uint32
+	tunnelingAgentIP              net.IP
 	platform                      string
 	cloudCredentialSecretTemplate *corev1.Secret
 	openshiftConsoleCallbackURI   string
 	dnsClusterIP                  string
+	opaIntegration                bool
+	opaWebhookTimeout             int
+	userSSHKeyAgent               bool
+	versions                      kubermatic.Versions
 
 	rLock                      *sync.Mutex
 	reconciledSuccessfullyOnce bool

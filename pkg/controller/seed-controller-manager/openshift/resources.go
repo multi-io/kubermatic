@@ -23,11 +23,10 @@ import (
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/resources"
 	"k8c.io/kubermatic/v2/pkg/resources/nodeportproxy"
-
-	corev1 "k8s.io/api/core/v1"
+	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 )
 
-func (r *Reconciler) getOSData(ctx context.Context, cluster *kubermaticv1.Cluster) (*openshiftData, error) {
+func (r *Reconciler) getOSData(ctx context.Context, cluster *kubermaticv1.Cluster, versions kubermatic.Versions) (*openshiftData, error) {
 	seed, err := r.seedGetter()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get seed: %v", err)
@@ -44,24 +43,26 @@ func (r *Reconciler) getOSData(ctx context.Context, cluster *kubermaticv1.Cluste
 	}
 
 	return &openshiftData{
-		cluster:                               cluster,
-		client:                                r.Client,
-		dc:                                    &datacenter,
-		overwriteRegistry:                     r.overwriteRegistry,
-		nodeAccessNetwork:                     r.nodeAccessNetwork,
-		oidc:                                  r.oidc,
-		etcdDiskSize:                          r.etcdDiskSize,
-		kubermaticImage:                       r.kubermaticImage,
-		etcdLauncherImage:                     r.etcdLauncherImage,
-		dnatControllerImage:                   r.dnatControllerImage,
+		cluster:             cluster,
+		client:              r.Client,
+		dc:                  &datacenter,
+		overwriteRegistry:   r.overwriteRegistry,
+		nodeAccessNetwork:   r.nodeAccessNetwork,
+		oidc:                r.oidc,
+		etcdDiskSize:        r.etcdDiskSize,
+		kubermaticImage:     r.kubermaticImage,
+		etcdLauncherImage:   r.etcdLauncherImage,
+		dnatControllerImage: r.dnatControllerImage,
+		externalURL:         r.externalURL,
+		seed:                seed.DeepCopy(),
+		versions:            versions,
+
 		supportsFailureDomainZoneAntiAffinity: supportsFailureDomainZoneAntiAffinity,
-		externalURL:                           r.externalURL,
-		seed:                                  seed.DeepCopy(),
 	}, nil
 }
 
 func (r *Reconciler) reconcileResources(ctx context.Context, cluster *kubermaticv1.Cluster) error {
-	osData, err := r.getOSData(ctx, cluster)
+	osData, err := r.getOSData(ctx, cluster, r.versions)
 	if err != nil {
 		return fmt.Errorf("failed to get osData: %v", err)
 	}
@@ -118,7 +119,7 @@ func (r *Reconciler) reconcileResources(ctx context.Context, cluster *kubermatic
 		return fmt.Errorf("failed to reconcile Deployments: %v", err)
 	}
 
-	if osData.Cluster().Spec.ExposeStrategy == corev1.ServiceTypeLoadBalancer {
+	if osData.Cluster().Spec.ExposeStrategy == kubermaticv1.ExposeStrategyLoadBalancer {
 		if err := nodeportproxy.EnsureResources(ctx, r.Client, osData); err != nil {
 			return fmt.Errorf("failed to ensure NodePortProxy resources: %v", err)
 		}

@@ -19,6 +19,7 @@ package resources
 import (
 	"context"
 	"fmt"
+	"net"
 
 	openshiftresources "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/openshift/resources"
 	"k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/cloudcontroller"
@@ -27,6 +28,8 @@ import (
 	coredns "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/core-dns"
 	dnatcontroller "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/dnat-controller"
 	dnsautoscaler "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/dns-autoscaler"
+	envoyagent "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/envoy-agent"
+	"k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/gatekeeper"
 	kubestatemetrics "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/kube-state-metrics"
 	kubernetesdashboard "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/kubernetes-dashboard"
 	machinecontroller "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/machine-controller"
@@ -44,6 +47,7 @@ import (
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -140,6 +144,17 @@ func (r *reconciler) reconcile(ctx context.Context) error {
 		errs = append(errs, err)
 	}
 
+	if err := r.reconcileValidatingWebhookConfigurations(ctx, data); err != nil {
+		errs = append(errs, err)
+	}
+
+	// Try to delete OPA integration deployment if its present
+	if !r.opaIntegration {
+		if err := r.ensureOPAIntegrationIsRemoved(ctx); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
 	return utilerrors.NewAggregate(errs)
 }
 
@@ -168,6 +183,10 @@ func (r *reconciler) reconcileServiceAcconts(ctx context.Context) error {
 	creators := []reconciling.NamedServiceAccountCreatorGetter{
 		userauth.ServiceAccountCreator(),
 		usersshkeys.ServiceAccountCreator(),
+	}
+
+	if r.userSSHKeyAgent {
+		creators = append(creators, usersshkeys.ServiceAccountCreator())
 	}
 
 	if r.openshift {
@@ -204,7 +223,10 @@ func (r *reconciler) reconcileRoles(ctx context.Context) error {
 	creators := []reconciling.NamedRoleCreatorGetter{
 		machinecontroller.KubeSystemRoleCreator(),
 		clusterautoscaler.KubeSystemRoleCreator(),
-		usersshkeys.RoleCreator(),
+	}
+
+	if r.userSSHKeyAgent {
+		creators = append(creators, usersshkeys.RoleCreator())
 	}
 
 	if err := reconciling.ReconcileRoles(ctx, creators, metav1.NamespaceSystem, r.Client); err != nil {
@@ -271,8 +293,12 @@ func (r *reconciler) reconcileRoleBindings(ctx context.Context) error {
 		scheduler.RoleBindingAuthDelegator(),
 		controllermanager.RoleBindingAuthDelegator(),
 		clusterautoscaler.KubeSystemRoleBindingCreator(),
-		usersshkeys.RoleBindingCreator(),
 	}
+
+	if r.userSSHKeyAgent {
+		creators = append(creators, usersshkeys.RoleBindingCreator())
+	}
+
 	if err := reconciling.ReconcileRoleBindings(ctx, creators, metav1.NamespaceSystem, r.Client); err != nil {
 		return fmt.Errorf("failed to reconcile RoleBindings in kube-system Namespace: %v", err)
 	}
@@ -395,6 +421,11 @@ func (r *reconciler) reconcileCRDs(ctx context.Context) error {
 		machinecontroller.ClusterCRDCreator(),
 	}
 
+	if r.opaIntegration {
+		creators = append(creators, gatekeeper.ConfigCRDCreator())
+		creators = append(creators, gatekeeper.ConstraintTemplateCRDCreator())
+	}
+
 	if err := reconciling.ReconcileCustomResourceDefinitions(ctx, creators, "", r.Client); err != nil {
 		return fmt.Errorf("failed to reconcile CustomResourceDefinitions: %v", err)
 	}
@@ -411,6 +442,21 @@ func (r *reconciler) reconcileMutatingWebhookConfigurations(
 
 	if err := reconciling.ReconcileMutatingWebhookConfigurations(ctx, creators, "", r.Client); err != nil {
 		return fmt.Errorf("failed to reconcile MutatingWebhookConfigurations: %v", err)
+	}
+	return nil
+}
+
+func (r *reconciler) reconcileValidatingWebhookConfigurations(
+	ctx context.Context,
+	data reconcileData,
+) error {
+	creators := []reconciling.NamedValidatingWebhookConfigurationCreatorGetter{}
+	if r.opaIntegration {
+		creators = append(creators, gatekeeper.ValidatingWebhookConfigurationCreator(data.caCert.Cert, r.namespace, r.opaWebhookTimeout))
+	}
+
+	if err := reconciling.ReconcileValidatingWebhookConfigurations(ctx, creators, "", r.Client); err != nil {
+		return fmt.Errorf("failed to reconcile ValidatingWebhookConfigurations: %v", err)
 	}
 	return nil
 }
@@ -457,9 +503,33 @@ func (r *reconciler) reconcileConfigMaps(ctx context.Context, data reconcileData
 		return fmt.Errorf("failed to reconcile ConfigMaps in kube-public namespace: %v", err)
 	}
 
-	creators = []reconciling.NamedConfigMapCreatorGetter{
-		openvpn.ClientConfigConfigMapCreator(r.clusterURL.Hostname(), r.openvpnServerPort),
+	if len(r.tunnelingAgentIP) > 0 {
+		creators = []reconciling.NamedConfigMapCreatorGetter{
+			openvpn.ClientConfigConfigMapCreator(r.tunnelingAgentIP.String(), r.openvpnServerPort),
+			envoyagent.ConfigMapCreator(envoyagent.Config{
+				AdminPort: 9902,
+				ProxyHost: r.clusterURL.Hostname(),
+				ProxyPort: 8088,
+				Listeners: []envoyagent.Listener{
+					{
+						BindAddress: r.tunnelingAgentIP.String(),
+						BindPort:    r.openvpnServerPort,
+						Authority:   net.JoinHostPort(fmt.Sprintf("openvpn-server.%s.svc.cluster.local", r.namespace), "1194"),
+					},
+					{
+						BindAddress: r.tunnelingAgentIP.String(),
+						BindPort:    r.kasSecurePort,
+						Authority:   net.JoinHostPort(fmt.Sprintf("apiserver-external.%s.svc.cluster.local", r.namespace), "443"),
+					},
+				},
+			}),
+		}
+	} else {
+		creators = []reconciling.NamedConfigMapCreatorGetter{
+			openvpn.ClientConfigConfigMapCreator(r.clusterURL.Hostname(), r.openvpnServerPort),
+		}
 	}
+
 	if r.openshift {
 		creators = append(creators, openshift.ControlplaneConfigCreator(r.platform))
 	} else {
@@ -479,9 +549,13 @@ func (r *reconciler) reconcileConfigMaps(ctx context.Context, data reconcileData
 func (r *reconciler) reconcileSecrets(ctx context.Context, data reconcileData) error {
 	creators := []reconciling.NamedSecretCreatorGetter{
 		openvpn.ClientCertificate(data.openVPNCACert),
-		usersshkeys.SecretCreator(data.userSSHKeys),
 		cloudcontroller.CloudConfig(data.cloudConfig),
 	}
+
+	if r.userSSHKeyAgent {
+		creators = append(creators, usersshkeys.SecretCreator(data.userSSHKeys))
+	}
+
 	if r.openshift {
 		creators = append(creators, openshift.OAuthBootstrapPasswordCreatorGetter(r.seedClient, r.namespace))
 		if r.cloudCredentialSecretTemplate != nil {
@@ -516,11 +590,18 @@ func (r *reconciler) reconcileSecrets(ctx context.Context, data reconcileData) e
 }
 
 func (r *reconciler) reconcileDaemonSet(ctx context.Context) error {
-	dsCreators := []reconciling.NamedDaemonSetCreatorGetter{
-		usersshkeys.DaemonSetCreator(),
+	var dsCreators []reconciling.NamedDaemonSetCreatorGetter
+
+	if r.userSSHKeyAgent {
+		dsCreators = append(dsCreators, usersshkeys.DaemonSetCreator(r.versions))
 	}
+
 	if !r.openshift {
 		dsCreators = append(dsCreators, nodelocaldns.DaemonSetCreator())
+	}
+
+	if len(r.tunnelingAgentIP) > 0 {
+		dsCreators = append(dsCreators, envoyagent.DaemonSetCreator(r.tunnelingAgentIP, r.versions))
 	}
 
 	if err := reconciling.ReconcileDaemonSets(ctx, dsCreators, metav1.NamespaceSystem, r.Client); err != nil {
@@ -533,12 +614,15 @@ func (r *reconciler) reconcileDaemonSet(ctx context.Context) error {
 func (r *reconciler) reconcileNamespaces(ctx context.Context) error {
 
 	if !r.openshift {
-		// creators := []reconciling.NamedNamespaceCreatorGetter{
-		// 	kubernetesdashboard.NamespaceCreator,
-		// }
-		// if err := reconciling.ReconcileNamespaces(ctx, creators, "", r.Client); err != nil {
-		// 	return fmt.Errorf("failed to reconcile namespaces: %v", err)
-		// }
+		creators := []reconciling.NamedNamespaceCreatorGetter{
+			// kubernetesdashboard.NamespaceCreator,
+		}
+		if r.opaIntegration {
+			creators = append(creators, gatekeeper.NamespaceCreator)
+		}
+		if err := reconciling.ReconcileNamespaces(ctx, creators, "", r.Client); err != nil {
+			return fmt.Errorf("failed to reconcile namespaces: %v", err)
+		}
 		return nil
 	}
 
@@ -641,4 +725,14 @@ type reconcileData struct {
 	openVPNCACert *resources.ECDSAKeyPair
 	userSSHKeys   map[string][]byte
 	cloudConfig   []byte
+}
+
+func (r *reconciler) ensureOPAIntegrationIsRemoved(ctx context.Context) error {
+	for _, resource := range gatekeeper.GetResourcesToRemoveOnDelete() {
+		if err := r.Client.Delete(ctx, resource); err != nil && !errors.IsNotFound(err) {
+			return fmt.Errorf("failed to ensure OPA integration is removed/not present: %v", err)
+		}
+	}
+
+	return nil
 }

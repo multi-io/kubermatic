@@ -26,10 +26,6 @@ import (
 	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
 	"k8c.io/kubermatic/v2/pkg/handler/test"
 	"k8c.io/kubermatic/v2/pkg/handler/test/hack"
-	"k8c.io/kubermatic/v2/pkg/handler/v1/cluster"
-
-	rbacv1 "k8s.io/api/rbac/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -61,9 +57,9 @@ func TestBindUserToRole(t *testing.T) {
 				test.GenDefaultCluster(),
 			),
 			existingKubernrtesObjs: []runtime.Object{
-				genDefaultRole("role-1", "default"),
-				genDefaultRole("role-1", "test"),
-				genDefaultClusterRole("role-1"),
+				test.GenDefaultRole("role-1", "default"),
+				test.GenDefaultRole("role-1", "test"),
+				test.GenDefaultClusterRole("role-1"),
 			},
 			existingAPIUser: test.GenDefaultAPIUser(),
 		},
@@ -79,7 +75,7 @@ func TestBindUserToRole(t *testing.T) {
 				test.GenDefaultCluster(),
 			),
 			existingKubernrtesObjs: []runtime.Object{
-				genDefaultRole("role-1", "test"),
+				test.GenDefaultRole("role-1", "test"),
 			},
 			existingAPIUser: test.GenDefaultAPIUser(),
 		},
@@ -96,8 +92,8 @@ func TestBindUserToRole(t *testing.T) {
 				test.GenDefaultCluster(),
 			),
 			existingKubernrtesObjs: []runtime.Object{
-				genDefaultRole("role-1", "default"),
-				genDefaultRoleBinding("test", "default", "role-1", "bob@acme.com"),
+				test.GenDefaultRole("role-1", "default"),
+				test.GenDefaultRoleBinding("test", "default", "role-1", "bob@acme.com"),
 			},
 			existingAPIUser: test.GenDefaultAPIUser(),
 		},
@@ -113,8 +109,8 @@ func TestBindUserToRole(t *testing.T) {
 				test.GenDefaultCluster(),
 			),
 			existingKubernrtesObjs: []runtime.Object{
-				genDefaultRole("role-1", "default"),
-				genDefaultRoleBinding("test", "default", "role-1", "bob@acme.com"),
+				test.GenDefaultRole("role-1", "default"),
+				test.GenDefaultRoleBinding("test", "default", "role-1", "bob@acme.com"),
 			},
 			existingAPIUser: test.GenDefaultAPIUser(),
 		},
@@ -131,9 +127,9 @@ func TestBindUserToRole(t *testing.T) {
 				test.GenDefaultCluster(),
 			),
 			existingKubernrtesObjs: []runtime.Object{
-				genDefaultRole("role-1", "default"),
-				genDefaultRole("role-1", "test"),
-				genDefaultClusterRole("role-1"),
+				test.GenDefaultRole("role-1", "default"),
+				test.GenDefaultRole("role-1", "test"),
+				test.GenDefaultClusterRole("role-1"),
 			},
 			existingAPIUser: test.GenDefaultAPIUser(),
 		},
@@ -149,7 +145,7 @@ func TestBindUserToRole(t *testing.T) {
 				test.GenDefaultCluster(),
 			),
 			existingKubernrtesObjs: []runtime.Object{
-				genDefaultRole("role-1", "test"),
+				test.GenDefaultRole("role-1", "test"),
 			},
 			existingAPIUser: test.GenDefaultAPIUser(),
 		},
@@ -166,8 +162,8 @@ func TestBindUserToRole(t *testing.T) {
 				test.GenDefaultCluster(),
 			),
 			existingKubernrtesObjs: []runtime.Object{
-				genDefaultRole("role-1", "default"),
-				genDefaultGroupRoleBinding("test", "default", "role-1", "admins"),
+				test.GenDefaultRole("role-1", "default"),
+				test.GenDefaultGroupRoleBinding("test", "default", "role-1", "admins"),
 			},
 			existingAPIUser: test.GenDefaultAPIUser(),
 		},
@@ -183,8 +179,8 @@ func TestBindUserToRole(t *testing.T) {
 				test.GenDefaultCluster(),
 			),
 			existingKubernrtesObjs: []runtime.Object{
-				genDefaultRole("role-1", "default"),
-				genDefaultRoleBinding("test", "default", "role-1", "bob@acme.com"),
+				test.GenDefaultRole("role-1", "default"),
+				test.GenDefaultRoleBinding("test", "default", "role-1", "bob@acme.com"),
 			},
 			existingAPIUser: test.GenDefaultAPIUser(),
 		},
@@ -200,8 +196,8 @@ func TestBindUserToRole(t *testing.T) {
 				test.GenDefaultCluster(),
 			),
 			existingKubernrtesObjs: []runtime.Object{
-				genDefaultRole("role-1", "default"),
-				genDefaultGroupRoleBinding("test", "default", "role-1", "test"),
+				test.GenDefaultRole("role-1", "default"),
+				test.GenDefaultGroupRoleBinding("test", "default", "role-1", "test"),
 			},
 			existingAPIUser: test.GenDefaultAPIUser(),
 		},
@@ -218,9 +214,9 @@ func TestBindUserToRole(t *testing.T) {
 				genUser("John", "john@acme.com", true),
 			),
 			existingKubernrtesObjs: []runtime.Object{
-				genDefaultRole("role-1", "default"),
-				genDefaultRole("role-1", "test"),
-				genDefaultClusterRole("role-1"),
+				test.GenDefaultRole("role-1", "default"),
+				test.GenDefaultRole("role-1", "test"),
+				test.GenDefaultClusterRole("role-1"),
 			},
 			existingAPIUser: test.GenAPIUser("John", "john@acme.com"),
 		},
@@ -237,9 +233,9 @@ func TestBindUserToRole(t *testing.T) {
 				genUser("John", "john@acme.com", false),
 			),
 			existingKubernrtesObjs: []runtime.Object{
-				genDefaultRole("role-1", "default"),
-				genDefaultRole("role-1", "test"),
-				genDefaultClusterRole("role-1"),
+				test.GenDefaultRole("role-1", "default"),
+				test.GenDefaultRole("role-1", "test"),
+				test.GenDefaultClusterRole("role-1"),
 			},
 			existingAPIUser: test.GenAPIUser("John", "john@acme.com"),
 		},
@@ -297,8 +293,8 @@ func TestUnbindUserFromRoleBinding(t *testing.T) {
 				test.GenDefaultCluster(),
 			),
 			existingKubernrtesObjs: []runtime.Object{
-				genDefaultRole("role-1", "default"),
-				genDefaultRoleBinding("test", "default", "role-1", "bob@acme.com"),
+				test.GenDefaultRole("role-1", "default"),
+				test.GenDefaultRoleBinding("test", "default", "role-1", "bob@acme.com"),
 			},
 			existingAPIUser: test.GenDefaultAPIUser(),
 		},
@@ -314,8 +310,8 @@ func TestUnbindUserFromRoleBinding(t *testing.T) {
 				test.GenDefaultCluster(),
 			),
 			existingKubernrtesObjs: []runtime.Object{
-				genDefaultRole("role-1", "default"),
-				genDefaultGroupRoleBinding("test", "default", "role-1", "test"),
+				test.GenDefaultRole("role-1", "default"),
+				test.GenDefaultGroupRoleBinding("test", "default", "role-1", "test"),
 			},
 			existingAPIUser: test.GenDefaultAPIUser(),
 		},
@@ -332,8 +328,8 @@ func TestUnbindUserFromRoleBinding(t *testing.T) {
 				genUser("John", "john@acme.com", true),
 			),
 			existingKubernrtesObjs: []runtime.Object{
-				genDefaultRole("role-1", "default"),
-				genDefaultRoleBinding("test", "default", "role-1", "bob@acme.com"),
+				test.GenDefaultRole("role-1", "default"),
+				test.GenDefaultRoleBinding("test", "default", "role-1", "bob@acme.com"),
 			},
 			existingAPIUser: test.GenAPIUser("John", "john@acme.com"),
 		},
@@ -350,8 +346,8 @@ func TestUnbindUserFromRoleBinding(t *testing.T) {
 				genUser("John", "john@acme.com", false),
 			),
 			existingKubernrtesObjs: []runtime.Object{
-				genDefaultRole("role-1", "default"),
-				genDefaultRoleBinding("test", "default", "role-1", "bob@acme.com"),
+				test.GenDefaultRole("role-1", "default"),
+				test.GenDefaultRoleBinding("test", "default", "role-1", "bob@acme.com"),
 			},
 			existingAPIUser: test.GenAPIUser("John", "john@acme.com"),
 		},
@@ -403,14 +399,14 @@ func TestListRoleBinding(t *testing.T) {
 				test.GenDefaultCluster(),
 			),
 			existingKubernrtesObjs: []runtime.Object{
-				genDefaultRole("role-1", "default"),
-				genDefaultRole("role-2", "default"),
-				genDefaultClusterRole("role-1"),
-				genDefaultRoleBinding("binding-1", "default", "role-1", "test-1@example.com"),
-				genDefaultRoleBinding("binding-2", "default", "role-2", "test-2@example.com"),
-				genDefaultGroupRoleBinding("binding-3", "default", "role-2", "test"),
-				genDefaultRoleBinding("binding-1", "test", "role-10", "test-10@example.com"),
-				genDefaultGroupRoleBinding("binding-2", "test", "role-10", "test"),
+				test.GenDefaultRole("role-1", "default"),
+				test.GenDefaultRole("role-2", "default"),
+				test.GenDefaultClusterRole("role-1"),
+				test.GenDefaultRoleBinding("binding-1", "default", "role-1", "test-1@example.com"),
+				test.GenDefaultRoleBinding("binding-2", "default", "role-2", "test-2@example.com"),
+				test.GenDefaultGroupRoleBinding("binding-3", "default", "role-2", "test"),
+				test.GenDefaultRoleBinding("binding-1", "test", "role-10", "test-10@example.com"),
+				test.GenDefaultGroupRoleBinding("binding-2", "test", "role-10", "test"),
 			},
 			existingAPIUser: test.GenDefaultAPIUser(),
 		},
@@ -424,14 +420,14 @@ func TestListRoleBinding(t *testing.T) {
 				genUser("John", "john@acme.com", true),
 			),
 			existingKubernrtesObjs: []runtime.Object{
-				genDefaultRole("role-1", "default"),
-				genDefaultRole("role-2", "default"),
-				genDefaultClusterRole("role-1"),
-				genDefaultRoleBinding("binding-1", "default", "role-1", "test-1@example.com"),
-				genDefaultRoleBinding("binding-2", "default", "role-2", "test-2@example.com"),
-				genDefaultGroupRoleBinding("binding-3", "default", "role-2", "test"),
-				genDefaultRoleBinding("binding-1", "test", "role-10", "test-10@example.com"),
-				genDefaultGroupRoleBinding("binding-2", "test", "role-10", "test"),
+				test.GenDefaultRole("role-1", "default"),
+				test.GenDefaultRole("role-2", "default"),
+				test.GenDefaultClusterRole("role-1"),
+				test.GenDefaultRoleBinding("binding-1", "default", "role-1", "test-1@example.com"),
+				test.GenDefaultRoleBinding("binding-2", "default", "role-2", "test-2@example.com"),
+				test.GenDefaultGroupRoleBinding("binding-3", "default", "role-2", "test"),
+				test.GenDefaultRoleBinding("binding-1", "test", "role-10", "test-10@example.com"),
+				test.GenDefaultGroupRoleBinding("binding-2", "test", "role-10", "test"),
 			},
 			existingAPIUser: test.GenAPIUser("John", "john@acme.com"),
 		},
@@ -445,14 +441,14 @@ func TestListRoleBinding(t *testing.T) {
 				genUser("John", "john@acme.com", false),
 			),
 			existingKubernrtesObjs: []runtime.Object{
-				genDefaultRole("role-1", "default"),
-				genDefaultRole("role-2", "default"),
-				genDefaultClusterRole("role-1"),
-				genDefaultRoleBinding("binding-1", "default", "role-1", "test-1@example.com"),
-				genDefaultRoleBinding("binding-2", "default", "role-2", "test-2@example.com"),
-				genDefaultGroupRoleBinding("binding-3", "default", "role-2", "test"),
-				genDefaultRoleBinding("binding-1", "test", "role-10", "test-10@example.com"),
-				genDefaultGroupRoleBinding("binding-2", "test", "role-10", "test"),
+				test.GenDefaultRole("role-1", "default"),
+				test.GenDefaultRole("role-2", "default"),
+				test.GenDefaultClusterRole("role-1"),
+				test.GenDefaultRoleBinding("binding-1", "default", "role-1", "test-1@example.com"),
+				test.GenDefaultRoleBinding("binding-2", "default", "role-2", "test-2@example.com"),
+				test.GenDefaultGroupRoleBinding("binding-3", "default", "role-2", "test"),
+				test.GenDefaultRoleBinding("binding-1", "test", "role-10", "test-10@example.com"),
+				test.GenDefaultGroupRoleBinding("binding-2", "test", "role-10", "test"),
 			},
 			existingAPIUser: test.GenAPIUser("John", "john@acme.com"),
 		},
@@ -484,80 +480,6 @@ func TestListRoleBinding(t *testing.T) {
 	}
 }
 
-func genDefaultRoleBinding(name, namespace, roleID, userEmail string) *rbacv1.RoleBinding {
-	return &rbacv1.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Labels:    map[string]string{cluster.UserClusterComponentKey: cluster.UserClusterBindingComponentValue},
-			Namespace: namespace,
-		},
-		Subjects: []rbacv1.Subject{
-			{
-				Kind: "User",
-				Name: userEmail,
-			},
-		},
-		RoleRef: rbacv1.RoleRef{
-			Name: roleID,
-		},
-	}
-}
-
-func genDefaultGroupRoleBinding(name, namespace, roleID, group string) *rbacv1.RoleBinding {
-	return &rbacv1.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Labels:    map[string]string{cluster.UserClusterComponentKey: cluster.UserClusterBindingComponentValue},
-			Namespace: namespace,
-		},
-		Subjects: []rbacv1.Subject{
-			{
-				Kind: "Group",
-				Name: group,
-			},
-		},
-		RoleRef: rbacv1.RoleRef{
-			Name: roleID,
-		},
-	}
-}
-
-func genDefaultClusterRoleBinding(name, roleID, userEmail string) *rbacv1.ClusterRoleBinding {
-	return &rbacv1.ClusterRoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   name,
-			Labels: map[string]string{cluster.UserClusterComponentKey: cluster.UserClusterBindingComponentValue},
-		},
-		Subjects: []rbacv1.Subject{
-			{
-				Kind: "User",
-				Name: userEmail,
-			},
-		},
-		RoleRef: rbacv1.RoleRef{
-			Name: roleID,
-		},
-	}
-}
-
-func genDefaultGroupClusterRoleBinding(name, roleID, group string) *rbacv1.ClusterRoleBinding {
-	return &rbacv1.ClusterRoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   name,
-			Labels: map[string]string{cluster.UserClusterComponentKey: cluster.UserClusterBindingComponentValue},
-		},
-		Subjects: []rbacv1.Subject{
-			{
-				Kind: "Group",
-				Name: group,
-			},
-		},
-		RoleRef: rbacv1.RoleRef{
-			Name: roleID,
-		},
-	}
-}
-
 func TestBindUserToClusterRole(t *testing.T) {
 	t.Parallel()
 
@@ -584,8 +506,8 @@ func TestBindUserToClusterRole(t *testing.T) {
 				test.GenDefaultCluster(),
 			),
 			existingKubernrtesObjs: []runtime.Object{
-				genDefaultClusterRole("role-1"),
-				genDefaultClusterRole("role-2"),
+				test.GenDefaultClusterRole("role-1"),
+				test.GenDefaultClusterRole("role-2"),
 			},
 			existingAPIUser: test.GenDefaultAPIUser(),
 		},
@@ -600,7 +522,7 @@ func TestBindUserToClusterRole(t *testing.T) {
 				test.GenDefaultCluster(),
 			),
 			existingKubernrtesObjs: []runtime.Object{
-				genDefaultClusterRole("role-2"),
+				test.GenDefaultClusterRole("role-2"),
 			},
 			existingAPIUser: test.GenDefaultAPIUser(),
 		},
@@ -616,9 +538,9 @@ func TestBindUserToClusterRole(t *testing.T) {
 				test.GenDefaultCluster(),
 			),
 			existingKubernrtesObjs: []runtime.Object{
-				genDefaultClusterRole("role-1"),
-				genDefaultClusterRole("role-2"),
-				genDefaultClusterRoleBinding("test", "role-1", "bob@acme.com"),
+				test.GenDefaultClusterRole("role-1"),
+				test.GenDefaultClusterRole("role-2"),
+				test.GenDefaultClusterRoleBinding("test", "role-1", "bob@acme.com"),
 			},
 			existingAPIUser: test.GenDefaultAPIUser(),
 		},
@@ -626,15 +548,15 @@ func TestBindUserToClusterRole(t *testing.T) {
 			name:             "scenario 4: bind existing user",
 			roleName:         "role-1",
 			body:             `{"userEmail":"test@example.com"}`,
-			expectedResponse: `{"error":{"code":400,"message":"user test@example.com already connected to role role-1"}}`,
+			expectedResponse: `{"error":{"code":400,"message":"user test@example.com already connected to the cluster role role-1"}}`,
 			clusterToGet:     test.GenDefaultCluster().Name,
 			httpStatus:       http.StatusBadRequest,
 			existingKubermaticObjs: test.GenDefaultKubermaticObjects(
 				test.GenDefaultCluster(),
 			),
 			existingKubernrtesObjs: []runtime.Object{
-				genDefaultClusterRole("role-1"),
-				genDefaultClusterRoleBinding("test", "role-1", "test@example.com"),
+				test.GenDefaultClusterRole("role-1"),
+				test.GenDefaultClusterRoleBinding("test", "role-1", "test@example.com"),
 			},
 			existingAPIUser: test.GenDefaultAPIUser(),
 		},
@@ -651,8 +573,8 @@ func TestBindUserToClusterRole(t *testing.T) {
 				test.GenDefaultCluster(),
 			),
 			existingKubernrtesObjs: []runtime.Object{
-				genDefaultClusterRole("role-1"),
-				genDefaultClusterRole("role-2"),
+				test.GenDefaultClusterRole("role-1"),
+				test.GenDefaultClusterRole("role-2"),
 			},
 			existingAPIUser: test.GenDefaultAPIUser(),
 		},
@@ -667,7 +589,7 @@ func TestBindUserToClusterRole(t *testing.T) {
 				test.GenDefaultCluster(),
 			),
 			existingKubernrtesObjs: []runtime.Object{
-				genDefaultClusterRole("role-2"),
+				test.GenDefaultClusterRole("role-2"),
 			},
 			existingAPIUser: test.GenDefaultAPIUser(),
 		},
@@ -683,9 +605,9 @@ func TestBindUserToClusterRole(t *testing.T) {
 				test.GenDefaultCluster(),
 			),
 			existingKubernrtesObjs: []runtime.Object{
-				genDefaultClusterRole("role-1"),
-				genDefaultClusterRole("role-2"),
-				genDefaultClusterRoleBinding("test", "role-1", "bob@acme.com"),
+				test.GenDefaultClusterRole("role-1"),
+				test.GenDefaultClusterRole("role-2"),
+				test.GenDefaultClusterRoleBinding("test", "role-1", "bob@acme.com"),
 			},
 			existingAPIUser: test.GenDefaultAPIUser(),
 		},
@@ -700,9 +622,9 @@ func TestBindUserToClusterRole(t *testing.T) {
 				test.GenDefaultCluster(),
 			),
 			existingKubernrtesObjs: []runtime.Object{
-				genDefaultClusterRole("role-1"),
-				genDefaultClusterRole("role-2"),
-				genDefaultGroupClusterRoleBinding("test", "role-1", "admins"),
+				test.GenDefaultClusterRole("role-1"),
+				test.GenDefaultClusterRole("role-2"),
+				test.GenDefaultGroupClusterRoleBinding("test", "role-1", "admins"),
 			},
 			existingAPIUser: test.GenDefaultAPIUser(),
 		},
@@ -710,15 +632,15 @@ func TestBindUserToClusterRole(t *testing.T) {
 			name:             "scenario 9: bind existing group",
 			roleName:         "role-1",
 			body:             `{"group":"test"}`,
-			expectedResponse: `{"error":{"code":400,"message":"group test already connected to role role-1"}}`,
+			expectedResponse: `{"error":{"code":400,"message":"group test already connected to the cluster role role-1"}}`,
 			clusterToGet:     test.GenDefaultCluster().Name,
 			httpStatus:       http.StatusBadRequest,
 			existingKubermaticObjs: test.GenDefaultKubermaticObjects(
 				test.GenDefaultCluster(),
 			),
 			existingKubernrtesObjs: []runtime.Object{
-				genDefaultClusterRole("role-1"),
-				genDefaultGroupClusterRoleBinding("test", "role-1", "test"),
+				test.GenDefaultClusterRole("role-1"),
+				test.GenDefaultGroupClusterRoleBinding("test", "role-1", "test"),
 			},
 			existingAPIUser: test.GenDefaultAPIUser(),
 		},
@@ -734,9 +656,9 @@ func TestBindUserToClusterRole(t *testing.T) {
 				genUser("John", "john@acme.com", true),
 			),
 			existingKubernrtesObjs: []runtime.Object{
-				genDefaultClusterRole("role-1"),
-				genDefaultClusterRole("role-2"),
-				genDefaultClusterRoleBinding("test", "role-1", "bob@acme.com"),
+				test.GenDefaultClusterRole("role-1"),
+				test.GenDefaultClusterRole("role-2"),
+				test.GenDefaultClusterRoleBinding("test", "role-1", "bob@acme.com"),
 			},
 			existingAPIUser: test.GenAPIUser("John", "john@acme.com"),
 		},
@@ -752,9 +674,9 @@ func TestBindUserToClusterRole(t *testing.T) {
 				genUser("John", "john@acme.com", false),
 			),
 			existingKubernrtesObjs: []runtime.Object{
-				genDefaultClusterRole("role-1"),
-				genDefaultClusterRole("role-2"),
-				genDefaultClusterRoleBinding("test", "role-1", "bob@acme.com"),
+				test.GenDefaultClusterRole("role-1"),
+				test.GenDefaultClusterRole("role-2"),
+				test.GenDefaultClusterRoleBinding("test", "role-1", "bob@acme.com"),
 			},
 			existingAPIUser: test.GenAPIUser("John", "john@acme.com"),
 		},
@@ -811,9 +733,9 @@ func TestUnbindUserFromClusterRoleBinding(t *testing.T) {
 				test.GenDefaultCluster(),
 			),
 			existingKubernrtesObjs: []runtime.Object{
-				genDefaultClusterRole("role-1"),
-				genDefaultClusterRole("role-2"),
-				genDefaultClusterRoleBinding("test", "role-1", "bob@acme.com"),
+				test.GenDefaultClusterRole("role-1"),
+				test.GenDefaultClusterRole("role-2"),
+				test.GenDefaultClusterRoleBinding("test", "role-1", "bob@acme.com"),
 			},
 			existingAPIUser: test.GenDefaultAPIUser(),
 		},
@@ -829,9 +751,9 @@ func TestUnbindUserFromClusterRoleBinding(t *testing.T) {
 				test.GenDefaultCluster(),
 			),
 			existingKubernrtesObjs: []runtime.Object{
-				genDefaultClusterRole("role-1"),
-				genDefaultClusterRole("role-2"),
-				genDefaultGroupClusterRoleBinding("test", "role-1", "test"),
+				test.GenDefaultClusterRole("role-1"),
+				test.GenDefaultClusterRole("role-2"),
+				test.GenDefaultGroupClusterRoleBinding("test", "role-1", "test"),
 			},
 			existingAPIUser: test.GenDefaultAPIUser(),
 		},
@@ -847,9 +769,9 @@ func TestUnbindUserFromClusterRoleBinding(t *testing.T) {
 				genUser("John", "john@acme.com", true),
 			),
 			existingKubernrtesObjs: []runtime.Object{
-				genDefaultClusterRole("role-1"),
-				genDefaultClusterRole("role-2"),
-				genDefaultClusterRoleBinding("test", "role-1", "bob@acme.com"),
+				test.GenDefaultClusterRole("role-1"),
+				test.GenDefaultClusterRole("role-2"),
+				test.GenDefaultClusterRoleBinding("test", "role-1", "bob@acme.com"),
 			},
 			existingAPIUser: test.GenAPIUser("John", "john@acme.com"),
 		},
@@ -865,9 +787,9 @@ func TestUnbindUserFromClusterRoleBinding(t *testing.T) {
 				genUser("John", "john@acme.com", false),
 			),
 			existingKubernrtesObjs: []runtime.Object{
-				genDefaultClusterRole("role-1"),
-				genDefaultClusterRole("role-2"),
-				genDefaultClusterRoleBinding("test", "role-1", "bob@acme.com"),
+				test.GenDefaultClusterRole("role-1"),
+				test.GenDefaultClusterRole("role-2"),
+				test.GenDefaultClusterRoleBinding("test", "role-1", "bob@acme.com"),
 			},
 			existingAPIUser: test.GenAPIUser("John", "john@acme.com"),
 		},
@@ -920,12 +842,12 @@ func TestListClusterRoleBinding(t *testing.T) {
 				test.GenDefaultCluster(),
 			),
 			existingKubernrtesObjs: []runtime.Object{
-				genDefaultClusterRole("role-1"),
-				genDefaultClusterRole("role-2"),
-				genDefaultClusterRoleBinding("binding-1-1", "role-1", "test-1"),
-				genDefaultClusterRoleBinding("binding-1-2", "role-1", "test-2"),
-				genDefaultClusterRoleBinding("binding-2-1", "role-2", "test-3"),
-				genDefaultGroupClusterRoleBinding("binding-2-2", "role-2", "test-4"),
+				test.GenDefaultClusterRole("role-1"),
+				test.GenDefaultClusterRole("role-2"),
+				test.GenDefaultClusterRoleBinding("binding-1-1", "role-1", "test-1"),
+				test.GenDefaultClusterRoleBinding("binding-1-2", "role-1", "test-2"),
+				test.GenDefaultClusterRoleBinding("binding-2-1", "role-2", "test-3"),
+				test.GenDefaultGroupClusterRoleBinding("binding-2-2", "role-2", "test-4"),
 			},
 			existingAPIUser: test.GenDefaultAPIUser(),
 		},
@@ -940,12 +862,12 @@ func TestListClusterRoleBinding(t *testing.T) {
 				genUser("John", "john@acme.com", true),
 			),
 			existingKubernrtesObjs: []runtime.Object{
-				genDefaultClusterRole("role-1"),
-				genDefaultClusterRole("role-2"),
-				genDefaultClusterRoleBinding("binding-1-1", "role-1", "test-1"),
-				genDefaultClusterRoleBinding("binding-1-2", "role-1", "test-2"),
-				genDefaultClusterRoleBinding("binding-2-1", "role-2", "test-3"),
-				genDefaultGroupClusterRoleBinding("binding-2-2", "role-2", "test-4"),
+				test.GenDefaultClusterRole("role-1"),
+				test.GenDefaultClusterRole("role-2"),
+				test.GenDefaultClusterRoleBinding("binding-1-1", "role-1", "test-1"),
+				test.GenDefaultClusterRoleBinding("binding-1-2", "role-1", "test-2"),
+				test.GenDefaultClusterRoleBinding("binding-2-1", "role-2", "test-3"),
+				test.GenDefaultGroupClusterRoleBinding("binding-2-2", "role-2", "test-4"),
 			},
 			existingAPIUser: test.GenAPIUser("John", "john@acme.com"),
 		},
@@ -960,12 +882,12 @@ func TestListClusterRoleBinding(t *testing.T) {
 				genUser("John", "john@acme.com", false),
 			),
 			existingKubernrtesObjs: []runtime.Object{
-				genDefaultClusterRole("role-1"),
-				genDefaultClusterRole("role-2"),
-				genDefaultClusterRoleBinding("binding-1-1", "role-1", "test-1"),
-				genDefaultClusterRoleBinding("binding-1-2", "role-1", "test-2"),
-				genDefaultClusterRoleBinding("binding-2-1", "role-2", "test-3"),
-				genDefaultGroupClusterRoleBinding("binding-2-2", "role-2", "test-4"),
+				test.GenDefaultClusterRole("role-1"),
+				test.GenDefaultClusterRole("role-2"),
+				test.GenDefaultClusterRoleBinding("binding-1-1", "role-1", "test-1"),
+				test.GenDefaultClusterRoleBinding("binding-1-2", "role-1", "test-2"),
+				test.GenDefaultClusterRoleBinding("binding-2-1", "role-2", "test-3"),
+				test.GenDefaultGroupClusterRoleBinding("binding-2-2", "role-2", "test-4"),
 			},
 			existingAPIUser: test.GenAPIUser("John", "john@acme.com"),
 		},

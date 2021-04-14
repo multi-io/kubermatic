@@ -22,17 +22,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-)
 
-// ExposeStrategy is the strategy to expose the cluster with.
-type ExposeStrategy string
-
-const (
-	// NodePortStrategy creates a NodePort with a "nodeport-proxy.k8s.io/expose": "true" annotation to expose
-	// all clusters on one central Service of type LoadBalancer via the NodePort proxy.
-	NodePortStrategy ExposeStrategy = "NodePort"
-	// LoadBalancerStrategy creates a LoadBalancer service per cluster.
-	LoadBalancerStrategy ExposeStrategy = "LoadBalancer"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -66,7 +57,7 @@ type KubermaticConfigurationSpec struct {
 	// ExposeStrategy is the strategy to expose the cluster with.
 	// Note: The `seed_dns_overwrite` setting of a Seed's datacenter doesn't have any effect
 	// if this is set to LoadBalancerStrategy.
-	ExposeStrategy ExposeStrategy `json:"exposeStrategy,omitempty"`
+	ExposeStrategy kubermaticv1.ExposeStrategy `json:"exposeStrategy,omitempty"`
 	// Ingress contains settings for making the API and UI accessible remotely.
 	Ingress KubermaticIngressConfiguration `json:"ingress,omitempty"`
 	// Versions configures the available and default Kubernetes/Openshift versions and updates.
@@ -152,8 +143,12 @@ type KubermaticSeedControllerConfiguration struct {
 type KubermaticUserClusterConfiguration struct {
 	// KubermaticDockerRepository is the repository containing the Kubermatic user-cluster-controller-manager image.
 	KubermaticDockerRepository string `json:"kubermaticDockerRepository,omitempty"`
-	// DNATControllerDockerRepository is the repository containing the Kubermatic user-cluster-controller-manager image.
+	// DNATControllerDockerRepository is the repository containing the
+	// dnat-controller image.
 	DNATControllerDockerRepository string `json:"dnatControllerDockerRepository,omitempty"`
+	// EtcdLauncherDockerRepository is the repository containing the Kubermatic
+	// etcd-launcher image.
+	EtcdLauncherDockerRepository string `json:"etcdLauncherDockerRepository,omitempty"`
 	// OverwriteRegistry specifies a custom Docker registry which will be used for all images
 	// used inside user clusters (user cluster control plane + addons). This also applies to
 	// the KubermaticDockerRepository and DNATControllerDockerRepository fields.

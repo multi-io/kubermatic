@@ -27,6 +27,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -62,7 +63,7 @@ func Add(ctx context.Context, log *zap.SugaredLogger, mgr manager.Manager) error
 		Reconciler: r,
 		// This controller is not safe to run with more than one worker
 		// as it looks at the state of the whole cluster, which may result
-		// in race bahaviour if there are more.
+		// in race behaviour if there are more.
 		MaxConcurrentReconciles: 1,
 	})
 	if err != nil {
@@ -141,6 +142,9 @@ func (r *reconciler) reconcile() (*reconcile.Result, error) {
 func (r *reconciler) updateNode(name string, modify func(*corev1.Node)) error {
 	node := &corev1.Node{}
 	if err := r.client.Get(r.ctx, types.NamespacedName{Name: name}, node); err != nil {
+		if kerrors.IsNotFound(err) {
+			return nil
+		}
 		return err
 	}
 	oldNode := node.DeepCopy()

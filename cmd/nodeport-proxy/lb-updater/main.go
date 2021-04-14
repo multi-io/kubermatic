@@ -26,9 +26,11 @@ import (
 	"github.com/go-test/deep"
 	"go.uber.org/zap"
 
-	cmdutil "k8c.io/kubermatic/v2/cmd/util"
+	"k8c.io/kubermatic/v2/pkg/controller/nodeport-proxy/envoymanager"
 	controllerutil "k8c.io/kubermatic/v2/pkg/controller/util"
 	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
+	"k8c.io/kubermatic/v2/pkg/resources/nodeportproxy"
+	"k8c.io/kubermatic/v2/pkg/util/cli"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -44,25 +46,26 @@ import (
 )
 
 const (
-	defaultExposeAnnotationKey = "nodeport-proxy.k8s.io/expose"
-	healthCheckPort            = 8002
+	healthCheckPort = 8002
 )
 
 var (
-	lbName              string
-	lbNamespace         string
-	namespaced          bool
-	exposeAnnotationKey string
+	lbName      string
+	lbNamespace string
+	namespaced  bool
 )
 
 func main() {
 	logOpts := kubermaticlog.NewDefaultOptions()
+	opts := envoymanager.Options{}
 	logOpts.AddFlags(flag.CommandLine)
 
 	flag.StringVar(&lbName, "lb-name", "nodeport-lb", "name of the LoadBalancer service to manage.")
 	flag.StringVar(&lbNamespace, "lb-namespace", "nodeport-proxy", "namespace of the LoadBalancer service to manage. Needs to exist")
 	flag.BoolVar(&namespaced, "namespaced", false, "Whether this controller should only watch services in the lbNamespace")
-	flag.StringVar(&exposeAnnotationKey, "expose-annotation-key", defaultExposeAnnotationKey, "The annotation key used to determine if a Service should be exposed")
+	flag.StringVar(&opts.ExposeAnnotationKey, "expose-annotation-key", nodeportproxy.DefaultExposeAnnotationKey, "The annotation key used to determine if a Service should be exposed")
+	flag.IntVar(&opts.EnvoySNIListenerPort, "envoy-sni-port", 0, "Port used for SNI entry point.")
+	flag.IntVar(&opts.EnvoyTunnelingListenerPort, "envoy-tunneling-port", 0, "Port used for HTTP/2 CONNECT termination.")
 	flag.Parse()
 
 	// setup signal handler
@@ -83,7 +86,7 @@ func main() {
 		}
 	}()
 
-	cmdutil.Hello(log, "LoadBalancer Updater", logOpts.Debug)
+	cli.Hello(log, "LoadBalancer Updater", logOpts.Debug, nil)
 
 	config, err := ctrlruntimeconfig.GetConfig()
 	if err != nil {
@@ -106,6 +109,7 @@ func main() {
 		lbName:      lbName,
 		namespace:   namespace,
 		log:         log,
+		opts:        opts,
 	}
 
 	ctrl, err := controller.New("lb-updater", mgr,
@@ -130,6 +134,7 @@ type LBUpdater struct {
 	lbName      string
 	namespace   string
 	log         *zap.SugaredLogger
+	opts        envoymanager.Options
 }
 
 func (u *LBUpdater) Reconcile(request reconcile.Request) (reconcile.Result, error) {
@@ -156,12 +161,28 @@ func (u *LBUpdater) syncLB(s string) error {
 		TargetPort: intstr.FromInt(healthCheckPort),
 		Protocol:   corev1.ProtocolTCP,
 	})
+	if u.opts.IsSNIEnabled() {
+		wantLBPorts = append(wantLBPorts, corev1.ServicePort{
+			Name:       "sni-listener",
+			Port:       int32(u.opts.EnvoySNIListenerPort),
+			TargetPort: intstr.FromInt(u.opts.EnvoySNIListenerPort),
+			Protocol:   corev1.ProtocolTCP,
+		})
+	}
+	if u.opts.IsTunnelingEnabled() {
+		wantLBPorts = append(wantLBPorts, corev1.ServicePort{
+			Name:       "tunneling-listener",
+			Port:       int32(u.opts.EnvoyTunnelingListenerPort),
+			TargetPort: intstr.FromInt(u.opts.EnvoyTunnelingListenerPort),
+			Protocol:   corev1.ProtocolTCP,
+		})
+	}
 
 	for _, service := range services.Items {
 		serviceLog := u.log.With("namespace", service.Namespace).With("name", service.Name)
 
-		if service.Annotations[exposeAnnotationKey] != "true" {
-			serviceLog.Debugw("Skipping service as the annotation is not set to 'true'", "annotation", exposeAnnotationKey)
+		if e := service.Annotations[u.opts.ExposeAnnotationKey]; e != "true" && e != nodeportproxy.NodePortType.String() {
+			serviceLog.Debugw("Skipping service as the annotation is not set to 'true' or NodePort", "annotation", u.opts.ExposeAnnotationKey)
 			continue
 		}
 
@@ -255,7 +276,7 @@ func setNodePortAndName(portToSet *corev1.ServicePort, lbPorts []corev1.ServiceP
 			return
 		}
 	}
-	if portToSet.Name != "healthz" {
+	if portToSet.Name != "healthz" && portToSet.Name != "sni-listener" && portToSet.Name != "tunneling-listener" {
 		portToSet.Name = fmt.Sprintf("%s-%d", portToSet.Name, portToSet.Port)
 	}
 	// We must reset the NodePort, it is being abused to carry over the port of the target service

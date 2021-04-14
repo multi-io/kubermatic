@@ -26,6 +26,11 @@ import (
 	"github.com/gorilla/mux"
 )
 
+func DecodeEmptyReq(c context.Context, r *http.Request) (interface{}, error) {
+	var req struct{}
+	return req, nil
+}
+
 // ProjectReq represents a request for project-specific data
 type ProjectReq struct {
 	// in: path
@@ -129,4 +134,13 @@ func DecodeClusterID(c context.Context, r *http.Request) (string, error) {
 // UserIDGetter knows how to get user ID from the request
 type UserIDGetter interface {
 	GetUserID() string
+}
+
+func DecodeSSHKeyID(c context.Context, r *http.Request) (string, error) {
+	keyID := mux.Vars(r)["key_id"]
+	if keyID == "" {
+		return "", fmt.Errorf("'key_id' parameter is required but was not provided")
+	}
+
+	return keyID, nil
 }

@@ -107,7 +107,7 @@ func TestUserWatchEndpoint(t *testing.T) {
 			var user *apiv1.User
 			err = json.Unmarshal(wsMsg.p, &user)
 			if err != nil {
-				t.Fatalf("failed unmarshalling user: %v", err)
+				t.Fatalf("failed unmarshaling user: %v", err)
 			}
 			if user.Name != tc.existingAPIUser.Name {
 				t.Fatalf("got wrong initial user from watch, expected: %s, got %s", tc.existingAPIUser.Name, user.Name)
@@ -133,7 +133,7 @@ func TestUserWatchEndpoint(t *testing.T) {
 			select {
 			case <-time.After(time.Second * 5):
 				if !tc.updateShouldTimeout {
-					t.Fatal("Watch update notification didnt arrive in time")
+					t.Fatal("Watch update notification didn't arrive in time")
 				}
 			case wsMsg = <-ch:
 			}
@@ -145,7 +145,7 @@ func TestUserWatchEndpoint(t *testing.T) {
 				var userUpdate *apiv1.User
 				err = json.Unmarshal(wsMsg.p, &userUpdate)
 				if err != nil {
-					t.Fatalf("failed unmarshalling user: %v", err)
+					t.Fatalf("failed unmarshaling user: %v", err)
 				}
 
 				if !reflect.DeepEqual(userUpdate.Settings, tc.userSettingsUpdate) {

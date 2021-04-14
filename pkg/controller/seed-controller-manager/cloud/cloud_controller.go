@@ -19,7 +19,6 @@ package cloud
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"time"
 
 	"go.uber.org/zap"
@@ -33,12 +32,14 @@ import (
 	"k8c.io/kubermatic/v2/pkg/provider/cloud/aws"
 	"k8c.io/kubermatic/v2/pkg/provider/cloud/azure"
 	"k8c.io/kubermatic/v2/pkg/provider/cloud/openstack"
+	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -56,20 +57,22 @@ const (
 	// hardcoded AZs and Subnets towards multi-AZ support.
 	awsHarcodedAZMigrationRevision = 2
 	// currentMigrationRevision describes the current migration revision. If this is set on the
-	// cluster, certain migrations wont get executed. This must never be decremented.
+	// cluster, certain migrations won't get executed. This must never be decremented.
 	CurrentMigrationRevision = awsHarcodedAZMigrationRevision
 )
 
-// Check if the Reconciler fullfills the interface
+// Check if the Reconciler fulfills the interface
 // at compile time
 var _ reconcile.Reconciler = &Reconciler{}
 
 type Reconciler struct {
 	client.Client
+
 	log        *zap.SugaredLogger
 	recorder   record.EventRecorder
 	seedGetter provider.SeedGetter
 	workerName string
+	versions   kubermatic.Versions
 }
 
 func Add(
@@ -78,6 +81,7 @@ func Add(
 	numWorkers int,
 	seedGetter provider.SeedGetter,
 	workerName string,
+	versions kubermatic.Versions,
 ) error {
 	reconciler := &Reconciler{
 		Client:     mgr.GetClient(),
@@ -85,6 +89,7 @@ func Add(
 		recorder:   mgr.GetEventRecorderFor(ControllerName),
 		seedGetter: seedGetter,
 		workerName: workerName,
+		versions:   versions,
 	}
 
 	c, err := controller.New(ControllerName, mgr, controller.Options{Reconciler: reconciler, MaxConcurrentReconciles: numWorkers})
@@ -115,6 +120,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 		r.Client,
 		r.workerName,
 		cluster,
+		r.versions,
 		kubermaticv1.ClusterConditionCloudControllerReconcilingSuccess,
 		func() (*reconcile.Result, error) {
 			return r.reconcile(ctx, log, cluster)
@@ -237,15 +243,16 @@ func (r *Reconciler) migrateAWSMultiAZ(ctx context.Context, cluster *kubermaticv
 
 func (r *Reconciler) updateCluster(name string, modify func(*kubermaticv1.Cluster)) (*kubermaticv1.Cluster, error) {
 	cluster := &kubermaticv1.Cluster{}
-	if err := r.Get(context.Background(), types.NamespacedName{Name: name}, cluster); err != nil {
-		return nil, err
-	}
-	oldCluster := cluster.DeepCopy()
-	modify(cluster)
-	if reflect.DeepEqual(oldCluster, cluster) {
-		return cluster, nil
-	}
-	return cluster, r.Patch(context.Background(), cluster, client.MergeFrom(oldCluster))
+	return cluster, retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		if err := r.Get(context.Background(), types.NamespacedName{Name: name}, cluster); err != nil {
+			if kerrors.IsNotFound(err) {
+				return nil
+			}
+			return err
+		}
+		modify(cluster)
+		return r.Update(context.Background(), cluster)
+	})
 }
 
 func (r *Reconciler) getGlobalSecretKeySelectorValue(configVar *providerconfig.GlobalSecretKeySelector, key string) (string, error) {

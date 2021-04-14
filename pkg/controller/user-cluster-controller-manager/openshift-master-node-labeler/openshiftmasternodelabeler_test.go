@@ -61,7 +61,7 @@ func TestReconciliation(t *testing.T) {
 				}
 				for _, node := range nodes.Items {
 					if _, exists := node.Labels["node-role.kubernetes.io/master"]; !exists {
-						return fmt.Errorf("node %q didnt have the master label anymore", node.Name)
+						return fmt.Errorf("node %q didn't have the master label anymore", node.Name)
 					}
 				}
 				return nil
@@ -129,7 +129,7 @@ func TestReconciliation(t *testing.T) {
 				}
 				for _, node := range nodes.Items {
 					if _, exists := node.Labels["node-role.kubernetes.io/master"]; !exists {
-						return fmt.Errorf("node %q didnt have the master label", node.Name)
+						return fmt.Errorf("node %q didn't have the master label", node.Name)
 					}
 				}
 				return nil
@@ -142,7 +142,7 @@ func TestReconciliation(t *testing.T) {
 					return fmt.Errorf("expected err to be nil, was %v", err)
 				}
 				if r == nil {
-					return errors.New("expcted to get reconcile.Result, but was nil")
+					return errors.New("expected to get reconcile.Result, but was nil")
 				}
 				if r.RequeueAfter != time.Minute {
 					return fmt.Errorf("expected RequeueAfter to be 1 Minute, was %v", r.RequeueAfter)

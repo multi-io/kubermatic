@@ -47,8 +47,11 @@ type openshiftData interface {
 	EtcdDiskSize() resource.Quantity
 	NodeLocalDNSCacheEnabled() bool
 	KubermaticAPIImage() string
+	KubermaticDockerTag() string
 	DNATControllerImage() string
+	DNATControllerTag() string
 	GetOauthExternalNodePort() (int32, error)
 	ExternalURL() string
 	Seed() *kubermaticv1.Seed
+	GetCSIMigrationFeatureGates() []string
 }

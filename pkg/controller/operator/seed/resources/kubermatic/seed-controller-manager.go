@@ -26,6 +26,7 @@ import (
 	"k8c.io/kubermatic/v2/pkg/features"
 	"k8c.io/kubermatic/v2/pkg/resources"
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
+	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -40,7 +41,7 @@ func seedControllerManagerPodLabels() map[string]string {
 	}
 }
 
-func SeedControllerManagerDeploymentCreator(workerName string, versions common.Versions, cfg *operatorv1alpha1.KubermaticConfiguration, seed *kubermaticv1.Seed) reconciling.NamedDeploymentCreatorGetter {
+func SeedControllerManagerDeploymentCreator(workerName string, versions kubermatic.Versions, cfg *operatorv1alpha1.KubermaticConfiguration, seed *kubermaticv1.Seed) reconciling.NamedDeploymentCreatorGetter {
 	return func() (string, reconciling.DeploymentCreator) {
 		return common.SeedControllerManagerDeploymentName, func(d *appsv1.Deployment) (*appsv1.Deployment, error) {
 			d.Spec.Replicas = cfg.Spec.SeedController.Replicas
@@ -63,10 +64,11 @@ func SeedControllerManagerDeploymentCreator(workerName string, versions common.V
 				"-kubernetes-addons-path=/opt/addons/kubernetes",
 				"-openshift-addons-path=/opt/addons/openshift",
 				"-worker-count=4",
+				"-admissionwebhook-cert-dir=/opt/webhook-serving-cert/",
 				fmt.Sprintf("-backup-container=/opt/backup/%s", storeContainerKey),
 				fmt.Sprintf("-cleanup-container=/opt/backup/%s", cleanupContainerKey),
-				fmt.Sprintf("-seed-admissionwebhook-cert-file=/opt/seed-webhook-serving-cert/%s", resources.ServingCertSecretKey),
-				fmt.Sprintf("-seed-admissionwebhook-key-file=/opt/seed-webhook-serving-cert/%s", resources.ServingCertKeySecretKey),
+				fmt.Sprintf("-admissionwebhook-cert-name=%s", resources.ServingCertSecretKey),
+				fmt.Sprintf("-admissionwebhook-key-name=%s", resources.ServingCertKeySecretKey),
 				fmt.Sprintf("-namespace=%s", cfg.Namespace),
 				fmt.Sprintf("-external-url=%s", cfg.Spec.Ingress.Domain),
 				fmt.Sprintf("-datacenter-name=%s", seed.Name),
@@ -76,6 +78,7 @@ func SeedControllerManagerDeploymentCreator(workerName string, versions common.V
 				fmt.Sprintf("-worker-name=%s", workerName),
 				fmt.Sprintf("-kubermatic-image=%s", cfg.Spec.UserCluster.KubermaticDockerRepository),
 				fmt.Sprintf("-dnatcontroller-image=%s", cfg.Spec.UserCluster.DNATControllerDockerRepository),
+				fmt.Sprintf("-etcd-launcher-image=%s", cfg.Spec.UserCluster.EtcdLauncherDockerRepository),
 				fmt.Sprintf("-overwrite-registry=%s", cfg.Spec.UserCluster.OverwriteRegistry),
 				fmt.Sprintf("-apiserver-default-replicas=%d", *cfg.Spec.UserCluster.APIServerReplicas),
 				fmt.Sprintf("-controller-manager-default-replicas=%d", 1),
@@ -125,10 +128,10 @@ func SeedControllerManagerDeploymentCreator(workerName string, versions common.V
 					},
 				},
 				{
-					Name: "seed-webhook-serving-cert",
+					Name: "webhook-serving-cert",
 					VolumeSource: corev1.VolumeSource{
 						Secret: &corev1.SecretVolumeSource{
-							SecretName: common.SeedWebhookServingCertSecretName,
+							SecretName: common.WebhookServingCertSecretName,
 						},
 					},
 				},
@@ -146,8 +149,8 @@ func SeedControllerManagerDeploymentCreator(workerName string, versions common.V
 					ReadOnly:  true,
 				},
 				{
-					Name:      "seed-webhook-serving-cert",
-					MountPath: "/opt/seed-webhook-serving-cert/",
+					Name:      "webhook-serving-cert",
+					MountPath: "/opt/webhook-serving-cert/",
 					ReadOnly:  true,
 				},
 			}

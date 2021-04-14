@@ -77,7 +77,7 @@ func validateMachineNetworksFromClusterSpec(spec *kubermaticv1.ClusterSpec) erro
 	}
 
 	if len(networks) > 0 && spec.Version.Semver().Minor() < 9 {
-		return errors.New("cant specify machinenetworks on kubernetes <= 1.9.0")
+		return errors.New("can't specify machinenetworks on kubernetes <= 1.9.0")
 	}
 
 	if len(networks) > 0 && spec.Cloud.VSphere == nil {
@@ -142,6 +142,9 @@ func ValidateCloudChange(newSpec, oldSpec kubermaticv1.CloudSpec) error {
 		return ErrCloudChangeNotAllowed
 	}
 	if newSpec.Alibaba == nil && oldSpec.Alibaba != nil {
+		return ErrCloudChangeNotAllowed
+	}
+	if newSpec.Anexia == nil && oldSpec.Anexia != nil {
 		return ErrCloudChangeNotAllowed
 	}
 	if newSpec.DatacenterName != oldSpec.DatacenterName {
@@ -292,6 +295,11 @@ func ValidateCloudSpec(spec kubermaticv1.CloudSpec, dc *kubermaticv1.Datacenter)
 			return fmt.Errorf("datacenter %q is not a alibaba datacenter", spec.DatacenterName)
 		}
 		return validateAlibabaCloudSpec(spec.Alibaba)
+	case spec.Anexia != nil:
+		if dc.Spec.Anexia == nil {
+			return fmt.Errorf("datacenter %q is not a anexia datacenter", spec.DatacenterName)
+		}
+		return validateAnexiaCloudSpec(spec.Anexia)
 	default:
 		return errors.New("no cloud provider specified")
 	}
@@ -481,12 +489,45 @@ func validateAlibabaCloudSpec(spec *kubermaticv1.AlibabaCloudSpec) error {
 	return nil
 }
 
+func validateAnexiaCloudSpec(spec *kubermaticv1.AnexiaCloudSpec) error {
+	if spec.Token == "" {
+		if spec.CredentialsReference == nil {
+			return errors.New("no token or credentials reference specified")
+		}
+
+		if err := kuberneteshelper.ValidateSecretKeySelector(spec.CredentialsReference, resources.AnexiaToken); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func ValidateUpdateWindow(updateWindow *kubermaticv1.UpdateWindow) error {
 	if updateWindow != nil && updateWindow.Start != "" && updateWindow.Length != "" {
 		_, err := timeutil.ParsePeriodic(updateWindow.Start, updateWindow.Length)
 		if err != nil {
 			return fmt.Errorf("error parsing update window: %s", err)
 		}
+	}
+	return nil
+}
+
+func ValidateLeaderElectionSettings(l kubermaticv1.LeaderElectionSettings) error {
+	if l.LeaseDurationSeconds != nil && *l.LeaseDurationSeconds < 0 {
+		return fmt.Errorf("lease duration seconds cannot be negative: %d", *l.LeaseDurationSeconds)
+	}
+	if l.RenewDeadlineSeconds != nil && *l.RenewDeadlineSeconds < 0 {
+		return fmt.Errorf("renew deadline seconds cannot be negative: %d", *l.RenewDeadlineSeconds)
+	}
+	if l.RetryPeriodSeconds != nil && *l.RetryPeriodSeconds < 0 {
+		return fmt.Errorf("retry period seconds cannot be negative: %d", *l.RetryPeriodSeconds)
+	}
+	if lds, rds := l.LeaseDurationSeconds, l.RenewDeadlineSeconds; (lds == nil) != (rds == nil) {
+		return errors.New("leader election lease duration and renew deadline should be either both specified or unspecified")
+	}
+	if lds, rds := l.LeaseDurationSeconds, l.RenewDeadlineSeconds; lds != nil && *lds < *rds {
+		return errors.New("control plane leader election renew deadline cannot be smaller than lease duration")
 	}
 	return nil
 }

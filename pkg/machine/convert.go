@@ -21,6 +21,7 @@ import (
 
 	clusterv1alpha1 "github.com/kubermatic/machine-controller/pkg/apis/cluster/v1alpha1"
 	alibaba "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/alibaba/types"
+	anexia "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/anexia/types"
 	aws "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/aws/types"
 	azure "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/azure/types"
 	digitalocean "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/digitalocean/types"
@@ -66,8 +67,12 @@ func GetAPIV1OperatingSystemSpec(machineSpec clusterv1alpha1.MachineSpec) (*apiv
 		if err := json.Unmarshal(decodedProviderSpec.OperatingSystemSpec.Raw, &config); err != nil {
 			return nil, fmt.Errorf("failed to parse flatcar config: %v", err)
 		}
+
 		operatingSystemSpec.Flatcar = &apiv1.FlatcarSpec{
 			DisableAutoUpdate: config.DisableAutoUpdate,
+		}
+		if config.ProvisioningUtility == flatcar.CloudInit {
+			operatingSystemSpec.Flatcar.ProvisioningUtility = flatcar.CloudInit
 		}
 
 	case providerconfig.OperatingSystemUbuntu:
@@ -172,10 +177,12 @@ func GetAPIV2NodeCloudSpec(machineSpec clusterv1alpha1.MachineSpec) (*apiv1.Node
 			return nil, fmt.Errorf("failed to parse openstack config: %v", err)
 		}
 		cloudSpec.Openstack = &apiv1.OpenstackNodeSpec{
-			Flavor:           config.Flavor.Value,
-			Image:            config.Image.Value,
-			Tags:             config.Tags,
-			AvailabilityZone: config.AvailabilityZone.Value,
+			Flavor:                    config.Flavor.Value,
+			Image:                     config.Image.Value,
+			Tags:                      config.Tags,
+			AvailabilityZone:          config.AvailabilityZone.Value,
+			InstanceReadyCheckPeriod:  config.InstanceReadyCheckPeriod.Value,
+			InstanceReadyCheckTimeout: config.InstanceReadyCheckTimeout.Value,
 		}
 		cloudSpec.Openstack.UseFloatingIP = config.FloatingIPPool.Value != ""
 		if config.RootDiskSizeGB != nil && *config.RootDiskSizeGB > 0 {
@@ -188,6 +195,12 @@ func GetAPIV2NodeCloudSpec(machineSpec clusterv1alpha1.MachineSpec) (*apiv1.Node
 		}
 		cloudSpec.Hetzner = &apiv1.HetznerNodeSpec{
 			Type: config.ServerType.Value,
+		}
+		// MachineDeployments created by KKP will only ever have a single network
+		// set, but users might have created ones with many; we have to make a choice
+		// here as to what to display in KKP.
+		if len(config.Networks) > 0 {
+			cloudSpec.Hetzner.Network = config.Networks[0].Value
 		}
 	case providerconfig.CloudProviderVsphere:
 		config := &vsphere.RawConfig{}
@@ -253,6 +266,20 @@ func GetAPIV2NodeCloudSpec(machineSpec clusterv1alpha1.MachineSpec) (*apiv1.Node
 			InternetMaxBandwidthOut: config.InternetMaxBandwidthOut.Value,
 			Labels:                  config.Labels,
 			ZoneID:                  config.ZoneID.Value,
+		}
+	case providerconfig.CloudProviderAnexia:
+		{
+			config := &anexia.RawConfig{}
+			if err := json.Unmarshal(decodedProviderSpec.CloudProviderSpec.Raw, &config); err != nil {
+				return nil, fmt.Errorf("failed to parse anexia config: %v", err)
+			}
+			cloudSpec.Anexia = &apiv1.AnexiaNodeSpec{
+				VlanID:     config.VlanID.Value,
+				TemplateID: config.TemplateID.Value,
+				CPUs:       config.CPUs,
+				Memory:     int64(config.Memory),
+				DiskSize:   int64(config.DiskSize),
+			}
 		}
 	default:
 		return nil, fmt.Errorf("unknown cloud provider %q", decodedProviderSpec.CloudProvider)

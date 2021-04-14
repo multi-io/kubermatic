@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/util/retry"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -192,17 +193,31 @@ func (r *reconciler) reconcile(log *zap.SugaredLogger, request reconcile.Request
 				log.Debug("Labels on cluster are already up to date")
 				continue
 			}
-			oldCluster := cluster.DeepCopy()
-			cluster.Labels = newClusterLabels
-			cluster.Status.InheritedLabels = getInheritedLabels(project.Labels)
 			log.Debug("Updating labels on cluster")
-			if err := seedClient.Patch(r.ctx, cluster, ctrlruntimeclient.MergeFrom(oldCluster)); err != nil {
+			if err := r.updateCluster(cluster.Name, seedClient, func(c *kubermaticv1.Cluster) {
+				c.Labels = newClusterLabels
+				c.Status.InheritedLabels = getInheritedLabels(project.Labels)
+			}); err != nil {
 				errs = append(errs, fmt.Errorf("failed to update cluster %q", cluster.Name))
 			}
 		}
 	}
 
 	return utilerrors.NewAggregate(errs)
+}
+
+func (r *reconciler) updateCluster(name string, client ctrlruntimeclient.Client, modify func(*kubermaticv1.Cluster)) error {
+	cluster := &kubermaticv1.Cluster{}
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		if err := client.Get(r.ctx, types.NamespacedName{Name: name}, cluster); err != nil {
+			if kerrors.IsNotFound(err) {
+				return nil
+			}
+			return err
+		}
+		modify(cluster)
+		return client.Update(r.ctx, cluster)
+	})
 }
 
 func (r *reconciler) filterClustersByProjectID(
@@ -232,7 +247,7 @@ func getLabelsForCluster(
 ) (changed bool, newClusterLabels map[string]string) {
 	// They shouldn't be nil as we skip projects without labels
 	// and need a label on the cluster to associate it to a project
-	// but better be safe than panicing.
+	// but better be safe than panicking.
 	if clusterLabels == nil {
 		clusterLabels = map[string]string{}
 	}

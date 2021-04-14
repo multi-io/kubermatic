@@ -177,7 +177,7 @@ func TestGetPreset(t *testing.T) {
 					},
 				},
 			},
-			expectedError: "missing preset 'test-2' for the user 'test@example.com'",
+			expectedError: "preset.kubermatic.k8s.io \"test-2\" not found",
 		},
 	}
 	for _, tc := range testcases {
@@ -453,13 +453,14 @@ func TestCredentialEndpoint(t *testing.T) {
 					Spec: kubermaticv1.PresetSpec{
 						RequiredEmailDomain: "example.com",
 						Hetzner: &kubermaticv1.Hetzner{
-							Token: "secret",
+							Token:   "secret",
+							Network: "test",
 						},
 					},
 				},
 			},
 			cloudSpec:         kubermaticv1.CloudSpec{Hetzner: &kubermaticv1.HetznerCloudSpec{}},
-			expectedCloudSpec: &kubermaticv1.CloudSpec{Hetzner: &kubermaticv1.HetznerCloudSpec{Token: "secret"}},
+			expectedCloudSpec: &kubermaticv1.CloudSpec{Hetzner: &kubermaticv1.HetznerCloudSpec{Token: "secret", Network: "test"}},
 		},
 		{
 			name:       "test 5: set credentials for Packet provider",
@@ -649,7 +650,7 @@ func TestCredentialEndpoint(t *testing.T) {
 			},
 
 			cloudSpec:     kubermaticv1.CloudSpec{Azure: &kubermaticv1.AzureCloudSpec{}},
-			expectedError: "missing preset 'test' for the user 'test@example.com'",
+			expectedError: "preset.kubermatic.k8s.io \"test\" not found",
 		},
 		{
 			name:       "test 14: set credentials for Alibaba provider",

@@ -24,21 +24,24 @@ import (
 	prometheusapi "github.com/prometheus/client_golang/api"
 	"go.uber.org/zap"
 
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/handler/auth"
 	"k8c.io/kubermatic/v2/pkg/handler/middleware"
 	"k8c.io/kubermatic/v2/pkg/handler/v1/common"
 	"k8c.io/kubermatic/v2/pkg/keycloak"
 	"k8c.io/kubermatic/v2/pkg/provider"
 	"k8c.io/kubermatic/v2/pkg/serviceaccount"
+	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 	"k8c.io/kubermatic/v2/pkg/watcher"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // Routing represents an object which binds endpoints to http handlers.
 type Routing struct {
 	log                                   *zap.SugaredLogger
+	logger                                log.Logger
+	versions                              kubermatic.Versions
 	presetsProvider                       provider.PresetProvider
 	seedsGetter                           provider.SeedsGetter
 	seedsClientGetter                     provider.SeedClientGetter
@@ -52,7 +55,6 @@ type Routing struct {
 	projectProvider                       provider.ProjectProvider
 	mdRequestProviderGetter               provider.MachineDeploymentRequestProviderGetter
 	privilegedProjectProvider             provider.PrivilegedProjectProvider
-	logger                                log.Logger
 	oidcIssuerVerifier                    auth.OIDCIssuerVerifier
 	tokenVerifiers                        auth.TokenVerifier
 	tokenExtractors                       auth.TokenExtractor
@@ -68,7 +70,7 @@ type Routing struct {
 	saTokenGenerator                      serviceaccount.TokenGenerator
 	eventRecorderProvider                 provider.EventRecorderProvider
 	keycloakFacade                        keycloak.Facade
-	exposeStrategy                        corev1.ServiceType
+	exposeStrategy                        kubermaticv1.ExposeStrategy
 	accessibleAddons                      sets.String
 	userInfoGetter                        provider.UserInfoGetter
 	settingsProvider                      provider.SettingsProvider
@@ -82,6 +84,7 @@ type Routing struct {
 func NewRouting(routingParams RoutingParams) Routing {
 	return Routing{
 		log:                                   routingParams.Log,
+		logger:                                log.NewLogfmtLogger(os.Stderr),
 		presetsProvider:                       routingParams.PresetsProvider,
 		seedsGetter:                           routingParams.SeedsGetter,
 		seedsClientGetter:                     routingParams.SeedsClientGetter,
@@ -98,7 +101,6 @@ func NewRouting(routingParams RoutingParams) Routing {
 		projectProvider:                       routingParams.ProjectProvider,
 		mdRequestProviderGetter:               routingParams.MdRequestProviderGetter,
 		privilegedProjectProvider:             routingParams.PrivilegedProjectProvider,
-		logger:                                log.NewLogfmtLogger(os.Stderr),
 		oidcIssuerVerifier:                    routingParams.OIDCIssuerVerifier,
 		tokenVerifiers:                        routingParams.TokenVerifiers,
 		tokenExtractors:                       routingParams.TokenExtractors,
@@ -119,6 +121,7 @@ func NewRouting(routingParams RoutingParams) Routing {
 		admissionPluginProvider:               routingParams.AdmissionPluginProvider,
 		settingsWatcher:                       routingParams.SettingsWatcher,
 		userWatcher:                           routingParams.UserWatcher,
+		versions:                              routingParams.Versions,
 	}
 }
 
@@ -160,7 +163,7 @@ type RoutingParams struct {
 	SATokenGenerator                      serviceaccount.TokenGenerator
 	EventRecorderProvider                 provider.EventRecorderProvider
 	KeycloakFacade                        keycloak.Facade
-	ExposeStrategy                        corev1.ServiceType
+	ExposeStrategy                        kubermaticv1.ExposeStrategy
 	AccessibleAddons                      sets.String
 	UserInfoGetter                        provider.UserInfoGetter
 	SettingsProvider                      provider.SettingsProvider
@@ -170,4 +173,8 @@ type RoutingParams struct {
 	UserWatcher                           watcher.UserWatcher
 	ExternalClusterProvider               provider.ExternalClusterProvider
 	PrivilegedExternalClusterProvider     provider.PrivilegedExternalClusterProvider
+	ConstraintTemplateProvider            provider.ConstraintTemplateProvider
+	ConstraintProvider                    provider.ConstraintProvider
+	PrivilegedConstraintProvider          provider.PrivilegedConstraintProvider
+	Versions                              kubermatic.Versions
 }

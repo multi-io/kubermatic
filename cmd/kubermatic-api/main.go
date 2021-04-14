@@ -49,11 +49,12 @@ import (
 
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
+	gatekeeperconfigv1alpha1 "github.com/open-policy-agent/gatekeeper/apis/config/v1alpha1"
 	prometheusapi "github.com/prometheus/client_golang/api"
 	"go.uber.org/zap"
 
 	clusterv1alpha1 "github.com/kubermatic/machine-controller/pkg/apis/cluster/v1alpha1"
-	cmdutil "k8c.io/kubermatic/v2/cmd/util"
+
 	"k8c.io/kubermatic/v2/pkg/cluster/client"
 	"k8c.io/kubermatic/v2/pkg/controller/master-controller-manager/rbac"
 	kubermaticclientset "k8c.io/kubermatic/v2/pkg/crd/client/clientset/versioned"
@@ -70,6 +71,7 @@ import (
 	"k8c.io/kubermatic/v2/pkg/provider"
 	kubernetesprovider "k8c.io/kubermatic/v2/pkg/provider/kubernetes"
 	"k8c.io/kubermatic/v2/pkg/serviceaccount"
+	"k8c.io/kubermatic/v2/pkg/util/cli"
 	"k8c.io/kubermatic/v2/pkg/version"
 	kuberneteswatcher "k8c.io/kubermatic/v2/pkg/watcher/kubernetes"
 
@@ -106,13 +108,16 @@ func main() {
 	}()
 	kubermaticlog.Logger = log
 
-	cmdutil.Hello(log, "API", options.log.Debug)
+	cli.Hello(log, "API", options.log.Debug, &options.versions)
 
 	if err := clusterv1alpha1.AddToScheme(scheme.Scheme); err != nil {
 		kubermaticlog.Logger.Fatalw("failed to register scheme", zap.Stringer("api", clusterv1alpha1.SchemeGroupVersion), zap.Error(err))
 	}
 	if err := v1beta1.AddToScheme(scheme.Scheme); err != nil {
 		kubermaticlog.Logger.Fatalw("failed to register scheme", zap.Stringer("api", v1beta1.SchemeGroupVersion), zap.Error(err))
+	}
+	if err := gatekeeperconfigv1alpha1.AddToScheme(scheme.Scheme); err != nil {
+		kubermaticlog.Logger.Fatalw("failed to register scheme", zap.Stringer("api", gatekeeperconfigv1alpha1.GroupVersion), zap.Error(err))
 	}
 
 	providers, err := createInitProviders(options)
@@ -173,7 +178,7 @@ func createInitProviders(options serverRunOptions) (providers, error) {
 	kubermaticMasterInformerFactory := kubermaticinformers.NewSharedInformerFactory(kubermaticMasterClient, 30*time.Minute)
 
 	// We use the manager only to get a lister-backed ctrlruntimeclient.Client. We can not use it for most
-	// other actions, because it doesn't support impersonation (and cant be changed to do that as that would mean it has to replicate the apiservers RBAC for the lister)
+	// other actions, because it doesn't support impersonation (and can't be changed to do that as that would mean it has to replicate the apiservers RBAC for the lister)
 	mgr, err := manager.New(masterCfg, manager.Options{MetricsBindAddress: "0"})
 	if err != nil {
 		return providers{}, fmt.Errorf("failed to construct manager: %v", err)
@@ -210,7 +215,7 @@ func createInitProviders(options serverRunOptions) (providers, error) {
 	}
 
 	seedClientGetter := provider.SeedClientGetterFactory(seedKubeconfigGetter)
-	clusterProviderGetter := clusterProviderFactory(mgr.GetRESTMapper(), seedKubeconfigGetter, seedClientGetter, options.workerName, options.featureGates.Enabled(features.OIDCKubeCfgEndpoint))
+	clusterProviderGetter := clusterProviderFactory(mgr.GetRESTMapper(), seedKubeconfigGetter, seedClientGetter, options)
 
 	presetsProvider, err := kubernetesprovider.NewPresetsProvider(ctx, client, options.presetsFile, options.dynamicPresets)
 	if err != nil {
@@ -265,7 +270,17 @@ func createInitProviders(options serverRunOptions) (providers, error) {
 
 	externalClusterProvider, err := kubernetesprovider.NewExternalClusterProvider(defaultImpersonationClient.CreateImpersonatedClient, mgr.GetClient())
 	if err != nil {
-		return providers{}, fmt.Errorf("failed to create user info getter due to %v", err)
+		return providers{}, fmt.Errorf("failed to create external cluster provider due to %v", err)
+	}
+
+	constraintTemplateProvider, err := kubernetesprovider.NewConstraintTemplateProvider(defaultImpersonationClient.CreateImpersonatedClient, mgr.GetClient())
+	if err != nil {
+		return providers{}, fmt.Errorf("failed to create constraint template provider due to %v", err)
+	}
+
+	constraintProvider, err := kubernetesprovider.NewConstraintProvider(defaultImpersonationClient.CreateImpersonatedClient, mgr.GetClient())
+	if err != nil {
+		return providers{}, fmt.Errorf("failed to create constraint provider due to %v", err)
 	}
 
 	kubeMasterInformerFactory.Start(wait.NeverStop)
@@ -318,6 +333,9 @@ func createInitProviders(options serverRunOptions) (providers, error) {
 		userWatcher:                           userWatcher,
 		externalClusterProvider:               externalClusterProvider,
 		privilegedExternalClusterProvider:     externalClusterProvider,
+		constraintTemplateProvider:            constraintTemplateProvider,
+		constraintProvider:                    constraintProvider,
+		privilegedConstraintProvider:          constraintProvider,
 	}, nil
 }
 
@@ -423,6 +441,10 @@ func createAPIHandler(options serverRunOptions, prov providers, oidcIssuerVerifi
 		UserWatcher:                           prov.userWatcher,
 		ExternalClusterProvider:               prov.externalClusterProvider,
 		PrivilegedExternalClusterProvider:     prov.privilegedExternalClusterProvider,
+		ConstraintTemplateProvider:            prov.constraintTemplateProvider,
+		ConstraintProvider:                    prov.constraintProvider,
+		PrivilegedConstraintProvider:          prov.privilegedConstraintProvider,
+		Versions:                              options.versions,
 	}
 
 	r := handler.NewRouting(routingParams)
@@ -511,7 +533,7 @@ func setSecureHeaders(next http.Handler) http.Handler {
 	})
 }
 
-func clusterProviderFactory(mapper meta.RESTMapper, seedKubeconfigGetter provider.SeedKubeconfigGetter, seedClientGetter provider.SeedClientGetter, workerName string, oidcKubeCfgEndpointEnabled bool) provider.ClusterProviderGetter {
+func clusterProviderFactory(mapper meta.RESTMapper, seedKubeconfigGetter provider.SeedKubeconfigGetter, seedClientGetter provider.SeedClientGetter, options serverRunOptions) provider.ClusterProviderGetter {
 	return func(seed *kubermaticv1.Seed) (provider.ClusterProvider, error) {
 		cfg, err := seedKubeconfigGetter(seed)
 		if err != nil {
@@ -519,7 +541,7 @@ func clusterProviderFactory(mapper meta.RESTMapper, seedKubeconfigGetter provide
 		}
 		kubeClient, err := kubernetes.NewForConfig(cfg)
 		if err != nil {
-			return nil, fmt.Errorf("faild to create kubeClient: %v", err)
+			return nil, fmt.Errorf("failed to create kubeClient: %v", err)
 		}
 		defaultImpersonationClientForSeed := kubernetesprovider.NewImpersonationClient(cfg, mapper)
 
@@ -537,11 +559,12 @@ func clusterProviderFactory(mapper meta.RESTMapper, seedKubeconfigGetter provide
 			cfg,
 			defaultImpersonationClientForSeed.CreateImpersonatedClient,
 			userClusterConnectionProvider,
-			workerName,
+			options.workerName,
 			rbac.ExtractGroupPrefix,
 			seedCtrlruntimeClient,
 			kubeClient,
-			oidcKubeCfgEndpointEnabled,
+			options.featureGates.Enabled(features.OIDCKubeCfgEndpoint),
+			options.versions,
 		), nil
 	}
 }

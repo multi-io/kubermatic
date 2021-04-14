@@ -21,11 +21,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	jsonpatch "github.com/evanphx/json-patch"
-	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
 	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
@@ -40,27 +38,18 @@ import (
 	kubernetesprovider "k8c.io/kubermatic/v2/pkg/provider/kubernetes"
 	"k8c.io/kubermatic/v2/pkg/resources/cloudcontroller"
 	"k8c.io/kubermatic/v2/pkg/resources/cluster"
-	machineresource "k8c.io/kubermatic/v2/pkg/resources/machine"
 	"k8c.io/kubermatic/v2/pkg/util/errors"
 	"k8c.io/kubermatic/v2/pkg/validation"
 
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/util/rand"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/klog"
 	"k8s.io/metrics/pkg/apis/metrics/v1beta1"
-)
 
-// NodeDeploymentEvent represents type of events related to Node Deployment
-type NodeDeploymentEvent string
-
-const (
-	nodeDeploymentCreationStart   NodeDeploymentEvent = "NodeDeploymentCreationStart"
-	nodeDeploymentCreationSuccess NodeDeploymentEvent = "NodeDeploymentCreationSuccess"
-	nodeDeploymentCreationFail    NodeDeploymentEvent = "NodeDeploymentCreationFail"
+	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // ClusterTypes holds a list of supported cluster types
@@ -78,9 +67,10 @@ type patchCluster struct {
 	Spec          patchClusterSpec `json:"spec"`
 }
 
-func CreateEndpoint(ctx context.Context, projectID string, body apiv1.CreateClusterSpec, sshKeyProvider provider.SSHKeyProvider, projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, seedsGetter provider.SeedsGetter,
-	initNodeDeploymentFailures *prometheus.CounterVec, eventRecorderProvider provider.EventRecorderProvider, credentialManager provider.PresetProvider,
-	exposeStrategy corev1.ServiceType, userInfoGetter provider.UserInfoGetter) (interface{}, error) {
+func CreateEndpoint(ctx context.Context, projectID string, body apiv1.CreateClusterSpec,
+	projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider,
+	seedsGetter provider.SeedsGetter, credentialManager provider.PresetProvider, exposeStrategy kubermaticv1.ExposeStrategy,
+	userInfoGetter provider.UserInfoGetter) (interface{}, error) {
 
 	clusterProvider := ctx.Value(middleware.ClusterProviderContextKey).(provider.ClusterProvider)
 	privilegedClusterProvider := ctx.Value(middleware.PrivilegedClusterProviderContextKey).(provider.PrivilegedClusterProvider)
@@ -92,7 +82,6 @@ func CreateEndpoint(ctx context.Context, projectID string, body apiv1.CreateClus
 	if err != nil {
 		return nil, common.KubernetesErrorToHTTPError(err)
 	}
-	k8sClient := privilegedClusterProvider.GetSeedClusterAdminClient()
 
 	seed, dc, err := provider.DatacenterFromSeedMap(adminUserInfo, seedsGetter, body.Cluster.Spec.Cloud.DatacenterName)
 	if err != nil {
@@ -139,11 +128,37 @@ func CreateEndpoint(ctx context.Context, projectID string, body apiv1.CreateClus
 		return nil, common.KubernetesErrorToHTTPError(err)
 	}
 
+	// Start filling cluster object.
 	partialCluster := &kubermaticv1.Cluster{}
 	partialCluster.Labels = body.Cluster.Labels
 	if partialCluster.Labels == nil {
 		partialCluster.Labels = make(map[string]string)
 	}
+
+	// Serialize initial machine deployment request into annotation if it is in the body and provider different than
+	// BringYourOwn was selected. The request will be transformed into machine deployment by the controller once cluster
+	// will be ready. To make it easier to determine if a machine deployment annotation has already been applied to
+	// the user cluster (in case errors happen and the controller needs to re-reconcile), we ensure that the MD
+	// has a proper name instead of relying on the GenerateName.
+	partialCluster.Annotations = make(map[string]string)
+	if body.NodeDeployment != nil {
+		isBYO, err := common.IsBringYourOwnProvider(spec.Cloud)
+		if err != nil {
+			return nil, errors.NewBadRequest("cannot verify the provider due to an invalid spec: %v", err)
+		}
+		if !isBYO {
+			if body.NodeDeployment.Name == "" {
+				body.NodeDeployment.Name = fmt.Sprintf("%s-worker-%s", body.Cluster.Name, rand.String(6))
+			}
+
+			data, err := json.Marshal(body.NodeDeployment)
+			if err != nil {
+				return "", fmt.Errorf("cannot marshal initial machine deployment: %v", err)
+			}
+			partialCluster.Annotations[apiv1.InitialMachineDeploymentRequestAnnotation] = string(data)
+		}
+	}
+
 	// Owning project ID must be set early, because it will be inherited by some child objects,
 	// for example the credentials secret.
 	partialCluster.Labels[kubermaticv1.ProjectIDLabelKey] = projectID
@@ -169,7 +184,13 @@ func CreateEndpoint(ctx context.Context, projectID string, body apiv1.CreateClus
 		partialCluster.Spec.UsePodSecurityPolicyAdmissionPlugin = true
 	}
 
-	// generate the name here so that it can be used in the secretName below
+	if body.Cluster.Spec.EnableUserSSHKeyAgent == nil {
+		partialCluster.Spec.EnableUserSSHKeyAgent = true
+	} else {
+		partialCluster.Spec.EnableUserSSHKeyAgent = *body.Cluster.Spec.EnableUserSSHKeyAgent
+	}
+
+	// Generate the name here so that it can be used in the secretName below.
 	partialCluster.Name = rand.String(10)
 
 	if cloudcontroller.ExternalCloudControllerFeatureSupported(dc, partialCluster) {
@@ -192,33 +213,6 @@ func CreateEndpoint(ctx context.Context, projectID string, body apiv1.CreateClus
 	newCluster, err := createNewCluster(ctx, userInfoGetter, clusterProvider, privilegedClusterProvider, project, partialCluster)
 	if err != nil {
 		return nil, common.KubernetesErrorToHTTPError(err)
-	}
-
-	// Create the initial node deployment in the background.
-	if body.NodeDeployment != nil && body.NodeDeployment.Spec.Replicas > 0 {
-		// for BringYourOwn provider we don't create ND
-		isBYO, err := common.IsBringYourOwnProvider(spec.Cloud)
-		if err != nil {
-			return nil, errors.NewBadRequest("failed to create an initial node deployment due to an invalid spec: %v", err)
-		}
-		if !isBYO {
-			go func() {
-				defer utilruntime.HandleCrash()
-				ndName := getNodeDeploymentDisplayName(body.NodeDeployment)
-				eventRecorderProvider.ClusterRecorderFor(k8sClient).Eventf(newCluster, corev1.EventTypeNormal, string(nodeDeploymentCreationStart), "Started creation of initial node deployment %s", ndName)
-				err := createInitialNodeDeploymentWithRetries(ctx, body.NodeDeployment, newCluster, project, sshKeyProvider, seedsGetter, clusterProvider, privilegedClusterProvider, userInfoGetter)
-				if err != nil {
-					eventRecorderProvider.ClusterRecorderFor(k8sClient).Eventf(newCluster, corev1.EventTypeWarning, string(nodeDeploymentCreationFail), "Failed to create initial node deployment %s: %v", ndName, err)
-					klog.Errorf("failed to create initial node deployment for cluster %s: %v", newCluster.Name, err)
-					initNodeDeploymentFailures.With(prometheus.Labels{"cluster": newCluster.Name, "datacenter": body.Cluster.Spec.Cloud.DatacenterName}).Add(1)
-				} else {
-					eventRecorderProvider.ClusterRecorderFor(k8sClient).Eventf(newCluster, corev1.EventTypeNormal, string(nodeDeploymentCreationSuccess), "Successfully created initial node deployment %s", ndName)
-					klog.V(5).Infof("created initial node deployment for cluster %s", newCluster.Name)
-				}
-			}()
-		} else {
-			klog.V(5).Infof("KubeAdm provider detected an initial node deployment won't be created for cluster %s", newCluster.Name)
-		}
 	}
 
 	log := kubermaticlog.Logger.With("cluster", newCluster.Name)
@@ -378,7 +372,9 @@ func PatchEndpoint(ctx context.Context, userInfoGetter provider.UserInfoGetter, 
 	newInternalCluster.Spec.Openshift = patchedCluster.Spec.Openshift
 	newInternalCluster.Spec.Sys11Auth = patchedCluster.Spec.Sys11Auth
 	newInternalCluster.Spec.UpdateWindow = patchedCluster.Spec.UpdateWindow
+	newInternalCluster.Spec.OPAIntegration = patchedCluster.Spec.OPAIntegration
 	newInternalCluster.Spec.PodNodeSelectorAdmissionPluginConfig = patchedCluster.Spec.PodNodeSelectorAdmissionPluginConfig
+	newInternalCluster.Spec.ServiceAccount = patchedCluster.Spec.ServiceAccount
 
 	incompatibleKubelets, err := common.CheckClusterVersionSkew(ctx, userInfoGetter, clusterProvider, newInternalCluster, projectID)
 	if err != nil {
@@ -468,6 +464,230 @@ func GetClusterEventsEndpoint(ctx context.Context, userInfoGetter provider.UserI
 	}
 
 	return events, nil
+}
+
+func HealthEndpoint(ctx context.Context, userInfoGetter provider.UserInfoGetter, projectID, clusterID string, projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider) (interface{}, error) {
+	clusterProvider := ctx.Value(middleware.ClusterProviderContextKey).(provider.ClusterProvider)
+	privilegedClusterProvider := ctx.Value(middleware.PrivilegedClusterProviderContextKey).(provider.PrivilegedClusterProvider)
+	project, err := common.GetProject(ctx, userInfoGetter, projectProvider, privilegedProjectProvider, projectID, nil)
+	if err != nil {
+		return nil, common.KubernetesErrorToHTTPError(err)
+	}
+
+	existingCluster, err := GetInternalCluster(ctx, userInfoGetter, clusterProvider, privilegedClusterProvider, project, projectID, clusterID, &provider.ClusterGetOptions{})
+	if err != nil {
+		return nil, common.KubernetesErrorToHTTPError(err)
+	}
+
+	return apiv1.ClusterHealth{
+		Apiserver:                    existingCluster.Status.ExtendedHealth.Apiserver,
+		Scheduler:                    existingCluster.Status.ExtendedHealth.Scheduler,
+		Controller:                   existingCluster.Status.ExtendedHealth.Controller,
+		MachineController:            existingCluster.Status.ExtendedHealth.MachineController,
+		Etcd:                         existingCluster.Status.ExtendedHealth.Etcd,
+		CloudProviderInfrastructure:  existingCluster.Status.ExtendedHealth.CloudProviderInfrastructure,
+		UserClusterControllerManager: existingCluster.Status.ExtendedHealth.UserClusterControllerManager,
+	}, nil
+}
+
+func GetMetricsEndpoint(ctx context.Context, userInfoGetter provider.UserInfoGetter, projectID, clusterID string, projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider) (interface{}, error) {
+	privilegedClusterProvider := ctx.Value(middleware.PrivilegedClusterProviderContextKey).(provider.PrivilegedClusterProvider)
+	clusterProvider := ctx.Value(middleware.ClusterProviderContextKey).(provider.ClusterProvider)
+
+	cluster, err := GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, projectID, clusterID, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := common.GetClusterClient(ctx, userInfoGetter, clusterProvider, cluster, projectID)
+	if err != nil {
+		return nil, common.KubernetesErrorToHTTPError(err)
+	}
+
+	nodeList := &corev1.NodeList{}
+	if err := client.List(ctx, nodeList); err != nil {
+		return nil, err
+	}
+	availableResources := make(map[string]corev1.ResourceList)
+	for _, n := range nodeList.Items {
+		availableResources[n.Name] = n.Status.Allocatable
+	}
+
+	dynamicClient, err := clusterProvider.GetAdminClientForCustomerCluster(ctx, cluster)
+	if err != nil {
+		return nil, common.KubernetesErrorToHTTPError(err)
+	}
+
+	allNodeMetricsList := &v1beta1.NodeMetricsList{}
+	if err := dynamicClient.List(ctx, allNodeMetricsList); err != nil {
+		// Happens during cluster creation when the CRD is not setup yet
+		if _, ok := err.(*meta.NoKindMatchError); !ok {
+			return nil, common.KubernetesErrorToHTTPError(err)
+		}
+	}
+
+	seedAdminClient := privilegedClusterProvider.GetSeedClusterAdminRuntimeClient()
+	podMetricsList := &v1beta1.PodMetricsList{}
+	if err := seedAdminClient.List(ctx, podMetricsList, &ctrlruntimeclient.ListOptions{Namespace: fmt.Sprintf("cluster-%s", cluster.Name)}); err != nil {
+		// Happens during cluster creation when the CRD is not setup yet
+		if _, ok := err.(*meta.NoKindMatchError); !ok {
+			return nil, common.KubernetesErrorToHTTPError(err)
+		}
+	}
+	return ConvertClusterMetrics(podMetricsList, allNodeMetricsList.Items, availableResources, cluster.Name)
+}
+
+func ListNamespaceEndpoint(ctx context.Context, userInfoGetter provider.UserInfoGetter, projectID, clusterID string, projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider) (interface{}, error) {
+	clusterProvider := ctx.Value(middleware.ClusterProviderContextKey).(provider.ClusterProvider)
+
+	cluster, err := GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, projectID, clusterID, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := common.GetClusterClient(ctx, userInfoGetter, clusterProvider, cluster, projectID)
+	if err != nil {
+		return nil, common.KubernetesErrorToHTTPError(err)
+	}
+
+	namespaceList := &corev1.NamespaceList{}
+	if err := client.List(ctx, namespaceList); err != nil {
+		return nil, common.KubernetesErrorToHTTPError(err)
+	}
+
+	var apiNamespaces []apiv1.Namespace
+
+	for _, namespace := range namespaceList.Items {
+		apiNamespace := apiv1.Namespace{Name: namespace.Name}
+		apiNamespaces = append(apiNamespaces, apiNamespace)
+	}
+
+	return apiNamespaces, nil
+}
+
+func AssignSSHKeyEndpoint(ctx context.Context, userInfoGetter provider.UserInfoGetter, projectID, clusterID, keyID string, projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, sshKeyProvider provider.SSHKeyProvider, privilegedSSHKeyProvider provider.PrivilegedSSHKeyProvider) (interface{}, error) {
+	clusterProvider := ctx.Value(middleware.ClusterProviderContextKey).(provider.ClusterProvider)
+	privilegedClusterProvider := ctx.Value(middleware.PrivilegedClusterProviderContextKey).(provider.PrivilegedClusterProvider)
+	if len(keyID) == 0 {
+		return nil, errors.NewBadRequest("please provide an SSH key")
+	}
+
+	project, err := common.GetProject(ctx, userInfoGetter, projectProvider, privilegedProjectProvider, projectID, nil)
+	if err != nil {
+		return nil, common.KubernetesErrorToHTTPError(err)
+	}
+	_, err = GetInternalCluster(ctx, userInfoGetter, clusterProvider, privilegedClusterProvider, project, projectID, clusterID, &provider.ClusterGetOptions{})
+	if err != nil {
+		return nil, common.KubernetesErrorToHTTPError(err)
+	}
+
+	// sanity check, make sure that the key belongs to the project
+	// alternatively we could examine the owner references
+	{
+		projectSSHKeys, err := sshKeyProvider.List(project, nil)
+		if err != nil {
+			return nil, common.KubernetesErrorToHTTPError(err)
+		}
+		found := false
+		for _, projectSSHKey := range projectSSHKeys {
+			if projectSSHKey.Name == keyID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, fmt.Errorf("the given ssh key %s does not belong to the given project %s (%s)", keyID, project.Spec.Name, project.Name)
+		}
+	}
+
+	sshKey, err := getSSHKey(ctx, userInfoGetter, sshKeyProvider, privilegedSSHKeyProvider, projectID, keyID)
+	if err != nil {
+		return nil, common.KubernetesErrorToHTTPError(err)
+	}
+
+	apiKey := apiv1.SSHKey{
+		ObjectMeta: apiv1.ObjectMeta{
+			ID:                sshKey.Name,
+			Name:              sshKey.Spec.Name,
+			CreationTimestamp: apiv1.NewTime(sshKey.CreationTimestamp.Time),
+		},
+	}
+
+	if sshKey.IsUsedByCluster(clusterID) {
+		return apiKey, nil
+	}
+	sshKey.AddToCluster(clusterID)
+	if err := UpdateClusterSSHKey(ctx, userInfoGetter, sshKeyProvider, privilegedSSHKeyProvider, sshKey, projectID); err != nil {
+		return nil, err
+	}
+
+	return apiKey, nil
+}
+
+func DetachSSHKeyEndpoint(ctx context.Context, userInfoGetter provider.UserInfoGetter, projectID, clusterID, keyID string, projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, sshKeyProvider provider.SSHKeyProvider, privilegedSSHKeyProvider provider.PrivilegedSSHKeyProvider) (interface{}, error) {
+	clusterProvider := ctx.Value(middleware.ClusterProviderContextKey).(provider.ClusterProvider)
+	privilegedClusterProvider := ctx.Value(middleware.PrivilegedClusterProviderContextKey).(provider.PrivilegedClusterProvider)
+
+	project, err := common.GetProject(ctx, userInfoGetter, projectProvider, privilegedProjectProvider, projectID, nil)
+	if err != nil {
+		return nil, common.KubernetesErrorToHTTPError(err)
+	}
+
+	_, err = GetInternalCluster(ctx, userInfoGetter, clusterProvider, privilegedClusterProvider, project, projectID, clusterID, &provider.ClusterGetOptions{})
+	if err != nil {
+		return nil, common.KubernetesErrorToHTTPError(err)
+	}
+
+	// sanity check, make sure that the key belongs to the project
+	// alternatively we could examine the owner references
+	{
+		projectSSHKeys, err := sshKeyProvider.List(project, nil)
+		if err != nil {
+			return nil, common.KubernetesErrorToHTTPError(err)
+		}
+
+		found := false
+		for _, projectSSHKey := range projectSSHKeys {
+			if projectSSHKey.Name == keyID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, errors.NewNotFound("sshkey", keyID)
+		}
+	}
+
+	clusterSSHKey, err := getSSHKey(ctx, userInfoGetter, sshKeyProvider, privilegedSSHKeyProvider, projectID, keyID)
+	if err != nil {
+		return nil, common.KubernetesErrorToHTTPError(err)
+	}
+
+	clusterSSHKey.RemoveFromCluster(clusterID)
+	if err := UpdateClusterSSHKey(ctx, userInfoGetter, sshKeyProvider, privilegedSSHKeyProvider, clusterSSHKey, projectID); err != nil {
+		return nil, common.KubernetesErrorToHTTPError(err)
+	}
+	return nil, nil
+}
+
+func ListSSHKeysEndpoint(ctx context.Context, userInfoGetter provider.UserInfoGetter, projectID, clusterID string, projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, sshKeyProvider provider.SSHKeyProvider) (interface{}, error) {
+	clusterProvider := ctx.Value(middleware.ClusterProviderContextKey).(provider.ClusterProvider)
+	privilegedClusterProvider := ctx.Value(middleware.PrivilegedClusterProviderContextKey).(provider.PrivilegedClusterProvider)
+
+	project, err := common.GetProject(ctx, userInfoGetter, projectProvider, privilegedProjectProvider, projectID, nil)
+	if err != nil {
+		return nil, common.KubernetesErrorToHTTPError(err)
+	}
+	_, err = GetInternalCluster(ctx, userInfoGetter, clusterProvider, privilegedClusterProvider, project, projectID, clusterID, &provider.ClusterGetOptions{})
+	if err != nil {
+		return nil, common.KubernetesErrorToHTTPError(err)
+	}
+	keys, err := sshKeyProvider.List(project, &provider.SSHKeyListOptions{ClusterName: clusterID})
+	if err != nil {
+		return nil, common.KubernetesErrorToHTTPError(err)
+	}
+	apiKeys := common.ConvertInternalSSHKeysToExternal(keys)
+	return apiKeys, nil
 }
 
 func UpdateClusterSSHKey(ctx context.Context, userInfoGetter provider.UserInfoGetter, sshKeyProvider provider.SSHKeyProvider, privilegedSSHKeyProvider provider.PrivilegedSSHKeyProvider, clusterSSHKey *kubermaticv1.UserSSHKey, projectID string) error {
@@ -567,85 +787,6 @@ func createNewCluster(ctx context.Context, userInfoGetter provider.UserInfoGette
 	return clusterProvider.New(project, userInfo, cluster)
 }
 
-func createInitialNodeDeploymentWithRetries(endpointContext context.Context, nodeDeployment *apiv1.NodeDeployment, cluster *kubermaticv1.Cluster,
-	project *kubermaticv1.Project, sshKeyProvider provider.SSHKeyProvider,
-	seedsGetter provider.SeedsGetter, clusterProvider provider.ClusterProvider, privilegedClusterProvider provider.PrivilegedClusterProvider, userInfoGetter provider.UserInfoGetter) error {
-	return wait.Poll(5*time.Second, 30*time.Minute, func() (bool, error) {
-		err := createInitialNodeDeployment(endpointContext, nodeDeployment, cluster, project, sshKeyProvider, seedsGetter, clusterProvider, privilegedClusterProvider, userInfoGetter)
-		if err != nil {
-			// unrecoverable
-			if strings.Contains(err.Error(), `admission webhook "machine-controller.kubermatic.io-machinedeployments" denied the request`) {
-				klog.V(4).Infof("giving up creating initial Node Deployments for cluster %s (%s) due to an unrecoverabl err %#v", cluster.Name, cluster.Spec.HumanReadableName, err)
-				return false, err
-			}
-			// Likely recoverable
-			klog.V(4).Infof("retrying creating initial Node Deployments for cluster %s (%s) due to %v", cluster.Name, cluster.Spec.HumanReadableName, err)
-			return false, nil
-		}
-		return true, nil
-	})
-}
-
-func createInitialNodeDeployment(endpointContext context.Context, nodeDeployment *apiv1.NodeDeployment, cluster *kubermaticv1.Cluster,
-	project *kubermaticv1.Project, sshKeyProvider provider.SSHKeyProvider,
-	seedsGetter provider.SeedsGetter, clusterProvider provider.ClusterProvider, privilegedClusterProvider provider.PrivilegedClusterProvider, userInfoGetter provider.UserInfoGetter) error {
-	ctx, cancelCtx := context.WithCancel(context.Background())
-	defer cancelCtx()
-
-	nd, err := machineresource.Validate(nodeDeployment, cluster.Spec.Version.Semver())
-	if err != nil {
-		return fmt.Errorf("node deployment is not valid: %v", err)
-	}
-
-	cluster, err = GetInternalCluster(endpointContext, userInfoGetter, clusterProvider, privilegedClusterProvider, project, project.Name, cluster.Name, &provider.ClusterGetOptions{CheckInitStatus: true})
-	if err != nil {
-		return err
-	}
-
-	keys, err := sshKeyProvider.List(project, &provider.SSHKeyListOptions{ClusterName: cluster.Name})
-	if err != nil {
-		return err
-	}
-
-	client, err := common.GetClusterClient(endpointContext, userInfoGetter, clusterProvider, cluster, project.Name)
-	if err != nil {
-		return err
-	}
-
-	adminUserInfo, err := userInfoGetter(endpointContext, "")
-	if err != nil {
-		return err
-	}
-	_, dc, err := provider.DatacenterFromSeedMap(adminUserInfo, seedsGetter, cluster.Spec.Cloud.DatacenterName)
-	if err != nil {
-		return fmt.Errorf("error getting dc: %v", err)
-	}
-
-	assertedClusterProvider, ok := clusterProvider.(*kubernetesprovider.ClusterProvider)
-	if !ok {
-		return errors.New(http.StatusInternalServerError, "clusterprovider is not a kubernetesprovider.Clusterprovider, can not create secret")
-	}
-	data := common.CredentialsData{
-		Ctx:               ctx,
-		KubermaticCluster: cluster,
-		Client:            assertedClusterProvider.GetSeedClusterAdminRuntimeClient(),
-	}
-	md, err := machineresource.Deployment(cluster, nd, dc, keys, data)
-	if err != nil {
-		return err
-	}
-
-	return client.Create(ctx, md)
-}
-
-func getNodeDeploymentDisplayName(nd *apiv1.NodeDeployment) string {
-	if len(nd.Name) != 0 {
-		return " " + nd.Name
-	}
-
-	return ""
-}
-
 func GetInternalCluster(ctx context.Context, userInfoGetter provider.UserInfoGetter, clusterProvider provider.ClusterProvider, privilegedClusterProvider provider.PrivilegedClusterProvider, project *kubermaticv1.Project, projectID, clusterID string, options *provider.ClusterGetOptions) (*kubermaticv1.Cluster, error) {
 	adminUserInfo, err := userInfoGetter(ctx, "")
 	if err != nil {
@@ -717,8 +858,11 @@ func convertInternalClusterToExternal(internalCluster *kubermaticv1.Cluster, fil
 			AuditLogging:                         internalCluster.Spec.AuditLogging,
 			UsePodSecurityPolicyAdmissionPlugin:  internalCluster.Spec.UsePodSecurityPolicyAdmissionPlugin,
 			UsePodNodeSelectorAdmissionPlugin:    internalCluster.Spec.UsePodNodeSelectorAdmissionPlugin,
+			EnableUserSSHKeyAgent:                &internalCluster.Spec.EnableUserSSHKeyAgent,
 			AdmissionPlugins:                     internalCluster.Spec.AdmissionPlugins,
+			OPAIntegration:                       internalCluster.Spec.OPAIntegration,
 			PodNodeSelectorAdmissionPluginConfig: internalCluster.Spec.PodNodeSelectorAdmissionPluginConfig,
+			ServiceAccount:                       internalCluster.Spec.ServiceAccount,
 		},
 		Status: apiv1.ClusterStatus{
 			Version: internalCluster.Spec.Version,
@@ -814,4 +958,19 @@ func ConvertClusterMetrics(podMetrics *v1beta1.PodMetricsList, nodeMetrics []v1b
 	}
 
 	return clusterMetrics, nil
+}
+
+func getSSHKey(ctx context.Context, userInfoGetter provider.UserInfoGetter, sshKeyProvider provider.SSHKeyProvider, privilegedSSHKeyProvider provider.PrivilegedSSHKeyProvider, projectID, keyName string) (*kubermaticv1.UserSSHKey, error) {
+	adminUserInfo, err := userInfoGetter(ctx, "")
+	if err != nil {
+		return nil, errors.New(http.StatusInternalServerError, err.Error())
+	}
+	if adminUserInfo.IsAdmin {
+		return privilegedSSHKeyProvider.GetUnsecured(keyName)
+	}
+	userInfo, err := userInfoGetter(ctx, projectID)
+	if err != nil {
+		return nil, errors.New(http.StatusInternalServerError, err.Error())
+	}
+	return sshKeyProvider.Get(userInfo, keyName)
 }

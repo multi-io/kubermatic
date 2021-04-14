@@ -52,8 +52,7 @@ var (
 
 const (
 	Name = "machine-controller"
-
-	tag = "v1.24.4-sys11-2"
+	Tag  = "v1.24.4-sys11-2"
 
 	NodeLocalDNSCacheAddress = "169.254.20.10"
 )
@@ -67,6 +66,7 @@ type machinecontrollerData interface {
 	DC() *kubermaticv1.Datacenter
 	NodeLocalDNSCacheEnabled() bool
 	Seed() *kubermaticv1.Seed
+	GetCSIMigrationFeatureGates() []string
 }
 
 // DeploymentCreator returns the function to create and update the machine controller deployment
@@ -139,9 +139,9 @@ func DeploymentCreatorWithoutInitWrapper(data machinecontrollerData) reconciling
 			dep.Spec.Template.Spec.Containers = []corev1.Container{
 				{
 					Name:    Name,
-					Image:   data.ImageRegistry(resources.RegistryDocker) + "/syseleven/machine-controller:" + tag,
+					Image:   data.ImageRegistry(resources.RegistryDocker) + "/syseleven/machine-controller:" + Tag,
 					Command: []string{"/usr/local/bin/machine-controller"},
-					Args:    getFlags(clusterDNSIP, data.DC().Node, externalCloudProvider),
+					Args:    getFlags(clusterDNSIP, data.DC().Node, externalCloudProvider, data.GetCSIMigrationFeatureGates()),
 					Env: append(envVars, corev1.EnvVar{
 						Name:  "KUBECONFIG",
 						Value: "/etc/kubernetes/kubeconfig/kubeconfig",
@@ -240,11 +240,14 @@ func getEnvVars(data machinecontrollerData) ([]corev1.EnvVar, error) {
 		vars = append(vars, corev1.EnvVar{Name: "ALIBABA_ACCESS_KEY_ID", Value: credentials.Alibaba.AccessKeyID})
 		vars = append(vars, corev1.EnvVar{Name: "ALIBABA_ACCESS_KEY_SECRET", Value: credentials.Alibaba.AccessKeySecret})
 	}
+	if data.Cluster().Spec.Cloud.Anexia != nil {
+		vars = append(vars, corev1.EnvVar{Name: "ANEXIA_TOKEN", Value: credentials.Anexia.Token})
+	}
 	vars = append(vars, resources.GetHTTPProxyEnvVarsFromSeed(data.Seed(), data.Cluster().Address.InternalName)...)
 	return vars, nil
 }
 
-func getFlags(clusterDNSIP string, nodeSettings *kubermaticv1.NodeSettings, externalCloudProvider bool) []string {
+func getFlags(clusterDNSIP string, nodeSettings *kubermaticv1.NodeSettings, externalCloudProvider bool, featureGates []string) []string {
 	flags := []string{
 		"-kubeconfig", "/etc/kubernetes/kubeconfig/kubeconfig",
 		"-logtostderr",
@@ -258,6 +261,9 @@ func getFlags(clusterDNSIP string, nodeSettings *kubermaticv1.NodeSettings, exte
 	if nodeSettings != nil {
 		if len(nodeSettings.InsecureRegistries) > 0 {
 			flags = append(flags, "-node-insecure-registries", strings.Join(nodeSettings.InsecureRegistries, ","))
+		}
+		if len(nodeSettings.RegistryMirrors) > 0 {
+			flags = append(flags, "-node-registry-mirrors", strings.Join(nodeSettings.RegistryMirrors, ","))
 		}
 		if !nodeSettings.HTTPProxy.Empty() {
 			flags = append(flags, "-node-http-proxy", nodeSettings.HTTPProxy.String())
@@ -277,6 +283,9 @@ func getFlags(clusterDNSIP string, nodeSettings *kubermaticv1.NodeSettings, exte
 
 	if externalCloudProvider {
 		flags = append(flags, "-external-cloud-provider=true")
+	}
+	if len(featureGates) > 0 {
+		flags = append(flags, "-node-kubelet-feature-gates", strings.Join(append(featureGates, "RotateKubeletServerCertificate=true"), ","))
 	}
 
 	return flags

@@ -24,5 +24,3 @@ exec /usr/local/bin/etcd \
     --experimental-initial-corrupt-check=true \
     --experimental-corrupt-check-time=10m \
     --auto-compaction-retention=8
-    --heartbeat-interval=1000
-    --election-timeout=5000

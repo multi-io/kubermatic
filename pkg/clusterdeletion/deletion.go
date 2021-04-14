@@ -21,6 +21,9 @@ import (
 	"fmt"
 
 	"go.uber.org/zap"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 
 	kubermaticapiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
@@ -48,6 +51,11 @@ type Deletion struct {
 // CleanupCluster is responsible for cleaning up a cluster.
 func (d *Deletion) CleanupCluster(ctx context.Context, log *zap.SugaredLogger, cluster *kubermaticv1.Cluster) error {
 	log = log.Named("cleanup")
+
+	// Delete OPA constraints first to make sure some rules dont block deletion
+	if err := d.cleanupConstraints(ctx, cluster); err != nil {
+		return err
+	}
 
 	// Delete Volumes and LB's inside the user cluster
 	if err := d.cleanupInClusterResources(ctx, log, cluster); err != nil {
@@ -147,7 +155,7 @@ func (d *Deletion) cleanupInClusterResources(ctx context.Context, log *zap.Sugar
 
 	// If we deleted something it is implied that there was still something left. Just return
 	// here so the finalizers stay, it will make the cluster controller requeue us after a delay
-	// This also means that we may end up issuing multiple DELETE calls against the same ressource
+	// This also means that we may end up issuing multiple DELETE calls against the same resource
 	// if cleaning up takes some time, but that shouldn't cause any harm
 	// We also need to return when something was deleted so the checkIfAllLoadbalancersAreGone
 	// call gets an updated version of the cluster from the lister
@@ -170,4 +178,22 @@ func (d *Deletion) cleanupInClusterResources(ctx context.Context, log *zap.Sugar
 	kuberneteshelper.RemoveFinalizer(cluster, kubermaticapiv1.InClusterCredentialsRequestsCleanupFinalizer)
 	kuberneteshelper.RemoveFinalizer(cluster, kubermaticapiv1.InClusterImageRegistryConfigCleanupFinalizer)
 	return d.seedClient.Patch(ctx, cluster, controllerruntimeclient.MergeFrom(oldCluster))
+}
+
+func (d *Deletion) updateCluster(ctx context.Context, cluster *kubermaticv1.Cluster, modify func(*kubermaticv1.Cluster)) error {
+	// Store it here because it may be unset later on if an update request failed
+	name := cluster.Name
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
+		//Get latest version
+		if err := d.seedClient.Get(ctx, types.NamespacedName{Name: name}, cluster); err != nil {
+			if kerrors.IsNotFound(err) {
+				return nil
+			}
+			return err
+		}
+		// Apply modifications
+		modify(cluster)
+		// Update the cluster
+		return d.seedClient.Update(ctx, cluster)
+	})
 }

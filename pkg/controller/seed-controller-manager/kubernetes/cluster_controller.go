@@ -19,7 +19,6 @@ package kubernetes
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"time"
 
 	"k8c.io/kubermatic/v2/pkg/keycloak"
@@ -32,6 +31,7 @@ import (
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	kubermaticv1helper "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1/helper"
 	"k8c.io/kubermatic/v2/pkg/provider"
+	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
@@ -42,8 +42,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	autoscalingv1beta2 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1beta2"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/retry"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -58,7 +60,7 @@ const (
 
 // userClusterConnectionProvider offers functions to retrieve clients for the given user clusters
 type userClusterConnectionProvider interface {
-	GetClient(*kubermaticv1.Cluster, ...k8cuserclusterclient.ConfigOption) (ctrlruntimeclient.Client, error)
+	GetClient(context.Context, *kubermaticv1.Cluster, ...k8cuserclusterclient.ConfigOption) (ctrlruntimeclient.Client, error)
 }
 
 type Features struct {
@@ -105,6 +107,9 @@ type Reconciler struct {
 	keycloakFacade keycloak.Facade
 
 	features Features
+	versions kubermatic.Versions
+
+	tunnelingAgentIP string
 }
 
 // NewController creates a cluster controller.
@@ -138,7 +143,11 @@ func Add(
 	keycloakFacade keycloak.Facade,
 	etcdLauncherImage string,
 	dnatControllerImage string,
-	features Features) error {
+
+	tunnelingAgentIP string,
+
+	features Features,
+	versions kubermatic.Versions) error {
 
 	reconciler := &Reconciler{
 		log:                     log.Named(ControllerName),
@@ -175,7 +184,9 @@ func Add(
 
 		keycloakFacade: keycloakFacade,
 
-		features: features,
+		tunnelingAgentIP: tunnelingAgentIP,
+		features:         features,
+		versions:         versions,
 	}
 
 	c, err := controller.New(ControllerName, mgr, controller.Options{Reconciler: reconciler, MaxConcurrentReconciles: numWorkers})
@@ -234,6 +245,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 		r.Client,
 		r.workerName,
 		cluster,
+		r.versions,
 		kubermaticv1.ClusterConditionClusterControllerReconcilingSuccess,
 		func() (*reconcile.Result, error) {
 			// only reconcile this cluster if there are not yet too many updates running
@@ -270,7 +282,7 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, clus
 
 		// Defer getting the client to make sure we only request it if we actually need it
 		userClusterClientGetter := func() (ctrlruntimeclient.Client, error) {
-			client, err := r.userClusterConnProvider.GetClient(cluster)
+			client, err := r.userClusterConnProvider.GetClient(ctx, cluster)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get user cluster client: %v", err)
 			}
@@ -297,12 +309,21 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, clus
 }
 
 func (r *Reconciler) updateCluster(ctx context.Context, cluster *kubermaticv1.Cluster, modify func(*kubermaticv1.Cluster)) error {
-	oldCluster := cluster.DeepCopy()
-	modify(cluster)
-	if reflect.DeepEqual(oldCluster, cluster) {
-		return nil
-	}
-	return r.Patch(ctx, cluster, ctrlruntimeclient.MergeFrom(oldCluster))
+	// Store it here because it may be unset later on if an update request failed
+	name := cluster.Name
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
+		//Get latest version
+		if err := r.Get(ctx, types.NamespacedName{Name: name}, cluster); err != nil {
+			if kubeapierrors.IsNotFound(err) {
+				return nil
+			}
+			return err
+		}
+		// Apply modifications
+		modify(cluster)
+		// Update the cluster
+		return r.Update(ctx, cluster)
+	})
 }
 
 func (r *Reconciler) updateClusterError(ctx context.Context, cluster *kubermaticv1.Cluster, reason kubermaticv1.ClusterStatusError, message string) error {

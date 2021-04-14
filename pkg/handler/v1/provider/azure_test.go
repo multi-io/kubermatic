@@ -25,16 +25,18 @@ import (
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-06-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-06-01/network"
+	"github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2018-02-01/resources"
 	"github.com/stretchr/testify/assert"
-	"k8s.io/apimachinery/pkg/runtime"
 
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	providercommon "k8c.io/kubermatic/v2/pkg/handler/common/provider"
 	"k8c.io/kubermatic/v2/pkg/handler/test"
 	"k8c.io/kubermatic/v2/pkg/handler/test/hack"
-	azure "k8c.io/kubermatic/v2/pkg/handler/v1/provider"
 	"k8c.io/kubermatic/v2/pkg/provider"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const (
@@ -95,7 +97,7 @@ func TestAzureSizeEndpoint(t *testing.T) {
 			req.Header.Add("TenantID", testID)
 			req.Header.Add("Location", tc.location)
 
-			azure.NewAzureClientSet = MockNewSizeClient
+			providercommon.NewAzureClientSet = MockNewSizeClient
 
 			apiUser := test.GetUser(test.UserEmail, test.UserID, test.UserName)
 
@@ -143,7 +145,7 @@ func buildAzureDatacenterMeta() provider.SeedsGetter {
 	}
 }
 
-func MockNewSizeClient(subscriptionID, clientID, clientSecret, tenantID string) (azure.AzureClientSet, error) {
+func MockNewSizeClient(subscriptionID, clientID, clientSecret, tenantID string) (providercommon.AzureClientSet, error) {
 
 	if len(clientSecret) == 0 || len(subscriptionID) == 0 || len(clientID) == 0 || len(tenantID) == 0 {
 		return nil, fmt.Errorf("")
@@ -220,4 +222,23 @@ func (s *mockSizeClientImpl) ListVMSize(ctx context.Context, location string) ([
 	}
 
 	return *s.machineSizeList.Value, nil
+}
+
+func (s *mockSizeClientImpl) ListSecurityGroups(_ context.Context, _ string) ([]network.SecurityGroup, error) {
+	return nil, nil
+}
+func (s *mockSizeClientImpl) ListResourceGroups(_ context.Context) ([]resources.Group, error) {
+	return nil, nil
+}
+
+func (s *mockSizeClientImpl) ListRouteTables(_ context.Context, _ string) ([]network.RouteTable, error) {
+	return nil, nil
+}
+
+func (s *mockSizeClientImpl) ListVnets(_ context.Context, _ string) ([]network.VirtualNetwork, error) {
+	return nil, nil
+}
+
+func (s *mockSizeClientImpl) ListSubnets(_ context.Context, _, _ string) ([]network.Subnet, error) {
+	return nil, nil
 }

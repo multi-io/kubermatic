@@ -18,9 +18,7 @@ package cloudcontroller
 
 import (
 	"fmt"
-	"net/url"
 
-	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/resources"
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 	"k8c.io/kubermatic/v2/pkg/resources/vpnsidecar"
@@ -33,7 +31,7 @@ import (
 )
 
 const (
-	osName = "openstack-cloud-controller-manager"
+	OpenstackCCMDeploymentName = "openstack-cloud-controller-manager"
 )
 
 var (
@@ -51,19 +49,17 @@ var (
 
 func openStackDeploymentCreator(data *resources.TemplateData) reconciling.NamedDeploymentCreatorGetter {
 	return func() (string, reconciling.DeploymentCreator) {
-		return osName, func(dep *appsv1.Deployment) (*appsv1.Deployment, error) {
-			dep.Name = osName
-			dep.Labels = resources.BaseAppLabels(osName, nil)
+		return OpenstackCCMDeploymentName, func(dep *appsv1.Deployment) (*appsv1.Deployment, error) {
+			dep.Name = OpenstackCCMDeploymentName
+			dep.Labels = resources.BaseAppLabels(OpenstackCCMDeploymentName, nil)
 
 			dep.Spec.Replicas = resources.Int32(1)
 
 			dep.Spec.Selector = &metav1.LabelSelector{
-				MatchLabels: resources.BaseAppLabels(osName, nil),
+				MatchLabels: resources.BaseAppLabels(OpenstackCCMDeploymentName, nil),
 			}
 
-			dep.Spec.Template.Spec.Volumes = getOSVolumes()
-
-			podLabels, err := data.GetPodTemplateLabels(osName, dep.Spec.Template.Spec.Volumes, nil)
+			podLabels, err := data.GetPodTemplateLabels(OpenstackCCMDeploymentName, dep.Spec.Template.Spec.Volumes, nil)
 			if err != nil {
 				return nil, err
 			}
@@ -81,44 +77,47 @@ func openStackDeploymentCreator(data *resources.TemplateData) reconciling.NamedD
 			f := false
 			dep.Spec.Template.Spec.AutomountServiceAccountToken = &f
 
-			openvpnSidecar, err := vpnsidecar.OpenVPNSidecarContainer(data, "openvpn-client")
+			openvpnSidecar, err := vpnsidecar.OpenVPNSidecarContainer(data, openvpnClientContainerName)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get openvpn sidecar: %v", err)
-			}
-
-			osCloudProviderMounts := []corev1.VolumeMount{
-				{
-					Name:      resources.CloudControllerManagerKubeconfigSecretName,
-					MountPath: "/etc/kubernetes/kubeconfig",
-					ReadOnly:  true,
-				},
-				{
-					Name:      resources.CloudConfigConfigMapName,
-					MountPath: "/etc/kubernetes/cloud",
-					ReadOnly:  true,
-				},
 			}
 
 			version, err := getOSVersion(data.Cluster().Spec.Version)
 			if err != nil {
 				return nil, err
 			}
-			flags := getOSFlags(data)
+
+			dep.Spec.Template.Spec.Volumes = append(getVolumes(), corev1.Volume{
+				Name: resources.CloudConfigConfigMapName,
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: resources.CloudConfigConfigMapName,
+						},
+					},
+				},
+			})
 
 			dep.Spec.Template.Spec.Containers = []corev1.Container{
 				*openvpnSidecar,
 				{
-					Name:         osName,
-					Image:        data.ImageRegistry(resources.RegistryDocker) + "/k8scloudprovider/openstack-cloud-controller-manager:v" + version,
-					Command:      []string{"/bin/openstack-cloud-controller-manager"},
-					Args:         flags,
-					VolumeMounts: osCloudProviderMounts,
+					Name:    ccmContainerName,
+					Image:   data.ImageRegistry(resources.RegistryDocker) + "/k8scloudprovider/openstack-cloud-controller-manager:v" + version,
+					Command: []string{"/bin/openstack-cloud-controller-manager"},
+					Args:    getOSFlags(data),
+					VolumeMounts: append(getVolumeMounts(), corev1.VolumeMount{
+						Name:      resources.CloudConfigConfigMapName,
+						MountPath: "/etc/kubernetes/cloud",
+						ReadOnly:  true,
+					}),
 				},
 			}
+
 			defResourceRequirements := map[string]*corev1.ResourceRequirements{
-				osName:              osResourceRequirements.DeepCopy(),
+				ccmContainerName:    osResourceRequirements.DeepCopy(),
 				openvpnSidecar.Name: openvpnSidecar.Resources.DeepCopy(),
 			}
+
 			err = resources.SetResourceRequirements(dep.Spec.Template.Spec.Containers, defResourceRequirements, nil, dep.Annotations)
 			if err != nil {
 				return nil, fmt.Errorf("failed to set resource requirements: %v", err)
@@ -126,37 +125,6 @@ func openStackDeploymentCreator(data *resources.TemplateData) reconciling.NamedD
 
 			return dep, nil
 		}
-	}
-}
-
-func getOSVolumes() []corev1.Volume {
-	return []corev1.Volume{
-		{
-			Name: resources.CloudConfigConfigMapName,
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: resources.CloudConfigConfigMapName,
-					},
-				},
-			},
-		},
-		{
-			Name: resources.OpenVPNClientCertificatesSecretName,
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: resources.OpenVPNClientCertificatesSecretName,
-				},
-			},
-		},
-		{
-			Name: resources.CloudControllerManagerKubeconfigSecretName,
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: resources.CloudControllerManagerKubeconfigSecretName,
-				},
-			},
-		},
 	}
 }
 
@@ -183,42 +151,10 @@ func getOSVersion(version semver.Semver) (string, error) {
 	// 1.18.x. This enables the use of rwx (with some limitations).
 	// case 18:
 	// case 19:
+	//	return "1.19.2", nil
 	default:
 		return "1.19.2", nil
 	}
-}
-
-// ExternalCloudControllerFeatureSupported checks if the
-func ExternalCloudControllerFeatureSupported(dc *kubermaticv1.Datacenter, cluster *kubermaticv1.Cluster) bool {
-	if cluster.Spec.Cloud.Openstack == nil {
-		return false
-	}
-	// When using OpenStack external CCM with Open Telekom Cloud the creation
-	// of LBs fail as documented in the issue below:
-	// https://github.com/kubernetes/cloud-provider-openstack/issues/960
-	// Falling back to the in-tree CloudProvider mitigates the problem, even if
-	// not all features are expected to work properly (e.g.
-	// `manage-security-groups` should be set to false in cloud config, see
-	// https://kubernetes.io/docs/concepts/cluster-administration/cloud-providers/#load-balancer
-	// for more details).
-	//
-	// TODO(irozzo) This is a dirty hack to temporarily support OTC using
-	// Openstack provider, remove this when dedicated OTC support is
-	// introduced in Kubermatic.
-	if dc.Spec.Openstack != nil && isOTC(dc.Spec.Openstack) {
-		return false
-	}
-	return OpenStackCloudControllerSupported(cluster.Spec.Version)
-}
-
-// isOTC returns `true` if the OpenStack Datacenter uses OTC (i.e.
-// Open Telekom Cloud), `false` otherwise.
-func isOTC(dc *kubermaticv1.DatacenterSpecOpenstack) bool {
-	u, err := url.Parse(dc.AuthURL)
-	if err != nil {
-		return false
-	}
-	return u.Host == "iam.eu-de.otc.t-systems.com"
 }
 
 // OpenStackCloudControllerSupported checks if this version of Kubernetes is supported

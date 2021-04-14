@@ -85,6 +85,15 @@ func (r *Reconciler) reconcileCluster(ctx context.Context, cluster *kubermaticv1
 
 	}
 
+	if !kuberneteshelper.HasFinalizer(cluster, kubermaticapiv1.KubermaticConstraintCleanupFinalizer) {
+		err := r.updateCluster(ctx, cluster, func(c *kubermaticv1.Cluster) {
+			kuberneteshelper.AddFinalizer(c, kubermaticapiv1.KubermaticConstraintCleanupFinalizer)
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return &reconcile.Result{}, nil
 }
 
@@ -115,7 +124,13 @@ func (r *Reconciler) ensureClusterNetworkDefaults(ctx context.Context, cluster *
 
 	if cluster.Spec.ClusterNetwork.ProxyMode == "" {
 		setProxyMode := func(c *kubermaticv1.Cluster) {
-			c.Spec.ClusterNetwork.ProxyMode = resources.IPVSProxyMode
+			// IPVS causes issues with Hetzner's LoadBalancers, which should
+			// be addressed via https://github.com/kubernetes/enhancements/pull/1392
+			if c.Spec.Cloud.Hetzner != nil {
+				c.Spec.ClusterNetwork.ProxyMode = resources.IPTablesProxyMode
+			} else {
+				c.Spec.ClusterNetwork.ProxyMode = resources.IPVSProxyMode
+			}
 		}
 		modifiers = append(modifiers, setProxyMode)
 	}

@@ -37,14 +37,8 @@ const (
 	fakeDCName               = "europe-west3-c"
 	fakeExternalURL          = "dev.kubermatic.io"
 	fakeClusterNamespaceName = "cluster-ns"
-	// This must be the A record for *.europe-west3c.dev.kubermatic.io and
-	// *.alias-europe-west3-c.dev.kubermatic.io
-	externalIP = "34.89.181.151"
-	// Henrik created 2 dns entries for dns-test @ OVH.com. dns-test.kubermatic.io points to:
-	// - 192.168.1.1
-	// - 192.168.1.2
-	// - 2001:16B8:6844:D700:A1B9:D94B:FDC3:1C33
-	testDomain = "dns-test.kubermatic.io"
+	externalIP               = "34.89.181.151"
+	testDomain               = "dns-test.kubermatic.io"
 )
 
 func testLookupFunction(host string) ([]net.IP, error) {
@@ -78,7 +72,7 @@ func TestSyncClusterAddress(t *testing.T) {
 		name                 string
 		apiserverService     corev1.Service
 		frontproxyService    corev1.Service
-		exposeStrategy       corev1.ServiceType
+		exposeStrategy       kubermaticv1.ExposeStrategy
 		seedDNSOverwrite     string
 		expectedExternalName string
 		expectedIP           string
@@ -100,7 +94,7 @@ func TestSyncClusterAddress(t *testing.T) {
 					},
 				},
 			},
-			exposeStrategy:       corev1.ServiceTypeLoadBalancer,
+			exposeStrategy:       kubermaticv1.ExposeStrategyLoadBalancer,
 			expectedExternalName: "1.2.3.4",
 			expectedIP:           "1.2.3.4",
 			expectedPort:         int32(443),
@@ -121,7 +115,7 @@ func TestSyncClusterAddress(t *testing.T) {
 					},
 				},
 			},
-			exposeStrategy:       corev1.ServiceTypeLoadBalancer,
+			exposeStrategy:       kubermaticv1.ExposeStrategyLoadBalancer,
 			seedDNSOverwrite:     "alias-europe-west3-c",
 			expectedExternalName: "1.2.3.4",
 			expectedIP:           "1.2.3.4",
@@ -141,7 +135,7 @@ func TestSyncClusterAddress(t *testing.T) {
 						}},
 				},
 			},
-			exposeStrategy:       corev1.ServiceTypeNodePort,
+			exposeStrategy:       kubermaticv1.ExposeStrategyNodePort,
 			expectedExternalName: fmt.Sprintf("%s.%s.%s", fakeClusterName, fakeDCName, fakeExternalURL),
 			expectedIP:           externalIP,
 			expectedPort:         int32(32000),
@@ -160,7 +154,7 @@ func TestSyncClusterAddress(t *testing.T) {
 						},
 					},
 				}},
-			exposeStrategy:       corev1.ServiceTypeNodePort,
+			exposeStrategy:       kubermaticv1.ExposeStrategyNodePort,
 			seedDNSOverwrite:     "alias-europe-west3-c",
 			expectedExternalName: fmt.Sprintf("%s.alias-europe-west3-c.%s", fakeClusterName, fakeExternalURL),
 			expectedIP:           externalIP,

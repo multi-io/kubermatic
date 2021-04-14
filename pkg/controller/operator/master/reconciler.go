@@ -27,6 +27,7 @@ import (
 	operatorv1alpha1 "k8c.io/kubermatic/v2/pkg/crd/operator/v1alpha1"
 	"k8c.io/kubermatic/v2/pkg/kubernetes"
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
+	kubermaticversion "k8c.io/kubermatic/v2/pkg/version/kubermatic"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -49,7 +50,7 @@ type Reconciler struct {
 	scheme     *runtime.Scheme
 	workerName string
 	ctx        context.Context
-	versions   common.Versions
+	versions   kubermaticversion.Versions
 }
 
 // Reconcile acts upon requests and will restore the state of resources
@@ -202,8 +203,8 @@ func (r *Reconciler) reconcileSecrets(config *operatorv1alpha1.KubermaticConfigu
 	logger.Debug("Reconciling Secrets")
 
 	creators := []reconciling.NamedSecretCreatorGetter{
-		common.SeedWebhookServingCASecretCreator(config),
-		common.SeedWebhookServingCertSecretCreator(config, r.Client),
+		common.WebhookServingCASecretCreator(config),
+		common.WebhookServingCertSecretCreator(config, r.Client),
 		common.ExtraFilesSecretCreator(config),
 	}
 
@@ -338,12 +339,12 @@ func (r *Reconciler) reconcileAdmissionWebhooks(config *operatorv1alpha1.Kuberma
 		return fmt.Errorf("failed to reconcile mutating AdmissionWebhooks: %v", err)
 	}
 
-	valCreators := []reconciling.NamedValidatingWebhookConfigurationCreatorGetter{
+	creators := []reconciling.NamedValidatingWebhookConfigurationCreatorGetter{
 		common.SeedAdmissionWebhookCreator(config, r.Client),
 	}
 
-	if err := reconciling.ReconcileValidatingWebhookConfigurations(r.ctx, valCreators, "", r.Client); err != nil {
-		return fmt.Errorf("failed to reconcile validating AdmissionWebhooks: %v", err)
+	if err := reconciling.ReconcileValidatingWebhookConfigurations(r.ctx, creators, "", r.Client); err != nil {
+		return fmt.Errorf("failed to reconcile AdmissionWebhooks: %v", err)
 	}
 
 	return nil

@@ -81,6 +81,10 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&AdmissionPluginList{},
 		&ExternalCluster{},
 		&ExternalClusterList{},
+		&ConstraintTemplate{},
+		&ConstraintTemplateList{},
+		&Constraint{},
+		&ConstraintList{},
 	)
 
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)

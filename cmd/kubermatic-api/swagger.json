@@ -17,6 +17,61 @@
   },
   "host": "metakube.syseleven.de",
   "paths": {
+    "/api/projects/{project_id}/clusters/{cluster_id}/sshkeys/{key_id}": {
+      "delete": {
+        "description": "Unassignes an ssh key from the given cluster",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "operationId": "detachSSHKeyFromClusterV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "KeyID",
+            "name": "key_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/empty"
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
     "/api/v1/addonconfigs": {
       "get": {
         "produces": [
@@ -90,7 +145,10 @@
         "produces": [
           "application/json"
         ],
-        "operationId": "addon",
+        "tags": [
+          "addon"
+        ],
+        "operationId": "listAccessibleAddons",
         "responses": {
           "200": {
             "description": "AccessibleAddons",
@@ -742,12 +800,6 @@
             "type": "string",
             "x-go-name": "UserID",
             "name": "user_id",
-            "in": "query"
-          },
-          {
-            "type": "string",
-            "x-go-name": "Datacenter",
-            "name": "datacenter",
             "in": "query"
           }
         ],
@@ -2457,6 +2509,61 @@
         }
       }
     },
+    "/api/v1/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/installableaddons": {
+      "get": {
+        "description": "Lists names of addons that can be installed inside the user cluster",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "addon"
+        ],
+        "operationId": "listInstallableAddons",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "DC",
+            "name": "dc",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "AccessibleAddons",
+            "schema": {
+              "$ref": "#/definitions/AccessibleAddons"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
     "/api/v1/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/kubeconfig": {
       "get": {
         "produces": [
@@ -3506,135 +3613,6 @@
         }
       }
     },
-    "/api/v1/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/nodes": {
-      "get": {
-        "description": "This endpoint is deprecated, please create a Node Deployment instead.",
-        "produces": [
-          "application/json"
-        ],
-        "tags": [
-          "project"
-        ],
-        "summary": "Deprecated:\nLists nodes that belong to the given cluster",
-        "operationId": "listNodesForClusterLegacy",
-        "parameters": [
-          {
-            "type": "string",
-            "x-go-name": "ProjectID",
-            "name": "project_id",
-            "in": "path",
-            "required": true
-          },
-          {
-            "type": "string",
-            "x-go-name": "DC",
-            "name": "dc",
-            "in": "path",
-            "required": true
-          },
-          {
-            "type": "string",
-            "x-go-name": "ClusterID",
-            "name": "cluster_id",
-            "in": "path",
-            "required": true
-          },
-          {
-            "type": "boolean",
-            "x-go-name": "HideInitialConditions",
-            "name": "hideInitialConditions",
-            "in": "query"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Node",
-            "schema": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/Node"
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/responses/empty"
-          },
-          "403": {
-            "$ref": "#/responses/empty"
-          },
-          "default": {
-            "description": "errorResponse",
-            "schema": {
-              "$ref": "#/definitions/errorResponse"
-            }
-          }
-        }
-      },
-      "post": {
-        "description": "This endpoint is deprecated, please create a Node Deployment instead.\nUse POST /api/v1/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/nodedeployments",
-        "consumes": [
-          "application/json"
-        ],
-        "produces": [
-          "application/json"
-        ],
-        "tags": [
-          "project"
-        ],
-        "summary": "Deprecated:\nCreates a node that will belong to the given cluster",
-        "operationId": "createNodeForClusterLegacy",
-        "parameters": [
-          {
-            "type": "string",
-            "x-go-name": "ProjectID",
-            "name": "project_id",
-            "in": "path",
-            "required": true
-          },
-          {
-            "type": "string",
-            "x-go-name": "DC",
-            "name": "dc",
-            "in": "path",
-            "required": true
-          },
-          {
-            "type": "string",
-            "x-go-name": "ClusterID",
-            "name": "cluster_id",
-            "in": "path",
-            "required": true
-          },
-          {
-            "name": "Body",
-            "in": "body",
-            "schema": {
-              "$ref": "#/definitions/Node"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "Node",
-            "schema": {
-              "$ref": "#/definitions/Node"
-            }
-          },
-          "401": {
-            "$ref": "#/responses/empty"
-          },
-          "403": {
-            "$ref": "#/responses/empty"
-          },
-          "default": {
-            "description": "errorResponse",
-            "schema": {
-              "$ref": "#/definitions/errorResponse"
-            }
-          }
-        }
-      }
-    },
     "/api/v1/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/nodes/upgrades": {
       "put": {
         "description": "Upgrades node deployments in a cluster",
@@ -3695,76 +3673,6 @@
       }
     },
     "/api/v1/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/nodes/{node_id}": {
-      "get": {
-        "description": "This endpoint is deprecated, please create a Node Deployment instead.",
-        "consumes": [
-          "application/json"
-        ],
-        "produces": [
-          "application/json"
-        ],
-        "tags": [
-          "project"
-        ],
-        "summary": "Deprecated:\nGets a node that is assigned to the given cluster.",
-        "operationId": "getNodeForClusterLegacy",
-        "parameters": [
-          {
-            "type": "string",
-            "x-go-name": "ProjectID",
-            "name": "project_id",
-            "in": "path",
-            "required": true
-          },
-          {
-            "type": "string",
-            "x-go-name": "DC",
-            "name": "dc",
-            "in": "path",
-            "required": true
-          },
-          {
-            "type": "string",
-            "x-go-name": "ClusterID",
-            "name": "cluster_id",
-            "in": "path",
-            "required": true
-          },
-          {
-            "type": "string",
-            "x-go-name": "NodeID",
-            "name": "node_id",
-            "in": "path",
-            "required": true
-          },
-          {
-            "type": "boolean",
-            "x-go-name": "HideInitialConditions",
-            "name": "hideInitialConditions",
-            "in": "query"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Node",
-            "schema": {
-              "$ref": "#/definitions/Node"
-            }
-          },
-          "401": {
-            "$ref": "#/responses/empty"
-          },
-          "403": {
-            "$ref": "#/responses/empty"
-          },
-          "default": {
-            "description": "errorResponse",
-            "schema": {
-              "$ref": "#/definitions/errorResponse"
-            }
-          }
-        }
-      },
       "delete": {
         "description": "This endpoint is deprecated, please create a Node Deployment instead.",
         "produces": [
@@ -7024,6 +6932,56 @@
         }
       }
     },
+    "/api/v1/providers/aws/{dc}/securitygroups": {
+      "get": {
+        "description": "Lists available AWS Security Groups",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "aws"
+        ],
+        "operationId": "listAWSSecurityGroups",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "AccessKeyID",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "SecretAccessKey",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "Credential",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "x-go-name": "DC",
+            "name": "dc",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "AWSSecurityGroupList",
+            "schema": {
+              "$ref": "#/definitions/AWSSecurityGroupList"
+            }
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
     "/api/v1/providers/aws/{dc}/subnets": {
       "get": {
         "description": "Lists available AWS subnets",
@@ -8671,6 +8629,310 @@
         }
       }
     },
+    "/api/v2/constrainttemplates": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "constrainttemplates"
+        ],
+        "summary": "List constraint templates.",
+        "operationId": "listConstraintTemplates",
+        "responses": {
+          "200": {
+            "description": "ConstraintTemplate",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/ConstraintTemplate"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "Create constraint template",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "constrainttemplates"
+        ],
+        "operationId": "createConstraintTemplate",
+        "parameters": [
+          {
+            "name": "Body",
+            "in": "body",
+            "schema": {
+              "$ref": "#/definitions/ctBody"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ConstraintTemplate",
+            "schema": {
+              "$ref": "#/definitions/ConstraintTemplate"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/constrainttemplates/{ct_name}": {
+      "get": {
+        "description": "Get constraint templates specified by name",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "constrainttemplates"
+        ],
+        "operationId": "getConstraintTemplate",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "Name",
+            "name": "ct_name",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ConstraintTemplate",
+            "schema": {
+              "$ref": "#/definitions/ConstraintTemplate"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "delete": {
+        "description": "Deletes the specified cluster",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "constrainttemplates"
+        ],
+        "operationId": "deleteConstraintTemplate",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "Name",
+            "name": "ct_name",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/empty"
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "patch": {
+        "description": "Patch a specified constraint template",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "constrainttemplates"
+        ],
+        "operationId": "patchConstraintTemplate",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "Name",
+            "name": "ct_name",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "Patch",
+            "in": "body",
+            "schema": {
+              "type": "object"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ConstraintTemplate",
+            "schema": {
+              "$ref": "#/definitions/ConstraintTemplate"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/presets": {
+      "get": {
+        "description": "Lists presets",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "preset"
+        ],
+        "operationId": "listPresets",
+        "parameters": [
+          {
+            "type": "boolean",
+            "x-go-name": "Disabled",
+            "name": "disabled",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "PresetList",
+            "schema": {
+              "$ref": "#/definitions/PresetList"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/presets/{preset_name}/status": {
+      "put": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "preset"
+        ],
+        "summary": "Updates the status of a preset. It can enable or disable it, so that it won't be listed by the list endpoints.",
+        "operationId": "updatePresetStatus",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "PresetName",
+            "name": "preset_name",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "Provider",
+            "name": "provider",
+            "in": "query"
+          },
+          {
+            "name": "Body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "x-go-name": "Enabled"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/empty"
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
     "/api/v2/projects/{project_id}/clusters": {
       "get": {
         "produces": [
@@ -8915,6 +9177,883 @@
         }
       }
     },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/addons": {
+      "get": {
+        "description": "Lists addons that belong to the given cluster",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "addon"
+        ],
+        "operationId": "listAddonsV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Addon",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Addon"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "Creates an addon that will belong to the given cluster",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "addon"
+        ],
+        "operationId": "createAddonV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "Body",
+            "in": "body",
+            "schema": {
+              "$ref": "#/definitions/Addon"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Addon",
+            "schema": {
+              "$ref": "#/definitions/Addon"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/addons/{addon_id}": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "addon"
+        ],
+        "summary": "Gets an addon that is assigned to the given cluster.",
+        "operationId": "getAddonV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "AddonID",
+            "name": "addon_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Addon",
+            "schema": {
+              "$ref": "#/definitions/Addon"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "delete": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "addon"
+        ],
+        "summary": "Deletes the given addon that belongs to the cluster.",
+        "operationId": "deleteAddonV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "AddonID",
+            "name": "addon_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/empty"
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "patch": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "addon"
+        ],
+        "summary": "Patches an addon that is assigned to the given cluster.",
+        "operationId": "patchAddonV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "AddonID",
+            "name": "addon_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "Body",
+            "in": "body",
+            "schema": {
+              "$ref": "#/definitions/Addon"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Addon",
+            "schema": {
+              "$ref": "#/definitions/Addon"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/bindings": {
+      "get": {
+        "description": "List role binding",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "operationId": "listRoleBindingV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "RoleBinding",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/RoleBinding"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/clusterbindings": {
+      "get": {
+        "description": "List cluster role binding",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "operationId": "listClusterRoleBindingV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ClusterRoleBinding",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/ClusterRoleBinding"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/clusterrolenames": {
+      "get": {
+        "description": "Lists all ClusterRoles",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "operationId": "listClusterRoleNamesV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ClusterRoleName",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/ClusterRoleName"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/clusterroles": {
+      "get": {
+        "description": "Lists all ClusterRoles",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "operationId": "listClusterRoleV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ClusterRole",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/ClusterRole"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/clusterroles/{role_id}/clusterbindings": {
+      "post": {
+        "description": "Binds user to cluster role",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "operationId": "bindUserToClusterRoleV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "RoleID",
+            "name": "role_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "Body",
+            "in": "body",
+            "schema": {
+              "$ref": "#/definitions/ClusterRoleUser"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ClusterRoleBinding",
+            "schema": {
+              "$ref": "#/definitions/ClusterRoleBinding"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "delete": {
+        "description": "Unbinds user from cluster role binding",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "operationId": "unbindUserFromClusterRoleBindingV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "RoleID",
+            "name": "role_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "Body",
+            "in": "body",
+            "schema": {
+              "$ref": "#/definitions/ClusterRoleUser"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ClusterRoleBinding",
+            "schema": {
+              "$ref": "#/definitions/ClusterRoleBinding"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/constraints": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "summary": "Lists constraints for the specified cluster.",
+        "operationId": "listConstraints",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Constraint",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Constraint"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "summary": "Creates a given constraint for the specified cluster.",
+        "operationId": "createConstraint",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "Body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/constraintBody"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Constraint",
+            "schema": {
+              "$ref": "#/definitions/Constraint"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/constraints/{constraint_name}": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "summary": "Gets an specified constraint for the given cluster.",
+        "operationId": "getConstraint",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "Name",
+            "name": "constraint_name",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Constraint",
+            "schema": {
+              "$ref": "#/definitions/Constraint"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "delete": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "summary": "Deletes a specified constraint for the given cluster.",
+        "operationId": "deleteConstraint",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "Name",
+            "name": "constraint_name",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/empty"
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "patch": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "summary": "Patches a given constraint for the specified cluster.",
+        "operationId": "patchConstraint",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "Name",
+            "name": "constraint_name",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "Patch",
+            "in": "body",
+            "schema": {
+              "type": "object"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Constraint",
+            "schema": {
+              "$ref": "#/definitions/Constraint"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
     "/api/v2/projects/{project_id}/clusters/{cluster_id}/events": {
       "get": {
         "produces": [
@@ -8956,6 +10095,2599 @@
                 "$ref": "#/definitions/Event"
               }
             }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/gatekeeper/config": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "summary": "Gets the gatekeeper sync config for the specified cluster.",
+        "operationId": "getGatekeeperConfig",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "GatekeeperConfig",
+            "schema": {
+              "$ref": "#/definitions/GatekeeperConfig"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "Creates a gatekeeper config for the given cluster",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "operationId": "createGatekeeperConfig",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "Body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/GatekeeperConfig"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "GatekeeperConfig",
+            "schema": {
+              "$ref": "#/definitions/GatekeeperConfig"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "delete": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "summary": "Deletes the gatekeeper sync config for the specified cluster.",
+        "operationId": "deleteGatekeeperConfig",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/empty"
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "patch": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "summary": "Patches the gatekeeper config for the specified cluster.",
+        "operationId": "patchGatekeeperConfig",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "Patch",
+            "in": "body",
+            "schema": {
+              "type": "object"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "GatekeeperConfig",
+            "schema": {
+              "$ref": "#/definitions/GatekeeperConfig"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/health": {
+      "get": {
+        "description": "Returns the cluster's component health status",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "operationId": "getClusterHealthV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ClusterHealth",
+            "schema": {
+              "$ref": "#/definitions/ClusterHealth"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/installableaddons": {
+      "get": {
+        "description": "Lists names of addons that can be installed inside the user cluster",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "addon"
+        ],
+        "operationId": "listInstallableAddonsV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "AccessibleAddons",
+            "schema": {
+              "$ref": "#/definitions/AccessibleAddons"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/kubeconfig": {
+      "get": {
+        "produces": [
+          "application/octet-stream"
+        ],
+        "tags": [
+          "project"
+        ],
+        "summary": "Gets the kubeconfig for the specified cluster.",
+        "operationId": "getClusterKubeconfigV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/Kubeconfig"
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/machinedeployments": {
+      "get": {
+        "description": "Lists machine deployments that belong to the given cluster",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "operationId": "listMachineDeployments",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "NodeDeployment",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/NodeDeployment"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "Creates a machine deployment that will belong to the given cluster",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "operationId": "createMachineDeployment",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "Body",
+            "in": "body",
+            "schema": {
+              "$ref": "#/definitions/NodeDeployment"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "NodeDeployment",
+            "schema": {
+              "$ref": "#/definitions/NodeDeployment"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/machinedeployments/nodes/{node_id}": {
+      "delete": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "summary": "Deletes the given node that belongs to the machine deployment.",
+        "operationId": "deleteMachineDeploymentNode",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "NodeID",
+            "name": "node_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/empty"
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/machinedeployments/{machinedeployment_id}": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "summary": "Gets a machine deployment that is assigned to the given cluster.",
+        "operationId": "getMachineDeployment",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "MachineDeploymentID",
+            "name": "machinedeployment_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "NodeDeployment",
+            "schema": {
+              "$ref": "#/definitions/NodeDeployment"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "delete": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "summary": "Deletes the given machine deployment that belongs to the cluster.",
+        "operationId": "deleteMachineDeployment",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "MachineDeploymentID",
+            "name": "machinedeployment_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/empty"
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "patch": {
+        "description": "Patches a machine deployment that is assigned to the given cluster. Please note that at the moment only\nnode deployment's spec can be updated by a patch, no other fields can be changed using this endpoint.",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "operationId": "patchMachineDeployment",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "MachineDeploymentID",
+            "name": "machinedeployment_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "Patch",
+            "in": "body",
+            "schema": {
+              "type": "object"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "NodeDeployment",
+            "schema": {
+              "$ref": "#/definitions/NodeDeployment"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/machinedeployments/{machinedeployment_id}/nodes": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "summary": "Lists nodes that belong to the given machine deployment.",
+        "operationId": "listMachineDeploymentNodes",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "MachineDeploymentID",
+            "name": "machinedeployment_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "boolean",
+            "x-go-name": "HideInitialConditions",
+            "name": "hideInitialConditions",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Node",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Node"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/machinedeployments/{machinedeployment_id}/nodes/events": {
+      "get": {
+        "description": "If the value is 'normal' then normal events are returned. If the query parameter is missing method returns all events.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "summary": "Lists machine deployment events. If query parameter `type` is set to `warning` then only warning events are retrieved.",
+        "operationId": "listMachineDeploymentNodesEvents",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "MachineDeploymentID",
+            "name": "machinedeployment_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "Type",
+            "name": "type",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Event",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Event"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/machinedeployments/{machinedeployment_id}/nodes/metrics": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "metric"
+        ],
+        "summary": "Lists metrics that belong to the given machine deployment.",
+        "operationId": "listMachineDeploymentMetrics",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "MachineDeploymentID",
+            "name": "machinedeployment_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "NodeMetric",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/NodeMetric"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/metrics": {
+      "get": {
+        "description": "Gets cluster metrics",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "operationId": "getClusterMetricsV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ClusterMetrics",
+            "schema": {
+              "$ref": "#/definitions/ClusterMetrics"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/namespaces": {
+      "get": {
+        "description": "Lists all namespaces in the cluster",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "operationId": "listNamespaceV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Namespace",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Namespace"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/nodes": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "summary": "This endpoint is used for kubeadm cluster.",
+        "operationId": "listNodesForCluster",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "boolean",
+            "x-go-name": "HideInitialConditions",
+            "name": "hideInitialConditions",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Node",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Node"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/nodes/upgrades": {
+      "put": {
+        "description": "Upgrades node deployments in a cluster",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "operationId": "upgradeClusterNodeDeploymentsV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "Body",
+            "in": "body",
+            "schema": {
+              "$ref": "#/definitions/MasterVersion"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/empty"
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/oidckubeconfig": {
+      "get": {
+        "produces": [
+          "application/octet-stream"
+        ],
+        "tags": [
+          "project"
+        ],
+        "summary": "Gets the kubeconfig for the specified cluster with oidc authentication.",
+        "operationId": "getOidcClusterKubeconfigV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/Kubeconfig"
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/providers/alibaba/instancetypes": {
+      "get": {
+        "description": "Lists available Alibaba Instance Types",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "alibaba"
+        ],
+        "operationId": "listAlibabaInstanceTypesNoCredentialsV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "Region",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "AlibabaInstanceTypeList",
+            "schema": {
+              "$ref": "#/definitions/AlibabaInstanceTypeList"
+            }
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/providers/alibaba/zones": {
+      "get": {
+        "description": "Lists available Alibaba Instance Types",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "alibaba"
+        ],
+        "operationId": "listAlibabaZonesNoCredentialsV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "Region",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "AlibabaZoneList",
+            "schema": {
+              "$ref": "#/definitions/AlibabaZoneList"
+            }
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/providers/aws/sizes": {
+      "get": {
+        "description": "Lists available AWS sizes",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "aws"
+        ],
+        "operationId": "listAWSSizesNoCredentialsV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "AWSSizeList",
+            "schema": {
+              "$ref": "#/definitions/AWSSizeList"
+            }
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/providers/aws/subnets": {
+      "get": {
+        "description": "Lists available AWS subnets",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "aws"
+        ],
+        "operationId": "listAWSSubnetsNoCredentialsV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "AWSSubnetList",
+            "schema": {
+              "$ref": "#/definitions/AWSSubnetList"
+            }
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/providers/azure/availabilityzones": {
+      "get": {
+        "description": "Lists available VM availability zones in an Azure region",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "azure"
+        ],
+        "operationId": "listAzureAvailabilityZonesNoCredentialsV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "SKUName",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "AzureAvailabilityZonesList",
+            "schema": {
+              "$ref": "#/definitions/AzureAvailabilityZonesList"
+            }
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/providers/azure/sizes": {
+      "get": {
+        "description": "Lists available VM sizes in an Azure region",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "azure"
+        ],
+        "operationId": "listAzureSizesNoCredentialsV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "AzureSizeList",
+            "schema": {
+              "$ref": "#/definitions/AzureSizeList"
+            }
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/providers/digitalocean/sizes": {
+      "get": {
+        "description": "Lists sizes from digitalocean",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "digitalocean"
+        ],
+        "operationId": "listDigitaloceanSizesNoCredentialsV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "DigitaloceanSizeList",
+            "schema": {
+              "$ref": "#/definitions/DigitaloceanSizeList"
+            }
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/providers/gcp/disktypes": {
+      "get": {
+        "description": "Lists disk types from GCP",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "gcp"
+        ],
+        "operationId": "listGCPDiskTypesNoCredentialsV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "Zone",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "GCPDiskTypeList",
+            "schema": {
+              "$ref": "#/definitions/GCPDiskTypeList"
+            }
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/providers/gcp/networks": {
+      "get": {
+        "description": "Lists available GCP networks",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "gcp"
+        ],
+        "operationId": "listGCPNetworksNoCredentialsV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "GCPNetworkList",
+            "schema": {
+              "$ref": "#/definitions/GCPNetworkList"
+            }
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/providers/gcp/sizes": {
+      "get": {
+        "description": "Lists machine sizes from GCP",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "gcp"
+        ],
+        "operationId": "listGCPSizesNoCredentialsV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "Zone",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "GCPMachineSizeList",
+            "schema": {
+              "$ref": "#/definitions/GCPMachineSizeList"
+            }
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/providers/gcp/subnetworks": {
+      "get": {
+        "description": "Lists available GCP subnetworks",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "gcp"
+        ],
+        "operationId": "listGCPSubnetworksNoCredentialsV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "Network",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "GCPSubnetworkList",
+            "schema": {
+              "$ref": "#/definitions/GCPSubnetworkList"
+            }
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/providers/gcp/zones": {
+      "get": {
+        "description": "Lists available GCP zones",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "gcp"
+        ],
+        "operationId": "listGCPZonesNoCredentialsV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "GCPZoneList",
+            "schema": {
+              "$ref": "#/definitions/GCPZoneList"
+            }
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/providers/hetzner/sizes": {
+      "get": {
+        "description": "Lists sizes from hetzner",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "hetzner"
+        ],
+        "operationId": "listHetznerSizesNoCredentialsV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "HetznerSizeList",
+            "schema": {
+              "$ref": "#/definitions/HetznerSizeList"
+            }
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/providers/openstack/availabilityzones": {
+      "get": {
+        "description": "Lists availability zones from openstack",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "openstack"
+        ],
+        "operationId": "listOpenstackAvailabilityZonesNoCredentialsV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OpenstackAvailabilityZone",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/OpenstackAvailabilityZone"
+              }
+            }
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/providers/openstack/networks": {
+      "get": {
+        "description": "Lists networks from openstack",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "openstack"
+        ],
+        "operationId": "listOpenstackNetworksNoCredentialsV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OpenstackNetwork",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/OpenstackNetwork"
+              }
+            }
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/providers/openstack/securitygroups": {
+      "get": {
+        "description": "Lists security groups from openstack",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "openstack"
+        ],
+        "operationId": "listOpenstackSecurityGroupsNoCredentialsV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OpenstackSecurityGroup",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/OpenstackSecurityGroup"
+              }
+            }
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/providers/openstack/sizes": {
+      "get": {
+        "description": "Lists sizes from openstack",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "openstack"
+        ],
+        "operationId": "listOpenstackSizesNoCredentialsV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OpenstackSize",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/OpenstackSize"
+              }
+            }
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/providers/openstack/subnets": {
+      "get": {
+        "description": "Lists subnets from openstack",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "openstack"
+        ],
+        "operationId": "listOpenstackSubnetsNoCredentialsV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "NetworkID",
+            "name": "network_id",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OpenstackSubnet",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/OpenstackSubnet"
+              }
+            }
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/providers/openstack/tenants": {
+      "get": {
+        "description": "Lists tenants from openstack",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "openstack"
+        ],
+        "operationId": "listOpenstackTenantsNoCredentialsV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OpenstackTenant",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/OpenstackTenant"
+              }
+            }
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/providers/packet/sizes": {
+      "get": {
+        "description": "Lists sizes from packet",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "packet"
+        ],
+        "operationId": "listPacketSizesNoCredentialsV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "PacketSizeList",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/PacketSizeList"
+              }
+            }
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/providers/vsphere/folders": {
+      "get": {
+        "description": "Lists folders from vsphere datacenter",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "vsphere"
+        ],
+        "operationId": "listVSphereFoldersNoCredentialsV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "VSphereFolder",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/VSphereFolder"
+              }
+            }
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/providers/vsphere/networks": {
+      "get": {
+        "description": "Lists networks from vsphere datacenter",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "vsphere"
+        ],
+        "operationId": "listVSphereNetworksNoCredentialsV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "VSphereNetwork",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/VSphereNetwork"
+              }
+            }
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/rolenames": {
+      "get": {
+        "description": "Lists all Role names with namespaces",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "operationId": "listRoleNamesV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "RoleName",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/RoleName"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/roles": {
+      "get": {
+        "description": "Lists all Roles",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "operationId": "listRoleV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Role",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Role"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/roles/{namespace}/{role_id}/bindings": {
+      "post": {
+        "description": "Binds user to the role",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "operationId": "bindUserToRoleV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "RoleID",
+            "name": "role_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "Namespace",
+            "name": "namespace",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "Body",
+            "in": "body",
+            "schema": {
+              "$ref": "#/definitions/RoleUser"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "RoleBinding",
+            "schema": {
+              "$ref": "#/definitions/RoleBinding"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "delete": {
+        "description": "Unbinds user from the role binding",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "operationId": "unbindUserFromRoleBindingV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "RoleID",
+            "name": "role_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "Namespace",
+            "name": "namespace",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "Body",
+            "in": "body",
+            "schema": {
+              "$ref": "#/definitions/RoleUser"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "RoleBinding",
+            "schema": {
+              "$ref": "#/definitions/RoleBinding"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/sshkeys": {
+      "get": {
+        "description": "Lists ssh keys that are assigned to the cluster\nThe returned collection is sorted by creation timestamp.",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "operationId": "listSSHKeysAssignedToClusterV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SSHKey",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/SSHKey"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/sshkeys/{key_id}": {
+      "put": {
+        "description": "Assigns an existing ssh key to the given cluster",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "operationId": "assignSSHKeyToClusterV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "KeyID",
+            "name": "key_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "SSHKey",
+            "schema": {
+              "$ref": "#/definitions/SSHKey"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/token": {
+      "put": {
+        "description": "Revokes the current admin token",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "operationId": "revokeClusterAdminTokenV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/empty"
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/upgrades": {
+      "get": {
+        "description": "Gets possible cluster upgrades",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "operationId": "getClusterUpgradesV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "MasterVersion",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/MasterVersion"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/viewertoken": {
+      "put": {
+        "description": "Revokes the current viewer token",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "operationId": "revokeClusterViewerTokenV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/empty"
           },
           "401": {
             "$ref": "#/responses/empty"
@@ -9467,6 +13199,469 @@
           }
         }
       }
+    },
+    "/api/v2/providers/azure/resourcegroups": {
+      "get": {
+        "description": "Lists available VM resource groups",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "azure"
+        ],
+        "operationId": "listAzureResourceGroups",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "SubscriptionID",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "TenantID",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "ClientID",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "ClientSecret",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "Credential",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "Location",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "AzureResourceGroupsList",
+            "schema": {
+              "$ref": "#/definitions/AzureResourceGroupsList"
+            }
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/providers/azure/routetables": {
+      "get": {
+        "description": "Lists available VM route tables",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "azure"
+        ],
+        "operationId": "listAzureRouteTables",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "SubscriptionID",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "TenantID",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "ClientID",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "ClientSecret",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "Credential",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "ResourceGroup",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "Location",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "AzureRouteTablesList",
+            "schema": {
+              "$ref": "#/definitions/AzureRouteTablesList"
+            }
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/providers/azure/securitygroups": {
+      "get": {
+        "description": "Lists available VM security groups",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "azure"
+        ],
+        "operationId": "listAzureSecurityGroups",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "SubscriptionID",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "TenantID",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "ClientID",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "ClientSecret",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "Credential",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "ResourceGroup",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "Location",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "AzureSecurityGroupsList",
+            "schema": {
+              "$ref": "#/definitions/AzureSecurityGroupsList"
+            }
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/providers/azure/subnets": {
+      "get": {
+        "description": "Lists available VM subnets",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "azure"
+        ],
+        "operationId": "listAzureSubnets",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "SubscriptionID",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "TenantID",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "ClientID",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "ClientSecret",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "Credential",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "ResourceGroup",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "VirtualNetwork",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "AzureSubnetsList",
+            "schema": {
+              "$ref": "#/definitions/AzureSubnetsList"
+            }
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/providers/azure/vnets": {
+      "get": {
+        "description": "Lists available VM virtual networks",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "azure"
+        ],
+        "operationId": "listAzureVnets",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "SubscriptionID",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "TenantID",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "ClientID",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "ClientSecret",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "Credential",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "ResourceGroup",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "Location",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "AzureVirtualNetworksList",
+            "schema": {
+              "$ref": "#/definitions/AzureVirtualNetworksList"
+            }
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/providers/{provider_name}/presets": {
+      "get": {
+        "description": "Lists presets for the provider",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "preset"
+        ],
+        "operationId": "listProviderPresets",
+        "parameters": [
+          {
+            "type": "boolean",
+            "x-go-name": "Disabled",
+            "name": "disabled",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "x-go-name": "ProviderName",
+            "name": "provider_name",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "Datacenter",
+            "name": "datacenter",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "PresetList",
+            "schema": {
+              "$ref": "#/definitions/PresetList"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "put": {
+        "description": "Updates provider preset",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "preset"
+        ],
+        "operationId": "updatePreset",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProviderName",
+            "name": "provider_name",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "Body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/Preset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Preset",
+            "schema": {
+              "$ref": "#/definitions/Preset"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "Creates the preset",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "preset"
+        ],
+        "operationId": "createPreset",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProviderName",
+            "name": "provider_name",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "Body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/Preset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Preset",
+            "schema": {
+              "$ref": "#/definitions/Preset"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
     }
   },
   "definitions": {
@@ -9534,7 +13729,7 @@
           "x-go-name": "AssignPublicIP"
         },
         "availabilityZone": {
-          "description": "Availiability zone in which to place the node. It is coupled with the subnet to which the node will belong.",
+          "description": "Availability zone in which to place the node. It is coupled with the subnet to which the node will belong.",
           "type": "string",
           "x-go-name": "AvailabilityZone"
         },
@@ -9566,6 +13761,20 @@
           "type": "string",
           "x-go-name": "VolumeType",
           "example": "gp2, io1, st1, sc1, standard"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
+    },
+    "AWSSecurityGroupList": {
+      "type": "object",
+      "title": "AWSSecurityGroupList represents an array of AWS Security Group.",
+      "properties": {
+        "ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-go-name": "IDs"
         }
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
@@ -10034,7 +14243,7 @@
           "x-go-name": "Logo"
         },
         "logoFormat": {
-          "description": "LogoFormat contains logo format of the configured addon, i.e. svg+xml.",
+          "description": "LogoFormat contains logo format of the configured addon, i.e. svg+xml",
           "type": "string",
           "x-go-name": "LogoFormat"
         },
@@ -10054,6 +14263,11 @@
           "description": "DisplayName is visible in the UI",
           "type": "string",
           "x-go-name": "DisplayName"
+        },
+        "helpText": {
+          "description": "HelpText is visible in the UI next to the control",
+          "type": "string",
+          "x-go-name": "HelpText"
         },
         "internalName": {
           "description": "InternalName is used internally to save in the addon object",
@@ -10250,6 +14464,62 @@
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
     },
+    "AnexiaCloudSpec": {
+      "type": "object",
+      "title": "AnexiaCloudSpec specifies the access data to Anexia.",
+      "properties": {
+        "credentialsReference": {
+          "$ref": "#/definitions/GlobalSecretKeySelector"
+        },
+        "token": {
+          "type": "string",
+          "x-go-name": "Token"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+    },
+    "AnexiaNodeSpec": {
+      "description": "AnexiaNodeSpec anexia specific node settings",
+      "type": "object",
+      "required": [
+        "vlanID",
+        "templateID",
+        "cpus",
+        "memory",
+        "diskSize"
+      ],
+      "properties": {
+        "cpus": {
+          "description": "CPUs states how many cpus the node will have.",
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "CPUs"
+        },
+        "diskSize": {
+          "description": "DiskSize states the disk size that node will have.",
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "DiskSize"
+        },
+        "memory": {
+          "description": "Memory states the memory that node will have.",
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "Memory"
+        },
+        "templateID": {
+          "description": "TemplateID instance template",
+          "type": "string",
+          "x-go-name": "TemplateID"
+        },
+        "vlanID": {
+          "description": "VlanID Instance vlanID",
+          "type": "string",
+          "x-go-name": "VlanID"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
+    },
     "AuditLoggingSettings": {
       "type": "object",
       "properties": {
@@ -10276,7 +14546,7 @@
     },
     "AzureCloudSpec": {
       "type": "object",
-      "title": "AzureCloudSpec specifies acceess credentials to Azure cloud.",
+      "title": "AzureCloudSpec specifies access credentials to Azure cloud.",
       "properties": {
         "availabilitySet": {
           "type": "string",
@@ -10347,6 +14617,7 @@
           "x-go-name": "DataDiskSize"
         },
         "imageID": {
+          "description": "ImageID represents the ID of the image that should be used to run the node",
           "type": "string",
           "x-go-name": "ImageID"
         },
@@ -10376,6 +14647,48 @@
             "type": "string"
           },
           "x-go-name": "Zones"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
+    },
+    "AzureResourceGroupsList": {
+      "description": "AzureResourceGroupsList is the object representing the resource groups for vms in azure cloud provider",
+      "type": "object",
+      "properties": {
+        "resourceGroups": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-go-name": "ResourceGroups"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
+    },
+    "AzureRouteTablesList": {
+      "description": "AzureRouteTablesList is the object representing the route tables for vms in azure cloud provider",
+      "type": "object",
+      "properties": {
+        "routeTables": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-go-name": "RouteTables"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
+    },
+    "AzureSecurityGroupsList": {
+      "description": "AzureSecurityGroupsList is the object representing the security groups for vms in azure cloud provider",
+      "type": "object",
+      "properties": {
+        "securityGroups": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-go-name": "SecurityGroups"
         }
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
@@ -10424,10 +14737,83 @@
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
     },
+    "AzureSubnetsList": {
+      "description": "AzureSubnetsList is the object representing the subnets for vms in azure cloud provider",
+      "type": "object",
+      "properties": {
+        "subnets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-go-name": "Subnets"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
+    },
+    "AzureVirtualNetworksList": {
+      "description": "AzureVirtualNetworksList is the object representing the virtual network for vms in azure cloud provider",
+      "type": "object",
+      "properties": {
+        "virtualNetworks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-go-name": "VirtualNetworks"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
+    },
     "BringYourOwnCloudSpec": {
       "type": "object",
       "title": "BringYourOwnCloudSpec specifies access data for a bring your own cluster.",
       "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+    },
+    "ByPodStatus": {
+      "description": "ByPodStatus defines the observed state of ConstraintTemplate as seen by\nan individual controller",
+      "type": "object",
+      "properties": {
+        "errors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/CreateCRDError"
+          },
+          "x-go-name": "Errors"
+        },
+        "id": {
+          "description": "a unique identifier for the pod that wrote the status",
+          "type": "string",
+          "x-go-name": "ID"
+        },
+        "observedGeneration": {
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "ObservedGeneration"
+        }
+      },
+      "x-go-package": "github.com/open-policy-agent/frameworks/constraint/pkg/apis/templates/v1beta1"
+    },
+    "CRD": {
+      "type": "object",
+      "properties": {
+        "spec": {
+          "$ref": "#/definitions/CRDSpec"
+        }
+      },
+      "x-go-package": "github.com/open-policy-agent/frameworks/constraint/pkg/apis/templates/v1beta1"
+    },
+    "CRDSpec": {
+      "type": "object",
+      "properties": {
+        "names": {
+          "$ref": "#/definitions/Names"
+        },
+        "validation": {
+          "$ref": "#/definitions/Validation"
+        }
+      },
+      "x-go-package": "github.com/open-policy-agent/frameworks/constraint/pkg/apis/templates/v1beta1"
     },
     "CentOSSpec": {
       "description": "CentOSSpec contains CentOS specific settings",
@@ -10459,6 +14845,9 @@
       "properties": {
         "alibaba": {
           "$ref": "#/definitions/AlibabaCloudSpec"
+        },
+        "anexia": {
+          "$ref": "#/definitions/AnexiaCloudSpec"
         },
         "aws": {
           "$ref": "#/definitions/AWSCloudSpec"
@@ -10739,6 +15128,11 @@
         "clusterNetwork": {
           "$ref": "#/definitions/ClusterNetworkingConfig"
         },
+        "enableUserSSHKeyAgent": {
+          "description": "EnableUserSSHKeyAgent control whether the UserSSHKeyAgent will be deployed in the user cluster or not.\nIf it was enabled, the agent will be deployed and used to sync the user ssh keys, that the user attach\nto the created cluster. If the agent was disabled, it won't be deployed in the user cluster, thus after\nthe cluster creation any attached ssh keys won't be synced to the worker nodes. Once the agent is enabled/disabled\nit cannot be changed after the cluster is being created.",
+          "type": "boolean",
+          "x-go-name": "EnableUserSSHKeyAgent"
+        },
         "machineNetworks": {
           "description": "MachineNetworks optionally specifies the parameters for IPAM.",
           "type": "array",
@@ -10750,6 +15144,9 @@
         "oidc": {
           "$ref": "#/definitions/OIDCSettings"
         },
+        "opaIntegration": {
+          "$ref": "#/definitions/OPAIntegrationSettings"
+        },
         "openshift": {
           "$ref": "#/definitions/Openshift"
         },
@@ -10760,6 +15157,9 @@
             "type": "string"
           },
           "x-go-name": "PodNodeSelectorAdmissionPluginConfig"
+        },
+        "serviceAccount": {
+          "$ref": "#/definitions/ServiceAccountSettings"
         },
         "sys11auth": {
           "$ref": "#/definitions/Sys11AuthSettings"
@@ -10803,6 +15203,115 @@
       "format": "int8",
       "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
     },
+    "Constraint": {
+      "description": "Constraint represents a gatekeeper Constraint",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "x-go-name": "Name"
+        },
+        "spec": {
+          "$ref": "#/definitions/ConstraintSpec"
+        },
+        "status": {
+          "$ref": "#/definitions/ConstraintStatus"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
+    },
+    "ConstraintSpec": {
+      "type": "object",
+      "title": "ConstraintSpec specifies the data for the constraint.",
+      "properties": {
+        "constraintType": {
+          "description": "ConstraintType specifies the type of gatekeeper constraint that the constraint applies to",
+          "type": "string",
+          "x-go-name": "ConstraintType"
+        },
+        "match": {
+          "$ref": "#/definitions/Match"
+        },
+        "parameters": {
+          "$ref": "#/definitions/Parameters"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+    },
+    "ConstraintStatus": {
+      "description": "ConstraintStatus represents a constraint status which holds audit info",
+      "type": "object",
+      "properties": {
+        "auditTimestamp": {
+          "type": "string",
+          "x-go-name": "AuditTimestamp"
+        },
+        "enforcement": {
+          "type": "string",
+          "x-go-name": "Enforcement"
+        },
+        "violations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Violation"
+          },
+          "x-go-name": "Violations"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
+    },
+    "ConstraintTemplate": {
+      "description": "ConstraintTemplate represents a gatekeeper ConstraintTemplate",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "x-go-name": "Name"
+        },
+        "spec": {
+          "$ref": "#/definitions/ConstraintTemplateSpec"
+        },
+        "status": {
+          "$ref": "#/definitions/ConstraintTemplateStatus"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
+    },
+    "ConstraintTemplateSpec": {
+      "description": "ConstraintTemplateSpec is the object representing the gatekeeper constraint template spec and kubermatic related spec",
+      "type": "object",
+      "properties": {
+        "crd": {
+          "$ref": "#/definitions/CRD"
+        },
+        "targets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Target"
+          },
+          "x-go-name": "Targets"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+    },
+    "ConstraintTemplateStatus": {
+      "description": "ConstraintTemplateStatus defines the observed state of ConstraintTemplate",
+      "type": "object",
+      "properties": {
+        "byPod": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ByPodStatus"
+          },
+          "x-go-name": "ByPod"
+        },
+        "created": {
+          "type": "boolean",
+          "x-go-name": "Created"
+        }
+      },
+      "x-go-package": "github.com/open-policy-agent/frameworks/constraint/pkg/apis/templates/v1beta1"
+    },
     "ContainerLinuxSpec": {
       "description": "ContainerLinuxSpec ubuntu linux specific settings",
       "type": "object",
@@ -10833,6 +15342,25 @@
         }
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
+    },
+    "CreateCRDError": {
+      "type": "object",
+      "title": "CreateCRDError represents a single error caught during parsing, compiling, etc.",
+      "properties": {
+        "code": {
+          "type": "string",
+          "x-go-name": "Code"
+        },
+        "location": {
+          "type": "string",
+          "x-go-name": "Location"
+        },
+        "message": {
+          "type": "string",
+          "x-go-name": "Message"
+        }
+      },
+      "x-go-package": "github.com/open-policy-agent/frameworks/constraint/pkg/apis/templates/v1beta1"
     },
     "CreateClusterSpec": {
       "description": "CreateClusterSpec is the structure that is used to create cluster with its initial node deployment",
@@ -10940,6 +15468,9 @@
       "properties": {
         "alibaba": {
           "$ref": "#/definitions/DatacenterSpecAlibaba"
+        },
+        "anexia": {
+          "$ref": "#/definitions/DatacenterSpecAnexia"
         },
         "aws": {
           "$ref": "#/definitions/DatacenterSpecAWS"
@@ -11049,6 +15580,18 @@
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
     },
+    "DatacenterSpecAnexia": {
+      "type": "object",
+      "title": "DatacenterSpecAnexia describes a anexia datacenter.",
+      "properties": {
+        "location_id": {
+          "description": "LocationID the location of the region",
+          "type": "string",
+          "x-go-name": "LocationID"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+    },
     "DatacenterSpecAzure": {
       "description": "DatacenterSpecAzure describes an Azure cloud datacenter",
       "type": "object",
@@ -11127,6 +15670,11 @@
           "description": "Optional: Detailed location of the datacenter, like \"Hamburg\" or \"Datacenter 7\".\nFor informational purposes only.",
           "type": "string",
           "x-go-name": "Location"
+        },
+        "network": {
+          "description": "Network is the pre-existing Hetzner network in which the machines are running.\nWhile machines can be in multiple networks, a single one must be chosen for the\nHCloud CCM to work.",
+          "type": "string",
+          "x-go-name": "Network"
         }
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
@@ -11134,6 +15682,16 @@
     "DatacenterSpecKubevirt": {
       "type": "object",
       "title": "DatacenterSpecKubevirt describes a kubevirt datacenter.",
+      "properties": {
+        "dns_config": {
+          "$ref": "#/definitions/PodDNSConfig"
+        },
+        "dns_policy": {
+          "description": "DNSPolicy represents the dns policy for the pod. Valid values are 'ClusterFirstWithHostNet', 'ClusterFirst',\n'Default' or 'None'. Defaults to \"ClusterFirst\". DNS parameters given in DNSConfig will be merged with the\npolicy selected with DNSPolicy.",
+          "type": "string",
+          "x-go-name": "DNSPolicy"
+        }
+      },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
     },
     "DatacenterSpecOpenstack": {
@@ -11219,7 +15777,7 @@
           "x-go-name": "AllowInsecure"
         },
         "cluster": {
-          "description": "The name of the Kubernetes cluster to use.",
+          "description": "Optional: The name of the vSphere cluster to use.\nCluster is deprecated and may be removed in future releases as it is\ncurrently ignored.\nThe cluster hosting the VMs will be the same VM used as a template is\nlocated.",
           "type": "string",
           "x-go-name": "Cluster"
         },
@@ -11460,6 +16018,26 @@
         }
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
+    },
+    "ExposeStrategy": {
+      "type": "string",
+      "title": "ExposeStrategy is the strategy to expose the cluster with.",
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+    },
+    "ExternalDocumentation": {
+      "type": "object",
+      "title": "ExternalDocumentation allows referencing an external resource for extended documentation.",
+      "properties": {
+        "description": {
+          "type": "string",
+          "x-go-name": "Description"
+        },
+        "url": {
+          "type": "string",
+          "x-go-name": "URL"
+        }
+      },
+      "x-go-package": "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
     },
     "FakeCloudSpec": {
       "type": "object",
@@ -11726,6 +16304,58 @@
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
     },
+    "GVK": {
+      "description": "GVK group version kind of a resource",
+      "type": "object",
+      "properties": {
+        "group": {
+          "type": "string",
+          "x-go-name": "Group"
+        },
+        "kind": {
+          "type": "string",
+          "x-go-name": "Kind"
+        },
+        "version": {
+          "type": "string",
+          "x-go-name": "Version"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
+    },
+    "GatekeeperConfig": {
+      "description": "GatekeeperConfig represents a gatekeeper config",
+      "type": "object",
+      "properties": {
+        "spec": {
+          "$ref": "#/definitions/GatekeeperConfigSpec"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
+    },
+    "GatekeeperConfigSpec": {
+      "type": "object",
+      "properties": {
+        "match": {
+          "description": "Configuration for namespace exclusion",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MatchEntry"
+          },
+          "x-go-name": "Match"
+        },
+        "readiness": {
+          "$ref": "#/definitions/ReadinessSpec"
+        },
+        "sync": {
+          "$ref": "#/definitions/Sync"
+        },
+        "validation": {
+          "$ref": "#/definitions/Validation"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
+    },
     "GlobalCustomLinks": {
       "description": "GlobalCustomLinks defines custom links for global settings",
       "type": "array",
@@ -11797,7 +16427,13 @@
         "credentialsReference": {
           "$ref": "#/definitions/GlobalSecretKeySelector"
         },
+        "network": {
+          "description": "Network is the pre-existing Hetzner network in which the machines are running.\nWhile machines can be in multiple networks, a single one must be chosen for the\nHCloud CCM to work.\nIf this is empty, the network configured on the datacenter will be used.",
+          "type": "string",
+          "x-go-name": "Network"
+        },
         "token": {
+          "description": "Token is used to authenticate with the Hetzner cloud API.",
           "type": "string",
           "x-go-name": "Token"
         }
@@ -11811,6 +16447,11 @@
         "type"
       ],
       "properties": {
+        "network": {
+          "description": "network name",
+          "type": "string",
+          "x-go-name": "Network"
+        },
         "type": {
           "description": "server type",
           "type": "string",
@@ -11932,6 +16573,320 @@
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
     },
+    "JSON": {
+      "description": "These types are supported: bool, int64, float64, string, []interface{}, map[string]interface{} and nil.",
+      "type": "object",
+      "title": "JSON represents any valid JSON value.",
+      "properties": {
+        "Raw": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          }
+        }
+      },
+      "x-go-package": "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+    },
+    "JSONSchemaDefinitions": {
+      "type": "object",
+      "title": "JSONSchemaDefinitions contains the models explicitly defined in this spec.",
+      "additionalProperties": {
+        "$ref": "#/definitions/JSONSchemaProps"
+      },
+      "x-go-package": "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+    },
+    "JSONSchemaDependencies": {
+      "type": "object",
+      "title": "JSONSchemaDependencies represent a dependencies property.",
+      "additionalProperties": {
+        "$ref": "#/definitions/JSONSchemaPropsOrStringArray"
+      },
+      "x-go-package": "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+    },
+    "JSONSchemaProps": {
+      "type": "object",
+      "title": "JSONSchemaProps is a JSON-Schema following Specification Draft 4 (http://json-schema.org/).",
+      "properties": {
+        "$ref": {
+          "type": "string",
+          "x-go-name": "Ref"
+        },
+        "$schema": {
+          "$ref": "#/definitions/JSONSchemaURL"
+        },
+        "additionalItems": {
+          "$ref": "#/definitions/JSONSchemaPropsOrBool"
+        },
+        "additionalProperties": {
+          "$ref": "#/definitions/JSONSchemaPropsOrBool"
+        },
+        "allOf": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/JSONSchemaProps"
+          },
+          "x-go-name": "AllOf"
+        },
+        "anyOf": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/JSONSchemaProps"
+          },
+          "x-go-name": "AnyOf"
+        },
+        "default": {
+          "$ref": "#/definitions/JSON"
+        },
+        "definitions": {
+          "$ref": "#/definitions/JSONSchemaDefinitions"
+        },
+        "dependencies": {
+          "$ref": "#/definitions/JSONSchemaDependencies"
+        },
+        "description": {
+          "type": "string",
+          "x-go-name": "Description"
+        },
+        "enum": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/JSON"
+          },
+          "x-go-name": "Enum"
+        },
+        "example": {
+          "$ref": "#/definitions/JSON"
+        },
+        "exclusiveMaximum": {
+          "type": "boolean",
+          "x-go-name": "ExclusiveMaximum"
+        },
+        "exclusiveMinimum": {
+          "type": "boolean",
+          "x-go-name": "ExclusiveMinimum"
+        },
+        "externalDocs": {
+          "$ref": "#/definitions/ExternalDocumentation"
+        },
+        "format": {
+          "description": "format is an OpenAPI v3 format string. Unknown formats are ignored. The following formats are validated:\n\nbsonobjectid: a bson object ID, i.e. a 24 characters hex string\nuri: an URI as parsed by Golang net/url.ParseRequestURI\nemail: an email address as parsed by Golang net/mail.ParseAddress\nhostname: a valid representation for an Internet host name, as defined by RFC 1034, section 3.1 [RFC1034].\nipv4: an IPv4 IP as parsed by Golang net.ParseIP\nipv6: an IPv6 IP as parsed by Golang net.ParseIP\ncidr: a CIDR as parsed by Golang net.ParseCIDR\nmac: a MAC address as parsed by Golang net.ParseMAC\nuuid: an UUID that allows uppercase defined by the regex (?i)^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$\nuuid3: an UUID3 that allows uppercase defined by the regex (?i)^[0-9a-f]{8}-?[0-9a-f]{4}-?3[0-9a-f]{3}-?[0-9a-f]{4}-?[0-9a-f]{12}$\nuuid4: an UUID4 that allows uppercase defined by the regex (?i)^[0-9a-f]{8}-?[0-9a-f]{4}-?4[0-9a-f]{3}-?[89ab][0-9a-f]{3}-?[0-9a-f]{12}$\nuuid5: an UUID5 that allows uppercase defined by the regex (?i)^[0-9a-f]{8}-?[0-9a-f]{4}-?5[0-9a-f]{3}-?[89ab][0-9a-f]{3}-?[0-9a-f]{12}$\nisbn: an ISBN10 or ISBN13 number string like \"0321751043\" or \"978-0321751041\"\nisbn10: an ISBN10 number string like \"0321751043\"\nisbn13: an ISBN13 number string like \"978-0321751041\"\ncreditcard: a credit card number defined by the regex ^(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|6(?:011|5[0-9][0-9])[0-9]{12}|3[47][0-9]{13}|3(?:0[0-5]|[68][0-9])[0-9]{11}|(?:2131|1800|35\\\\d{3})\\\\d{11})$ with any non digit characters mixed in\nssn: a U.S. social security number following the regex ^\\\\d{3}[- ]?\\\\d{2}[- ]?\\\\d{4}$\nhexcolor: an hexadecimal color code like \"#FFFFFF: following the regex ^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$\nrgbcolor: an RGB color code like rgb like \"rgb(255,255,2559\"\nbyte: base64 encoded binary data\npassword: any kind of string\ndate: a date string like \"2006-01-02\" as defined by full-date in RFC3339\nduration: a duration string like \"22 ns\" as parsed by Golang time.ParseDuration or compatible with Scala duration format\ndatetime: a date time string like \"2014-12-15T19:30:20.000Z\" as defined by date-time in RFC3339.",
+          "type": "string",
+          "x-go-name": "Format"
+        },
+        "id": {
+          "type": "string",
+          "x-go-name": "ID"
+        },
+        "items": {
+          "$ref": "#/definitions/JSONSchemaPropsOrArray"
+        },
+        "maxItems": {
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "MaxItems"
+        },
+        "maxLength": {
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "MaxLength"
+        },
+        "maxProperties": {
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "MaxProperties"
+        },
+        "maximum": {
+          "type": "number",
+          "format": "double",
+          "x-go-name": "Maximum"
+        },
+        "minItems": {
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "MinItems"
+        },
+        "minLength": {
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "MinLength"
+        },
+        "minProperties": {
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "MinProperties"
+        },
+        "minimum": {
+          "type": "number",
+          "format": "double",
+          "x-go-name": "Minimum"
+        },
+        "multipleOf": {
+          "type": "number",
+          "format": "double",
+          "x-go-name": "MultipleOf"
+        },
+        "not": {
+          "$ref": "#/definitions/JSONSchemaProps"
+        },
+        "nullable": {
+          "type": "boolean",
+          "x-go-name": "Nullable"
+        },
+        "oneOf": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/JSONSchemaProps"
+          },
+          "x-go-name": "OneOf"
+        },
+        "pattern": {
+          "type": "string",
+          "x-go-name": "Pattern"
+        },
+        "patternProperties": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/JSONSchemaProps"
+          },
+          "x-go-name": "PatternProperties"
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/JSONSchemaProps"
+          },
+          "x-go-name": "Properties"
+        },
+        "required": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-go-name": "Required"
+        },
+        "title": {
+          "type": "string",
+          "x-go-name": "Title"
+        },
+        "type": {
+          "type": "string",
+          "x-go-name": "Type"
+        },
+        "uniqueItems": {
+          "type": "boolean",
+          "x-go-name": "UniqueItems"
+        },
+        "x-kubernetes-embedded-resource": {
+          "description": "x-kubernetes-embedded-resource defines that the value is an\nembedded Kubernetes runtime.Object, with TypeMeta and\nObjectMeta. The type must be object. It is allowed to further\nrestrict the embedded object. kind, apiVersion and metadata\nare validated automatically. x-kubernetes-preserve-unknown-fields\nis allowed to be true, but does not have to be if the object\nis fully specified (up to kind, apiVersion, metadata).",
+          "type": "boolean",
+          "x-go-name": "XEmbeddedResource"
+        },
+        "x-kubernetes-int-or-string": {
+          "description": "x-kubernetes-int-or-string specifies that this value is\neither an integer or a string. If this is true, an empty\ntype is allowed and type as child of anyOf is permitted\nif following one of the following patterns:\n\n1) anyOf:\ntype: integer\ntype: string\n2) allOf:\nanyOf:\ntype: integer\ntype: string\n... zero or more",
+          "type": "boolean",
+          "x-go-name": "XIntOrString"
+        },
+        "x-kubernetes-list-map-keys": {
+          "description": "x-kubernetes-list-map-keys annotates an array with the x-kubernetes-list-type `map` by specifying the keys used\nas the index of the map.\n\nThis tag MUST only be used on lists that have the \"x-kubernetes-list-type\"\nextension set to \"map\". Also, the values specified for this attribute must\nbe a scalar typed field of the child structure (no nesting is supported).\n\nThe properties specified must either be required or have a default value,\nto ensure those properties are present for all list items.\n\n+optional",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-go-name": "XListMapKeys"
+        },
+        "x-kubernetes-list-type": {
+          "description": "x-kubernetes-list-type annotates an array to further describe its topology.\nThis extension must only be used on lists and may have 3 possible values:\n\n1) `atomic`: the list is treated as a single entity, like a scalar.\nAtomic lists will be entirely replaced when updated. This extension\nmay be used on any type of list (struct, scalar, ...).\n2) `set`:\nSets are lists that must not have multiple items with the same value. Each\nvalue must be a scalar, an object with x-kubernetes-map-type `atomic` or an\narray with x-kubernetes-list-type `atomic`.\n3) `map`:\nThese lists are like maps in that their elements have a non-index key\nused to identify them. Order is preserved upon merge. The map tag\nmust only be used on a list with elements of type object.\nDefaults to atomic for arrays.\n+optional",
+          "type": "string",
+          "x-go-name": "XListType"
+        },
+        "x-kubernetes-map-type": {
+          "description": "x-kubernetes-map-type annotates an object to further describe its topology.\nThis extension must only be used when type is object and may have 2 possible values:\n\n1) `granular`:\nThese maps are actual maps (key-value pairs) and each fields are independent\nfrom each other (they can each be manipulated by separate actors). This is\nthe default behaviour for all maps.\n2) `atomic`: the list is treated as a single entity, like a scalar.\nAtomic maps will be entirely replaced when updated.\n+optional",
+          "type": "string",
+          "x-go-name": "XMapType"
+        },
+        "x-kubernetes-preserve-unknown-fields": {
+          "description": "x-kubernetes-preserve-unknown-fields stops the API server\ndecoding step from pruning fields which are not specified\nin the validation schema. This affects fields recursively,\nbut switches back to normal pruning behaviour if nested\nproperties or additionalProperties are specified in the schema.\nThis can either be true or undefined. False is forbidden.",
+          "type": "boolean",
+          "x-go-name": "XPreserveUnknownFields"
+        }
+      },
+      "x-go-package": "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+    },
+    "JSONSchemaPropsOrArray": {
+      "description": "JSONSchemaPropsOrArray represents a value that can either be a JSONSchemaProps\nor an array of JSONSchemaProps. Mainly here for serialization purposes.",
+      "type": "object",
+      "properties": {
+        "JSONSchemas": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/JSONSchemaProps"
+          }
+        },
+        "Schema": {
+          "$ref": "#/definitions/JSONSchemaProps"
+        }
+      },
+      "x-go-package": "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+    },
+    "JSONSchemaPropsOrBool": {
+      "description": "Defaults to true for the boolean property.",
+      "type": "object",
+      "title": "JSONSchemaPropsOrBool represents JSONSchemaProps or a boolean value.",
+      "properties": {
+        "Allows": {
+          "type": "boolean"
+        },
+        "Schema": {
+          "$ref": "#/definitions/JSONSchemaProps"
+        }
+      },
+      "x-go-package": "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+    },
+    "JSONSchemaPropsOrStringArray": {
+      "type": "object",
+      "title": "JSONSchemaPropsOrStringArray represents a JSONSchemaProps or a string array.",
+      "properties": {
+        "Property": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "Schema": {
+          "$ref": "#/definitions/JSONSchemaProps"
+        }
+      },
+      "x-go-package": "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+    },
+    "JSONSchemaURL": {
+      "type": "string",
+      "title": "JSONSchemaURL represents a schema url.",
+      "x-go-package": "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+    },
+    "Kind": {
+      "description": "Kind specifies the resource Kind and APIGroup",
+      "type": "object",
+      "properties": {
+        "apiGroups": {
+          "description": "APIGroups specifies the APIGroups of the resources",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-go-name": "APIGroups"
+        },
+        "kinds": {
+          "description": "Kinds specifies the kinds of the resources",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-go-name": "Kinds"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+    },
     "KubevirtCloudSpec": {
       "type": "object",
       "title": "KubevirtCloudSpec specifies the access data to Kubevirt.",
@@ -11998,6 +16953,57 @@
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
     },
+    "LabelSelector": {
+      "description": "A label selector is a label query over a set of resources. The result of matchLabels and\nmatchExpressions are ANDed. An empty label selector matches all objects. A null\nlabel selector matches no objects.",
+      "type": "object",
+      "properties": {
+        "matchExpressions": {
+          "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.\n+optional",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LabelSelectorRequirement"
+          },
+          "x-go-name": "MatchExpressions"
+        },
+        "matchLabels": {
+          "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels\nmap is equivalent to an element of matchExpressions, whose key field is \"key\", the\noperator is \"In\", and the values array contains only \"value\". The requirements are ANDed.\n+optional",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "x-go-name": "MatchLabels"
+        }
+      },
+      "x-go-package": "k8s.io/apimachinery/pkg/apis/meta/v1"
+    },
+    "LabelSelectorOperator": {
+      "type": "string",
+      "title": "A label selector operator is the set of operators that can be used in a selector requirement.",
+      "x-go-package": "k8s.io/apimachinery/pkg/apis/meta/v1"
+    },
+    "LabelSelectorRequirement": {
+      "description": "A label selector requirement is a selector that contains values, a key, and an operator that\nrelates the key and values.",
+      "type": "object",
+      "properties": {
+        "key": {
+          "description": "key is the label key that the selector applies to.\n+patchMergeKey=key\n+patchStrategy=merge",
+          "type": "string",
+          "x-go-name": "Key"
+        },
+        "operator": {
+          "$ref": "#/definitions/LabelSelectorOperator"
+        },
+        "values": {
+          "description": "values is an array of string values. If the operator is In or NotIn,\nthe values array must be non-empty. If the operator is Exists or DoesNotExist,\nthe values array must be empty. This array is replaced during a strategic\nmerge patch.\n+optional",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-go-name": "Values"
+        }
+      },
+      "x-go-package": "k8s.io/apimachinery/pkg/apis/meta/v1"
+    },
     "Limits": {
       "type": "object",
       "title": "Limits is a struct that contains the response of a limit query.",
@@ -12051,6 +17057,40 @@
       },
       "x-go-package": "github.com/kubermatic/machine-controller/pkg/apis/cluster/v1alpha1"
     },
+    "MachineDeploymentVMResourceQuota": {
+      "type": "object",
+      "properties": {
+        "enableGPU": {
+          "type": "boolean",
+          "x-go-name": "EnableGPU"
+        },
+        "maxCPU": {
+          "description": "Maximal number of vCPU",
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "MaxCPU"
+        },
+        "maxRAM": {
+          "description": "Maximum RAM size in GB",
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "MaxRAM"
+        },
+        "minCPU": {
+          "description": "Minimal number of vCPU",
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "MinCPU"
+        },
+        "minRAM": {
+          "description": "Minimal RAM size in GB",
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "MinRAM"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+    },
     "MachineNetworkingConfig": {
       "type": "object",
       "title": "MachineNetworkingConfig specifies the networking parameters used for IPAM.",
@@ -12092,6 +17132,70 @@
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
     },
+    "Match": {
+      "description": "Match contains the constraint to resource matching data",
+      "type": "object",
+      "properties": {
+        "excludedNamespaces": {
+          "description": "ExcludedNamespaces is a list of namespace names. If defined, a constraint will only apply to resources not in a listed namespace.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-go-name": "ExcludedNamespaces"
+        },
+        "kinds": {
+          "description": "Kinds accepts a list of objects with apiGroups and kinds fields that list the groups/kinds of objects to which\nthe constraint will apply. If multiple groups/kinds objects are specified, only one match is needed for the resource to be in scope",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Kind"
+          },
+          "x-go-name": "Kinds"
+        },
+        "labelSelector": {
+          "$ref": "#/definitions/LabelSelector"
+        },
+        "namespaceSelector": {
+          "$ref": "#/definitions/LabelSelector"
+        },
+        "namespaces": {
+          "description": "Namespaces is a list of namespace names. If defined, a constraint will only apply to resources in a listed namespace.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-go-name": "Namespaces"
+        },
+        "scope": {
+          "description": "Scope accepts *, Cluster, or Namespaced which determines if cluster-scoped and/or namesapced-scoped resources are selected. (defaults to *)",
+          "type": "string",
+          "x-go-name": "Scope"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+    },
+    "MatchEntry": {
+      "type": "object",
+      "properties": {
+        "excludedNamespaces": {
+          "description": "Namespaces which will be excluded",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-go-name": "ExcludedNamespaces"
+        },
+        "processes": {
+          "description": "Processes which will be excluded in the given namespaces (sync, webhook, audit, *)",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-go-name": "Processes"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
+    },
     "MetaKubeVersions": {
       "type": "object",
       "title": "MetaKubeVersions describes the versions of running MetaKube components.",
@@ -12104,6 +17208,23 @@
       },
       "x-go-name": "KubermaticVersions",
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
+    },
+    "Names": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "x-go-name": "Kind"
+        },
+        "shortNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-go-name": "ShortNames"
+        }
+      },
+      "x-go-package": "github.com/open-policy-agent/frameworks/constraint/pkg/apis/templates/v1beta1"
     },
     "Namespace": {
       "description": "Namespace defines namespace",
@@ -12188,6 +17309,9 @@
       "properties": {
         "alibaba": {
           "$ref": "#/definitions/AlibabaNodeSpec"
+        },
+        "anexia": {
+          "$ref": "#/definitions/AnexiaNodeSpec"
         },
         "aws": {
           "$ref": "#/definitions/AWSNodeSpec"
@@ -12421,6 +17545,14 @@
           "description": "Optional: Translates to --pod-infra-container-image on the kubelet.\nIf not set, the kubelet will default it.",
           "type": "string",
           "x-go-name": "PauseImage"
+        },
+        "registry_mirrors": {
+          "description": "Optional: These image registries will be configured as registry mirrors\non the container runtime.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-go-name": "RegistryMirrors"
         }
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
@@ -12619,6 +17751,23 @@
         "usernameClaim": {
           "type": "string",
           "x-go-name": "UsernameClaim"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+    },
+    "OPAIntegrationSettings": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "description": "Enabled is the flag for enabling OPA integration",
+          "type": "boolean",
+          "x-go-name": "Enabled"
+        },
+        "webhookTimeoutSeconds": {
+          "description": "WebhookTimeout is the timeout that is set for the gatekeeper validating webhook admission review calls.\nBy default 10 seconds.",
+          "type": "integer",
+          "format": "int32",
+          "x-go-name": "WebhookTimeoutSeconds"
         }
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
@@ -12866,6 +18015,16 @@
           "description": "image to use",
           "type": "string",
           "x-go-name": "Image"
+        },
+        "instanceReadyCheckPeriod": {
+          "description": "Period of time to check for instance ready status",
+          "type": "string",
+          "x-go-name": "InstanceReadyCheckPeriod"
+        },
+        "instanceReadyCheckTimeout": {
+          "description": "Max time to wait for the instance to be ready",
+          "type": "string",
+          "x-go-name": "InstanceReadyCheckTimeout"
         },
         "tags": {
           "description": "Additional metadata to set",
@@ -13123,6 +18282,66 @@
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
     },
+    "Parameters": {
+      "description": "Parameters specifies the parameters used by the constraint template REGO",
+      "type": "object",
+      "properties": {
+        "rawJSON": {
+          "description": "RawJSON contains the raw JSON parameters used by REGO",
+          "type": "string",
+          "x-go-name": "RawJSON"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+    },
+    "PodDNSConfig": {
+      "description": "PodDNSConfig defines the DNS parameters of a pod in addition to\nthose generated from DNSPolicy.",
+      "type": "object",
+      "properties": {
+        "nameservers": {
+          "description": "A list of DNS name server IP addresses.\nThis will be appended to the base nameservers generated from DNSPolicy.\nDuplicated nameservers will be removed.\n+optional",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-go-name": "Nameservers"
+        },
+        "options": {
+          "description": "A list of DNS resolver options.\nThis will be merged with the base options generated from DNSPolicy.\nDuplicated entries will be removed. Resolution options given in Options\nwill override those that appear in the base DNSPolicy.\n+optional",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PodDNSConfigOption"
+          },
+          "x-go-name": "Options"
+        },
+        "searches": {
+          "description": "A list of DNS search domains for host-name lookup.\nThis will be appended to the base search paths generated from DNSPolicy.\nDuplicated search paths will be removed.\n+optional",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-go-name": "Searches"
+        }
+      },
+      "x-go-package": "k8s.io/api/core/v1"
+    },
+    "PodDNSConfigOption": {
+      "type": "object",
+      "title": "PodDNSConfigOption defines DNS resolver options of a pod.",
+      "properties": {
+        "name": {
+          "description": "Required.",
+          "type": "string",
+          "x-go-name": "Name"
+        },
+        "value": {
+          "description": "+optional",
+          "type": "string",
+          "x-go-name": "Value"
+        }
+      },
+      "x-go-package": "k8s.io/api/core/v1"
+    },
     "PolicyRule": {
       "description": "PolicyRule holds information that describes a policy rule, but does not contain information\nabout who the rule applies to or which namespace the rule applies to.",
       "type": "object",
@@ -13169,6 +18388,56 @@
         }
       },
       "x-go-package": "k8s.io/api/rbac/v1"
+    },
+    "Preset": {
+      "description": "Preset represents a preset",
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "x-go-name": "Enabled"
+        },
+        "name": {
+          "type": "string",
+          "x-go-name": "Name"
+        },
+        "providers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PresetProvider"
+          },
+          "x-go-name": "Providers"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
+    },
+    "PresetList": {
+      "description": "PresetList represents a list of presets",
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Preset"
+          },
+          "x-go-name": "Items"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
+    },
+    "PresetProvider": {
+      "description": "PresetProvider represents a preset provider",
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "x-go-name": "Enabled"
+        },
+        "name": {
+          "$ref": "#/definitions/ProviderType"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
     },
     "Project": {
       "description": "Project is a top-level container for a set of resources",
@@ -13238,6 +18507,10 @@
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
     },
+    "ProviderType": {
+      "type": "string",
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+    },
     "ProxySettings": {
       "description": "ProxySettings allow configuring a HTTP proxy for the controlplanes\nand nodes",
       "type": "object",
@@ -13265,6 +18538,11 @@
       "title": "PublicAlibabaCloudSpec is a public counterpart of apiv1.AlibabaCloudSpec.",
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
     },
+    "PublicAnexiaCloudSpec": {
+      "type": "object",
+      "title": "PublicAnexiaCloudSpec is a public counterpart of apiv1.AnexiaCloudSpec.",
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
+    },
     "PublicAzureCloudSpec": {
       "type": "object",
       "title": "PublicAzureCloudSpec is a public counterpart of apiv1.AzureCloudSpec.",
@@ -13281,6 +18559,9 @@
       "properties": {
         "alibaba": {
           "$ref": "#/definitions/PublicAlibabaCloudSpec"
+        },
+        "anexia": {
+          "$ref": "#/definitions/PublicAnexiaCloudSpec"
         },
         "aws": {
           "$ref": "#/definitions/PublicAWSCloudSpec"
@@ -13481,6 +18762,17 @@
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
     },
+    "ReadinessSpec": {
+      "type": "object",
+      "properties": {
+        "statsEnabled": {
+          "description": "enables stats for gatekeeper audit",
+          "type": "boolean",
+          "x-go-name": "StatsEnabled"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
+    },
     "ResourceLabelMap": {
       "type": "object",
       "title": "ResourceLabelMap defines list of labels grouped by specific resource types.",
@@ -13671,7 +18963,7 @@
           "x-go-name": "SeedDatacenters"
         },
         "expose_strategy": {
-          "$ref": "#/definitions/ServiceType"
+          "$ref": "#/definitions/ExposeStrategy"
         },
         "kubeconfig": {
           "$ref": "#/definitions/ObjectReference"
@@ -13722,7 +19014,7 @@
           "x-go-name": "SeedDatacenters"
         },
         "expose_strategy": {
-          "$ref": "#/definitions/ServiceType"
+          "$ref": "#/definitions/ExposeStrategy"
         },
         "kubeconfig": {
           "$ref": "#/definitions/ObjectReference"
@@ -13787,6 +19079,29 @@
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
     },
+    "ServiceAccountSettings": {
+      "type": "object",
+      "properties": {
+        "apiAudiences": {
+          "description": "APIAudiences are the Identifiers of the API\nIf this is not specified, it will be set to a single element list containing the issuer URL",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-go-name": "APIAudiences"
+        },
+        "issuer": {
+          "description": "Issuer is the identifier of the service account token issuer\nIf this is not specified, it will be set to the URL of apiserver by default",
+          "type": "string",
+          "x-go-name": "Issuer"
+        },
+        "tokenVolumeProjectionEnabled": {
+          "type": "boolean",
+          "x-go-name": "TokenVolumeProjectionEnabled"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+    },
     "ServiceAccountToken": {
       "description": "ServiceAccountToken represent an API service account token",
       "type": "object",
@@ -13826,11 +19141,6 @@
         }
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
-    },
-    "ServiceType": {
-      "description": "Service Type string describes ingress methods for a service",
-      "type": "string",
-      "x-go-package": "k8s.io/api/core/v1"
     },
     "SettingSpec": {
       "type": "object",
@@ -13873,6 +19183,9 @@
           "type": "boolean",
           "x-go-name": "EnableOIDCKubeconfig"
         },
+        "machineDeploymentVMResourceQuota": {
+          "$ref": "#/definitions/MachineDeploymentVMResourceQuota"
+        },
         "restrictProjectCreation": {
           "type": "boolean",
           "x-go-name": "RestrictProjectCreation"
@@ -13913,6 +19226,20 @@
       },
       "x-go-package": "k8s.io/api/rbac/v1"
     },
+    "Sync": {
+      "type": "object",
+      "properties": {
+        "syncOnly": {
+          "description": "If non-empty, entries on this list will be replicated into OPA",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/GVK"
+          },
+          "x-go-name": "SyncOnly"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
+    },
     "Sys11AuthSettings": {
       "type": "object",
       "properties": {
@@ -13942,12 +19269,52 @@
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
     },
+    "Target": {
+      "type": "object",
+      "properties": {
+        "libs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-go-name": "Libs"
+        },
+        "rego": {
+          "type": "string",
+          "x-go-name": "Rego"
+        },
+        "target": {
+          "type": "string",
+          "x-go-name": "Target"
+        }
+      },
+      "x-go-package": "github.com/open-policy-agent/frameworks/constraint/pkg/apis/templates/v1beta1"
+    },
     "Time": {
       "description": "Programs using times should typically store and pass them as values,\nnot pointers. That is, time variables and struct fields should be of\ntype time.Time, not *time.Time.\n\nA Time value can be used by multiple goroutines simultaneously except\nthat the methods GobDecode, UnmarshalBinary, UnmarshalJSON and\nUnmarshalText are not concurrency-safe.\n\nTime instants can be compared using the Before, After, and Equal methods.\nThe Sub method subtracts two instants, producing a Duration.\nThe Add method adds a Time and a Duration, producing a Time.\n\nThe zero value of type Time is January 1, year 1, 00:00:00.000000000 UTC.\nAs this time is unlikely to come up in practice, the IsZero method gives\na simple way of detecting a time that has not been initialized explicitly.\n\nEach Time has associated with it a Location, consulted when computing the\npresentation form of the time, such as in the Format, Hour, and Year methods.\nThe methods Local, UTC, and In return a Time with a specific location.\nChanging the location in this way changes only the presentation; it does not\nchange the instant in time being denoted and therefore does not affect the\ncomputations described in earlier paragraphs.\n\nRepresentations of a Time value saved by the GobEncode, MarshalBinary,\nMarshalJSON, and MarshalText methods store the Time.Location's offset, but not\nthe location name. They therefore lose information about Daylight Saving Time.\n\nIn addition to the required “wall clock” reading, a Time may contain an optional\nreading of the current process's monotonic clock, to provide additional precision\nfor comparison or subtraction.\nSee the “Monotonic Clocks” section in the package documentation for details.\n\nNote that the Go == operator compares not just the time instant but also the\nLocation and the monotonic clock reading. Therefore, Time values should not\nbe used as map or database keys without first guaranteeing that the\nidentical Location has been set for all values, which can be achieved\nthrough use of the UTC or Local method, and that the monotonic clock reading\nhas been stripped by setting t = t.Round(0). In general, prefer t.Equal(u)\nto t == u, since t.Equal uses the most accurate comparison available and\ncorrectly handles the case when only one of its arguments has a monotonic\nclock reading.",
       "type": "string",
       "format": "date-time",
       "title": "A Time represents an instant in time with nanosecond precision.",
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
+    },
+    "Trace": {
+      "type": "object",
+      "properties": {
+        "dump": {
+          "description": "Also dump the state of OPA with the trace. Set to `All` to dump everything.",
+          "type": "string",
+          "x-go-name": "Dump"
+        },
+        "kind": {
+          "$ref": "#/definitions/GVK"
+        },
+        "user": {
+          "description": "Only trace requests from the specified user",
+          "type": "string",
+          "x-go-name": "User"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
     },
     "UID": {
       "description": "UID is a type that holds unique ID values, including UUIDs.  Because we\ndon't ONLY use UUIDs, this is an alias to string.  Being a type captures\nintent and helps make sure that UIDs and names do not get conflated.",
@@ -14199,10 +19566,46 @@
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
     },
+    "Validation": {
+      "type": "object",
+      "properties": {
+        "openAPIV3Schema": {
+          "$ref": "#/definitions/JSONSchemaProps"
+        }
+      },
+      "x-go-package": "github.com/open-policy-agent/frameworks/constraint/pkg/apis/templates/v1beta1"
+    },
     "Version": {
       "type": "object",
       "title": "Version represents a single semantic version.",
       "x-go-package": "github.com/Masterminds/semver/v3"
+    },
+    "Violation": {
+      "description": "Violation represents a gatekeeper constraint violation",
+      "type": "object",
+      "properties": {
+        "enforcementAction": {
+          "type": "string",
+          "x-go-name": "EnforcementAction"
+        },
+        "kind": {
+          "type": "string",
+          "x-go-name": "Kind"
+        },
+        "message": {
+          "type": "string",
+          "x-go-name": "Message"
+        },
+        "name": {
+          "type": "string",
+          "x-go-name": "Name"
+        },
+        "namespace": {
+          "type": "string",
+          "x-go-name": "Namespace"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
     },
     "body": {
       "type": "object",
@@ -14219,6 +19622,34 @@
         }
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/handler/v2/external_cluster"
+    },
+    "constraintBody": {
+      "type": "object",
+      "properties": {
+        "Spec": {
+          "$ref": "#/definitions/ConstraintSpec"
+        },
+        "name": {
+          "description": "Name is the name for the constraint",
+          "type": "string",
+          "x-go-name": "Name"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/handler/v2/constraint"
+    },
+    "ctBody": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "Name of the constraint template",
+          "type": "string",
+          "x-go-name": "Name"
+        },
+        "spec": {
+          "$ref": "#/definitions/ConstraintTemplateSpec"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/handler/v2/constraint_template"
     },
     "errorResponse": {
       "description": "ErrorResponse is the default representation of an error",

@@ -17,6 +17,7 @@ LABEL maintainer="support@kubermatic.com"
 
 ENV KUBERMATIC_CHARTS_DIRECTORY=/opt/charts/
 
+SHELL ["/bin/ash", "-o", "pipefail", "-c"]
 ADD https://storage.googleapis.com/kubernetes-release/release/v1.18.8/bin/linux/amd64/kubectl /usr/local/bin/kubectl
 RUN wget -q -O- https://get.helm.sh/helm-v3.3.1-linux-amd64.tar.gz | tar xzOf - linux-amd64/helm > /usr/local/bin/helm
 
@@ -27,7 +28,6 @@ RUN chmod +x /usr/local/bin/kubectl /usr/local/bin/helm && apk --no-cache add ca
 COPY ./_build/image-loader \
      ./_build/kubermatic-api \
      ./_build/kubermatic-operator \
-     ./_build/kubermatic-operator-util \
      ./_build/kubermatic-installer \
      ./_build/master-controller-manager \
      ./_build/owner-remover \

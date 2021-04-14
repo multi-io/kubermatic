@@ -15,12 +15,12 @@
 nodePortProxy:
   replicas: 3
   image:
-    repository: "quay.io/kubermatic/nodeport-proxy"
+    repository: "syseleven/nodeport-proxy"
     tag: "__KUBERMATIC_TAG__"
   envoy:
     image:
       repository: "docker.io/envoyproxy/envoy-alpine"
-      tag: v1.13.0
+      tag: v1.16.0
 
   nodeSelector: {}
   affinity:

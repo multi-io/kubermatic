@@ -17,11 +17,12 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	"k8c.io/kubermatic/v2/pkg/semver"
-	apimodels "k8c.io/kubermatic/v2/pkg/test/e2e/api/utils/apiclient/models"
+	apimodels "k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/models"
 )
 
 // Returns a matrix of (version x operating system)
@@ -118,7 +119,7 @@ func (s *vSphereScenario) Cluster(secrets secrets) *apimodels.CreateClusterSpec 
 	return spec
 }
 
-func (s *vSphereScenario) NodeDeployments(num int, _ secrets) ([]apimodels.NodeDeployment, error) {
+func (s *vSphereScenario) NodeDeployments(_ context.Context, num int, _ secrets) ([]apimodels.NodeDeployment, error) {
 	osName := getOSNameFromSpec(s.nodeOsSpec)
 	replicas := int32(num)
 	return []apimodels.NodeDeployment{

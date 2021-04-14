@@ -4,10 +4,10 @@ import (
 	"net/http"
 
 	"k8c.io/kubermatic/v2/pkg/handler/v1/addon"
-	"k8c.io/kubermatic/v2/pkg/handler/v1/node"
 
 	"github.com/go-kit/kit/endpoint"
 	httptransport "github.com/go-kit/kit/transport/http"
+	handlercommon "k8c.io/kubermatic/v2/pkg/handler/common"
 	"k8c.io/kubermatic/v2/pkg/handler/middleware"
 	"k8c.io/kubermatic/v2/pkg/handler/v1/cluster"
 	"k8c.io/kubermatic/v2/pkg/handler/v1/provider"
@@ -207,7 +207,7 @@ func (r Routing) unsealVaultAddon() http.Handler {
 			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
 			middleware.UserSaver(r.userProvider),
 			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-			middleware.Addons(r.addonProviderGetter, r.seedsGetter),
+			middleware.Addons(r.clusterProviderGetter, r.addonProviderGetter, r.seedsGetter),
 		)(addon.UnsealVaultAddonEndpoint(r.seedsGetter, r.userInfoGetter)),
 		addon.DecodeUnsealVaultAddon,
 		EncodeJSON,
@@ -237,8 +237,8 @@ func (r Routing) createNodeDeploymentRequest() http.Handler {
 			middleware.UserSaver(r.userProvider),
 			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
 			middleware.MachineDeploymentRequests(r.mdRequestProviderGetter, r.seedsGetter),
-		)(node.CreateNodeDeploymentRequestEndpoint(r.sshKeyProvider, r.projectProvider, r.seedsGetter, r.userInfoGetter)),
-		node.DecodeCreateNodeDeploymentRequest,
+		)(handlercommon.CreateNodeDeploymentRequestEndpoint(r.sshKeyProvider, r.projectProvider, r.seedsGetter, r.userInfoGetter)),
+		handlercommon.DecodeCreateNodeDeploymentRequest,
 		SetStatusCreatedHeader(EncodeJSON),
 		r.defaultServerOptions()...,
 	)
@@ -263,8 +263,8 @@ func (r Routing) listNodeDeploymentRequests() http.Handler {
 			middleware.UserSaver(r.userProvider),
 			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
 			middleware.MachineDeploymentRequests(r.mdRequestProviderGetter, r.seedsGetter),
-		)(node.ListNodeDeploymentRequestEndpoint(r.projectProvider, r.userInfoGetter)),
-		node.DecodeListNodeDeploymentRequests,
+		)(handlercommon.ListNodeDeploymentRequestEndpoint(r.projectProvider, r.userInfoGetter)),
+		handlercommon.DecodeListNodeDeploymentRequests,
 		EncodeJSON,
 		r.defaultServerOptions()...,
 	)
@@ -289,8 +289,8 @@ func (r Routing) getNodeDeploymentRequest() http.Handler {
 			middleware.UserSaver(r.userProvider),
 			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
 			middleware.MachineDeploymentRequests(r.mdRequestProviderGetter, r.seedsGetter),
-		)(node.GetNodeDeploymentRequestEndpoint(r.projectProvider, r.userInfoGetter)),
-		node.DecodeGetNodeDeploymentRequest,
+		)(handlercommon.GetNodeDeploymentRequestEndpoint(r.projectProvider, r.userInfoGetter)),
+		handlercommon.DecodeGetNodeDeploymentRequest,
 		EncodeJSON,
 		r.defaultServerOptions()...,
 	)
@@ -318,8 +318,8 @@ func (r Routing) patchNodeDeploymentRequest() http.Handler {
 			middleware.UserSaver(r.userProvider),
 			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
 			middleware.MachineDeploymentRequests(r.mdRequestProviderGetter, r.seedsGetter),
-		)(node.PatchNodeDeploymentRequestEndpoint(r.sshKeyProvider, r.projectProvider, r.seedsGetter, r.userInfoGetter)),
-		node.DecodePatchNodeDeploymentRequest,
+		)(handlercommon.PatchNodeDeploymentRequestEndpoint(r.sshKeyProvider, r.projectProvider, r.seedsGetter, r.userInfoGetter)),
+		handlercommon.DecodePatchNodeDeploymentRequest,
 		EncodeJSON,
 		r.defaultServerOptions()...,
 	)
@@ -344,8 +344,8 @@ func (r Routing) deleteNodeDeploymentRequest() http.Handler {
 			middleware.UserSaver(r.userProvider),
 			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
 			middleware.MachineDeploymentRequests(r.mdRequestProviderGetter, r.seedsGetter),
-		)(node.DeleteNodeDeploymentRequestEndpoint(r.projectProvider, r.userInfoGetter)),
-		node.DecodeGetNodeDeploymentRequest,
+		)(handlercommon.DeleteNodeDeploymentRequestEndpoint(r.projectProvider, r.userInfoGetter)),
+		handlercommon.DecodeGetNodeDeploymentRequest,
 		EncodeJSON,
 		r.defaultServerOptions()...,
 	)
