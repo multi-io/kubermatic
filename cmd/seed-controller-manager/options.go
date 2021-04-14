@@ -22,6 +22,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/url"
 	"path"
 	"strings"
@@ -37,11 +38,13 @@ import (
 	"k8c.io/kubermatic/v2/pkg/keycloak"
 	"k8c.io/kubermatic/v2/pkg/provider"
 	"k8c.io/kubermatic/v2/pkg/resources"
-	seedvalidation "k8c.io/kubermatic/v2/pkg/validation/seed"
+	"k8c.io/kubermatic/v2/pkg/util/flagopts"
+	"k8c.io/kubermatic/v2/pkg/validation"
+	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/net"
+	knet "k8s.io/apimachinery/pkg/util/net"
 	certutil "k8s.io/client-go/util/cert"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/yaml"
@@ -88,7 +91,7 @@ type controllerRunOptions struct {
 	apiServerEndpointReconcilingDisabled             bool
 	controllerManagerDefaultReplicas                 int
 	schedulerDefaultReplicas                         int
-	seedValidationHook                               seedvalidation.WebhookOpts
+	validationWebhook                                validation.WebhookOpts
 	concurrentClusterUpdate                          int
 	addonEnforceInterval                             int
 	defaultComponentSettings                         string
@@ -99,12 +102,18 @@ type controllerRunOptions struct {
 	oidcIssuerClientID     string
 	oidcIssuerClientSecret string
 
+	// Used in the tunneling expose strategy
+	tunnelingAgentIP flagopts.IPValue
+
 	featureGates features.FeatureGate
 }
 
 func newControllerRunOptions() (controllerRunOptions, error) {
-	c := controllerRunOptions{}
-	var rawFeatureGates string
+	c := controllerRunOptions{
+		featureGates: features.FeatureGate{},
+		// Default IP used by tunneling agents
+		tunnelingAgentIP: flagopts.IPValue{IP: net.ParseIP("192.168.30.10")},
+	}
 	var rawEtcdDiskSize string
 	var defaultKubernetesAddonsList string
 	var defaultKubernetesAddonsFile string
@@ -144,7 +153,7 @@ func newControllerRunOptions() (controllerRunOptions, error) {
 	flag.StringVar(&c.inClusterPrometheusRemoteWriteConfigsFile, "in-cluster-prometheus-remote-write-configs-file", "", "The file containing the remote write configurations for the prometheus running in the customer cluster namespaces.")
 	flag.StringVar(&c.monitoringEnvironmentLabel, "monitoring-environment-label", "", "The label for monitoring environment label. Default: ''")
 	flag.StringVar(&c.monitoringScrapeAnnotationPrefix, "monitoring-scrape-annotation-prefix", "monitoring.kubermatic.io", "The prefix for monitoring annotations in the user cluster. Default: monitoring.kubermatic.io -> monitoring.kubermatic.io/port, monitoring.kubermatic.io/path")
-	flag.StringVar(&rawFeatureGates, "feature-gates", "", "A set of key=value pairs that describe feature gates for various features.")
+	flag.Var(&c.featureGates, "feature-gates", "A set of key=value pairs that describe feature gates for various features.")
 	flag.StringVar(&c.oidcCAFile, "oidc-ca-file", "", "The path to the certificate for the CA that signed your identity provider’s web certificate.")
 	flag.StringVar(&c.oidcIssuerURL, "oidc-issuer-url", "", "URL of the OpenID token issuer. Example: http://auth.int.kubermatic.io")
 	flag.StringVar(&c.oidcIssuerClientID, "oidc-issuer-client-id", "", "Issuer client ID")
@@ -161,15 +170,14 @@ func newControllerRunOptions() (controllerRunOptions, error) {
 	flag.IntVar(&c.concurrentClusterUpdate, "max-parallel-reconcile", 10, "The default number of resources updates per cluster")
 	flag.IntVar(&c.addonEnforceInterval, "addon-enforce-interval", 5, "Check and ensure default usercluster addons are deployed every interval in minutes. Set to 0 to disable.")
 	flag.StringVar(&c.defaultComponentSettings, "default-component-settings", "", "YAML file with default cluster component settings")
-	c.seedValidationHook.AddFlags(flag.CommandLine)
+	flag.Var(&c.tunnelingAgentIP, "tunneling-agent-ip", "The address used by the tunneling agents.")
+	c.validationWebhook.AddFlags(flag.CommandLine, true)
 	addFlags(flag.CommandLine)
 	flag.Parse()
 
-	featureGates, err := features.NewFeatures(rawFeatureGates)
-	if err != nil {
-		return c, err
+	if err := c.validationWebhook.Validate(); err != nil {
+		return c, fmt.Errorf("invalid admission webhook configuration: %v", err)
 	}
-	c.featureGates = featureGates
 
 	etcdDiskSize, err := resource.ParseQuantity(rawEtcdDiskSize)
 	if err != nil {
@@ -248,7 +256,7 @@ func (o controllerRunOptions) validate() error {
 	}
 
 	// Validate node-port range
-	if _, err := net.ParsePortRange(o.nodePortRange); err != nil {
+	if _, err := knet.ParsePortRange(o.nodePortRange); err != nil {
 		return fmt.Errorf("failed to parse nodePortRange: %v", err)
 	}
 
@@ -298,6 +306,7 @@ type controllerContext struct {
 	dockerPullConfigJSON []byte
 	log                  *zap.SugaredLogger
 	keycloakFacade       keycloak.Facade
+	versions             kubermatic.Versions
 }
 
 func loadAddons(listOpt, fileOpt string) (kubermaticv1.AddonList, error) {

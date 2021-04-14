@@ -7,6 +7,7 @@ import (
 	"go.uber.org/zap"
 
 	corev1 "k8s.io/api/core/v1"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
@@ -118,6 +119,9 @@ func (r *reconciler) updateNode(name string, modify func(*corev1.Node) bool) err
 		// Get latest version
 		node := &corev1.Node{}
 		if err := r.client.Get(r.ctx, types.NamespacedName{Name: name}, node); err != nil {
+			if kerrors.IsNotFound(err) {
+				return nil
+			}
 			return err
 		}
 		// Apply modifications

@@ -32,9 +32,11 @@ import (
 	"go.uber.org/zap"
 
 	clusterv1alpha1 "github.com/kubermatic/machine-controller/pkg/apis/cluster/v1alpha1"
-	cmdutil "k8c.io/kubermatic/v2/cmd/util"
+
 	sys11nodereadiness "k8c.io/kubermatic/v2/pkg/controller/sys11-node-readiness"
+
 	clusterrolelabeler "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/cluster-role-labeler"
+	constraintsyncer "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/constraint-syncer"
 	containerlinux "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/container-linux"
 	"k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/flatcar"
 	"k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/ipam"
@@ -51,6 +53,9 @@ import (
 	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
 	"k8c.io/kubermatic/v2/pkg/pprof"
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
+	"k8c.io/kubermatic/v2/pkg/util/cli"
+	"k8c.io/kubermatic/v2/pkg/util/flagopts"
+	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -79,6 +84,8 @@ type controllerRunOptions struct {
 	clusterURL                    string
 	clusterDNSDomain              string
 	openvpnServerPort             int
+	kasSecurePort                 int
+	tunnelingAgentIP              flagopts.IPValue
 	overwriteRegistry             string
 	cloudProviderName             string
 	cloudCredentialSecretTemplate string
@@ -89,6 +96,9 @@ type controllerRunOptions struct {
 	updateWindowStart             string
 	updateWindowLength            string
 	dnsClusterIP                  string
+	opaIntegration                bool
+	opaWebhookTimeout             int
+	useSSHKeyAgent                bool
 }
 
 func main() {
@@ -109,6 +119,8 @@ func main() {
 	flag.StringVar(&runOp.clusterDNSDomain, "cluster-dns-domain", "", "Cluster DNS domain")
 	flag.StringVar(&runOp.dnsClusterIP, "dns-cluster-ip", "", "KubeDNS service IP for the cluster")
 	flag.IntVar(&runOp.openvpnServerPort, "openvpn-server-port", 0, "OpenVPN server port")
+	flag.IntVar(&runOp.kasSecurePort, "kas-secure-port", 6443, "Secure KAS port")
+	flag.Var(&runOp.tunnelingAgentIP, "tunneling-agent-ip", "If specified the tunneling agent will bind to this IP address, otherwise it will not be deployed.")
 	flag.StringVar(&runOp.overwriteRegistry, "overwrite-registry", "", "registry to use for all images")
 	flag.StringVar(&runOp.cloudProviderName, "cloud-provider-name", "", "Name of the cloudprovider")
 	flag.StringVar(&runOp.cloudCredentialSecretTemplate, "cloud-credential-secret-template", "", "A serialized Kubernetes secret whose Name and Data fields will be used to create a secret for the openshift cloud credentials operator.")
@@ -118,12 +130,16 @@ func main() {
 	flag.StringVar(&runOp.ownerEmail, "owner-email", "", "An email address of the user who created the cluster. Used as default subject for the admin cluster role binding")
 	flag.StringVar(&runOp.updateWindowStart, "update-window-start", "", "The start time of the update window, e.g. 02:00")
 	flag.StringVar(&runOp.updateWindowLength, "update-window-length", "", "The length of the update window, e.g. 1h")
+	flag.BoolVar(&runOp.opaIntegration, "opa-integration", false, "Enable OPA integration in user cluster")
+	flag.IntVar(&runOp.opaWebhookTimeout, "opa-webhook-timeout", 3, "Timeout for OPA Integration validating webhook, in seconds")
+	flag.BoolVar(&runOp.useSSHKeyAgent, "enable-ssh-key-agent", false, "Enable UserSSHKeyAgent integration in user cluster")
 	flag.Parse()
 
 	rawLog := kubermaticlog.New(logOpts.Debug, logOpts.Format)
 	log := rawLog.Sugar()
 
-	cmdutil.Hello(log, "User-Cluster Controller-Manager", logOpts.Debug)
+	versions := kubermatic.NewDefaultVersions()
+	cli.Hello(log, "User-Cluster Controller-Manager", logOpts.Debug, &versions)
 
 	if runOp.ownerEmail == "" {
 		log.Fatal("-owner-email must be set")
@@ -233,11 +249,17 @@ func main() {
 		runOp.cloudProviderName,
 		clusterURL,
 		runOp.clusterDNSDomain,
-		runOp.openvpnServerPort,
+		uint32(runOp.openvpnServerPort),
+		uint32(runOp.kasSecurePort),
+		runOp.tunnelingAgentIP.IP,
 		healthHandler.AddReadinessCheck,
 		cloudCredentialSecretTemplate,
 		runOp.openshiftConsoleCallbackURI,
 		runOp.dnsClusterIP,
+		runOp.opaIntegration,
+		versions,
+		runOp.useSSHKeyAgent,
+		runOp.opaWebhookTimeout,
 		log,
 	); err != nil {
 		log.Fatalw("Failed to register user cluster controller", zap.Error(err))
@@ -325,6 +347,13 @@ func main() {
 		log.Fatalw("Failed to register ownerbindingcreator controller", zap.Error(err))
 	}
 	log.Info("Registered ownerbindingcreator controller")
+
+	if runOp.opaIntegration {
+		if err := constraintsyncer.Add(ctx, log, seedMgr, mgr, runOp.namespace); err != nil {
+			log.Fatalw("Failed to register constraintsyncer controller", zap.Error(err))
+		}
+		log.Info("Registered constraintsyncer controller")
+	}
 
 	// This group is forever waiting in a goroutine for signals to stop
 	{

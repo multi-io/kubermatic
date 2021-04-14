@@ -26,8 +26,6 @@ import (
 
 	"github.com/go-kit/kit/endpoint"
 	"github.com/gorilla/mux"
-	"github.com/prometheus/client_golang/prometheus"
-
 	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	handlercommon "k8c.io/kubermatic/v2/pkg/handler/common"
@@ -37,17 +35,11 @@ import (
 	kubernetesprovider "k8c.io/kubermatic/v2/pkg/provider/kubernetes"
 	"k8c.io/kubermatic/v2/pkg/util/errors"
 	kubermaticerrors "k8c.io/kubermatic/v2/pkg/util/errors"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/klog"
-	"k8s.io/metrics/pkg/apis/metrics/v1beta1"
-
-	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func CreateEndpoint(sshKeyProvider provider.SSHKeyProvider, projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, seedsGetter provider.SeedsGetter,
-	initNodeDeploymentFailures *prometheus.CounterVec, eventRecorderProvider provider.EventRecorderProvider, credentialManager provider.PresetProvider,
-	exposeStrategy corev1.ServiceType, userInfoGetter provider.UserInfoGetter, settingsProvider provider.SettingsProvider, updateManager common.UpdateManager) endpoint.Endpoint {
+func CreateEndpoint(projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, seedsGetter provider.SeedsGetter, credentialManager provider.PresetProvider,
+	exposeStrategy kubermaticv1.ExposeStrategy, userInfoGetter provider.UserInfoGetter, settingsProvider provider.SettingsProvider, updateManager common.UpdateManager) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(CreateReq)
 		globalSettings, err := settingsProvider.GetGlobalSettings()
@@ -59,7 +51,7 @@ func CreateEndpoint(sshKeyProvider provider.SSHKeyProvider, projectProvider prov
 			return nil, errors.NewBadRequest(err.Error())
 		}
 
-		return handlercommon.CreateEndpoint(ctx, req.ProjectID, req.Body, sshKeyProvider, projectProvider, privilegedProjectProvider, seedsGetter, initNodeDeploymentFailures, eventRecorderProvider, credentialManager, exposeStrategy, userInfoGetter)
+		return handlercommon.CreateEndpoint(ctx, req.ProjectID, req.Body, projectProvider, privilegedProjectProvider, seedsGetter, credentialManager, exposeStrategy, userInfoGetter)
 	}
 }
 
@@ -136,226 +128,35 @@ func GetClusterEventsEndpoint(projectProvider provider.ProjectProvider, privileg
 func HealthEndpoint(projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, userInfoGetter provider.UserInfoGetter) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(common.GetClusterReq)
-		clusterProvider := ctx.Value(middleware.ClusterProviderContextKey).(provider.ClusterProvider)
-		privilegedClusterProvider := ctx.Value(middleware.PrivilegedClusterProviderContextKey).(provider.PrivilegedClusterProvider)
-		project, err := common.GetProject(ctx, userInfoGetter, projectProvider, privilegedProjectProvider, req.ProjectID, nil)
-		if err != nil {
-			return nil, common.KubernetesErrorToHTTPError(err)
-		}
-
-		existingCluster, err := handlercommon.GetInternalCluster(ctx, userInfoGetter, clusterProvider, privilegedClusterProvider, project, req.ProjectID, req.ClusterID, &provider.ClusterGetOptions{})
-		if err != nil {
-			return nil, common.KubernetesErrorToHTTPError(err)
-		}
-
-		return apiv1.ClusterHealth{
-			Apiserver:                    existingCluster.Status.ExtendedHealth.Apiserver,
-			Scheduler:                    existingCluster.Status.ExtendedHealth.Scheduler,
-			Controller:                   existingCluster.Status.ExtendedHealth.Controller,
-			MachineController:            existingCluster.Status.ExtendedHealth.MachineController,
-			Etcd:                         existingCluster.Status.ExtendedHealth.Etcd,
-			CloudProviderInfrastructure:  existingCluster.Status.ExtendedHealth.CloudProviderInfrastructure,
-			UserClusterControllerManager: existingCluster.Status.ExtendedHealth.UserClusterControllerManager,
-		}, nil
+		return handlercommon.HealthEndpoint(ctx, userInfoGetter, req.ProjectID, req.ClusterID, projectProvider, privilegedProjectProvider)
 	}
 }
 
 func AssignSSHKeyEndpoint(sshKeyProvider provider.SSHKeyProvider, privilegedSSHKeyProvider provider.PrivilegedSSHKeyProvider, projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, userInfoGetter provider.UserInfoGetter) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(AssignSSHKeysReq)
-		clusterProvider := ctx.Value(middleware.ClusterProviderContextKey).(provider.ClusterProvider)
-		privilegedClusterProvider := ctx.Value(middleware.PrivilegedClusterProviderContextKey).(provider.PrivilegedClusterProvider)
-		if len(req.KeyID) == 0 {
-			return nil, errors.NewBadRequest("please provide an SSH key")
-		}
-
-		project, err := common.GetProject(ctx, userInfoGetter, projectProvider, privilegedProjectProvider, req.ProjectID, nil)
-		if err != nil {
-			return nil, common.KubernetesErrorToHTTPError(err)
-		}
-		_, err = handlercommon.GetInternalCluster(ctx, userInfoGetter, clusterProvider, privilegedClusterProvider, project, req.ProjectID, req.ClusterID, &provider.ClusterGetOptions{})
-		if err != nil {
-			return nil, common.KubernetesErrorToHTTPError(err)
-		}
-
-		// sanity check, make sure that the key belongs to the project
-		// alternatively we could examine the owner references
-		{
-			projectSSHKeys, err := sshKeyProvider.List(project, nil)
-			if err != nil {
-				return nil, common.KubernetesErrorToHTTPError(err)
-			}
-			found := false
-			for _, projectSSHKey := range projectSSHKeys {
-				if projectSSHKey.Name == req.KeyID {
-					found = true
-					break
-				}
-			}
-			if !found {
-				return nil, fmt.Errorf("the given ssh key %s does not belong to the given project %s (%s)", req.KeyID, project.Spec.Name, project.Name)
-			}
-		}
-
-		sshKey, err := getSSHKey(ctx, userInfoGetter, sshKeyProvider, privilegedSSHKeyProvider, req.ProjectID, req.KeyID)
-		if err != nil {
-			return nil, common.KubernetesErrorToHTTPError(err)
-		}
-
-		apiKey := apiv1.SSHKey{
-			ObjectMeta: apiv1.ObjectMeta{
-				ID:                sshKey.Name,
-				Name:              sshKey.Spec.Name,
-				CreationTimestamp: apiv1.NewTime(sshKey.CreationTimestamp.Time),
-			},
-		}
-
-		if sshKey.IsUsedByCluster(req.ClusterID) {
-			return apiKey, nil
-		}
-		sshKey.AddToCluster(req.ClusterID)
-		if err := handlercommon.UpdateClusterSSHKey(ctx, userInfoGetter, sshKeyProvider, privilegedSSHKeyProvider, sshKey, req.ProjectID); err != nil {
-			return nil, err
-		}
-
-		return apiKey, nil
+		return handlercommon.AssignSSHKeyEndpoint(ctx, userInfoGetter, req.ProjectID, req.ClusterID, req.KeyID, projectProvider, privilegedProjectProvider, sshKeyProvider, privilegedSSHKeyProvider)
 	}
-}
-
-func getSSHKey(ctx context.Context, userInfoGetter provider.UserInfoGetter, sshKeyProvider provider.SSHKeyProvider, privilegedSSHKeyProvider provider.PrivilegedSSHKeyProvider, projectID, keyName string) (*kubermaticv1.UserSSHKey, error) {
-	adminUserInfo, err := userInfoGetter(ctx, "")
-	if err != nil {
-		return nil, errors.New(http.StatusInternalServerError, err.Error())
-	}
-	if adminUserInfo.IsAdmin {
-		return privilegedSSHKeyProvider.GetUnsecured(keyName)
-	}
-	userInfo, err := userInfoGetter(ctx, projectID)
-	if err != nil {
-		return nil, errors.New(http.StatusInternalServerError, err.Error())
-	}
-	return sshKeyProvider.Get(userInfo, keyName)
 }
 
 func ListSSHKeysEndpoint(sshKeyProvider provider.SSHKeyProvider, projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, userInfoGetter provider.UserInfoGetter) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(ListSSHKeysReq)
-		clusterProvider := ctx.Value(middleware.ClusterProviderContextKey).(provider.ClusterProvider)
-		privilegedClusterProvider := ctx.Value(middleware.PrivilegedClusterProviderContextKey).(provider.PrivilegedClusterProvider)
-
-		project, err := common.GetProject(ctx, userInfoGetter, projectProvider, privilegedProjectProvider, req.ProjectID, nil)
-		if err != nil {
-			return nil, common.KubernetesErrorToHTTPError(err)
-		}
-		_, err = handlercommon.GetInternalCluster(ctx, userInfoGetter, clusterProvider, privilegedClusterProvider, project, req.ProjectID, req.ClusterID, &provider.ClusterGetOptions{})
-		if err != nil {
-			return nil, common.KubernetesErrorToHTTPError(err)
-		}
-		keys, err := sshKeyProvider.List(project, &provider.SSHKeyListOptions{ClusterName: req.ClusterID})
-		if err != nil {
-			return nil, common.KubernetesErrorToHTTPError(err)
-		}
-		apiKeys := common.ConvertInternalSSHKeysToExternal(keys)
-		return apiKeys, nil
+		return handlercommon.ListSSHKeysEndpoint(ctx, userInfoGetter, req.ProjectID, req.ClusterID, projectProvider, privilegedProjectProvider, sshKeyProvider)
 	}
 }
 
 func DetachSSHKeyEndpoint(sshKeyProvider provider.SSHKeyProvider, privilegedSSHKeyProvider provider.PrivilegedSSHKeyProvider, projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, userInfoGetter provider.UserInfoGetter) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(DetachSSHKeysReq)
-		clusterProvider := ctx.Value(middleware.ClusterProviderContextKey).(provider.ClusterProvider)
-		privilegedClusterProvider := ctx.Value(middleware.PrivilegedClusterProviderContextKey).(provider.PrivilegedClusterProvider)
-
-		project, err := common.GetProject(ctx, userInfoGetter, projectProvider, privilegedProjectProvider, req.ProjectID, nil)
-		if err != nil {
-			return nil, common.KubernetesErrorToHTTPError(err)
-		}
-
-		_, err = handlercommon.GetInternalCluster(ctx, userInfoGetter, clusterProvider, privilegedClusterProvider, project, req.ProjectID, req.ClusterID, &provider.ClusterGetOptions{})
-		if err != nil {
-			return nil, common.KubernetesErrorToHTTPError(err)
-		}
-
-		// sanity check, make sure that the key belongs to the project
-		// alternatively we could examine the owner references
-		{
-			projectSSHKeys, err := sshKeyProvider.List(project, nil)
-			if err != nil {
-				return nil, common.KubernetesErrorToHTTPError(err)
-			}
-
-			found := false
-			for _, projectSSHKey := range projectSSHKeys {
-				if projectSSHKey.Name == req.KeyID {
-					found = true
-					break
-				}
-			}
-			if !found {
-				return nil, errors.NewNotFound("sshkey", req.KeyID)
-			}
-		}
-
-		clusterSSHKey, err := getSSHKey(ctx, userInfoGetter, sshKeyProvider, privilegedSSHKeyProvider, req.ProjectID, req.KeyID)
-		if err != nil {
-			return nil, common.KubernetesErrorToHTTPError(err)
-		}
-
-		clusterSSHKey.RemoveFromCluster(req.ClusterID)
-		if err := handlercommon.UpdateClusterSSHKey(ctx, userInfoGetter, sshKeyProvider, privilegedSSHKeyProvider, clusterSSHKey, req.ProjectID); err != nil {
-			return nil, common.KubernetesErrorToHTTPError(err)
-		}
-		return nil, nil
+		return handlercommon.DetachSSHKeyEndpoint(ctx, userInfoGetter, req.ProjectID, req.ClusterID, req.KeyID, projectProvider, privilegedProjectProvider, sshKeyProvider, privilegedSSHKeyProvider)
 	}
 }
 
 func GetMetricsEndpoint(projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, userInfoGetter provider.UserInfoGetter) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(common.GetClusterReq)
-		privilegedClusterProvider := ctx.Value(middleware.PrivilegedClusterProviderContextKey).(provider.PrivilegedClusterProvider)
-		clusterProvider := ctx.Value(middleware.ClusterProviderContextKey).(provider.ClusterProvider)
-
-		cluster, err := handlercommon.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
-		if err != nil {
-			return nil, err
-		}
-
-		client, err := common.GetClusterClient(ctx, userInfoGetter, clusterProvider, cluster, req.ProjectID)
-		if err != nil {
-			return nil, common.KubernetesErrorToHTTPError(err)
-		}
-
-		nodeList := &corev1.NodeList{}
-		if err := client.List(ctx, nodeList); err != nil {
-			return nil, err
-		}
-		availableResources := make(map[string]corev1.ResourceList)
-		for _, n := range nodeList.Items {
-			availableResources[n.Name] = n.Status.Allocatable
-		}
-
-		dynamicClient, err := clusterProvider.GetAdminClientForCustomerCluster(cluster)
-		if err != nil {
-			return nil, common.KubernetesErrorToHTTPError(err)
-		}
-
-		allNodeMetricsList := &v1beta1.NodeMetricsList{}
-		if err := dynamicClient.List(ctx, allNodeMetricsList); err != nil {
-			// Happens during cluster creation when the CRD is not setup yet
-			if _, ok := err.(*meta.NoKindMatchError); !ok {
-				return nil, common.KubernetesErrorToHTTPError(err)
-			}
-		}
-
-		seedAdminClient := privilegedClusterProvider.GetSeedClusterAdminRuntimeClient()
-		podMetricsList := &v1beta1.PodMetricsList{}
-		if err := seedAdminClient.List(ctx, podMetricsList, &ctrlruntimeclient.ListOptions{Namespace: fmt.Sprintf("cluster-%s", cluster.Name)}); err != nil {
-			// Happens during cluster creation when the CRD is not setup yet
-			if _, ok := err.(*meta.NoKindMatchError); !ok {
-				return nil, common.KubernetesErrorToHTTPError(err)
-			}
-		}
-		return handlercommon.ConvertClusterMetrics(podMetricsList, allNodeMetricsList.Items, availableResources, cluster.Name)
+		return handlercommon.GetMetricsEndpoint(ctx, userInfoGetter, req.ProjectID, req.ClusterID, projectProvider, privilegedProjectProvider)
 	}
 }
 
@@ -467,15 +268,6 @@ func DecodeListReq(c context.Context, r *http.Request) (interface{}, error) {
 	return req, nil
 }
 
-func decodeSSHKeyID(c context.Context, r *http.Request) (string, error) {
-	keyID := mux.Vars(r)["key_id"]
-	if keyID == "" {
-		return "", fmt.Errorf("'key_id' parameter is required but was not provided")
-	}
-
-	return keyID, nil
-}
-
 // PatchReq defines HTTP request for patchCluster endpoint
 // swagger:parameters patchCluster
 type PatchReq struct {
@@ -520,7 +312,7 @@ func DecodeAssignSSHKeyReq(c context.Context, r *http.Request) (interface{}, err
 	}
 	req.DCReq = dcr.(common.DCReq)
 
-	keyID, err := decodeSSHKeyID(c, r)
+	keyID, err := common.DecodeSSHKeyID(c, r)
 	if err != nil {
 		return nil, err
 	}
@@ -690,7 +482,7 @@ func DecodeGetClusterEvents(c context.Context, r *http.Request) (interface{}, er
 		if req.Type == "warning" || req.Type == "normal" {
 			return req, nil
 		}
-		return nil, fmt.Errorf("wrong query paramater, unsupported type: %s", req.Type)
+		return nil, fmt.Errorf("wrong query parameter, unsupported type: %s", req.Type)
 	}
 
 	return req, nil
@@ -699,31 +491,7 @@ func DecodeGetClusterEvents(c context.Context, r *http.Request) (interface{}, er
 func ListNamespaceEndpoint(projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, userInfoGetter provider.UserInfoGetter) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(common.GetClusterReq)
-		clusterProvider := ctx.Value(middleware.ClusterProviderContextKey).(provider.ClusterProvider)
-
-		cluster, err := handlercommon.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, req.ProjectID, req.ClusterID, nil)
-		if err != nil {
-			return nil, err
-		}
-
-		client, err := common.GetClusterClient(ctx, userInfoGetter, clusterProvider, cluster, req.ProjectID)
-		if err != nil {
-			return nil, common.KubernetesErrorToHTTPError(err)
-		}
-
-		namespaceList := &corev1.NamespaceList{}
-		if err := client.List(ctx, namespaceList); err != nil {
-			return nil, common.KubernetesErrorToHTTPError(err)
-		}
-
-		var apiNamespaces []apiv1.Namespace
-
-		for _, namespace := range namespaceList.Items {
-			apiNamespace := apiv1.Namespace{Name: namespace.Name}
-			apiNamespaces = append(apiNamespaces, apiNamespace)
-		}
-
-		return apiNamespaces, nil
+		return handlercommon.ListNamespaceEndpoint(ctx, userInfoGetter, req.ProjectID, req.ClusterID, projectProvider, privilegedProjectProvider)
 	}
 }
 

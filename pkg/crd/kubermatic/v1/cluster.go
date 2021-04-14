@@ -48,11 +48,17 @@ const (
 )
 
 const (
+	CCMMigrationNeededAnnotation = "ccm-migration.k8c.io/migration-needed"
+	CSIMigrationNeededAnnotation = "csi-migration.k8c.io/migration-needed"
+)
+
+const (
 	WorkerNameLabelKey   = "worker-name"
 	ProjectIDLabelKey    = "project-id"
 	UpdatedByVPALabelKey = "updated-by-vpa"
 
 	DefaultEtcdClusterSize = 3
+	MinEtcdClusterSize     = 3
 	MaxEtcdClusterSize     = 9
 )
 
@@ -100,7 +106,7 @@ type ClusterSpec struct {
 
 	// ExposeStrategy is the approach we use to expose this cluster, either via NodePort
 	// or via a dedicated LoadBalancer
-	ExposeStrategy corev1.ServiceType `json:"exposeStrategy"`
+	ExposeStrategy ExposeStrategy `json:"exposeStrategy"`
 
 	// Pause tells that this cluster is currently not managed by the controller.
 	// It indicates that the user needs to do some action to resolve the pause.
@@ -127,6 +133,14 @@ type ClusterSpec struct {
 
 	UsePodSecurityPolicyAdmissionPlugin bool `json:"usePodSecurityPolicyAdmissionPlugin,omitempty"`
 	UsePodNodeSelectorAdmissionPlugin   bool `json:"usePodNodeSelectorAdmissionPlugin,omitempty"`
+
+	// EnableUserSSHKeyAgent control whether the UserSSHKeyAgent will be deployed in the user cluster or not.
+	// If it was enabled, the agent will be deployed and used to sync the user ssh keys, that the user attach
+	// to the created cluster. If the agent was disabled, it won't be deployed in the user cluster, thus after
+	// the cluster creation any attached ssh keys won't be synced to the worker nodes. Once the agent is enabled/disabled
+	// it cannot be changed after the cluster is being created.
+	EnableUserSSHKeyAgent bool `json:"enableUserSSHKeyAgent,omitempty"`
+
 	// PodNodeSelectorAdmissionPluginConfig provides the configuration for the PodNodeSelector.
 	// It's used by the backend to create a configuration file for this plugin.
 	// The key:value from the map is converted to the namespace:<node-selectors-labels> in the file.
@@ -139,6 +153,11 @@ type ClusterSpec struct {
 	AdmissionPlugins                     []string          `json:"admissionPlugins,omitempty"`
 
 	AuditLogging *AuditLoggingSettings `json:"auditLogging,omitempty"`
+
+	// OPAIntegration is a preview feature that enables OPA integration with Kubermatic for the cluster.
+	// Enabling it causes gatekeeper and its resources to be deployed on the user cluster.
+	// By default it is disabled.
+	OPAIntegration *OPAIntegrationSettings `json:"opaIntegration,omitempty"`
 
 	// ServiceAccount contains service account related settings for the kube-apiserver of user cluster.
 	ServiceAccount *ServiceAccountSettings `json:"serviceAccount,omitempty"`
@@ -179,26 +198,37 @@ const (
 	// the status of cloud provider resources for a given cluster.
 	ClusterConditionSeedResourcesUpToDate ClusterConditionType = "SeedResourcesUpToDate"
 
-	ClusterConditionClusterControllerReconcilingSuccess        ClusterConditionType = "ClusterControllerReconciledSuccessfully"
-	ClusterConditionAddonControllerReconcilingSuccess          ClusterConditionType = "AddonControllerReconciledSuccessfully"
-	ClusterConditionAddonInstallerControllerReconcilingSuccess ClusterConditionType = "AddonInstallerControllerReconciledSuccessfully"
-	ClusterConditionBackupControllerReconcilingSuccess         ClusterConditionType = "BackupControllerReconciledSuccessfully"
-	ClusterConditionEtcdRestoreControllerReconcilingSuccess    ClusterConditionType = "EtcdRestoreControllerReconciledSuccessfully"
-	ClusterConditionBackupScheduleControllerReconcilingSuccess ClusterConditionType = "BackupScheduleControllerReconciledSuccessfully"
-	ClusterConditionCloudControllerReconcilingSuccess          ClusterConditionType = "CloudControllerReconcilledSuccessfully"
-	ClusterConditionComponentDefaulterReconcilingSuccess       ClusterConditionType = "ComponentDefaulterReconciledSuccessfully"
-	ClusterConditionUpdateControllerReconcilingSuccess         ClusterConditionType = "UpdateControllerReconciledSuccessfully"
-	ClusterConditionMonitoringControllerReconcilingSuccess     ClusterConditionType = "MonitoringControllerReconciledSuccessfully"
-	ClusterConditionOpenshiftControllerReconcilingSuccess      ClusterConditionType = "OpenshiftControllerReconciledSuccessfully"
-	ClusterConditionClusterInitialized                         ClusterConditionType = "ClusterInitialized"
+	ClusterConditionClusterControllerReconcilingSuccess           ClusterConditionType = "ClusterControllerReconciledSuccessfully"
+	ClusterConditionAddonControllerReconcilingSuccess             ClusterConditionType = "AddonControllerReconciledSuccessfully"
+	ClusterConditionAddonInstallerControllerReconcilingSuccess    ClusterConditionType = "AddonInstallerControllerReconciledSuccessfully"
+	ClusterConditionBackupControllerReconcilingSuccess            ClusterConditionType = "BackupControllerReconciledSuccessfully"
+	ClusterConditionEtcdRestoreControllerReconcilingSuccess       ClusterConditionType = "EtcdRestoreControllerReconciledSuccessfully"
+	ClusterConditionBackupScheduleControllerReconcilingSuccess    ClusterConditionType = "BackupScheduleControllerReconciledSuccessfully"
+	ClusterConditionCloudControllerReconcilingSuccess             ClusterConditionType = "CloudControllerReconcilledSuccessfully"
+	ClusterConditionComponentDefaulterReconcilingSuccess          ClusterConditionType = "ComponentDefaulterReconciledSuccessfully"
+	ClusterConditionUpdateControllerReconcilingSuccess            ClusterConditionType = "UpdateControllerReconciledSuccessfully"
+	ClusterConditionMonitoringControllerReconcilingSuccess        ClusterConditionType = "MonitoringControllerReconciledSuccessfully"
+	ClusterConditionOpenshiftControllerReconcilingSuccess         ClusterConditionType = "OpenshiftControllerReconciledSuccessfully"
+	ClusterConditionMachineDeploymentControllerReconcilingSuccess ClusterConditionType = "MachineDeploymentReconciledSuccessfully"
+	ClusterConditionClusterInitialized                            ClusterConditionType = "ClusterInitialized"
 
 	ClusterConditionRancherInitialized     ClusterConditionType = "RancherInitializedSuccessfully"
 	ClusterConditionRancherClusterImported ClusterConditionType = "RancherClusterImportedSuccessfully"
 
 	ClusterConditionEtcdClusterInitialized ClusterConditionType = "EtcdClusterInitialized"
 
-	ReasonClusterUpdateSuccessful = "ClusterUpdateSuccessful"
-	ReasonClusterUpdateInProgress = "ClusterUpdateInProgress"
+	// ClusterConditionNone is a special value indicating that no cluster condition should be set
+	ClusterConditionNone ClusterConditionType = ""
+	// This condition is met when a CSI migration is ongoing and the CSI
+	// migration feature gates are activated on the Kubelets of all the nodes.
+	// When this condition is `true` CSIMigration{provider}Complete can be
+	// enabled.
+	ClusterConditionCSIKubeletMigrationCompleted ClusterConditionType = "CSIKubeletMigrationCompleted"
+
+	ReasonClusterUpdateSuccessful             = "ClusterUpdateSuccessful"
+	ReasonClusterUpdateInProgress             = "ClusterUpdateInProgress"
+	ReasonClusterCSIKubeletMigrationCompleted = "CSIKubeletMigrationSuccess"
+	ReasonClusterCCMMigrationInProgress       = "CSIKubeletMigrationInProgress"
 )
 
 var AllClusterConditionTypes = []ClusterConditionType{
@@ -264,7 +294,7 @@ type ClusterStatus struct {
 
 	// ErrorReason contains a error reason in case the controller encountered an error. Will be reset if the error was resolved
 	ErrorReason *ClusterStatusError `json:"errorReason,omitempty"`
-	// ErrorMessage contains a defauled error message in case the controller encountered an error. Will be reset if the error was resolved
+	// ErrorMessage contains a default error message in case the controller encountered an error. Will be reset if the error was resolved
 	ErrorMessage *string `json:"errorMessage,omitempty"`
 
 	// Conditions contains conditions the cluster is in, its primary use case is status signaling between controllers or between
@@ -318,10 +348,18 @@ type AuditLoggingSettings struct {
 	Enabled bool `json:"enabled,omitempty"`
 }
 
+type OPAIntegrationSettings struct {
+	// Enabled is the flag for enabling OPA integration
+	Enabled bool `json:"enabled,omitempty"`
+	// WebhookTimeout is the timeout that is set for the gatekeeper validating webhook admission review calls.
+	// By default 10 seconds.
+	WebhookTimeoutSeconds *int32 `json:"webhookTimeoutSeconds,omitempty"`
+}
+
 type ServiceAccountSettings struct {
 	TokenVolumeProjectionEnabled bool `json:"tokenVolumeProjectionEnabled,omitempty"`
 	// Issuer is the identifier of the service account token issuer
-	// If this is not specified, it will be set to the default value kubernetes.default.svc
+	// If this is not specified, it will be set to the URL of apiserver by default
 	Issuer string `json:"issuer,omitempty"`
 	// APIAudiences are the Identifiers of the API
 	// If this is not specified, it will be set to a single element list containing the issuer URL
@@ -330,8 +368,8 @@ type ServiceAccountSettings struct {
 
 type ComponentSettings struct {
 	Apiserver         APIServerSettings       `json:"apiserver"`
-	ControllerManager DeploymentSettings      `json:"controllerManager"`
-	Scheduler         DeploymentSettings      `json:"scheduler"`
+	ControllerManager ControllerSettings      `json:"controllerManager"`
+	Scheduler         ControllerSettings      `json:"scheduler"`
 	Etcd              EtcdStatefulSetSettings `json:"etcd"`
 	Prometheus        StatefulSetSettings     `json:"prometheus"`
 }
@@ -341,6 +379,11 @@ type APIServerSettings struct {
 
 	EndpointReconcilingDisabled *bool  `json:"endpointReconcilingDisabled,omitempty"`
 	NodePortRange               string `json:"nodePortRange,omitempty"`
+}
+
+type ControllerSettings struct {
+	DeploymentSettings     `json:",inline"`
+	LeaderElectionSettings `json:"leaderElection,omitempty"`
 }
 
 type DeploymentSettings struct {
@@ -357,6 +400,22 @@ type EtcdStatefulSetSettings struct {
 	DeploymentSettings `json:",inline"`
 	StorageClass       string             `json:"storageClass,omitempty"`
 	DiskSize           *resource.Quantity `json:"diskSize,omitempty"`
+}
+
+type LeaderElectionSettings struct {
+	// LeaseDurationSeconds is the duration in seconds that non-leader candidates
+	// will wait to force acquire leadership. This is measured against time of
+	// last observed ack.
+	// +optional
+	LeaseDurationSeconds *int32 `json:"leaseDurationSeconds,omitempty"`
+	// RenewDeadlineSeconds is the duration in seconds that the acting controlplane
+	// will retry refreshing leadership before giving up.
+	// +optional
+	RenewDeadlineSeconds *int32 `json:"renewDeadlineSeconds,omitempty"`
+	// RetryPeriodSeconds is the duration in seconds the LeaderElector clients
+	// should wait between tries of actions.
+	// +optional
+	RetryPeriodSeconds *int32 `json:"retryPeriodSeconds,omitempty"`
 }
 
 // ClusterNetworkingConfig specifies the different networking
@@ -423,6 +482,7 @@ type CloudSpec struct {
 	GCP          *GCPCloudSpec          `json:"gcp,omitempty"`
 	Kubevirt     *KubevirtCloudSpec     `json:"kubevirt,omitempty"`
 	Alibaba      *AlibabaCloudSpec      `json:"alibaba,omitempty"`
+	Anexia       *AnexiaCloudSpec       `json:"anexia,omitempty"`
 }
 
 // KeyCert is a pair of key and cert.
@@ -455,10 +515,16 @@ type DigitaloceanCloudSpec struct {
 type HetznerCloudSpec struct {
 	CredentialsReference *providerconfig.GlobalSecretKeySelector `json:"credentialsReference,omitempty"`
 
-	Token string `json:"token,omitempty"` // Token is used to authenticate with the Hetzner cloud API.
+	// Token is used to authenticate with the Hetzner cloud API.
+	Token string `json:"token,omitempty"`
+	// Network is the pre-existing Hetzner network in which the machines are running.
+	// While machines can be in multiple networks, a single one must be chosen for the
+	// HCloud CCM to work.
+	// If this is empty, the network configured on the datacenter will be used.
+	Network string `json:"network,omitempty"`
 }
 
-// AzureCloudSpec specifies acceess credentials to Azure cloud.
+// AzureCloudSpec specifies access credentials to Azure cloud.
 type AzureCloudSpec struct {
 	CredentialsReference *providerconfig.GlobalSecretKeySelector `json:"credentialsReference,omitempty"`
 
@@ -603,6 +669,13 @@ type AlibabaCloudSpec struct {
 	AccessKeySecret string `json:"accessKeySecret,omitempty"`
 }
 
+// AnexiaCloudSpec specifies the access data to Anexia.
+type AnexiaCloudSpec struct {
+	CredentialsReference *providerconfig.GlobalSecretKeySelector `json:"credentialsReference,omitempty"`
+
+	Token string `json:"token,omitempty"`
+}
+
 type HealthStatus int
 
 const (
@@ -706,6 +779,9 @@ func (cluster *Cluster) GetSecretName() string {
 	}
 	if cluster.Spec.Cloud.Alibaba != nil {
 		return fmt.Sprintf("%s-alibaba-%s", CredentialPrefix, cluster.Name)
+	}
+	if cluster.Spec.Cloud.Anexia != nil {
+		return fmt.Sprintf("%s-anexia-%s", CredentialPrefix, cluster.Name)
 	}
 	return ""
 }

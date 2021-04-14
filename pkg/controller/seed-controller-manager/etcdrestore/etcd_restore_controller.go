@@ -30,6 +30,7 @@ import (
 	kubermaticv1helper "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1/helper"
 	kuberneteshelper "k8c.io/kubermatic/v2/pkg/kubernetes"
 	"k8c.io/kubermatic/v2/pkg/resources"
+	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -65,6 +66,7 @@ type Reconciler struct {
 	workerName string
 	ctrlruntimeclient.Client
 	recorder record.EventRecorder
+	versions kubermatic.Versions
 }
 
 // Add creates a new etcd restore controller that is responsible for
@@ -74,6 +76,7 @@ func Add(
 	log *zap.SugaredLogger,
 	numWorkers int,
 	workerName string,
+	v kubermatic.Versions,
 ) error {
 	log = log.Named(ControllerName)
 	client := mgr.GetClient()
@@ -83,6 +86,7 @@ func Add(
 		Client:     client,
 		workerName: workerName,
 		recorder:   mgr.GetEventRecorderFor(ControllerName),
+		versions:   v,
 	}
 
 	ctrlOptions := controller.Options{
@@ -267,6 +271,7 @@ func (r *Reconciler) rebuildEtcdStatefulset(ctx context.Context, log *zap.Sugare
 		if err := r.updateCluster(ctx, cluster, func(cluster *kubermaticv1.Cluster) {
 			kubermaticv1helper.SetClusterCondition(
 				cluster,
+				r.versions,
 				kubermaticv1.ClusterConditionEtcdClusterInitialized,
 				corev1.ConditionFalse,
 				"",

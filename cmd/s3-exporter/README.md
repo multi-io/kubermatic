@@ -30,7 +30,7 @@ Releasing:
 
 ```
 # Go to the project dir
-cd $GOPATH/src/k8c.io/kubermatic/v2
+cd $GOPATH/src/k8c.io/kubermatic
 
 # Increment the tag variable in the publish script
 vim hack/publish-s3-exporter.sh
@@ -39,10 +39,10 @@ vim hack/publish-s3-exporter.sh
 ./hack/publish-s3-exporter.sh
 
 # Optional: Set the new version in the chart
-vim ../config/kubermatic/values.yaml
+vim charts/kubermatic/values.yaml
 ```
 
-Avaiable metrics:
+Available metrics:
 
 ```
 # HELP go_gc_duration_seconds A summary of the GC invocation durations.

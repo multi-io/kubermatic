@@ -17,10 +17,11 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"fmt"
 
 	"k8c.io/kubermatic/v2/pkg/semver"
-	apimodels "k8c.io/kubermatic/v2/pkg/test/e2e/api/utils/apiclient/models"
+	apimodels "k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/models"
 )
 
 // Returns a matrix of (version x operating system)
@@ -84,7 +85,7 @@ func (s *azureScenario) Cluster(secrets secrets) *apimodels.CreateClusterSpec {
 	}
 }
 
-func (s *azureScenario) NodeDeployments(num int, _ secrets) ([]apimodels.NodeDeployment, error) {
+func (s *azureScenario) NodeDeployments(_ context.Context, num int, _ secrets) ([]apimodels.NodeDeployment, error) {
 	replicas := int32(num)
 	size := "Standard_F2"
 	return []apimodels.NodeDeployment{

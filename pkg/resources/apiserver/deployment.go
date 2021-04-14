@@ -274,14 +274,6 @@ func getApiserverFlags(data *resources.TemplateData, etcdEndpoints []string, ena
 
 	serviceAccountKeyFile := filepath.Join("/etc/kubernetes/service-account-key", resources.ServiceAccountKeySecretKey)
 	flags := []string{
-		// The advertise address is used as endpoint address for the kubernetes
-		// service in the default namespace of the user cluster.
-		"--advertise-address", cluster.Address.IP,
-		// The secure port is used as target port for the kubernetes service in
-		// the default namespace of the user cluster, we use the NodePort value
-		// for being able to access the apiserver from the usercluster side.
-		"--secure-port", fmt.Sprint(cluster.Address.Port),
-		"--kubernetes-service-node-port", fmt.Sprint(cluster.Address.Port),
 		"--etcd-servers", strings.Join(etcdEndpoints, ","),
 		"--etcd-cafile", "/etc/etcd/pki/client/ca.crt",
 		"--etcd-certfile", filepath.Join("/etc/etcd/pki/client", resources.ApiserverEtcdClientCertificateCertSecretKey),
@@ -314,6 +306,30 @@ func getApiserverFlags(data *resources.TemplateData, etcdEndpoints []string, ena
 		"--requestheader-extra-headers-prefix", "X-Remote-Extra-",
 		"--requestheader-group-headers", "X-Remote-Group",
 		"--requestheader-username-headers", "X-Remote-User",
+	}
+
+	if cluster.Spec.ExposeStrategy == kubermaticv1.ExposeStrategyTunneling {
+		flags = append(flags,
+			// The advertise address is used as endpoint address for the kubernetes
+			// service in the default namespace of the user cluster.
+			"--advertise-address", cluster.Address.IP,
+			// The secure port is used as target port for the kubernetes service in
+			// the default namespace of the user cluster, we use the NodePort value
+			// for being able to access the apiserver from the usercluster side.
+			"--secure-port", fmt.Sprint(cluster.Address.Port))
+	} else {
+		// pre-pend to have advertise-address as first argument and avoid
+		// triggering unneeded redeployments.
+		flags = append([]string{
+			// The advertise address is used as endpoint address for the kubernetes
+			// service in the default namespace of the user cluster.
+			"--advertise-address", cluster.Address.IP,
+			// The secure port is used as target port for the kubernetes service in
+			// the default namespace of the user cluster, we use the NodePort value
+			// for being able to access the apiserver from the usercluster side.
+			"--secure-port", fmt.Sprint(cluster.Address.Port),
+			"--kubernetes-service-node-port", fmt.Sprint(cluster.Address.Port),
+		}, flags...)
 	}
 
 	if auditLogEnabled {
@@ -358,7 +374,7 @@ func getApiserverFlags(data *resources.TemplateData, etcdEndpoints []string, ena
 		flags = append(flags, "--kubelet-preferred-address-types", "ExternalIP,InternalIP")
 	}
 
-	cloudProviderName := data.GetKubernetesCloudProviderName()
+	cloudProviderName := resources.GetKubernetesCloudProviderName(data.Cluster(), resources.ExternalCloudProviderEnabled(data.Cluster()))
 	if cloudProviderName != "" && cloudProviderName != "external" {
 		flags = append(flags, "--cloud-provider", cloudProviderName)
 		flags = append(flags, "--cloud-config", "/etc/kubernetes/cloud/config")
@@ -366,19 +382,19 @@ func getApiserverFlags(data *resources.TemplateData, etcdEndpoints []string, ena
 
 	var oidcSettings *kubermaticv1.OIDCSettings
 
-	if data.Cluster().Spec.Sys11Auth.Realm != "" {
-		settings, err := keycloak.Sys11AuthToOidcSettings(data.Cluster().Spec.Sys11Auth, keycloakFacade)
+	if cluster.Spec.Sys11Auth.Realm != "" {
+		settings, err := keycloak.Sys11AuthToOidcSettings(cluster.Spec.Sys11Auth, keycloakFacade)
 		if _, ok := err.(*keycloak.RealmNotFoundError); ok {
 			// TODO create event?
-			klog.Errorf("Cluster %s sys11 auth: realm not found: %s", data.Cluster().Name, data.Cluster().Spec.Sys11Auth.Realm)
+			klog.Errorf("Cluster %s sys11 auth: realm not found: %s", cluster.Name, cluster.Spec.Sys11Auth.Realm)
 		} else if _, ok := err.(*keycloak.ClientNotFoundError); ok {
 			// TODO create event?
-			klog.Errorf("Cluster %s sys11 auth: metakube-cluster client not found in realm", data.Cluster().Name)
+			klog.Errorf("Cluster %s sys11 auth: metakube-cluster client not found in realm", cluster.Name)
 		} else if err != nil {
 			return nil, err
 		}
 		oidcSettings = settings
-	} else if data.Cluster().Spec.OIDC.IssuerURL != "" && data.Cluster().Spec.OIDC.ClientID != "" {
+	} else if cluster.Spec.OIDC.IssuerURL != "" && cluster.Spec.OIDC.ClientID != "" {
 		oidcSettings = &cluster.Spec.OIDC
 	}
 
@@ -405,6 +421,11 @@ func getApiserverFlags(data *resources.TemplateData, etcdEndpoints []string, ena
 		if len(data.OIDCCAFile()) > 0 {
 			flags = append(flags, "--oidc-ca-file", "/etc/kubernetes/dex/ca/caBundle.pem")
 		}
+	}
+
+	if fg := data.GetCSIMigrationFeatureGates(); len(fg) > 0 {
+		flags = append(flags, "--feature-gates")
+		flags = append(flags, strings.Join(fg, ","))
 	}
 
 	return flags, nil

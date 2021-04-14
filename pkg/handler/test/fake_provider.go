@@ -188,3 +188,53 @@ func (p *FakeExternalClusterProvider) CreateOrUpdateKubeconfigSecretForCluster(c
 func (p *FakeExternalClusterProvider) New(userInfo *provider.UserInfo, project *kubermaticapiv1.Project, cluster *kubermaticapiv1.ExternalCluster) (*kubermaticapiv1.ExternalCluster, error) {
 	return p.Provider.New(userInfo, project, cluster)
 }
+
+type FakeConstraintTemplateProvider struct {
+	Provider   *kubernetes.ConstraintTemplateProvider
+	FakeClient ctrlruntimeclient.Client
+}
+
+func (p *FakeConstraintTemplateProvider) List() (*kubermaticapiv1.ConstraintTemplateList, error) {
+	return p.Provider.List()
+}
+
+func (p *FakeConstraintTemplateProvider) Get(name string) (*kubermaticapiv1.ConstraintTemplate, error) {
+	return p.Provider.Get(name)
+}
+
+func (p *FakeConstraintTemplateProvider) Create(ct *kubermaticapiv1.ConstraintTemplate) (*kubermaticapiv1.ConstraintTemplate, error) {
+	return p.Provider.Create(ct)
+}
+
+func (p *FakeConstraintTemplateProvider) Update(ct *kubermaticapiv1.ConstraintTemplate) (*kubermaticapiv1.ConstraintTemplate, error) {
+	return p.Provider.Update(ct)
+}
+
+func (p *FakeConstraintTemplateProvider) Delete(ct *kubermaticapiv1.ConstraintTemplate) error {
+	return p.Provider.Delete(ct)
+}
+
+type FakeConstraintProvider struct {
+	Provider   *kubernetes.ConstraintProvider
+	FakeClient ctrlruntimeclient.Client
+}
+
+func (p *FakeConstraintProvider) List(cluster *kubermaticapiv1.Cluster) (*kubermaticapiv1.ConstraintList, error) {
+	return p.Provider.List(cluster)
+}
+
+func (p *FakeConstraintProvider) Get(cluster *kubermaticapiv1.Cluster, name string) (*kubermaticapiv1.Constraint, error) {
+	return p.Provider.Get(cluster, name)
+}
+
+func (p *FakeConstraintProvider) Delete(cluster *kubermaticapiv1.Cluster, userInfo *provider.UserInfo, name string) error {
+	return p.Provider.Delete(cluster, userInfo, name)
+}
+
+func (p *FakeConstraintProvider) Create(userInfo *provider.UserInfo, constraint *kubermaticapiv1.Constraint) (*kubermaticapiv1.Constraint, error) {
+	return p.Provider.Create(userInfo, constraint)
+}
+
+func (p *FakeConstraintProvider) Update(userInfo *provider.UserInfo, constraint *kubermaticapiv1.Constraint) (*kubermaticapiv1.Constraint, error) {
+	return p.Provider.Update(userInfo, constraint)
+}

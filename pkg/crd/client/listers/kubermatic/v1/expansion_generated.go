@@ -18,6 +18,18 @@ type AddonConfigListerExpansion interface{}
 // ClusterLister.
 type ClusterListerExpansion interface{}
 
+// ConstraintListerExpansion allows custom methods to be added to
+// ConstraintLister.
+type ConstraintListerExpansion interface{}
+
+// ConstraintNamespaceListerExpansion allows custom methods to be added to
+// ConstraintNamespaceLister.
+type ConstraintNamespaceListerExpansion interface{}
+
+// ConstraintTemplateListerExpansion allows custom methods to be added to
+// ConstraintTemplateLister.
+type ConstraintTemplateListerExpansion interface{}
+
 // EtcdBackupConfigListerExpansion allows custom methods to be added to
 // EtcdBackupConfigLister.
 type EtcdBackupConfigListerExpansion interface{}

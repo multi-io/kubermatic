@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"text/template"
 
-	"github.com/Masterminds/sprig"
+	"github.com/Masterminds/sprig/v3"
 
 	"k8c.io/kubermatic/v2/pkg/controller/master-controller-manager/rbac"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
@@ -66,7 +66,8 @@ type etcdStatefulSetCreatorData interface {
 	GetPodTemplateLabels(string, []corev1.Volume, map[string]string) (map[string]string, error)
 	ImageRegistry(string) string
 	EtcdDiskSize() resource.Quantity
-	EtcdLauncherImage() (string, string)
+	EtcdLauncherImage() string
+	EtcdLauncherTag() string
 	GetClusterRef() metav1.OwnerReference
 	SupportsFailureDomainZoneAntiAffinity() bool
 }
@@ -101,18 +102,12 @@ func StatefulSetCreator(data etcdStatefulSetCreatorData, enableDataCorruptionChe
 			}
 			set.Spec.Template.Spec.ServiceAccountName = rbac.EtcdLauncherServiceAccountName
 
-			image, tag := data.EtcdLauncherImage()
-			if tag == "" {
-				tag = resources.KUBERMATICCOMMIT
-			}
-
 			launcherEnabled := data.Cluster().Spec.Features[kubermaticv1.ClusterFeatureEtcdLauncher]
-
 			if launcherEnabled {
 				set.Spec.Template.Spec.InitContainers = []corev1.Container{
 					{
 						Name:            "etcd-launcher-init",
-						Image:           image + ":" + tag,
+						Image:           data.EtcdLauncherImage() + ":" + data.EtcdLauncherTag(),
 						ImagePullPolicy: corev1.PullIfNotPresent,
 						Command:         []string{"/bin/cp", "/etcd-launcher", "/opt/bin/"},
 						VolumeMounts: []corev1.VolumeMount{
@@ -366,7 +361,7 @@ func getBasePodLabels(cluster *kubermaticv1.Cluster) map[string]string {
 }
 
 // ImageTag returns the correct etcd image tag for a given Cluster
-// TODO: Other functions use this function, swtich them to getLauncherImage
+// TODO: Other functions use this function, switch them to getLauncherImage
 func ImageTag(c *kubermaticv1.Cluster) string {
 	/* Remove because we use v3.4.X for kubernetes < 1.17 too
 	if c.IsOpenshift() || c.Spec.Version.Minor() < 17 {
@@ -490,7 +485,5 @@ exec /usr/local/bin/etcd \
     --experimental-corrupt-check-time=10m \
 {{- end }}
     --auto-compaction-retention=8
-    --heartbeat-interval=1000
-    --election-timeout=5000
 `
 )

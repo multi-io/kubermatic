@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"text/template"
 
-	"github.com/Masterminds/sprig"
+	"github.com/Masterminds/sprig/v3"
 
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/resources/etcd"
@@ -211,7 +211,7 @@ apiServerArguments:
   - /etc/kubernetes/cloud/config
 {{- end }}
   enable-aggregator-routing:
-  # Thist _must_ stay false, if its true, the kube-apiserver will try to resolve endpoints for
+  # This _must_ stay false, if its true, the kube-apiserver will try to resolve endpoints for
   # the services that service the extension apis and error out because they are of type
   # ExternalName
   - 'false'

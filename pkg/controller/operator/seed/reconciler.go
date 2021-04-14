@@ -25,7 +25,7 @@ import (
 
 	"k8c.io/kubermatic/v2/pkg/controller/operator/common"
 	"k8c.io/kubermatic/v2/pkg/controller/operator/common/vpa"
-	"k8c.io/kubermatic/v2/pkg/controller/operator/seed/resources/kubermatic"
+	kubermaticseed "k8c.io/kubermatic/v2/pkg/controller/operator/seed/resources/kubermatic"
 	"k8c.io/kubermatic/v2/pkg/controller/operator/seed/resources/nodeportproxy"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	operatorv1alpha1 "k8c.io/kubermatic/v2/pkg/crd/operator/v1alpha1"
@@ -33,6 +33,7 @@ import (
 	"k8c.io/kubermatic/v2/pkg/kubernetes"
 	"k8c.io/kubermatic/v2/pkg/provider"
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
+	kubermaticversion "k8c.io/kubermatic/v2/pkg/version/kubermatic"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -61,7 +62,7 @@ type Reconciler struct {
 	seedRecorders  map[string]record.EventRecorder
 	seedsGetter    provider.SeedsGetter
 	workerName     string
-	versions       common.Versions
+	versions       kubermaticversion.Versions
 }
 
 // Reconcile acts upon requests and will restore the state of resources
@@ -183,7 +184,7 @@ func (r *Reconciler) cleanupDeletedSeed(cfg *operatorv1alpha1.KubermaticConfigur
 
 	log.Debug("Seed was deleted, cleaning up cluster-wide resources")
 
-	if err := common.CleanupClusterResource(client, &rbacv1.ClusterRoleBinding{}, kubermatic.ClusterRoleBindingName(cfg)); err != nil {
+	if err := common.CleanupClusterResource(client, &rbacv1.ClusterRoleBinding{}, kubermaticseed.ClusterRoleBindingName(cfg)); err != nil {
 		return fmt.Errorf("failed to clean up ClusterRoleBinding: %v", err)
 	}
 
@@ -197,6 +198,10 @@ func (r *Reconciler) cleanupDeletedSeed(cfg *operatorv1alpha1.KubermaticConfigur
 
 	if err := common.CleanupClusterResource(client, &admissionregistrationv1.ValidatingWebhookConfiguration{}, common.SeedAdmissionWebhookName(cfg)); err != nil {
 		return fmt.Errorf("failed to clean up ValidatingWebhookConfiguration: %v", err)
+	}
+
+	if err := common.CleanupClusterResource(client, &admissionregistrationv1.ValidatingWebhookConfiguration{}, kubermaticseed.ClusterAdmissionWebhookName); err != nil {
+		return fmt.Errorf("failed to clean up Seed ValidatingWebhookConfiguration: %v", err)
 	}
 
 	oldSeed := seed.DeepCopy()
@@ -290,7 +295,7 @@ func (r *Reconciler) reconcileServiceAccounts(cfg *operatorv1alpha1.KubermaticCo
 	log.Debug("reconciling Kubermatic ServiceAccounts")
 
 	creators := []reconciling.NamedServiceAccountCreatorGetter{
-		kubermatic.ServiceAccountCreator(cfg, seed),
+		kubermaticseed.ServiceAccountCreator(cfg, seed),
 	}
 
 	if !seed.Spec.NodeportProxy.Disable {
@@ -356,7 +361,7 @@ func (r *Reconciler) reconcileRoleBindings(cfg *operatorv1alpha1.KubermaticConfi
 func (r *Reconciler) reconcileClusterRoles(cfg *operatorv1alpha1.KubermaticConfiguration, seed *kubermaticv1.Seed, client ctrlruntimeclient.Client, log *zap.SugaredLogger) error {
 	log.Debug("reconciling ClusterRoles")
 
-	creators := []reconciling.NamedClusterRoleCreatorGetter{}
+	var creators []reconciling.NamedClusterRoleCreatorGetter
 
 	if !seed.Spec.NodeportProxy.Disable {
 		creators = append(creators, nodeportproxy.ClusterRoleCreator(cfg))
@@ -377,7 +382,7 @@ func (r *Reconciler) reconcileClusterRoleBindings(cfg *operatorv1alpha1.Kubermat
 	log.Debug("reconciling ClusterRoleBindings")
 
 	creators := []reconciling.NamedClusterRoleBindingCreatorGetter{
-		kubermatic.ClusterRoleBindingCreator(cfg, seed),
+		kubermaticseed.ClusterRoleBindingCreator(cfg, seed),
 	}
 
 	if !seed.Spec.NodeportProxy.Disable {
@@ -399,18 +404,18 @@ func (r *Reconciler) reconcileConfigMaps(cfg *operatorv1alpha1.KubermaticConfigu
 	log.Debug("reconciling ConfigMaps")
 
 	creators := []reconciling.NamedConfigMapCreatorGetter{
-		kubermatic.BackupContainersConfigMapCreator(cfg),
+		kubermaticseed.BackupContainersConfigMapCreator(cfg),
 	}
 
-	if creator := kubermatic.ClusterNamespacePrometheusScrapingConfigsConfigMapCreator(cfg); creator != nil {
+	if creator := kubermaticseed.ClusterNamespacePrometheusScrapingConfigsConfigMapCreator(cfg); creator != nil {
 		creators = append(creators, creator)
 	}
 
-	if creator := kubermatic.ClusterNamespacePrometheusRulesConfigMapCreator(cfg); creator != nil {
+	if creator := kubermaticseed.ClusterNamespacePrometheusRulesConfigMapCreator(cfg); creator != nil {
 		creators = append(creators, creator)
 	}
 
-	if creator := kubermatic.ClusterNamespacePrometheusRemoteWriteConfigsConfigMapCreator(cfg); creator != nil {
+	if creator := kubermaticseed.ClusterNamespacePrometheusRemoteWriteConfigsConfigMapCreator(cfg); creator != nil {
 		creators = append(creators, creator)
 	}
 
@@ -426,8 +431,8 @@ func (r *Reconciler) reconcileSecrets(cfg *operatorv1alpha1.KubermaticConfigurat
 
 	creators := []reconciling.NamedSecretCreatorGetter{
 		common.ExtraFilesSecretCreator(cfg),
-		common.SeedWebhookServingCASecretCreator(cfg),
-		common.SeedWebhookServingCertSecretCreator(cfg, client),
+		common.WebhookServingCASecretCreator(cfg),
+		common.WebhookServingCertSecretCreator(cfg, client),
 	}
 
 	if cfg.Spec.ImagePullSecret != "" {
@@ -460,14 +465,14 @@ func (r *Reconciler) reconcileDeployments(cfg *operatorv1alpha1.KubermaticConfig
 	log.Debug("reconciling Deployments")
 
 	creators := []reconciling.NamedDeploymentCreatorGetter{
-		kubermatic.SeedControllerManagerDeploymentCreator(r.workerName, r.versions, cfg, seed),
+		kubermaticseed.SeedControllerManagerDeploymentCreator(r.workerName, r.versions, cfg, seed),
 	}
 
 	if !seed.Spec.NodeportProxy.Disable {
 		creators = append(
 			creators,
-			nodeportproxy.EnvoyDeploymentCreator(seed, r.versions),
-			nodeportproxy.UpdaterDeploymentCreator(seed, r.versions),
+			nodeportproxy.EnvoyDeploymentCreator(cfg, seed, r.versions),
+			nodeportproxy.UpdaterDeploymentCreator(cfg, seed, r.versions),
 		)
 	}
 
@@ -506,7 +511,7 @@ func (r *Reconciler) reconcilePodDisruptionBudgets(cfg *operatorv1alpha1.Kuberma
 	log.Debug("reconciling PodDisruptionBudgets")
 
 	creators := []reconciling.NamedPodDisruptionBudgetCreatorGetter{
-		kubermatic.SeedControllerManagerPDBCreator(cfg),
+		kubermaticseed.SeedControllerManagerPDBCreator(cfg),
 	}
 
 	if !seed.Spec.NodeportProxy.Disable {
@@ -525,6 +530,7 @@ func (r *Reconciler) reconcileServices(cfg *operatorv1alpha1.KubermaticConfigura
 
 	creators := []reconciling.NamedServiceCreatorGetter{
 		common.SeedAdmissionServiceCreator(cfg, client),
+		kubermaticseed.ClusterAdmissionServiceCreator(cfg, client),
 	}
 
 	if err := reconciling.ReconcileServices(r.ctx, creators, cfg.Namespace, client, common.OwnershipModifierFactory(seed, r.scheme)); err != nil {
@@ -571,6 +577,7 @@ func (r *Reconciler) reconcileAdmissionWebhooks(cfg *operatorv1alpha1.Kubermatic
 
 	valCreators := []reconciling.NamedValidatingWebhookConfigurationCreatorGetter{
 		common.SeedAdmissionWebhookCreator(cfg, client),
+		kubermaticseed.ClusterAdmissionWebhookCreator(cfg, client),
 	}
 
 	if err := reconciling.ReconcileValidatingWebhookConfigurations(r.ctx, valCreators, "", client); err != nil {

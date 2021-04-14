@@ -130,6 +130,9 @@ func (p *ProjectProvider) Delete(userInfo *provider.UserInfo, projectInternalNam
 
 	existingProject := &kubermaticapiv1.Project{}
 	if err := masterImpersonatedClient.Get(context.Background(), ctrlruntimeclient.ObjectKey{Name: projectInternalName}, existingProject); err != nil {
+		if kerrors.IsNotFound(err) {
+			return nil
+		}
 		return err
 	}
 

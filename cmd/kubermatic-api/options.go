@@ -23,13 +23,14 @@ import (
 	"io/ioutil"
 	"strings"
 
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/features"
 	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
 	"k8c.io/kubermatic/v2/pkg/provider"
 	"k8c.io/kubermatic/v2/pkg/serviceaccount"
+	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 	"k8c.io/kubermatic/v2/pkg/watcher"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -44,7 +45,7 @@ type serverRunOptions struct {
 	presetsFile      string
 	swaggerFile      string
 	domain           string
-	exposeStrategy   corev1.ServiceType
+	exposeStrategy   kubermaticv1.ExposeStrategy
 	dynamicPresets   bool
 	namespace        string
 	log              kubermaticlog.Options
@@ -66,12 +67,12 @@ type serverRunOptions struct {
 	serviceAccountSigningKey string
 
 	featureGates features.FeatureGate
+	versions     kubermatic.Versions
 }
 
 func newServerRunOptions() (serverRunOptions, error) {
-	s := serverRunOptions{}
+	s := serverRunOptions{featureGates: features.FeatureGate{}}
 	var (
-		rawFeatureGates     string
 		rawExposeStrategy   string
 		rawAccessibleAddons string
 		oidcCAFile          string
@@ -100,7 +101,7 @@ func newServerRunOptions() (serverRunOptions, error) {
 	flag.StringVar(&s.oidcIssuerCookieHashKey, "oidc-issuer-cookie-hash-key", "", "Hash key authenticates the cookie value using HMAC. It is recommended to use a key with 32 or 64 bytes.")
 	flag.BoolVar(&s.oidcIssuerCookieSecureMode, "oidc-issuer-cookie-secure-mode", true, "When true cookie received only with HTTPS. Set false for local deployment with HTTP")
 	flag.BoolVar(&s.oidcIssuerOfflineAccessAsScope, "oidc-issuer-offline-access-as-scope", true, "Set it to false if OIDC provider requires to set \"access_type=offline\" query param when accessing the refresh token")
-	flag.StringVar(&rawFeatureGates, "feature-gates", "", "A set of key=value pairs that describe feature gates for various features.")
+	flag.Var(&s.featureGates, "feature-gates", "A set of key=value pairs that describe feature gates for various features.")
 	flag.StringVar(&s.domain, "domain", "localhost", "A domain name on which the server is deployed")
 	flag.StringVar(&s.serviceAccountSigningKey, "service-account-signing-key", "", "Signing key authenticates the service account's token value using HMAC. It is recommended to use a key with 32 bytes or longer.")
 	flag.StringVar(&rawExposeStrategy, "expose-strategy", "NodePort", "The strategy to expose the controlplane with, either \"NodePort\" which creates NodePorts with a \"nodeport-proxy.k8s.io/expose: true\" annotation or \"LoadBalancer\", which creates a LoadBalancer")
@@ -109,19 +110,10 @@ func newServerRunOptions() (serverRunOptions, error) {
 	addFlags(flag.CommandLine)
 	flag.Parse()
 
-	featureGates, err := features.NewFeatures(rawFeatureGates)
-	if err != nil {
-		return s, err
-	}
-	s.featureGates = featureGates
-
-	switch rawExposeStrategy {
-	case "NodePort":
-		s.exposeStrategy = corev1.ServiceTypeNodePort
-	case "LoadBalancer":
-		s.exposeStrategy = corev1.ServiceTypeLoadBalancer
-	default:
-		return s, fmt.Errorf("--expose-strategy must be either `NodePort` or `LoadBalancer`, got %q", rawExposeStrategy)
+	var validExposeStrategy bool
+	s.exposeStrategy, validExposeStrategy = kubermaticv1.ExposeStrategyFromString(rawExposeStrategy)
+	if !validExposeStrategy {
+		return s, fmt.Errorf("--expose-strategy must be one of: %s, got %q", kubermaticv1.AllExposeStrategies, rawExposeStrategy)
 	}
 
 	s.accessibleAddons = sets.NewString(strings.Split(rawAccessibleAddons, ",")...)
@@ -140,6 +132,8 @@ func newServerRunOptions() (serverRunOptions, error) {
 
 		s.oidcCABundle = pool
 	}
+
+	s.versions = kubermatic.NewDefaultVersions()
 
 	return s, nil
 }
@@ -200,4 +194,7 @@ type providers struct {
 	userWatcher                           watcher.UserWatcher
 	externalClusterProvider               provider.ExternalClusterProvider
 	privilegedExternalClusterProvider     provider.PrivilegedExternalClusterProvider
+	constraintTemplateProvider            provider.ConstraintTemplateProvider
+	constraintProvider                    provider.ConstraintProvider
+	privilegedConstraintProvider          provider.PrivilegedConstraintProvider
 }

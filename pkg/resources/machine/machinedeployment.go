@@ -92,6 +92,11 @@ func Deployment(c *kubermaticv1.Cluster, nd *apiv1.NodeDeployment, dc *kubermati
 		md.Annotations[apiv1.AutoscalerMaxSizeAnnotation] = strconv.Itoa(int(nd.Spec.MaxReplicas))
 		md.Annotations[apiv1.AutoscalerLegacyMinSizeAnnotation] = strconv.Itoa(int(nd.Spec.MinReplicas))
 		md.Annotations[apiv1.AutoscalerLegacyMaxSizeAnnotation] = strconv.Itoa(int(nd.Spec.MaxReplicas))
+	} else if md.Annotations != nil {
+		delete(md.Annotations, apiv1.AutoscalerMinSizeAnnotation)
+		delete(md.Annotations, apiv1.AutoscalerMaxSizeAnnotation)
+		delete(md.Annotations, apiv1.AutoscalerLegacyMinSizeAnnotation)
+		delete(md.Annotations, apiv1.AutoscalerLegacyMaxSizeAnnotation)
 	}
 
 	md.Spec.Template.Spec.Versions.Kubelet = nd.Spec.Template.Versions.Kubelet
@@ -223,13 +228,19 @@ func getProviderConfig(c *kubermaticv1.Cluster, nd *apiv1.NodeDeployment, dc *ku
 		}
 	case nd.Spec.Template.Cloud.Kubevirt != nil:
 		config.CloudProvider = providerconfig.CloudProviderKubeVirt
-		cloudExt, err = getKubevirtProviderSpec(nd.Spec.Template)
+		cloudExt, err = getKubevirtProviderSpec(nd.Spec.Template, dc)
 		if err != nil {
 			return nil, err
 		}
 	case nd.Spec.Template.Cloud.Alibaba != nil:
 		config.CloudProvider = providerconfig.CloudProviderAlibaba
 		cloudExt, err = getAlibabaProviderSpec(c, nd.Spec.Template, dc)
+		if err != nil {
+			return nil, err
+		}
+	case nd.Spec.Template.Cloud.Anexia != nil:
+		config.CloudProvider = providerconfig.CloudProviderAnexia
+		cloudExt, err = getAnexiaProviderSpec(nd.Spec.Template, dc)
 		if err != nil {
 			return nil, err
 		}
@@ -305,7 +316,8 @@ func Validate(nd *apiv1.NodeDeployment, controlPlaneVersion *semver.Version) (*a
 		nd.Spec.Template.Cloud.Packet == nil &&
 		nd.Spec.Template.Cloud.GCP == nil &&
 		nd.Spec.Template.Cloud.Kubevirt == nil &&
-		nd.Spec.Template.Cloud.Alibaba == nil {
+		nd.Spec.Template.Cloud.Alibaba == nil &&
+		nd.Spec.Template.Cloud.Anexia == nil {
 		return nil, fmt.Errorf("node deployment needs to have cloud provider data")
 	}
 

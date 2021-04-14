@@ -22,6 +22,7 @@ import (
 	"fmt"
 
 	providerconfig "github.com/kubermatic/machine-controller/pkg/providerconfig/types"
+
 	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	ksemver "k8c.io/kubermatic/v2/pkg/semver"
@@ -58,6 +59,7 @@ const (
 	GCPCloudProvider          = "gcp"
 	KubevirtCloudProvider     = "kubevirt"
 	AlibabaCloudProvider      = "alibaba"
+	AnexiaCloudProvider       = "anexia"
 
 	DefaultSSHPort     = 22
 	DefaultKubeletPort = 10250
@@ -180,16 +182,19 @@ type ClusterProvider interface {
 	// GetAdminClientForCustomerCluster returns a client to interact with all resources in the given cluster
 	//
 	// Note that the client you will get has admin privileges
-	GetAdminClientForCustomerCluster(*kubermaticv1.Cluster) (ctrlruntimeclient.Client, error)
+	GetAdminClientForCustomerCluster(context.Context, *kubermaticv1.Cluster) (ctrlruntimeclient.Client, error)
 
 	// GetClientForCustomerCluster returns a client to interact with all resources in the given cluster
 	//
 	// Note that the client doesn't use admin account instead it authn/authz as userInfo(email, group)
-	GetClientForCustomerCluster(*UserInfo, *kubermaticv1.Cluster) (ctrlruntimeclient.Client, error)
+	GetClientForCustomerCluster(context.Context, *UserInfo, *kubermaticv1.Cluster) (ctrlruntimeclient.Client, error)
 
 	// GetTokenForCustomerCluster returns a token for the given cluster with permissions granted to group that
 	// user belongs to.
-	GetTokenForCustomerCluster(userInfo *UserInfo, cluster *kubermaticv1.Cluster) (string, error)
+	GetTokenForCustomerCluster(context.Context, *UserInfo, *kubermaticv1.Cluster) (string, error)
+
+	// IsCluster checks if cluster exist with the given name
+	IsCluster(clusterName string) bool
 }
 
 // PrivilegedClusterProvider declares the set of methods for interacting with the seed clusters
@@ -428,6 +433,9 @@ func ClusterCloudProviderName(spec kubermaticv1.CloudSpec) (string, error) {
 	if spec.Alibaba != nil {
 		clouds = append(clouds, AlibabaCloudProvider)
 	}
+	if spec.Anexia != nil {
+		clouds = append(clouds, AnexiaCloudProvider)
+	}
 	if len(clouds) == 0 {
 		return "", nil
 	}
@@ -497,6 +505,9 @@ func DatacenterCloudProviderName(spec *kubermaticv1.DatacenterSpec) (string, err
 	}
 	if spec.Alibaba != nil {
 		clouds = append(clouds, AlibabaCloudProvider)
+	}
+	if spec.Anexia != nil {
+		clouds = append(clouds, AnexiaCloudProvider)
 	}
 	if len(clouds) == 0 {
 		return "", nil
@@ -699,6 +710,8 @@ type AdminProvider interface {
 
 // PresetProvider declares the set of methods for interacting with presets
 type PresetProvider interface {
+	CreatePreset(preset *kubermaticv1.Preset) (*kubermaticv1.Preset, error)
+	UpdatePreset(preset *kubermaticv1.Preset) (*kubermaticv1.Preset, error)
 	GetPresets(userInfo *UserInfo) ([]kubermaticv1.Preset, error)
 	GetPreset(userInfo *UserInfo, name string) (*kubermaticv1.Preset, error)
 	SetCloudCredentials(userInfo *UserInfo, presetName string, cloud kubermaticv1.CloudSpec, dc *kubermaticv1.Datacenter) (*kubermaticv1.CloudSpec, error)
@@ -765,4 +778,65 @@ type PrivilegedExternalClusterProvider interface {
 	// Note that this function:
 	// is unsafe in a sense that it uses privileged account to update the resources
 	UpdateUnsecured(cluster *kubermaticv1.ExternalCluster) (*kubermaticv1.ExternalCluster, error)
+}
+
+// ConstraintTemplateProvider declares the set of method for interacting with gatekeeper's constraint templates
+type ConstraintTemplateProvider interface {
+	// List gets a list of constraint templates, by default it returns all resources.
+	//
+	// Note that the list is taken from the cache
+	List() (*kubermaticv1.ConstraintTemplateList, error)
+
+	// Get gets the given constraint template
+	Get(name string) (*kubermaticv1.ConstraintTemplate, error)
+
+	// Create a Constraint Template
+	Create(ct *kubermaticv1.ConstraintTemplate) (*kubermaticv1.ConstraintTemplate, error)
+
+	// Update a Constraint Template
+	Update(ct *kubermaticv1.ConstraintTemplate) (*kubermaticv1.ConstraintTemplate, error)
+
+	// Delete a Constraint Template
+	Delete(ct *kubermaticv1.ConstraintTemplate) error
+}
+
+// ConstraintProvider declares the set of method for interacting with constraints
+type ConstraintProvider interface {
+	// List gets a list of constraints
+	//
+	// Note that the list is taken from the cache
+	List(cluster *kubermaticv1.Cluster) (*kubermaticv1.ConstraintList, error)
+
+	// Get gets the given constraints
+	Get(cluster *kubermaticv1.Cluster, name string) (*kubermaticv1.Constraint, error)
+
+	// Create creates the given constraint
+	Create(userInfo *UserInfo, constraint *kubermaticv1.Constraint) (*kubermaticv1.Constraint, error)
+
+	// Delete deletes the given constraint
+	Delete(cluster *kubermaticv1.Cluster, userInfo *UserInfo, name string) error
+
+	// Update updates the given constraint
+	Update(userInfo *UserInfo, constraint *kubermaticv1.Constraint) (*kubermaticv1.Constraint, error)
+}
+
+// PrivilegedConstraintProvider declares a set of methods for interacting with constraints using a privileged client
+type PrivilegedConstraintProvider interface {
+	// CreateUnsecured creates the given constraint using a privileged client
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to create the resource
+	CreateUnsecured(constraint *kubermaticv1.Constraint) (*kubermaticv1.Constraint, error)
+
+	// DeleteUnsecured deletes a constraint using a privileged client
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to delete the resource
+	DeleteUnsecured(cluster *kubermaticv1.Cluster, name string) error
+
+	// UpdateUnsecured updates the given constraint using a privileged client
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to update the resource
+	UpdateUnsecured(constraint *kubermaticv1.Constraint) (*kubermaticv1.Constraint, error)
 }

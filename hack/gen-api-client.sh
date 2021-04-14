@@ -14,6 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+### Generates the KKP API Swagger spec and client. The generated client is then
+### used in the api-e2e tests and published into https://github.com/kubermatic/go-kubermatic
+
 set -euo pipefail
 
 cd $(dirname $0)/..
@@ -38,11 +41,11 @@ go run github.com/go-swagger/go-swagger/cmd/swagger generate spec \
   --scan-models \
   -o ${TMP_SWAGGER}
 
-rm -r ../../pkg/test/e2e/api/utils/apiclient/
-mkdir -p ../../pkg/test/e2e/api/utils/apiclient/
+rm -r ../../pkg/test/e2e/utils/apiclient/
+mkdir -p ../../pkg/test/e2e/utils/apiclient/
 
 go run github.com/go-swagger/go-swagger/cmd/swagger generate client \
   -q \
   --skip-validation \
   -f ${TMP_SWAGGER} \
-  -t ../../pkg/test/e2e/api/utils/apiclient/
+  -t ../../pkg/test/e2e/utils/apiclient/

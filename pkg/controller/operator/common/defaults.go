@@ -49,7 +49,7 @@ const (
 	DefaultSeedControllerMgrReplicas              = 1
 	DefaultMasterControllerMgrReplicas            = 1
 	DefaultAPIServerReplicas                      = 2
-	DefaultExposeStrategy                         = operatorv1alpha1.NodePortStrategy
+	DefaultExposeStrategy                         = kubermaticv1.ExposeStrategyNodePort
 	DefaultVPARecommenderDockerRepository         = "gcr.io/google_containers/vpa-recommender"
 	DefaultVPAUpdaterDockerRepository             = "gcr.io/google_containers/vpa-updater"
 	DefaultVPAAdmissionControllerDockerRepository = "gcr.io/google_containers/vpa-admission-controller"
@@ -64,6 +64,7 @@ const (
 
 var (
 	DefaultAccessibleAddons = []string{
+		"cluster-autoscaler",
 		"node-exporter",
 		"gatekeeper",
 	}
@@ -475,11 +476,15 @@ func DefaultConfiguration(config *operatorv1alpha1.KubermaticConfiguration, logg
 		return copy, err
 	}
 
-	if err := defaultDockerRepo(&copy.Spec.UserCluster.KubermaticDockerRepository, resources.DefaultKubermaticImage, "userCluster.addons.kubermaticDockerRepository", logger); err != nil {
+	if err := defaultDockerRepo(&copy.Spec.UserCluster.KubermaticDockerRepository, resources.DefaultKubermaticImage, "userCluster.kubermaticDockerRepository", logger); err != nil {
 		return copy, err
 	}
 
-	if err := defaultDockerRepo(&copy.Spec.UserCluster.DNATControllerDockerRepository, resources.DefaultDNATControllerImage, "userCluster.addons.dnatControllerDockerRepository", logger); err != nil {
+	if err := defaultDockerRepo(&copy.Spec.UserCluster.DNATControllerDockerRepository, resources.DefaultDNATControllerImage, "userCluster.dnatControllerDockerRepository", logger); err != nil {
+		return copy, err
+	}
+
+	if err := defaultDockerRepo(&copy.Spec.UserCluster.EtcdLauncherDockerRepository, resources.DefaultEtcdLauncherImage, "userCluster.etcdLauncher.DockerRepository", logger); err != nil {
 		return copy, err
 	}
 
@@ -723,7 +728,7 @@ items:
 - apiVersion: kubermatic.k8s.io/v1
   kind: Addon
   metadata:
-    name: csi
+    name: csi-v2
     labels:
       addons.kubermatic.io/ensure: true
 - apiVersion: kubermatic.k8s.io/v1
@@ -809,7 +814,7 @@ items:
 - apiVersion: kubermatic.k8s.io/v1
   kind: Addon
   metadata:
-    name: storage-class
+    name: storage-class-v2
     labels:
       addons.kubermatic.io/ensure: true
 - apiVersion: kubermatic.k8s.io/v1

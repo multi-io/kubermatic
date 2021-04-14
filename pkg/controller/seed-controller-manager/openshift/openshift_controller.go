@@ -47,6 +47,7 @@ import (
 	"k8c.io/kubermatic/v2/pkg/resources/openvpn"
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 	"k8c.io/kubermatic/v2/pkg/resources/usercluster"
+	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
@@ -70,7 +71,7 @@ import (
 
 const ControllerName = "openshift_controller"
 
-// Check if the Reconciler fullfills the interface
+// Check if the Reconciler fulfills the interface
 // at compile time
 var _ reconcile.Reconciler = &Reconciler{}
 
@@ -88,6 +89,7 @@ type Features struct {
 
 type Reconciler struct {
 	client.Client
+
 	log                      *zap.SugaredLogger
 	scheme                   *runtime.Scheme
 	recorder                 record.EventRecorder
@@ -105,6 +107,7 @@ type Reconciler struct {
 	dnatControllerImage      string
 	features                 Features
 	concurrentClusterUpdates int
+	versions                 kubermatic.Versions
 }
 
 func Add(
@@ -124,9 +127,11 @@ func Add(
 	dnatControllerImage string,
 	features Features,
 	concurrentClusterUpdates int,
+	versions kubermatic.Versions,
 ) error {
 	reconciler := &Reconciler{
-		Client:                   mgr.GetClient(),
+		Client: mgr.GetClient(),
+
 		log:                      log.Named(ControllerName),
 		scheme:                   mgr.GetScheme(),
 		recorder:                 mgr.GetEventRecorderFor(ControllerName),
@@ -143,6 +148,7 @@ func Add(
 		dnatControllerImage:      dnatControllerImage,
 		features:                 features,
 		concurrentClusterUpdates: concurrentClusterUpdates,
+		versions:                 versions,
 	}
 
 	c, err := controller.New(ControllerName, mgr,
@@ -201,6 +207,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 		r.Client,
 		r.workerName,
 		cluster,
+		r.versions,
 		kubermaticv1.ClusterConditionOpenshiftControllerReconcilingSuccess,
 		func() (*reconcile.Result, error) {
 			// only reconcile this cluster if there are not yet too many updates running
@@ -230,7 +237,7 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, clus
 
 		// Defer getting the client to make sure we only request it if we actually need it
 		userClusterClientGetter := func() (client.Client, error) {
-			userClusterClient, err := r.userClusterConnProvider.GetClient(cluster)
+			userClusterClient, err := r.userClusterConnProvider.GetClient(ctx, cluster)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get user cluster client: %v", err)
 			}
@@ -299,7 +306,7 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, clus
 
 // clusterIsReachable checks if the cluster is reachable via its external name
 func (r *Reconciler) clusterIsReachable(ctx context.Context, c *kubermaticv1.Cluster) (bool, error) {
-	client, err := r.userClusterConnProvider.GetClient(c)
+	client, err := r.userClusterConnProvider.GetClient(ctx, c)
 	if err != nil {
 		return false, err
 	}
@@ -331,14 +338,14 @@ func (r *Reconciler) syncHeath(ctx context.Context, cluster *kubermaticv1.Cluste
 		if err != nil {
 			return fmt.Errorf("failed to get dep health %q: %v", name, err)
 		}
-		*healthMapping[name].healthStatus = kubermaticv1helper.GetHealthStatus(status, cluster)
+		*healthMapping[name].healthStatus = kubermaticv1helper.GetHealthStatus(status, cluster, r.versions)
 	}
 
 	status, err := resources.HealthyStatefulSet(ctx, r.Client, nn(cluster.Status.NamespaceName, resources.EtcdStatefulSetName), 2)
 	if err != nil {
 		return fmt.Errorf("failed to get etcd health: %v", err)
 	}
-	currentHealth.Etcd = kubermaticv1helper.GetHealthStatus(status, cluster)
+	currentHealth.Etcd = kubermaticv1helper.GetHealthStatus(status, cluster, r.versions)
 
 	//TODO: Revisit this. This is a tiny bit ugly, but Openshift doesn't have a distinct scheduler
 	// and introducing a distinct health struct for Openshift means we have to change the API as well
@@ -350,10 +357,11 @@ func (r *Reconciler) syncHeath(ctx context.Context, cluster *kubermaticv1.Cluste
 		})
 	}
 
-	if !cluster.Status.HasConditionValue(kubermaticv1.ClusterConditionClusterInitialized, corev1.ConditionTrue) && kubermaticv1helper.IsClusterInitialized(cluster) {
+	if !cluster.Status.HasConditionValue(kubermaticv1.ClusterConditionClusterInitialized, corev1.ConditionTrue) && kubermaticv1helper.IsClusterInitialized(cluster, r.versions) {
 		err = r.updateCluster(ctx, cluster, func(c *kubermaticv1.Cluster) {
 			kubermaticv1helper.SetClusterCondition(
 				c,
+				r.versions,
 				kubermaticv1.ClusterConditionClusterInitialized,
 				corev1.ConditionTrue,
 				"",
@@ -658,7 +666,7 @@ func (r *Reconciler) networkDefaults(ctx context.Context, cluster *kubermaticv1.
 // GetServiceCreators returns all service creators that are currently in use
 func getAllServiceCreators(osData *openshiftData) []reconciling.NamedServiceCreatorGetter {
 	creators := []reconciling.NamedServiceCreatorGetter{
-		apiserver.ServiceCreator(osData.Cluster().Spec.ExposeStrategy),
+		apiserver.ServiceCreator(osData.Cluster().Spec.ExposeStrategy, osData.Cluster().Address.InternalName),
 		openshiftresources.OpenshiftAPIServiceCreator,
 		openvpn.ServiceCreator(osData.Cluster().Spec.ExposeStrategy),
 		etcd.ServiceCreator(osData),
@@ -668,7 +676,7 @@ func getAllServiceCreators(osData *openshiftData) []reconciling.NamedServiceCrea
 		metricsserver.ServiceCreator(),
 	}
 
-	if osData.Cluster().Spec.ExposeStrategy == corev1.ServiceTypeLoadBalancer {
+	if osData.Cluster().Spec.ExposeStrategy == kubermaticv1.ExposeStrategyLoadBalancer {
 		creators = append(creators, nodeportproxy.FrontLoadBalancerServiceCreator())
 	}
 
@@ -718,7 +726,7 @@ func (r *Reconciler) ensureRoleBindings(ctx context.Context, c *kubermaticv1.Clu
 	return nil
 }
 
-// A cheap helper because I am too lazy to type this everytime
+// A cheap helper because I am too lazy to type this every time
 func nn(namespace, name string) types.NamespacedName {
 	return types.NamespacedName{Namespace: namespace, Name: name}
 }

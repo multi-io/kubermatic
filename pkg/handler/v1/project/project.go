@@ -31,6 +31,7 @@ import (
 	"k8c.io/kubermatic/v2/pkg/handler/middleware"
 	"k8c.io/kubermatic/v2/pkg/handler/v1/common"
 	"k8c.io/kubermatic/v2/pkg/provider"
+	"k8c.io/kubermatic/v2/pkg/provider/kubernetes"
 	"k8c.io/kubermatic/v2/pkg/util/errors"
 
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -49,6 +50,10 @@ func CreateEndpoint(projectProvider provider.ProjectProvider, privilegedProjectP
 		}
 
 		user := ctx.Value(middleware.UserCRContextKey).(*kubermaticapiv1.User)
+		if kubernetes.IsServiceAccount(user.Spec.Email) {
+			return nil, errors.New(http.StatusForbidden, "the Service Account is not allowed to create a project")
+		}
+
 		settings, err := settingsProvider.GetGlobalSettings()
 		if err != nil {
 			return nil, common.KubernetesErrorToHTTPError(err)
@@ -451,7 +456,7 @@ func DecodeList(c context.Context, r *http.Request) (interface{}, error) {
 	if queryParam != "" {
 		displayAll, err = strconv.ParseBool(queryParam)
 		if err != nil {
-			return nil, fmt.Errorf("wrong query paramater: %v", err)
+			return nil, fmt.Errorf("wrong query parameter: %v", err)
 		}
 	}
 	req.DisplayAll = displayAll

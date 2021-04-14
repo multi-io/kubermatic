@@ -23,6 +23,7 @@ import (
 	operatorv1alpha1 "k8c.io/kubermatic/v2/pkg/crd/operator/v1alpha1"
 	"k8c.io/kubermatic/v2/pkg/resources"
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
+	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -37,7 +38,7 @@ func masterControllerManagerPodLabels() map[string]string {
 	}
 }
 
-func MasterControllerManagerDeploymentCreator(cfg *operatorv1alpha1.KubermaticConfiguration, workerName string, versions common.Versions) reconciling.NamedDeploymentCreatorGetter {
+func MasterControllerManagerDeploymentCreator(cfg *operatorv1alpha1.KubermaticConfiguration, workerName string, versions kubermatic.Versions) reconciling.NamedDeploymentCreatorGetter {
 	return func() (string, reconciling.DeploymentCreator) {
 		return common.MasterControllerManagerDeploymentName, func(d *appsv1.Deployment) (*appsv1.Deployment, error) {
 			d.Spec.Replicas = cfg.Spec.MasterController.Replicas
@@ -56,10 +57,10 @@ func MasterControllerManagerDeploymentCreator(cfg *operatorv1alpha1.KubermaticCo
 
 			d.Spec.Template.Spec.Volumes = []corev1.Volume{
 				{
-					Name: "seed-webhook-serving-cert",
+					Name: "webhook-serving-cert",
 					VolumeSource: corev1.VolumeSource{
 						Secret: &corev1.SecretVolumeSource{
-							SecretName: common.SeedWebhookServingCertSecretName,
+							SecretName: common.WebhookServingCertSecretName,
 						},
 					},
 				},
@@ -69,10 +70,12 @@ func MasterControllerManagerDeploymentCreator(cfg *operatorv1alpha1.KubermaticCo
 				"-logtostderr",
 				"-internal-address=0.0.0.0:8085",
 				"-worker-count=20",
+				"-admissionwebhook-cert-dir=/opt/webhook-serving-cert/",
 				fmt.Sprintf("-namespace=%s", cfg.Namespace),
 				fmt.Sprintf("-pprof-listen-address=%s", *cfg.Spec.MasterController.PProfEndpoint),
-				fmt.Sprintf("-seed-admissionwebhook-cert-file=/opt/seed-webhook-serving-cert/%s", resources.ServingCertSecretKey),
-				fmt.Sprintf("-seed-admissionwebhook-key-file=/opt/seed-webhook-serving-cert/%s", resources.ServingCertKeySecretKey),
+				fmt.Sprintf("-admissionwebhook-cert-name=%s", resources.ServingCertSecretKey),
+				fmt.Sprintf("-admissionwebhook-key-name=%s", resources.ServingCertKeySecretKey),
+				fmt.Sprintf("-feature-gates=%s", common.StringifyFeatureGates(cfg)),
 			}
 
 			// Only EE does support dynamic-datacenters
@@ -106,8 +109,8 @@ func MasterControllerManagerDeploymentCreator(cfg *operatorv1alpha1.KubermaticCo
 					},
 					VolumeMounts: []corev1.VolumeMount{
 						{
-							Name:      "seed-webhook-serving-cert",
-							MountPath: "/opt/seed-webhook-serving-cert/",
+							Name:      "webhook-serving-cert",
+							MountPath: "/opt/webhook-serving-cert/",
 							ReadOnly:  true,
 						},
 					},

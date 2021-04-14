@@ -19,12 +19,15 @@ limitations under the License.
 package api
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
 	"sort"
 	"testing"
 	"time"
+
+	"k8c.io/kubermatic/v2/pkg/test/e2e/utils"
 
 	"k8s.io/apimachinery/pkg/api/equality"
 )
@@ -63,15 +66,18 @@ func TestListCredentials(t *testing.T) {
 			expectedList: []string{"e2e-gcp", "e2e-gcp-datacenter"},
 		},
 	}
+
+	ctx := context.Background()
+
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			masterToken, err := retrieveMasterToken()
+			masterToken, err := utils.RetrieveMasterToken(ctx)
 			if err != nil {
 				t.Fatalf("failed to get master token: %v", err)
 			}
 
-			apiRunner := createRunner(masterToken, t)
-			credentialList, err := apiRunner.ListCredentials(tc.provider, tc.datacenter)
+			testClient := utils.NewTestClient(masterToken, t)
+			credentialList, err := testClient.ListCredentials(tc.provider, tc.datacenter)
 			if err != nil {
 				t.Fatalf("failed to get credential names for provider %s: %v", tc.provider, err)
 			}
@@ -106,21 +112,31 @@ func TestProviderEndpointsWithCredentials(t *testing.T) {
 			expectedCode:   http.StatusOK,
 		},
 	}
+
+	ctx := context.Background()
+
+	endpoint, err := utils.APIEndpoint()
+	if err != nil {
+		t.Fatalf("failed to determine Kubermatic API endpoint: %v", err)
+	}
+
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		t.Fatalf("failed to parse URL: %v", err)
+	}
+
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			masterToken, err := retrieveMasterToken()
+			masterToken, err := utils.RetrieveMasterToken(ctx)
 			if err != nil {
 				t.Fatalf("failed to get master token: %v", err)
 			}
 
-			var u url.URL
-			u.Host = getHost()
-			u.Scheme = getScheme()
 			u.Path = tc.path
 
 			req, err := http.NewRequest("GET", u.String(), nil)
 			if err != nil {
-				t.Fatalf("failed to make GET call: %v", err)
+				t.Fatalf("failed to create request: %v", err)
 			}
 
 			req.Header.Set("Cache-Control", "no-cache")
@@ -131,8 +147,14 @@ func TestProviderEndpointsWithCredentials(t *testing.T) {
 				req.Header.Set("Location", tc.location)
 			}
 
-			client := &http.Client{Timeout: time.Second * 10}
-
+			// with those settings the cumulative sleep duration is ~ 8s
+			// when all attempts are made.
+			client := &http.Client{
+				Transport: utils.NewRoundTripperWithRetries(t, 15*time.Second, utils.Backoff{
+					Steps:    4,
+					Duration: 1 * time.Second,
+					Factor:   1.5}),
+			}
 			resp, err := client.Do(req)
 			if err != nil {
 				t.Fatalf("error reading response: %v", err)
@@ -140,7 +162,7 @@ func TestProviderEndpointsWithCredentials(t *testing.T) {
 			defer resp.Body.Close()
 
 			if resp.StatusCode != tc.expectedCode {
-				t.Fatalf("expected code %d, but got %d", tc.expectedCode, resp.StatusCode)
+				t.Errorf("failed to get expected response [%d] from %q endpoint: %v", tc.expectedCode, tc.path, err)
 			}
 		})
 	}

@@ -27,6 +27,7 @@ import (
 
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	kubermaticv1helper "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1/helper"
+	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -50,12 +51,14 @@ const (
 )
 
 type Reconciler struct {
+	ctrlruntimeclient.Client
+
 	log              *zap.SugaredLogger
 	kubernetesAddons kubermaticv1.AddonList
 	openshiftAddons  kubermaticv1.AddonList
 	workerName       string
-	ctrlruntimeclient.Client
-	recorder record.EventRecorder
+	recorder         record.EventRecorder
+	versions         kubermatic.Versions
 }
 
 func Add(
@@ -65,16 +68,18 @@ func Add(
 	workerName string,
 	kubernetesAddons kubermaticv1.AddonList,
 	openshiftAddons kubermaticv1.AddonList,
+	versions kubermatic.Versions,
 ) error {
 	log = log.Named(ControllerName)
 
 	reconciler := &Reconciler{
+		Client:           mgr.GetClient(),
 		log:              log,
 		workerName:       workerName,
 		kubernetesAddons: kubernetesAddons,
 		openshiftAddons:  openshiftAddons,
-		Client:           mgr.GetClient(),
 		recorder:         mgr.GetEventRecorderFor(ControllerName),
+		versions:         versions,
 	}
 
 	c, err := controller.New(ControllerName, mgr, controller.Options{
@@ -127,10 +132,13 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	cluster := &kubermaticv1.Cluster{}
 	if err := r.Get(ctx, request.NamespacedName, cluster); err != nil {
 		if kerrors.IsNotFound(err) {
-			log.Debug("Skipping because the cluster is already gone")
+			log.Debug("Skipping because the cluster is gone")
 			return reconcile.Result{}, nil
 		}
 		return reconcile.Result{}, err
+	}
+	if cluster.DeletionTimestamp != nil {
+		return reconcile.Result{}, nil
 	}
 
 	// Add a wrapping here so we can emit an event on error
@@ -139,6 +147,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 		r.Client,
 		r.workerName,
 		cluster,
+		r.versions,
 		kubermaticv1.ClusterConditionAddonInstallerControllerReconcilingSuccess,
 		func() (*reconcile.Result, error) {
 			return r.reconcile(ctx, log, cluster)

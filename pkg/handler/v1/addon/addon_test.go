@@ -30,7 +30,6 @@ import (
 	"k8c.io/kubermatic/v2/pkg/handler/test/hack"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	k8sjson "k8s.io/apimachinery/pkg/util/json"
 )
 
 func TestGetAddon(t *testing.T) {
@@ -80,7 +79,7 @@ func TestGetAddon(t *testing.T) {
 			ExistingKubermaticObjs: test.GenDefaultKubermaticObjects(test.GenDefaultCluster()),
 			ExistingAPIUser:        test.GenDefaultAPIUser(),
 			ExistingAddons: []*kubermaticv1.Addon{
-				test.GenTestAddon("addon1", createRawVariables(t, testVariables), test.GenDefaultCluster(), creationTime),
+				test.GenTestAddon("addon1", test.CreateRawVariables(t, testVariables), test.GenDefaultCluster(), creationTime),
 			},
 			AddonToGet:         "addon1",
 			ExpectedHTTPStatus: http.StatusOK,
@@ -116,10 +115,10 @@ func TestGetAddon(t *testing.T) {
 			Name:                   "scenario 4: the admin John can get addon with variables that belongs to the Bob's cluster",
 			ClusterIDToSync:        test.GenDefaultCluster().Name,
 			ProjectIDToSync:        test.GenDefaultProject().Name,
-			ExistingKubermaticObjs: test.GenDefaultKubermaticObjects(test.GenDefaultCluster(), genUser("John", "john@acme.com", true)),
+			ExistingKubermaticObjs: test.GenDefaultKubermaticObjects(test.GenDefaultCluster(), test.GenAdminUser("John", "john@acme.com", true)),
 			ExistingAPIUser:        test.GenAPIUser("John", "john@acme.com"),
 			ExistingAddons: []*kubermaticv1.Addon{
-				test.GenTestAddon("addon1", createRawVariables(t, testVariables), test.GenDefaultCluster(), creationTime),
+				test.GenTestAddon("addon1", test.CreateRawVariables(t, testVariables), test.GenDefaultCluster(), creationTime),
 			},
 			AddonToGet:         "addon1",
 			ExpectedHTTPStatus: http.StatusOK,
@@ -217,7 +216,7 @@ func TestListAddons(t *testing.T) {
 				/*add cluster*/
 				cluster,
 				test.GenTestAddon("addon1", nil, cluster, creationTime),
-				test.GenTestAddon("addon2", createRawVariables(t, testVariables), cluster, creationTime),
+				test.GenTestAddon("addon2", test.CreateRawVariables(t, testVariables), cluster, creationTime),
 			},
 			ExistingAPIUser: test.GenAPIUser("john", "john@acme.com"),
 		},
@@ -291,8 +290,8 @@ func TestListAddons(t *testing.T) {
 				/*add cluster*/
 				cluster,
 				test.GenTestAddon("addon1", nil, cluster, creationTime),
-				test.GenTestAddon("addon2", createRawVariables(t, testVariables), cluster, creationTime),
-				genUser("bob", "bob@acme.com", true),
+				test.GenTestAddon("addon2", test.CreateRawVariables(t, testVariables), cluster, creationTime),
+				test.GenAdminUser("bob", "bob@acme.com", true),
 			},
 			ExistingAPIUser: test.GenAPIUser("bob", "bob@acme.com"),
 		},
@@ -417,7 +416,7 @@ func TestCreateAddon(t *testing.T) {
 				test.GenBinding("my-first-project-ID", "john@acme.com", "owners"),
 				/*add users*/
 				test.GenUser("", "john", "john@acme.com"),
-				genUser("bob", "bob@acme.com", true),
+				test.GenAdminUser("bob", "bob@acme.com", true),
 				/*add cluster*/
 				cluster,
 			},
@@ -583,7 +582,7 @@ func TestCreatePatchGetAddon(t *testing.T) {
 				test.GenBinding("my-first-project-ID", "john@acme.com", "owners"),
 				/*add users*/
 				test.GenUser("", "john", "john@acme.com"),
-				genUser("bob", "bob@acme.com", true),
+				test.GenAdminUser("bob", "bob@acme.com", true),
 				/*add cluster*/
 				cluster,
 			},
@@ -688,20 +687,4 @@ func TestCreatePatchGetAddon(t *testing.T) {
 			test.CompareWithResult(t, res, string(bytes))
 		})
 	}
-}
-
-func createRawVariables(t *testing.T, in map[string]interface{}) *runtime.RawExtension {
-	result := &runtime.RawExtension{}
-	raw, err := k8sjson.Marshal(in)
-	if err != nil {
-		t.Fatalf("failed to marshal external Variables: %v", err)
-	}
-	result.Raw = raw
-	return result
-}
-
-func genUser(name, email string, isAdmin bool) *kubermaticv1.User {
-	user := test.GenUser("", name, email)
-	user.Spec.IsAdmin = isAdmin
-	return user
 }

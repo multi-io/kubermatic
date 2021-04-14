@@ -34,6 +34,7 @@ import (
 	"k8c.io/kubermatic/v2/pkg/resources/certificates/triple"
 	"k8c.io/kubermatic/v2/pkg/resources/etcd"
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
+	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
@@ -46,6 +47,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/retry"
 	utilpointer "k8s.io/utils/pointer"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -76,6 +78,8 @@ const (
 )
 
 type Reconciler struct {
+	ctrlruntimeclient.Client
+
 	log              *zap.SugaredLogger
 	workerName       string
 	storeContainer   corev1.Container
@@ -87,8 +91,8 @@ type Reconciler struct {
 	// It must be configurable to cover offline use cases
 	backupContainerImage string
 
-	ctrlruntimeclient.Client
 	recorder record.EventRecorder
+	versions kubermatic.Versions
 }
 
 // Add creates a new Backup controller that is responsible for creating backupjobs
@@ -102,6 +106,7 @@ func Add(
 	cleanupContainer corev1.Container,
 	backupSchedule time.Duration,
 	backupContainerImage string,
+	versions kubermatic.Versions,
 ) error {
 	log = log.Named(ControllerName)
 	if err := validateStoreContainer(storeContainer); err != nil {
@@ -116,14 +121,15 @@ func Add(
 	}
 
 	reconciler := &Reconciler{
+		Client:               mgr.GetClient(),
 		log:                  log,
 		workerName:           workerName,
 		storeContainer:       storeContainer,
 		cleanupContainer:     cleanupContainer,
 		backupScheduleString: backupScheduleString,
 		backupContainerImage: backupContainerImage,
-		Client:               mgr.GetClient(),
 		recorder:             mgr.GetEventRecorderFor(ControllerName),
+		versions:             versions,
 	}
 	c, err := controller.New(ControllerName, mgr, controller.Options{
 		Reconciler:              reconciler,
@@ -233,6 +239,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 		r.Client,
 		r.workerName,
 		cluster,
+		r.versions,
 		kubermaticv1.ClusterConditionBackupControllerReconcilingSuccess,
 		func() (*reconcile.Result, error) {
 			return nil, r.reconcile(ctx, log, cluster)
@@ -274,9 +281,10 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, clus
 
 	// Always add the finalizer first
 	if !kuberneteshelper.HasFinalizer(cluster, cleanupFinalizer) {
-		oldCluster := cluster.DeepCopy()
-		kuberneteshelper.AddFinalizer(cluster, cleanupFinalizer)
-		if err := r.Patch(ctx, cluster, ctrlruntimeclient.MergeFrom(oldCluster)); err != nil {
+		err := r.updateCluster(ctx, cluster, func(c *kubermaticv1.Cluster) {
+			kuberneteshelper.AddFinalizer(c, cleanupFinalizer)
+		})
+		if err != nil {
 			return fmt.Errorf("failed to update cluster after adding cleanup finalizer: %v", err)
 		}
 	}
@@ -286,6 +294,25 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, clus
 	}
 
 	return reconciling.ReconcileCronJobs(ctx, []reconciling.NamedCronJobCreatorGetter{r.cronjob(cluster)}, metav1.NamespaceSystem, r.Client)
+}
+
+func (r *Reconciler) updateCluster(ctx context.Context, cluster *kubermaticv1.Cluster, modify func(*kubermaticv1.Cluster)) error {
+	// Store it here because it may be unset later on if an update request failed
+	name := cluster.Name
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
+		//Get latest version
+		c := &kubermaticv1.Cluster{}
+		if err := r.Get(ctx, types.NamespacedName{Name: name}, c); err != nil {
+			if kerrors.IsNotFound(err) {
+				return nil
+			}
+			return err
+		}
+		// Apply modifications
+		modify(c)
+		// Update the cluster
+		return r.Update(ctx, c)
+	})
 }
 
 func (r *Reconciler) getEtcdSecretName(cluster *kubermaticv1.Cluster) string {
@@ -427,7 +454,7 @@ func (r *Reconciler) cronjob(cluster *kubermaticv1.Cluster) reconciling.NamedCro
 				Value: cluster.Name,
 			})
 
-			cronJob.Spec.JobTemplate.Spec.Template.Spec.RestartPolicy = corev1.RestartPolicyOnFailure
+			cronJob.Spec.JobTemplate.Spec.Template.Spec.RestartPolicy = corev1.RestartPolicyNever
 			cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers = []corev1.Container{*storeContainer}
 			cronJob.Spec.JobTemplate.Spec.Template.Spec.Volumes = []corev1.Volume{
 				{

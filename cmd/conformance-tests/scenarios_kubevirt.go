@@ -17,10 +17,11 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"fmt"
 
 	"k8c.io/kubermatic/v2/pkg/semver"
-	apimodels "k8c.io/kubermatic/v2/pkg/test/e2e/api/utils/apiclient/models"
+	apimodels "k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/models"
 
 	"go.uber.org/zap"
 	utilpointer "k8s.io/utils/pointer"
@@ -78,14 +79,14 @@ func (s *kubevirtScenario) Cluster(secrets secrets) *apimodels.CreateClusterSpec
 	}
 }
 
-func (s *kubevirtScenario) NodeDeployments(num int, _ secrets) ([]apimodels.NodeDeployment, error) {
+func (s *kubevirtScenario) NodeDeployments(_ context.Context, num int, _ secrets) ([]apimodels.NodeDeployment, error) {
 	var sourceURL string
 
 	switch {
 	case s.nodeOsSpec.Ubuntu != nil:
-		sourceURL = "http://10.109.79.210/ubuntu.img"
+		sourceURL = "http://10.102.236.197/ubuntu.img"
 	case s.nodeOsSpec.Centos != nil:
-		sourceURL = "http://10.109.79.210/centos.img"
+		sourceURL = "http://10.102.236.197/centos.img"
 	default:
 		s.logger.Error("coreos operating system is not supported")
 	}
@@ -97,12 +98,12 @@ func (s *kubevirtScenario) NodeDeployments(num int, _ secrets) ([]apimodels.Node
 				Template: &apimodels.NodeSpec{
 					Cloud: &apimodels.NodeCloudSpec{
 						Kubevirt: &apimodels.KubevirtNodeSpec{
-							Memory:           utilpointer.StringPtr("1024M"),
+							Memory:           utilpointer.StringPtr("2048M"),
 							Namespace:        utilpointer.StringPtr("kube-system"),
 							SourceURL:        utilpointer.StringPtr(sourceURL),
 							StorageClassName: utilpointer.StringPtr("kubermatic-fast"),
-							PVCSize:          utilpointer.StringPtr("10Gi"),
-							CPUs:             utilpointer.StringPtr("1"),
+							PVCSize:          utilpointer.StringPtr("25Gi"),
+							CPUs:             utilpointer.StringPtr("2"),
 						},
 					},
 					Versions: &apimodels.NodeVersionInfo{

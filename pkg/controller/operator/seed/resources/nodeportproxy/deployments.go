@@ -22,7 +22,10 @@ import (
 
 	"k8c.io/kubermatic/v2/pkg/controller/operator/common"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	operatorv1alpha1 "k8c.io/kubermatic/v2/pkg/crd/operator/v1alpha1"
+	"k8c.io/kubermatic/v2/pkg/features"
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
+	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -37,9 +40,11 @@ const (
 	EnvoyDeploymentName   = "nodeport-proxy-envoy"
 	UpdaterDeploymentName = "nodeport-proxy-updater"
 	EnvoyPort             = 8002
+	EnvoySNIPort          = 6443
+	EnvoyTunnelingPort    = 8088
 )
 
-func EnvoyDeploymentCreator(seed *kubermaticv1.Seed, versions common.Versions) reconciling.NamedDeploymentCreatorGetter {
+func EnvoyDeploymentCreator(cfg *operatorv1alpha1.KubermaticConfiguration, seed *kubermaticv1.Seed, versions kubermatic.Versions) reconciling.NamedDeploymentCreatorGetter {
 	return func() (string, reconciling.DeploymentCreator) {
 		return EnvoyDeploymentName, func(d *appsv1.Deployment) (*appsv1.Deployment, error) {
 			d.Spec.Replicas = pointer.Int32Ptr(3)
@@ -84,17 +89,23 @@ func EnvoyDeploymentCreator(seed *kubermaticv1.Seed, versions common.Versions) r
 				},
 			}
 
+			args := []string{
+				"-listen-address=:8001",
+				"-envoy-node-name=kube",
+				"-envoy-admin-port=9001",
+				fmt.Sprintf("-envoy-stats-port=%d", EnvoyPort),
+			}
+			if cfg.Spec.FeatureGates.Has(features.TunnelingExposeStrategy) {
+				args = append(args,
+					fmt.Sprintf("-envoy-sni-port=%d", EnvoySNIPort),
+					fmt.Sprintf("-envoy-tunneling-port=%d", EnvoyTunnelingPort))
+			}
 			d.Spec.Template.Spec.Containers = []corev1.Container{
 				{
 					Name:    "envoy-manager",
 					Image:   seed.Spec.NodeportProxy.EnvoyManager.DockerRepository + ":" + versions.Kubermatic,
 					Command: []string{"/envoy-manager"},
-					Args: []string{
-						"-listen-address=:8001",
-						"-envoy-node-name=kube",
-						"-envoy-admin-port=9001",
-						fmt.Sprintf("-envoy-stats-port=%d", EnvoyPort),
-					},
+					Args:    args,
 					Ports: []corev1.ContainerPort{
 						{
 							Name:          "grpc",
@@ -191,7 +202,7 @@ func EnvoyPDBCreator() reconciling.NamedPodDisruptionBudgetCreatorGetter {
 	}
 }
 
-func UpdaterDeploymentCreator(seed *kubermaticv1.Seed, versions common.Versions) reconciling.NamedDeploymentCreatorGetter {
+func UpdaterDeploymentCreator(cfg *operatorv1alpha1.KubermaticConfiguration, seed *kubermaticv1.Seed, versions kubermatic.Versions) reconciling.NamedDeploymentCreatorGetter {
 	return func() (string, reconciling.DeploymentCreator) {
 		return UpdaterDeploymentName, func(d *appsv1.Deployment) (*appsv1.Deployment, error) {
 			d.Spec.Replicas = pointer.Int32Ptr(1)
@@ -208,15 +219,21 @@ func UpdaterDeploymentCreator(seed *kubermaticv1.Seed, versions common.Versions)
 
 			d.Spec.Template.Spec.ServiceAccountName = ServiceAccountName
 
+			args := []string{
+				"-lb-namespace=$(NAMESPACE)",
+				fmt.Sprintf("-lb-name=%s", ServiceName),
+			}
+			if cfg.Spec.FeatureGates.Has(features.TunnelingExposeStrategy) {
+				args = append(args,
+					fmt.Sprintf("-envoy-sni-port=%d", EnvoySNIPort),
+					fmt.Sprintf("-envoy-tunneling-port=%d", EnvoyTunnelingPort))
+			}
 			d.Spec.Template.Spec.Containers = []corev1.Container{
 				{
 					Name:    "lb-updater",
 					Image:   seed.Spec.NodeportProxy.Updater.DockerRepository + ":" + versions.Kubermatic,
 					Command: []string{"/lb-updater"},
-					Args: []string{
-						"-lb-namespace=$(NAMESPACE)",
-						fmt.Sprintf("-lb-name=%s", ServiceName),
-					},
+					Args:    args,
 					Env: []corev1.EnvVar{
 						{
 							Name: "NAMESPACE",
