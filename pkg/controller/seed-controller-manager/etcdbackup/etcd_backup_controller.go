@@ -94,6 +94,9 @@ const (
 	// when the backup delete job is deleted, the corresponding etcdbackupconfig.status.currentBackups entry is also removed
 	succeededJobRetentionTime = 1 * time.Minute
 	failedJobRetentionTime    = 10 * time.Minute
+
+	// maximum number of simutaneously running backup delete jobs per cluster
+	maxSimultaneousDeleteJobsPerCluster = 3
 )
 
 // Reconciler stores necessary components that are required to create etcd backups
@@ -470,8 +473,12 @@ func (r *Reconciler) startPendingBackupDeleteJobs(ctx context.Context, backupCon
 		keepCount = 0
 	}
 	kept := 0
+	runningDeleteJobsCount := 0
 	for i := len(backupConfig.Status.CurrentBackups) - 1; i >= 0; i-- {
 		backup := &backupConfig.Status.CurrentBackups[i]
+		if backup.DeletePhase == kubermaticv1.BackupStatusPhaseRunning {
+			runningDeleteJobsCount++
+		}
 		if backup.BackupPhase == kubermaticv1.BackupStatusPhaseFailed && backup.DeletePhase == "" {
 			backupsToDelete = append(backupsToDelete, backup)
 		} else if backup.BackupPhase == kubermaticv1.BackupStatusPhaseCompleted {
@@ -484,10 +491,13 @@ func (r *Reconciler) startPendingBackupDeleteJobs(ctx context.Context, backupCon
 
 	modified := false
 	for _, backup := range backupsToDelete {
-		if err := r.createDeleteJob(ctx, backupConfig, cluster, backup); err != nil {
-			return nil, err
+		if runningDeleteJobsCount < maxSimultaneousDeleteJobsPerCluster {
+			if err := r.createDeleteJob(ctx, backupConfig, cluster, backup); err != nil {
+				return nil, err
+			}
+			runningDeleteJobsCount++
+			modified = true
 		}
-		modified = true
 	}
 
 	if modified {
