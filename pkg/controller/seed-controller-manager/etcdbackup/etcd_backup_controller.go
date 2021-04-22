@@ -869,6 +869,7 @@ func (r *Reconciler) deleteJob(backupConfig *kubermaticv1.EtcdBackupConfig, clus
 		})
 	job := r.jobBase(backupConfig, cluster, backupStatus.DeleteJobName)
 	job.Spec.Template.Spec.Containers = []corev1.Container{*deleteContainer}
+	job.Spec.ActiveDeadlineSeconds = resources.Int64(25 * 60)
 	return job
 }
 
@@ -906,7 +907,7 @@ func (r *Reconciler) jobBase(backupConfig *kubermaticv1.EtcdBackupConfig, cluste
 			BackoffLimit:          utilpointer.Int32Ptr(3),
 			Completions:           utilpointer.Int32Ptr(1),
 			Parallelism:           utilpointer.Int32Ptr(1),
-			ActiveDeadlineSeconds: resources.Int64(25 * 60),
+			ActiveDeadlineSeconds: resources.Int64(2 * 60),
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					RestartPolicy: corev1.RestartPolicyOnFailure,
