@@ -56,12 +56,12 @@ func (do *digitalocean) ValidateCloudSpec(spec kubermaticv1.CloudSpec) error {
 	return err
 }
 
-func (do *digitalocean) InitializeCloudProvider(cluster *kubermaticv1.Cluster, update provider.ClusterUpdater) (*kubermaticv1.Cluster, error) {
-	return cluster, nil
+func (do *digitalocean) InitializeCloudProvider(_ context.Context, cluster *kubermaticv1.Cluster, update provider.ClusterUpdater) error {
+	return nil
 }
 
-func (do *digitalocean) CleanUpCloudProvider(cluster *kubermaticv1.Cluster, _ provider.ClusterUpdater) (*kubermaticv1.Cluster, error) {
-	return cluster, nil
+func (do *digitalocean) CleanUpCloudProvider(_ context.Context, cluster *kubermaticv1.Cluster, _ provider.ClusterUpdater) error {
+	return nil
 }
 
 // ValidateCloudSpecUpdate verifies whether an update of cloud spec is valid and permitted

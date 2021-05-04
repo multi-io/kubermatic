@@ -47,7 +47,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/client-go/util/retry"
 	utilpointer "k8s.io/utils/pointer"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -281,7 +280,7 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, clus
 
 	// Always add the finalizer first
 	if !kuberneteshelper.HasFinalizer(cluster, cleanupFinalizer) {
-		err := r.updateCluster(ctx, cluster, func(c *kubermaticv1.Cluster) {
+		err := r.patchCluster(ctx, cluster, func(c *kubermaticv1.Cluster) {
 			kuberneteshelper.AddFinalizer(c, cleanupFinalizer)
 		})
 		if err != nil {
@@ -296,23 +295,8 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, clus
 	return reconciling.ReconcileCronJobs(ctx, []reconciling.NamedCronJobCreatorGetter{r.cronjob(cluster)}, metav1.NamespaceSystem, r.Client)
 }
 
-func (r *Reconciler) updateCluster(ctx context.Context, cluster *kubermaticv1.Cluster, modify func(*kubermaticv1.Cluster)) error {
-	// Store it here because it may be unset later on if an update request failed
-	name := cluster.Name
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
-		//Get latest version
-		c := &kubermaticv1.Cluster{}
-		if err := r.Get(ctx, types.NamespacedName{Name: name}, c); err != nil {
-			if kerrors.IsNotFound(err) {
-				return nil
-			}
-			return err
-		}
-		// Apply modifications
-		modify(c)
-		// Update the cluster
-		return r.Update(ctx, c)
-	})
+func (r *Reconciler) patchCluster(ctx context.Context, cluster *kubermaticv1.Cluster, modify func(*kubermaticv1.Cluster)) error {
+	return kuberneteshelper.PatchCluster(ctx, cluster, r.Client, modify)
 }
 
 func (r *Reconciler) getEtcdSecretName(cluster *kubermaticv1.Cluster) string {

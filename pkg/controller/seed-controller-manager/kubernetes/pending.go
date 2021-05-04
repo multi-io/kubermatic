@@ -44,7 +44,7 @@ func (r *Reconciler) reconcileCluster(ctx context.Context, cluster *kubermaticv1
 	}
 
 	if !kuberneteshelper.HasFinalizer(cluster, kubermaticapiv1.EtcdBackupConfigCleanupFinalizer) {
-		if err := r.updateCluster(ctx, cluster, func(c *kubermaticv1.Cluster) {
+		if err := r.patchCluster(ctx, cluster, func(c *kubermaticv1.Cluster) {
 			kuberneteshelper.AddFinalizer(c, kubermaticapiv1.EtcdBackupConfigCleanupFinalizer)
 		}); err != nil {
 			return nil, err
@@ -75,7 +75,7 @@ func (r *Reconciler) reconcileCluster(ctx context.Context, cluster *kubermaticv1
 		// Only add the node deletion finalizer when the cluster is actually running
 		// Otherwise we fail to delete the nodes and are stuck in a loop
 		if !kuberneteshelper.HasFinalizer(cluster, kubermaticapiv1.NodeDeletionFinalizer) {
-			err = r.updateCluster(ctx, cluster, func(c *kubermaticv1.Cluster) {
+			err = r.patchCluster(ctx, cluster, func(c *kubermaticv1.Cluster) {
 				kuberneteshelper.AddFinalizer(c, kubermaticapiv1.NodeDeletionFinalizer)
 			})
 			if err != nil {
@@ -86,7 +86,7 @@ func (r *Reconciler) reconcileCluster(ctx context.Context, cluster *kubermaticv1
 	}
 
 	if !kuberneteshelper.HasFinalizer(cluster, kubermaticapiv1.KubermaticConstraintCleanupFinalizer) {
-		err := r.updateCluster(ctx, cluster, func(c *kubermaticv1.Cluster) {
+		err := r.patchCluster(ctx, cluster, func(c *kubermaticv1.Cluster) {
 			kuberneteshelper.AddFinalizer(c, kubermaticapiv1.KubermaticConstraintCleanupFinalizer)
 		})
 		if err != nil {
@@ -135,7 +135,7 @@ func (r *Reconciler) ensureClusterNetworkDefaults(ctx context.Context, cluster *
 		modifiers = append(modifiers, setProxyMode)
 	}
 
-	return r.updateCluster(ctx, cluster, func(c *kubermaticv1.Cluster) {
+	return r.patchCluster(ctx, cluster, func(c *kubermaticv1.Cluster) {
 		for _, modify := range modifiers {
 			modify(c)
 		}
@@ -144,7 +144,7 @@ func (r *Reconciler) ensureClusterNetworkDefaults(ctx context.Context, cluster *
 
 // ensureEtcdLauncherFeatureFlag will apply seed controller etcdLauncher setting on the cluster level
 func (r *Reconciler) ensureEtcdLauncherFeatureFlag(ctx context.Context, cluster *kubermaticv1.Cluster) error {
-	return r.updateCluster(ctx, cluster, func(c *kubermaticv1.Cluster) {
+	return r.patchCluster(ctx, cluster, func(c *kubermaticv1.Cluster) {
 		if r.features.EtcdLauncher { // enabled at the controller level
 			// we only modify the cluster feature flag if it's not explicitly set, regardless of the value
 			if _, set := c.Spec.Features[kubermaticv1.ClusterFeatureEtcdLauncher]; !set {

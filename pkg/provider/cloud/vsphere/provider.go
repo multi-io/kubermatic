@@ -125,16 +125,14 @@ func getVMRootPath(dc *kubermaticv1.DatacenterSpecVSphere) string {
 }
 
 // InitializeCloudProvider initializes the vsphere cloud provider by setting up vm folders for the cluster.
-func (v *Provider) InitializeCloudProvider(cluster *kubermaticv1.Cluster, update provider.ClusterUpdater) (*kubermaticv1.Cluster, error) {
-	ctx := context.Background()
-
+func (v *Provider) InitializeCloudProvider(ctx context.Context, cluster *kubermaticv1.Cluster, update provider.ClusterUpdater) error {
 	username, password, err := GetCredentialsForCluster(cluster.Spec.Cloud, v.secretKeySelector, v.dc)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	session, err := newSession(ctx, v.dc, username, password)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create vCenter session: %v", err)
+		return fmt.Errorf("failed to create vCenter session: %v", err)
 	}
 	defer session.Logout()
 
@@ -144,19 +142,19 @@ func (v *Provider) InitializeCloudProvider(cluster *kubermaticv1.Cluster, update
 		// the VM management in vCenter
 		clusterFolder := path.Join(rootPath, cluster.Name)
 		if err := createVMFolder(ctx, session, clusterFolder); err != nil {
-			return nil, fmt.Errorf("failed to create the VM folder %q: %v", clusterFolder, err)
+			return fmt.Errorf("failed to create the VM folder %q: %v", clusterFolder, err)
 		}
 
-		cluster, err = update(cluster.Name, func(cluster *kubermaticv1.Cluster) {
+		err = update(ctx, cluster, func(cluster *kubermaticv1.Cluster) {
 			kuberneteshelper.AddFinalizer(cluster, folderCleanupFinalizer)
 			cluster.Spec.Cloud.VSphere.Folder = clusterFolder
 		})
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 
-	return cluster, nil
+	return nil
 }
 
 // GetNetworks returns a slice of VSphereNetworks of the datacenter from the passed cloudspec.
@@ -257,32 +255,31 @@ func (v *Provider) ValidateCloudSpec(spec kubermaticv1.CloudSpec) error {
 // CleanUpCloudProvider we always check if the folder is there and remove it if yes because we know its absolute path
 // This covers cases where the finalizer was not added
 // We also remove the finalizer if either the folder is not present or we successfully deleted it
-func (v *Provider) CleanUpCloudProvider(cluster *kubermaticv1.Cluster, update provider.ClusterUpdater) (*kubermaticv1.Cluster, error) {
-	ctx := context.TODO()
+func (v *Provider) CleanUpCloudProvider(ctx context.Context, cluster *kubermaticv1.Cluster, update provider.ClusterUpdater) error {
 	username, password, err := GetCredentialsForCluster(cluster.Spec.Cloud, v.secretKeySelector, v.dc)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	session, err := newSession(ctx, v.dc, username, password)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create vCenter session: %v", err)
+		return fmt.Errorf("failed to create vCenter session: %v", err)
 	}
 	defer session.Logout()
 
 	if kuberneteshelper.HasFinalizer(cluster, folderCleanupFinalizer) {
 		if err := deleteVMFolder(ctx, session, cluster.Spec.Cloud.VSphere.Folder); err != nil {
-			return nil, err
+			return err
 		}
-		cluster, err = update(cluster.Name, func(cluster *kubermaticv1.Cluster) {
+		err = update(ctx, cluster, func(cluster *kubermaticv1.Cluster) {
 			kuberneteshelper.RemoveFinalizer(cluster, folderCleanupFinalizer)
 		})
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 
-	return cluster, nil
+	return nil
 }
 
 // ValidateCloudSpecUpdate verifies whether an update of cloud spec is valid and permitted
