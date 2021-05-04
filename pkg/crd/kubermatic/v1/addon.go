@@ -17,6 +17,8 @@ limitations under the License.
 package v1
 
 import (
+	"time"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -31,6 +33,10 @@ const (
 	AddonKindName = "Addon"
 
 	AddonResourcesCreated AddonConditionType = "AddonResourcesCreatedSuccessfully"
+
+	// ControllerRequeueAddonReconcileOnClusterNotReadyPeriod in a requeue period if cluster is found in not ready state
+	// while reconciling addons.
+	ControllerRequeueAddonReconcileOnClusterNotReadyPeriod = 10 * time.Second
 )
 
 //+genclient
