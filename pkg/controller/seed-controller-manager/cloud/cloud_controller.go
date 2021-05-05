@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"time"
 
+	kuberneteshelper "k8c.io/kubermatic/v2/pkg/kubernetes"
+
 	"go.uber.org/zap"
 
 	providerconfig "github.com/kubermatic/machine-controller/pkg/providerconfig/types"
@@ -36,10 +38,8 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -158,7 +158,7 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, clus
 			finalizers.Has(kubermaticapiv1.NodeDeletionFinalizer) {
 			return &reconcile.Result{RequeueAfter: 5 * time.Second}, nil
 		}
-		if _, err := prov.CleanUpCloudProvider(cluster, r.updateCluster); err != nil {
+		if err := prov.CleanUpCloudProvider(ctx, cluster, r.patchCluster); err != nil {
 			return nil, fmt.Errorf("failed cloud provider cleanup: %v", err)
 		}
 		return nil, nil
@@ -180,11 +180,11 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, clus
 		}
 	}
 
-	if _, err := prov.InitializeCloudProvider(cluster, r.updateCluster); err != nil {
+	if err := prov.InitializeCloudProvider(ctx, cluster, r.patchCluster); err != nil {
 		return nil, fmt.Errorf("failed cloud provider init: %v", err)
 	}
 
-	if _, err := r.updateCluster(cluster.Name, func(c *kubermaticv1.Cluster) {
+	if err := r.patchCluster(ctx, cluster, func(c *kubermaticv1.Cluster) {
 		c.Status.ExtendedHealth.CloudProviderInfrastructure = kubermaticv1.HealthStatusUp
 	}); err != nil {
 		return nil, fmt.Errorf("failed to set cluster health: %v", err)
@@ -213,7 +213,7 @@ func (r *Reconciler) migrateICMP(ctx context.Context, log *zap.SugaredLogger, cl
 	}
 
 	var err error
-	if cluster, err = r.updateCluster(cluster.Name, func(c *kubermaticv1.Cluster) {
+	if err = r.patchCluster(ctx, cluster, func(c *kubermaticv1.Cluster) {
 		c.Status.CloudMigrationRevision = icmpMigrationRevision
 	}); err != nil {
 		return fmt.Errorf("failed to update cluster %q after successfully executing its cloudProvider migration: %v",
@@ -225,13 +225,13 @@ func (r *Reconciler) migrateICMP(ctx context.Context, log *zap.SugaredLogger, cl
 
 func (r *Reconciler) migrateAWSMultiAZ(ctx context.Context, cluster *kubermaticv1.Cluster, cloudProvider provider.CloudProvider) error {
 	if prov, ok := cloudProvider.(*aws.AmazonEC2); ok {
-		if err := prov.MigrateToMultiAZ(cluster, r.updateCluster); err != nil {
+		if err := prov.MigrateToMultiAZ(ctx, cluster, r.patchCluster); err != nil {
 			return fmt.Errorf("failed to migrate AWS cluster %q to multi-AZ: %q", cluster.Name, err)
 		}
 	}
 
 	var err error
-	if cluster, err = r.updateCluster(cluster.Name, func(c *kubermaticv1.Cluster) {
+	if err = r.patchCluster(ctx, cluster, func(c *kubermaticv1.Cluster) {
 		c.Status.CloudMigrationRevision = awsHarcodedAZMigrationRevision
 	}); err != nil {
 		return fmt.Errorf("failed to update cluster %q after successfully executing its cloudProvider migration: %v",
@@ -241,18 +241,8 @@ func (r *Reconciler) migrateAWSMultiAZ(ctx context.Context, cluster *kubermaticv
 	return nil
 }
 
-func (r *Reconciler) updateCluster(name string, modify func(*kubermaticv1.Cluster)) (*kubermaticv1.Cluster, error) {
-	cluster := &kubermaticv1.Cluster{}
-	return cluster, retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		if err := r.Get(context.Background(), types.NamespacedName{Name: name}, cluster); err != nil {
-			if kerrors.IsNotFound(err) {
-				return nil
-			}
-			return err
-		}
-		modify(cluster)
-		return r.Update(context.Background(), cluster)
-	})
+func (r *Reconciler) patchCluster(ctx context.Context, cluster *kubermaticv1.Cluster, modify func(*kubermaticv1.Cluster)) error {
+	return kuberneteshelper.PatchCluster(ctx, cluster, r.Client, modify)
 }
 
 func (r *Reconciler) getGlobalSecretKeySelectorValue(configVar *providerconfig.GlobalSecretKeySelector, key string) (string, error) {

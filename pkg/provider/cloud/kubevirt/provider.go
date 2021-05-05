@@ -17,6 +17,7 @@ limitations under the License.
 package kubevirt
 
 import (
+	"context"
 	"encoding/base64"
 	"errors"
 
@@ -64,12 +65,12 @@ func (k *kubevirt) ValidateCloudSpec(spec v1.CloudSpec) error {
 	return nil
 }
 
-func (k *kubevirt) InitializeCloudProvider(c *v1.Cluster, p provider.ClusterUpdater) (*v1.Cluster, error) {
-	return c, nil
+func (k *kubevirt) InitializeCloudProvider(ctx context.Context, c *v1.Cluster, p provider.ClusterUpdater) error {
+	return nil
 }
 
-func (k *kubevirt) CleanUpCloudProvider(c *v1.Cluster, p provider.ClusterUpdater) (*v1.Cluster, error) {
-	return c, nil
+func (k *kubevirt) CleanUpCloudProvider(ctx context.Context, c *v1.Cluster, p provider.ClusterUpdater) error {
+	return nil
 }
 
 func (k *kubevirt) ValidateCloudSpecUpdate(oldSpec v1.CloudSpec, newSpec v1.CloudSpec) error {

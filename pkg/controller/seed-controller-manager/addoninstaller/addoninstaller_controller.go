@@ -141,6 +141,14 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 		return reconcile.Result{}, nil
 	}
 
+	// If API server or etcd are down then addon installation will fail.
+	if !cluster.Status.ExtendedHealth.AllHealthy() {
+		return reconcile.Result{
+			Requeue:      true,
+			RequeueAfter: kubermaticv1.ControllerRequeueAddonReconcileOnClusterNotReadyPeriod,
+		}, nil
+	}
+
 	// Add a wrapping here so we can emit an event on error
 	result, err := kubermaticv1helper.ClusterReconcileWrapper(
 		ctx,

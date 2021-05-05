@@ -17,9 +17,14 @@ limitations under the License.
 package kubernetes
 
 import (
+	"context"
 	"fmt"
+	"reflect"
 	"regexp"
 	"strconv"
+
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -66,6 +71,16 @@ func AddFinalizer(obj metav1.Object, finalizers ...string) {
 	set := sets.NewString(obj.GetFinalizers()...)
 	set.Insert(finalizers...)
 	obj.SetFinalizers(set.List())
+}
+
+// PatchCluster updates cluster using merge patch request
+func PatchCluster(ctx context.Context, cluster *kubermaticv1.Cluster, client ctrlruntimeclient.Client, modify func(*kubermaticv1.Cluster)) error {
+	oldCluster := cluster.DeepCopy()
+	modify(cluster)
+	if reflect.DeepEqual(oldCluster, cluster) {
+		return nil
+	}
+	return client.Patch(ctx, cluster, ctrlruntimeclient.MergeFrom(oldCluster))
 }
 
 // GenerateToken generates a new, random token that can be used

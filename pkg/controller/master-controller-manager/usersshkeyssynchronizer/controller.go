@@ -190,8 +190,9 @@ func (r *Reconciler) reconcile(log *zap.SugaredLogger, request reconcile.Request
 
 		if kubernetes.HasFinalizer(cluster, UserSSHKeysClusterIDsCleanupFinalizer) {
 			oldCluster := cluster.DeepCopy()
-			kubernetes.RemoveFinalizer(cluster, UserSSHKeysClusterIDsCleanupFinalizer)
-			if err := seedClient.Patch(r.ctx, cluster, ctrlruntimeclient.MergeFrom(oldCluster)); err != nil {
+			kubernetes.AddFinalizer(cluster, UserSSHKeysClusterIDsCleanupFinalizer)
+			err := r.client.Patch(r.ctx, cluster, ctrlruntimeclient.MergeFrom(oldCluster))
+			if err != nil {
 				return fmt.Errorf("failed removing %s finalizer: %v", UserSSHKeysClusterIDsCleanupFinalizer, err)
 			}
 		}

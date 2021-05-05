@@ -195,7 +195,7 @@ func (r *Reconciler) getClusterTemplateData(ctx context.Context, cluster *kuberm
 // ensureNamespaceExists will create the cluster namespace
 func (r *Reconciler) ensureNamespaceExists(ctx context.Context, cluster *kubermaticv1.Cluster) error {
 	if cluster.Status.NamespaceName == "" {
-		err := r.updateCluster(ctx, cluster, func(c *kubermaticv1.Cluster) {
+		err := r.patchCluster(ctx, cluster, func(c *kubermaticv1.Cluster) {
 			c.Status.NamespaceName = fmt.Sprintf("cluster-%s", c.Name)
 		})
 		if err != nil {
@@ -291,67 +291,71 @@ func (r *Reconciler) ensureDeployments(ctx context.Context, cluster *kubermaticv
 }
 
 // GetSecretCreators returns all SecretCreators that are currently in use
-func (r *Reconciler) GetSecretCreators(data *resources.TemplateData) []reconciling.NamedSecretCreatorGetter {
-	creators := []reconciling.NamedSecretCreatorGetter{
-		certificates.RootCACreator(data),
-		openvpn.CACreator(),
-		certificates.FrontProxyCACreator(),
-		resources.ImagePullSecretCreator(r.dockerPullConfigJSON),
-		apiserver.FrontProxyClientCertificateCreator(data),
-		etcd.TLSCertificateCreator(data),
-		apiserver.EtcdClientCertificateCreator(data),
-		apiserver.TLSServingCertificateCreator(data),
-		apiserver.KubeletClientCertificateCreator(data),
-		apiserver.ServiceAccountKeyCreator(),
-		openvpn.TLSServingCertificateCreator(data),
-		openvpn.InternalClientCertificateCreator(data),
-		machinecontroller.TLSServingCertificateCreator(data),
-		metricsserver.TLSServingCertSecretCreator(data.GetRootCA),
+func (r *Reconciler) GetSecretCreators(data *resources.TemplateData) [][]reconciling.NamedSecretCreatorGetter {
+	creators := [][]reconciling.NamedSecretCreatorGetter{
+		{
+			certificates.RootCACreator(data),
+			openvpn.CACreator(),
+			certificates.FrontProxyCACreator(),
+		},
+		{
+			resources.ImagePullSecretCreator(r.dockerPullConfigJSON),
+			apiserver.FrontProxyClientCertificateCreator(data),
+			etcd.TLSCertificateCreator(data),
+			apiserver.EtcdClientCertificateCreator(data),
+			apiserver.TLSServingCertificateCreator(data),
+			apiserver.KubeletClientCertificateCreator(data),
+			apiserver.ServiceAccountKeyCreator(),
+			openvpn.TLSServingCertificateCreator(data),
+			openvpn.InternalClientCertificateCreator(data),
+			machinecontroller.TLSServingCertificateCreator(data),
+			metricsserver.TLSServingCertSecretCreator(data.GetRootCA),
 
-		// Kubeconfigs
-		resources.GetInternalKubeconfigCreator(resources.SchedulerKubeconfigSecretName, resources.SchedulerCertUsername, nil, data),
-		resources.GetInternalKubeconfigCreator(resources.KubeletDnatControllerKubeconfigSecretName, resources.KubeletDnatControllerCertUsername, nil, data),
-		resources.GetInternalKubeconfigCreator(resources.MachineControllerKubeconfigSecretName, resources.MachineControllerCertUsername, nil, data),
-		resources.GetInternalKubeconfigCreator(resources.ControllerManagerKubeconfigSecretName, resources.ControllerManagerCertUsername, nil, data),
-		resources.GetInternalKubeconfigCreator(resources.KubeStateMetricsKubeconfigSecretName, resources.KubeStateMetricsCertUsername, nil, data),
-		resources.GetInternalKubeconfigCreator(resources.MetricsServerKubeconfigSecretName, resources.MetricsServerCertUsername, nil, data),
-		resources.GetInternalKubeconfigCreator(resources.InternalUserClusterAdminKubeconfigSecretName, resources.InternalUserClusterAdminKubeconfigCertUsername, []string{"system:masters"}, data),
-		resources.GetInternalKubeconfigCreator(resources.KubernetesDashboardKubeconfigSecretName, resources.KubernetesDashboardCertUsername, nil, data),
-		resources.GetInternalKubeconfigCreator(resources.ClusterAutoscalerKubeconfigSecretName, resources.ClusterAutoscalerCertUsername, nil, data),
-		resources.AdminKubeconfigCreator(data),
-		apiserver.TokenViewerCreator(),
-		apiserver.TokenUsersCreator(data),
-		resources.ViewerKubeconfigCreator(data),
+			// Kubeconfigs
+			resources.GetInternalKubeconfigCreator(resources.SchedulerKubeconfigSecretName, resources.SchedulerCertUsername, nil, data),
+			resources.GetInternalKubeconfigCreator(resources.KubeletDnatControllerKubeconfigSecretName, resources.KubeletDnatControllerCertUsername, nil, data),
+			resources.GetInternalKubeconfigCreator(resources.MachineControllerKubeconfigSecretName, resources.MachineControllerCertUsername, nil, data),
+			resources.GetInternalKubeconfigCreator(resources.ControllerManagerKubeconfigSecretName, resources.ControllerManagerCertUsername, nil, data),
+			resources.GetInternalKubeconfigCreator(resources.KubeStateMetricsKubeconfigSecretName, resources.KubeStateMetricsCertUsername, nil, data),
+			resources.GetInternalKubeconfigCreator(resources.MetricsServerKubeconfigSecretName, resources.MetricsServerCertUsername, nil, data),
+			resources.GetInternalKubeconfigCreator(resources.InternalUserClusterAdminKubeconfigSecretName, resources.InternalUserClusterAdminKubeconfigCertUsername, []string{"system:masters"}, data),
+			resources.GetInternalKubeconfigCreator(resources.KubernetesDashboardKubeconfigSecretName, resources.KubernetesDashboardCertUsername, nil, data),
+			resources.GetInternalKubeconfigCreator(resources.ClusterAutoscalerKubeconfigSecretName, resources.ClusterAutoscalerCertUsername, nil, data),
+			resources.AdminKubeconfigCreator(data),
+			apiserver.TokenViewerCreator(),
+			apiserver.TokenUsersCreator(data),
+			resources.ViewerKubeconfigCreator(data),
+		},
+	}
+
+	if len(data.OIDCCAFile()) > 0 {
+		creators[0] = append(creators[0], apiserver.DexCACertificateCreator(data.GetDexCA))
 	}
 
 	if flag := data.Cluster().Spec.Features[kubermaticv1.ClusterFeatureExternalCloudProvider]; flag {
-		creators = append(creators, resources.GetInternalKubeconfigCreator(
+		creators[1] = append(creators[1], resources.GetInternalKubeconfigCreator(
 			resources.CloudControllerManagerKubeconfigSecretName, resources.CloudControllerManagerCertUsername, nil, data,
 		))
 	}
 
-	if len(data.OIDCCAFile()) > 0 {
-		creators = append(creators, apiserver.DexCACertificateCreator(data.GetDexCA))
-	}
-
 	if data.Cluster().Spec.Cloud.GCP != nil {
-		creators = append(creators, resources.ServiceAccountSecretCreator(data))
+		creators[1] = append(creators[1], resources.ServiceAccountSecretCreator(data))
 	}
 
 	if data.Cluster().Spec.OPAIntegration != nil && data.Cluster().Spec.OPAIntegration.Enabled {
-		creators = append(creators, gatekeeper.TLSServingCertSecretCreator(data))
+		creators[1] = append(creators[1], gatekeeper.TLSServingCertSecretCreator(data))
 	}
 
 	return creators
 }
 
 func (r *Reconciler) ensureSecrets(ctx context.Context, c *kubermaticv1.Cluster, data *resources.TemplateData) error {
-	namedSecretCreatorGetters := r.GetSecretCreators(data)
-
-	if err := reconciling.ReconcileSecrets(ctx, namedSecretCreatorGetters, c.Status.NamespaceName, r.Client, reconciling.OwnerRefWrapper(resources.GetClusterRef(c))); err != nil {
-		return fmt.Errorf("failed to ensure that the Secret exists: %v", err)
+	modifier := reconciling.OwnerRefWrapper(resources.GetClusterRef(c))
+	for _, creators := range r.GetSecretCreators(data) {
+		if err := reconciling.ReconcileSecrets(ctx, creators, c.Status.NamespaceName, r.Client, modifier); err != nil {
+			return fmt.Errorf("failed to ensure that the Secret exists: %v", err)
+		}
 	}
-
 	return nil
 }
 
