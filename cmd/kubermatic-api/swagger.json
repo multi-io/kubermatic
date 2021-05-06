@@ -13680,6 +13680,10 @@
           "type": "string",
           "x-go-name": "InstanceProfileName"
         },
+        "openstackBillingTenant": {
+          "type": "string",
+          "x-go-name": "OpenstackBillingTenant"
+        },
         "roleARN": {
           "description": "The IAM role, the control plane will use. The control plane will perform an assume-role",
           "type": "string",
