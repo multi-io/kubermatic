@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	v1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/handler/middleware"
 	"k8c.io/kubermatic/v2/pkg/handler/v1/common"
 	"k8c.io/kubermatic/v2/pkg/keycloak"
@@ -117,7 +117,7 @@ func GetKubeLoginKubeconfigEndpoint(ctx context.Context, projectID, clusterID st
 	return &encodeKubeConfigResponse{clientCfg: kubeloginClientCfg, filePrefix: "kubelogin"}, nil
 }
 
-func getKubeconfigWithUniqueName(project *v1.Project, cluster *v1.Cluster, clientConfig *clientcmdapi.Config, filePrefix string) (interface{}, error) {
+func getKubeconfigWithUniqueName(project *kubermaticv1.Project, cluster *kubermaticv1.Cluster, clientConfig *clientcmdapi.Config, filePrefix string) (interface{}, error) {
 	kubeloginClientCfg, err := NoDefaultsKubeconfig(clientConfig, "oidc", cluster, project)
 	if err != nil {
 		return nil, kcerrors.NewBadRequest("failed to replace default names in kubelogin kubeconfig: %v", err)
@@ -129,7 +129,7 @@ func getKubeconfigWithUniqueName(project *v1.Project, cluster *v1.Cluster, clien
 	}, nil
 }
 
-func getOidcSettings(ctx context.Context, cluster *v1.Cluster) (*v1.OIDCSettings, error) {
+func getOidcSettings(ctx context.Context, cluster *kubermaticv1.Cluster) (*kubermaticv1.OIDCSettings, error) {
 	keycloakFacade := ctx.Value(middleware.KeycloakFacadeContextKey).(keycloak.Facade)
 
 	switch {
@@ -148,7 +148,7 @@ func getOidcSettings(ctx context.Context, cluster *v1.Cluster) (*v1.OIDCSettings
 
 // This function will replace the 'default' context and user in a kubeconfig with sanitized names. Error will for now
 // always be nil, but added the return in case we want to add checks e.g. for cluster or project in the future
-func NoDefaultsKubeconfig(clientConfig *clientcmdapi.Config, username string, cluster *v1.Cluster, project *v1.Project) (*clientcmdapi.Config, error) {
+func NoDefaultsKubeconfig(clientConfig *clientcmdapi.Config, username string, cluster *kubermaticv1.Cluster, project *kubermaticv1.Project) (*clientcmdapi.Config, error) {
 
 	newUsername := fmt.Sprintf("%s-%s", username, cluster.Name)
 	newContext := fmt.Sprintf("%s@%s/%s", username, project.Spec.Name, cluster.Spec.HumanReadableName)
@@ -163,4 +163,17 @@ func NoDefaultsKubeconfig(clientConfig *clientcmdapi.Config, username string, cl
 	clientConfig.CurrentContext = newContext
 
 	return clientConfig, nil
+}
+
+func getOpenstackBillingTenant(cloudSpec *kubermaticv1.CloudSpec) string {
+	if cloudSpec.AWS != nil {
+		return cloudSpec.AWS.OpenstackBillingTenant
+	}
+	if cloudSpec.Azure != nil {
+		return cloudSpec.Azure.OpenstackBillingTenant
+	}
+	if cloudSpec.Openstack != nil {
+		return cloudSpec.Openstack.Tenant
+	}
+	return ""
 }
