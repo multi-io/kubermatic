@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"time"
 
+	kuberneteshelper "k8c.io/kubermatic/v2/pkg/kubernetes"
+
 	"k8c.io/kubermatic/v2/pkg/keycloak"
 
 	"go.uber.org/zap"
@@ -42,10 +44,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	autoscalingv1beta2 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1beta2"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/client-go/util/retry"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -308,27 +308,13 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, clus
 	return res, nil
 }
 
-func (r *Reconciler) updateCluster(ctx context.Context, cluster *kubermaticv1.Cluster, modify func(*kubermaticv1.Cluster)) error {
-	// Store it here because it may be unset later on if an update request failed
-	name := cluster.Name
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
-		//Get latest version
-		if err := r.Get(ctx, types.NamespacedName{Name: name}, cluster); err != nil {
-			if kubeapierrors.IsNotFound(err) {
-				return nil
-			}
-			return err
-		}
-		// Apply modifications
-		modify(cluster)
-		// Update the cluster
-		return r.Update(ctx, cluster)
-	})
+func (r *Reconciler) patchCluster(ctx context.Context, cluster *kubermaticv1.Cluster, modify func(*kubermaticv1.Cluster)) error {
+	return kuberneteshelper.PatchCluster(ctx, cluster, r.Client, modify)
 }
 
 func (r *Reconciler) updateClusterError(ctx context.Context, cluster *kubermaticv1.Cluster, reason kubermaticv1.ClusterStatusError, message string) error {
 	if cluster.Status.ErrorReason == nil || *cluster.Status.ErrorReason != reason {
-		err := r.updateCluster(ctx, cluster, func(c *kubermaticv1.Cluster) {
+		err := r.patchCluster(ctx, cluster, func(c *kubermaticv1.Cluster) {
 			c.Status.ErrorMessage = &message
 			c.Status.ErrorReason = &reason
 		})
@@ -342,7 +328,7 @@ func (r *Reconciler) updateClusterError(ctx context.Context, cluster *kubermatic
 
 func (r *Reconciler) clearClusterError(ctx context.Context, cluster *kubermaticv1.Cluster) error {
 	if cluster.Status.ErrorReason != nil || cluster.Status.ErrorMessage != nil {
-		err := r.updateCluster(ctx, cluster, func(c *kubermaticv1.Cluster) {
+		err := r.patchCluster(ctx, cluster, func(c *kubermaticv1.Cluster) {
 			c.Status.ErrorMessage = nil
 			c.Status.ErrorReason = nil
 		})

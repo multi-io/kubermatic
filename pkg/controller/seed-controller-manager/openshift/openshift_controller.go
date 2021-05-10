@@ -379,49 +379,54 @@ func (r *Reconciler) updateCluster(ctx context.Context, c *kubermaticv1.Cluster,
 	return r.Patch(ctx, c, client.MergeFrom(oldCluster))
 }
 
-func (r *Reconciler) getAllSecretCreators(ctx context.Context, osData *openshiftData) []reconciling.NamedSecretCreatorGetter {
-	creators := []reconciling.NamedSecretCreatorGetter{
-		certificates.RootCACreator(osData),
-		openvpn.CACreator(),
-		certificates.FrontProxyCACreator(),
-		openshiftresources.OpenShiftTLSServingCertificateCreator(osData),
-		openshiftresources.ServiceSignerCA(),
-		openshiftresources.OpenshiftControllerManagerServingCertSecretCreator(osData.GetRootCA),
-		resources.ImagePullSecretCreator(r.dockerPullConfigJSON),
-		apiserver.FrontProxyClientCertificateCreator(osData),
-		etcd.TLSCertificateCreator(osData),
-		apiserver.EtcdClientCertificateCreator(osData),
-		apiserver.TLSServingCertificateCreator(osData),
-		apiserver.KubeletClientCertificateCreator(osData),
-		apiserver.ServiceAccountKeyCreator(),
-		openvpn.TLSServingCertificateCreator(osData),
-		openvpn.InternalClientCertificateCreator(osData),
-		machinecontroller.TLSServingCertificateCreator(osData),
-		openshiftresources.KubeSchedulerServingCertCreator(osData.GetRootCA),
-		metricsserver.TLSServingCertSecretCreator(osData.GetRootCA),
+func (r *Reconciler) getAllSecretCreators(ctx context.Context, osData *openshiftData) [][]reconciling.NamedSecretCreatorGetter {
+	creators := [][]reconciling.NamedSecretCreatorGetter{
+		{
+			certificates.RootCACreator(osData),
+			openvpn.CACreator(),
+			certificates.FrontProxyCACreator(),
+			openshiftresources.ServiceSignerCA(),
+		},
+		{
+			openshiftresources.OpenShiftTLSServingCertificateCreator(osData),
+			openshiftresources.OpenshiftControllerManagerServingCertSecretCreator(osData.GetRootCA),
+			resources.ImagePullSecretCreator(r.dockerPullConfigJSON),
+			apiserver.FrontProxyClientCertificateCreator(osData),
+			etcd.TLSCertificateCreator(osData),
+			apiserver.EtcdClientCertificateCreator(osData),
+			apiserver.TLSServingCertificateCreator(osData),
+			apiserver.KubeletClientCertificateCreator(osData),
+			apiserver.ServiceAccountKeyCreator(),
+			openvpn.TLSServingCertificateCreator(osData),
+			openvpn.InternalClientCertificateCreator(osData),
+			machinecontroller.TLSServingCertificateCreator(osData),
+			openshiftresources.KubeSchedulerServingCertCreator(osData.GetRootCA),
+			metricsserver.TLSServingCertSecretCreator(osData.GetRootCA),
 
-		// Kubeconfigs
-		resources.GetInternalKubeconfigCreator(resources.SchedulerKubeconfigSecretName, resources.SchedulerCertUsername, nil, osData),
-		resources.GetInternalKubeconfigCreator(resources.KubeletDnatControllerKubeconfigSecretName, resources.KubeletDnatControllerCertUsername, nil, osData),
-		resources.GetInternalKubeconfigCreator(resources.MachineControllerKubeconfigSecretName, resources.MachineControllerCertUsername, nil, osData),
-		resources.GetInternalKubeconfigCreator(resources.ControllerManagerKubeconfigSecretName, resources.ControllerManagerCertUsername, nil, osData),
-		resources.GetInternalKubeconfigCreator(resources.KubeStateMetricsKubeconfigSecretName, resources.KubeStateMetricsCertUsername, nil, osData),
-		resources.GetInternalKubeconfigCreator(resources.MetricsServerKubeconfigSecretName, resources.MetricsServerCertUsername, nil, osData),
-		resources.GetInternalKubeconfigCreator(resources.InternalUserClusterAdminKubeconfigSecretName, resources.InternalUserClusterAdminKubeconfigCertUsername, []string{"system:masters"}, osData),
-		resources.GetInternalKubeconfigCreator(resources.ClusterAutoscalerKubeconfigSecretName, resources.ClusterAutoscalerCertUsername, nil, osData),
-		openshiftresources.ImagePullSecretCreator(osData.Cluster()),
-		openshiftresources.OauthSessionSecretCreator,
-		openshiftresources.OauthOCPBrandingSecretCreator,
-		openshiftresources.OauthTLSServingCertCreator(osData),
-		openshiftresources.ConsoleServingCertCreator(osData.GetRootCA),
+			// Kubeconfigs
+			resources.GetInternalKubeconfigCreator(resources.SchedulerKubeconfigSecretName, resources.SchedulerCertUsername, nil, osData),
+			resources.GetInternalKubeconfigCreator(resources.KubeletDnatControllerKubeconfigSecretName, resources.KubeletDnatControllerCertUsername, nil, osData),
+			resources.GetInternalKubeconfigCreator(resources.MachineControllerKubeconfigSecretName, resources.MachineControllerCertUsername, nil, osData),
+			resources.GetInternalKubeconfigCreator(resources.ControllerManagerKubeconfigSecretName, resources.ControllerManagerCertUsername, nil, osData),
+			resources.GetInternalKubeconfigCreator(resources.KubeStateMetricsKubeconfigSecretName, resources.KubeStateMetricsCertUsername, nil, osData),
+			resources.GetInternalKubeconfigCreator(resources.MetricsServerKubeconfigSecretName, resources.MetricsServerCertUsername, nil, osData),
+			resources.GetInternalKubeconfigCreator(resources.InternalUserClusterAdminKubeconfigSecretName, resources.InternalUserClusterAdminKubeconfigCertUsername, []string{"system:masters"}, osData),
+			resources.GetInternalKubeconfigCreator(resources.ClusterAutoscalerKubeconfigSecretName, resources.ClusterAutoscalerCertUsername, nil, osData),
+			openshiftresources.ImagePullSecretCreator(osData.Cluster()),
+			openshiftresources.OauthSessionSecretCreator,
+			openshiftresources.OauthOCPBrandingSecretCreator,
+			openshiftresources.OauthTLSServingCertCreator(osData),
+			openshiftresources.ConsoleServingCertCreator(osData.GetRootCA),
 
-		//TODO: This is only needed because of the ServiceAccount Token needed for Openshift
-		//TODO: Streamline this by using it everywhere and use the clientprovider here or remove
-		openshiftresources.ExternalX509KubeconfigCreator(osData),
-		openshiftresources.GetLoopbackKubeconfigCreator(ctx, osData, r.log)}
+			//TODO: This is only needed because of the ServiceAccount Token needed for Openshift
+			//TODO: Streamline this by using it everywhere and use the clientprovider here or remove
+			openshiftresources.ExternalX509KubeconfigCreator(osData),
+			openshiftresources.GetLoopbackKubeconfigCreator(ctx, osData, r.log),
+		},
+	}
 
 	if osData.cluster.Spec.Cloud.GCP != nil {
-		creators = append(creators, resources.ServiceAccountSecretCreator(osData))
+		creators[1] = append(creators[1], resources.ServiceAccountSecretCreator(osData))
 	}
 
 	return creators
@@ -429,10 +434,11 @@ func (r *Reconciler) getAllSecretCreators(ctx context.Context, osData *openshift
 
 func (r *Reconciler) secrets(ctx context.Context, osData *openshiftData) error {
 	ns := osData.Cluster().Status.NamespaceName
-	if err := reconciling.ReconcileSecrets(ctx, r.getAllSecretCreators(ctx, osData), ns, r.Client); err != nil {
-		return fmt.Errorf("failed to reconcile Secrets: %v", err)
+	for _, creators := range r.getAllSecretCreators(ctx, osData) {
+		if err := reconciling.ReconcileSecrets(ctx, creators, ns, r.Client); err != nil {
+			return fmt.Errorf("failed to reconcile Secrets: %v", err)
+		}
 	}
-
 	return nil
 }
 

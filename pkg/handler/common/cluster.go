@@ -104,6 +104,13 @@ func CreateEndpoint(ctx context.Context, projectID string, body apiv1.CreateClus
 		return nil, errors.NewBadRequest("invalid cluster: %v", err)
 	}
 
+	// Sys11: The field OpenstackBillingTenant does not exist in upstream version. This field used for billing purposes
+	// by us. If we accidentally delete it during merge we might not notice it. This test ensures field is set.
+	// We ignore Fake cloud spec used in unit tests.
+	if spec.Cloud.Fake == nil && getOpenstackBillingTenant(&spec.Cloud) == "" {
+		return nil, errors.NewBadRequest("openstackBillingTenant is required")
+	}
+
 	// master level ExposeStrategy is the default
 	spec.ExposeStrategy = exposeStrategy
 	if seed.Spec.ExposeStrategy != "" {

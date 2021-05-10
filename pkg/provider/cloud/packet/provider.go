@@ -17,6 +17,7 @@ limitations under the License.
 package packet
 
 import (
+	"context"
 	"errors"
 
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
@@ -52,23 +53,23 @@ func (p *packet) ValidateCloudSpec(spec kubermaticv1.CloudSpec) error {
 
 // InitializeCloudProvider initializes a cluster, in particular
 // updates BillingCycle to the defaultBillingCycle, if it is not set.
-func (p *packet) InitializeCloudProvider(cluster *kubermaticv1.Cluster, update provider.ClusterUpdater) (*kubermaticv1.Cluster, error) {
+func (p *packet) InitializeCloudProvider(ctx context.Context, cluster *kubermaticv1.Cluster, update provider.ClusterUpdater) error {
 	var err error
 	if cluster.Spec.Cloud.Packet.BillingCycle == "" {
-		cluster, err = update(cluster.Name, func(cluster *kubermaticv1.Cluster) {
+		err = update(ctx, cluster, func(cluster *kubermaticv1.Cluster) {
 			cluster.Spec.Cloud.Packet.BillingCycle = defaultBillingCycle
 		})
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 
-	return cluster, nil
+	return nil
 }
 
 // CleanUpCloudProvider
-func (p *packet) CleanUpCloudProvider(cluster *kubermaticv1.Cluster, _ provider.ClusterUpdater) (*kubermaticv1.Cluster, error) {
-	return cluster, nil
+func (p *packet) CleanUpCloudProvider(_ context.Context, cluster *kubermaticv1.Cluster, _ provider.ClusterUpdater) error {
+	return nil
 }
 
 // ValidateCloudSpecUpdate verifies whether an update of cloud spec is valid and permitted

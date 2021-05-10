@@ -43,6 +43,7 @@ import (
 	clusterclient "k8c.io/kubermatic/v2/pkg/cluster/client"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	kubermaticv1helper "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1/helper"
+	kuberneteshelper "k8c.io/kubermatic/v2/pkg/kubernetes"
 	"k8c.io/kubermatic/v2/pkg/provider"
 	"k8c.io/kubermatic/v2/pkg/resources"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils"
@@ -61,7 +62,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/util/retry"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -398,16 +398,10 @@ func (r *testRunner) executeTests(
 		"[Kubermatic] Add LB and PV Finalizers",
 		report,
 		func() error {
-			return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-				if err := r.seedClusterClient.Get(ctx, types.NamespacedName{Name: clusterName}, cluster); err != nil {
-					return err
-				}
-				cluster.Finalizers = append(cluster.Finalizers,
-					kubermaticapiv1.InClusterPVCleanupFinalizer,
-					kubermaticapiv1.InClusterLBCleanupFinalizer,
-				)
-				return r.seedClusterClient.Update(ctx, cluster)
-			})
+			oldCluster := cluster.DeepCopy()
+			kuberneteshelper.AddFinalizer(cluster, kubermaticapiv1.InClusterPVCleanupFinalizer)
+			kuberneteshelper.AddFinalizer(cluster, kubermaticapiv1.InClusterLBCleanupFinalizer)
+			return r.seedClusterClient.Patch(ctx, cluster, ctrlruntimeclient.MergeFrom(oldCluster))
 		},
 	); err != nil {
 		return fmt.Errorf("failed to add PV and LB cleanup finalizers: %v", err)

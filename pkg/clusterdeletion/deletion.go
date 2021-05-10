@@ -21,10 +21,6 @@ import (
 	"fmt"
 
 	"go.uber.org/zap"
-	kerrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/util/retry"
-
 	kubermaticapiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	kuberneteshelper "k8c.io/kubermatic/v2/pkg/kubernetes"
@@ -180,20 +176,6 @@ func (d *Deletion) cleanupInClusterResources(ctx context.Context, log *zap.Sugar
 	return d.seedClient.Patch(ctx, cluster, controllerruntimeclient.MergeFrom(oldCluster))
 }
 
-func (d *Deletion) updateCluster(ctx context.Context, cluster *kubermaticv1.Cluster, modify func(*kubermaticv1.Cluster)) error {
-	// Store it here because it may be unset later on if an update request failed
-	name := cluster.Name
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
-		//Get latest version
-		if err := d.seedClient.Get(ctx, types.NamespacedName{Name: name}, cluster); err != nil {
-			if kerrors.IsNotFound(err) {
-				return nil
-			}
-			return err
-		}
-		// Apply modifications
-		modify(cluster)
-		// Update the cluster
-		return d.seedClient.Update(ctx, cluster)
-	})
+func (d *Deletion) patchCluster(ctx context.Context, cluster *kubermaticv1.Cluster, modify func(*kubermaticv1.Cluster)) error {
+	return kuberneteshelper.PatchCluster(ctx, cluster, d.seedClient, modify)
 }
