@@ -37,6 +37,7 @@ build-kubermatic:
   artifacts:
     paths:
     - _build
+    expire_in: '7 days'
   variables:
     GOCACHE: ${CI_PROJECT_DIR}/vendor/cache
   needs: ["go-mod-vendor"]
@@ -51,6 +52,7 @@ build-dnatcontroller:
   artifacts:
     paths:
       - cmd/kubeletdnat-controller/_build
+    expire_in: '7 days'
   needs: ["go-mod-vendor"]
 
 build-nodeport-proxy:
@@ -63,6 +65,7 @@ build-nodeport-proxy:
   artifacts:
     paths:
       - cmd/nodeport-proxy/_build
+    expire_in: '7 days'
   needs: ["go-mod-vendor"]
 
 lint-docker:
