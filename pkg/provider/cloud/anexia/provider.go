@@ -17,7 +17,6 @@ limitations under the License.
 package anexia
 
 import (
-	"context"
 	"errors"
 
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
@@ -52,12 +51,12 @@ func (a *Anexia) ValidateCloudSpec(spec kubermaticv1.CloudSpec) error {
 	return nil
 }
 
-func (a *Anexia) InitializeCloudProvider(_ context.Context, c *kubermaticv1.Cluster, p provider.ClusterUpdater) error {
-	return nil
+func (a *Anexia) InitializeCloudProvider(c *kubermaticv1.Cluster, p provider.ClusterUpdater) (*kubermaticv1.Cluster, error) {
+	return c, nil
 }
 
-func (a *Anexia) CleanUpCloudProvider(_ context.Context, c *kubermaticv1.Cluster, p provider.ClusterUpdater) error {
-	return nil
+func (a *Anexia) CleanUpCloudProvider(c *kubermaticv1.Cluster, p provider.ClusterUpdater) (*kubermaticv1.Cluster, error) {
+	return c, nil
 }
 
 func (a *Anexia) ValidateCloudSpecUpdate(oldSpec kubermaticv1.CloudSpec, newSpec kubermaticv1.CloudSpec) error {

@@ -67,31 +67,31 @@ func NewCloudProvider(secretKeyGetter provider.SecretKeySelectorValueFunc) provi
 
 // TODO: update behaviour of all these methods
 // InitializeCloudProvider initializes a cluster.
-func (g *gcp) InitializeCloudProvider(ctx context.Context, cluster *kubermaticv1.Cluster, update provider.ClusterUpdater) error {
+func (g *gcp) InitializeCloudProvider(cluster *kubermaticv1.Cluster, update provider.ClusterUpdater) (*kubermaticv1.Cluster, error) {
 	var err error
 	if cluster.Spec.Cloud.GCP.Network == "" && cluster.Spec.Cloud.GCP.Subnetwork == "" {
-		err = update(ctx, cluster, func(cluster *kubermaticv1.Cluster) {
+		cluster, err = update(cluster.Name, func(cluster *kubermaticv1.Cluster) {
 			cluster.Spec.Cloud.GCP.Network = DefaultNetwork
 		})
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	if err := g.ensureFirewallRules(ctx, cluster, update); err != nil {
-		return err
+	if err := g.ensureFirewallRules(cluster, update); err != nil {
+		return nil, err
 	}
 
 	// add the routes cleanup finalizer
 	if !kuberneteshelper.HasFinalizer(cluster, routesCleanupFinalizer) {
-		err = update(ctx, cluster, func(cluster *kubermaticv1.Cluster) {
+		cluster, err = update(cluster.Name, func(cluster *kubermaticv1.Cluster) {
 			kuberneteshelper.AddFinalizer(cluster, routesCleanupFinalizer)
 		})
 		if err != nil {
-			return fmt.Errorf("failed to add %s finalizer: %v", routesCleanupFinalizer, err)
+			return nil, fmt.Errorf("failed to add %s finalizer: %v", routesCleanupFinalizer, err)
 		}
 	}
-	return nil
+	return cluster, nil
 }
 
 // DefaultCloudSpec adds defaults to the cloud spec.
@@ -112,16 +112,16 @@ func (g *gcp) ValidateCloudSpec(spec kubermaticv1.CloudSpec) error {
 }
 
 // CleanUpCloudProvider removes firewall rules and related finalizer.
-func (g *gcp) CleanUpCloudProvider(ctx context.Context, cluster *kubermaticv1.Cluster, update provider.ClusterUpdater) error {
+func (g *gcp) CleanUpCloudProvider(cluster *kubermaticv1.Cluster, update provider.ClusterUpdater) (*kubermaticv1.Cluster, error) {
 
 	serviceAccount, err := GetCredentialsForCluster(cluster.Spec.Cloud, g.secretKeySelector)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	svc, projectID, err := ConnectToComputeService(serviceAccount)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	firewallService := compute.NewFirewallsService(svc)
@@ -133,14 +133,14 @@ func (g *gcp) CleanUpCloudProvider(ctx context.Context, cluster *kubermaticv1.Cl
 		_, err = firewallService.Delete(projectID, selfRuleName).Do()
 		// we ignore a Google API "not found" error
 		if err != nil && !isHTTPError(err, http.StatusNotFound) {
-			return fmt.Errorf("failed to delete firewall rule %s: %v", selfRuleName, err)
+			return nil, fmt.Errorf("failed to delete firewall rule %s: %v", selfRuleName, err)
 		}
 
-		err = update(ctx, cluster, func(cluster *kubermaticv1.Cluster) {
+		cluster, err = update(cluster.Name, func(cluster *kubermaticv1.Cluster) {
 			kuberneteshelper.RemoveFinalizer(cluster, firewallSelfCleanupFinalizer)
 		})
 		if err != nil {
-			return fmt.Errorf("failed to remove %s finalizer: %v", firewallSelfCleanupFinalizer, err)
+			return nil, fmt.Errorf("failed to remove %s finalizer: %v", firewallSelfCleanupFinalizer, err)
 		}
 	}
 
@@ -148,30 +148,30 @@ func (g *gcp) CleanUpCloudProvider(ctx context.Context, cluster *kubermaticv1.Cl
 		_, err = firewallService.Delete(projectID, icmpRuleName).Do()
 		// we ignore a Google API "not found" error
 		if err != nil && !isHTTPError(err, http.StatusNotFound) {
-			return fmt.Errorf("failed to delete firewall rule %s: %v", selfRuleName, err)
+			return nil, fmt.Errorf("failed to delete firewall rule %s: %v", selfRuleName, err)
 		}
 
-		err = update(ctx, cluster, func(cluster *kubermaticv1.Cluster) {
+		cluster, err = update(cluster.Name, func(cluster *kubermaticv1.Cluster) {
 			kuberneteshelper.RemoveFinalizer(cluster, firewallICMPCleanupFinalizer)
 		})
 		if err != nil {
-			return fmt.Errorf("failed to remove %s finalizer: %v", firewallICMPCleanupFinalizer, err)
+			return nil, fmt.Errorf("failed to remove %s finalizer: %v", firewallICMPCleanupFinalizer, err)
 		}
 	}
 
 	if kuberneteshelper.HasFinalizer(cluster, routesCleanupFinalizer) {
 		if err := g.cleanUnusedRoutes(cluster); err != nil {
-			return err
+			return nil, err
 		}
-		err = update(ctx, cluster, func(cluster *kubermaticv1.Cluster) {
+		cluster, err = update(cluster.Name, func(cluster *kubermaticv1.Cluster) {
 			kuberneteshelper.RemoveFinalizer(cluster, routesCleanupFinalizer)
 		})
 		if err != nil {
-			return fmt.Errorf("failed to remove %s finalizer: %v", routesCleanupFinalizer, err)
+			return nil, fmt.Errorf("failed to remove %s finalizer: %v", routesCleanupFinalizer, err)
 		}
 	}
 
-	return nil
+	return cluster, nil
 }
 
 // ConnectToComputeService establishes a service connection to the Compute Engine.
@@ -203,7 +203,7 @@ func ConnectToComputeService(serviceAccount string) (*compute.Service, string, e
 	return svc, projectID, nil
 }
 
-func (g *gcp) ensureFirewallRules(ctx context.Context, cluster *kubermaticv1.Cluster, update provider.ClusterUpdater) error {
+func (g *gcp) ensureFirewallRules(cluster *kubermaticv1.Cluster, update provider.ClusterUpdater) error {
 	serviceAccount, err := GetCredentialsForCluster(cluster.Spec.Cloud, g.secretKeySelector)
 	if err != nil {
 		return err
@@ -255,7 +255,7 @@ func (g *gcp) ensureFirewallRules(ctx context.Context, cluster *kubermaticv1.Clu
 			return fmt.Errorf("failed to create firewall rule %s: %v", selfRuleName, err)
 		}
 
-		err = update(ctx, cluster, func(cluster *kubermaticv1.Cluster) {
+		cluster, err = update(cluster.Name, func(cluster *kubermaticv1.Cluster) {
 			kuberneteshelper.AddFinalizer(cluster, firewallSelfCleanupFinalizer)
 		})
 		if err != nil {
@@ -280,12 +280,13 @@ func (g *gcp) ensureFirewallRules(ctx context.Context, cluster *kubermaticv1.Clu
 			return fmt.Errorf("failed to create firewall rule %s: %v", icmpRuleName, err)
 		}
 
-		err := update(ctx, cluster, func(cluster *kubermaticv1.Cluster) {
+		newCluster, err := update(cluster.Name, func(cluster *kubermaticv1.Cluster) {
 			kuberneteshelper.AddFinalizer(cluster, firewallICMPCleanupFinalizer)
 		})
 		if err != nil {
 			return fmt.Errorf("failed to add %s finalizer: %v", firewallICMPCleanupFinalizer, err)
 		}
+		*cluster = *newCluster
 	}
 
 	return err

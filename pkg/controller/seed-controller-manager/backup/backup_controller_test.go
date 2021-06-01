@@ -48,7 +48,8 @@ var (
 func TestEnsureBackupCronJob(t *testing.T) {
 	cluster := &kubermaticv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-cluster",
+			Name:            "test-cluster",
+			ResourceVersion: "1",
 		},
 		Spec: kubermaticv1.ClusterSpec{
 			Version: *semver.NewSemverOrDie("1.18.9"),
@@ -168,7 +169,7 @@ func TestCleanupJobSpec(t *testing.T) {
 		cleanupContainer: testCleanupContainer,
 	}
 
-	cleanupJob := reconciler.cleanupJob(&kubermaticv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "test-cluster"}})
+	cleanupJob := reconciler.cleanupJob(&kubermaticv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", ResourceVersion: "1"}})
 
 	if cleanupJob.Namespace != metav1.NamespaceSystem {
 		t.Errorf("expected cleanup jobs Namespace to be %q but was %q", metav1.NamespaceSystem, cleanupJob.Namespace)

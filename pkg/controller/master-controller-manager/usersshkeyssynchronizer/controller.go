@@ -37,7 +37,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/client-go/util/retry"
 
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -191,8 +190,7 @@ func (r *Reconciler) reconcile(log *zap.SugaredLogger, request reconcile.Request
 		if kubernetes.HasFinalizer(cluster, UserSSHKeysClusterIDsCleanupFinalizer) {
 			oldCluster := cluster.DeepCopy()
 			kubernetes.RemoveFinalizer(cluster, UserSSHKeysClusterIDsCleanupFinalizer)
-			err := r.client.Patch(r.ctx, cluster, ctrlruntimeclient.MergeFrom(oldCluster))
-			if err != nil {
+			if err := seedClient.Patch(r.ctx, cluster, ctrlruntimeclient.MergeFrom(oldCluster)); err != nil {
 				return fmt.Errorf("failed removing %s finalizer: %v", UserSSHKeysClusterIDsCleanupFinalizer, err)
 			}
 		}
@@ -210,23 +208,11 @@ func (r *Reconciler) reconcile(log *zap.SugaredLogger, request reconcile.Request
 		return fmt.Errorf("failed to reconcile ssh key secret: %v", err)
 	}
 
+	oldCluster := cluster.DeepCopy()
 	if !kubernetes.HasFinalizer(cluster, UserSSHKeysClusterIDsCleanupFinalizer) {
-		// Do Update instead of Path to ensure we don't mess up addition of other finalizers.
-		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-			//Get latest version
-			c := &kubermaticv1.Cluster{}
-			if err := r.client.Get(r.ctx, types.NamespacedName{Name: cluster.Name}, c); err != nil {
-				if kubeapierrors.IsNotFound(err) {
-					return nil
-				}
-				return err
-			}
-			kubernetes.AddFinalizer(c, UserSSHKeysClusterIDsCleanupFinalizer)
-			// Update the cluster
-			return r.client.Update(r.ctx, c)
-		})
-		if err != nil {
-			return fmt.Errorf("failed adding %s finalizer: %v", UserSSHKeysClusterIDsCleanupFinalizer, err)
+		kubernetes.AddFinalizer(cluster, UserSSHKeysClusterIDsCleanupFinalizer)
+		if err := seedClient.Patch(r.ctx, cluster, ctrlruntimeclient.MergeFromWithOptions(oldCluster, ctrlruntimeclient.MergeFromWithOptimisticLock{})); err != nil {
+			return fmt.Errorf("failed adding %s finalizer: %w", UserSSHKeysClusterIDsCleanupFinalizer, err)
 		}
 	}
 

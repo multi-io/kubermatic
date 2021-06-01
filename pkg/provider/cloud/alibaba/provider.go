@@ -17,7 +17,6 @@ limitations under the License.
 package alibaba
 
 import (
-	"context"
 	"errors"
 	"fmt"
 
@@ -60,12 +59,12 @@ func (a *Alibaba) ValidateCloudSpec(spec kubermaticv1.CloudSpec) error {
 	return nil
 }
 
-func (a *Alibaba) InitializeCloudProvider(_ context.Context, _ *kubermaticv1.Cluster, _ provider.ClusterUpdater) error {
-	return nil
+func (a *Alibaba) InitializeCloudProvider(c *kubermaticv1.Cluster, p provider.ClusterUpdater) (*kubermaticv1.Cluster, error) {
+	return c, nil
 }
 
-func (a *Alibaba) CleanUpCloudProvider(_ context.Context, _ *kubermaticv1.Cluster, _ provider.ClusterUpdater) error {
-	return nil
+func (a *Alibaba) CleanUpCloudProvider(c *kubermaticv1.Cluster, p provider.ClusterUpdater) (*kubermaticv1.Cluster, error) {
+	return c, nil
 }
 
 func (a *Alibaba) ValidateCloudSpecUpdate(oldSpec kubermaticv1.CloudSpec, newSpec kubermaticv1.CloudSpec) error {

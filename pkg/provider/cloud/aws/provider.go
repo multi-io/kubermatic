@@ -17,7 +17,6 @@ limitations under the License.
 package aws
 
 import (
-	"context"
 	"errors"
 	"fmt"
 
@@ -90,7 +89,7 @@ func (a *AmazonEC2) ValidateCloudSpec(spec kubermaticv1.CloudSpec) error {
 }
 
 // MigrateToMultiAZ migrates an AWS cluster from the old AZ-hardcoded spec to multi-AZ spec
-func (a *AmazonEC2) MigrateToMultiAZ(ctx context.Context, cluster *kubermaticv1.Cluster, clusterUpdater provider.ClusterUpdater) error {
+func (a *AmazonEC2) MigrateToMultiAZ(cluster *kubermaticv1.Cluster, clusterUpdater provider.ClusterUpdater) error {
 	// If not even the role name is set, then the cluster is not fully
 	// initialized and we don't need to worry about this migration just yet.
 	if cluster.Spec.Cloud.AWS.RoleName == "" {
@@ -109,12 +108,13 @@ func (a *AmazonEC2) MigrateToMultiAZ(ctx context.Context, cluster *kubermaticv1.
 			return fmt.Errorf("failed to get already existing aws IAM role %s: %v", cluster.Spec.Cloud.AWS.RoleName, err)
 		}
 
-		err = clusterUpdater(ctx, cluster, func(cluster *kubermaticv1.Cluster) {
+		newCluster, err := clusterUpdater(cluster.Name, func(cluster *kubermaticv1.Cluster) {
 			cluster.Spec.Cloud.AWS.ControlPlaneRoleARN = *getRoleOut.Role.Arn
 		})
 		if err != nil {
 			return err
 		}
+		*cluster = *newCluster
 	}
 
 	return nil
@@ -430,39 +430,39 @@ func createSecurityGroup(client ec2iface.EC2API, vpcID, clusterName string) (str
 	return securityGroupID, nil
 }
 
-func (a *AmazonEC2) InitializeCloudProvider(ctx context.Context, cluster *kubermaticv1.Cluster, update provider.ClusterUpdater) error {
+func (a *AmazonEC2) InitializeCloudProvider(cluster *kubermaticv1.Cluster, update provider.ClusterUpdater) (*kubermaticv1.Cluster, error) {
 	client, err := a.getClientSet(cluster.Spec.Cloud)
 	if err != nil {
-		return fmt.Errorf("failed to get API client: %v", err)
+		return nil, fmt.Errorf("failed to get API client: %v", err)
 	}
 
 	if cluster.Spec.Cloud.AWS.VPCID == "" {
 		vpc, err := getDefaultVpc(client.EC2)
 		if err != nil {
-			return fmt.Errorf("failed to get default vpc: %v", err)
+			return nil, fmt.Errorf("failed to get default vpc: %v", err)
 		}
-		err = update(ctx, cluster, func(cluster *kubermaticv1.Cluster) {
+		cluster, err = update(cluster.Name, func(cluster *kubermaticv1.Cluster) {
 			cluster.Spec.Cloud.AWS.VPCID = *vpc.VpcId
 		})
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	if cluster.Spec.Cloud.AWS.SecurityGroupID == "" {
 		securityGroupID, err := createSecurityGroup(client.EC2, cluster.Spec.Cloud.AWS.VPCID, cluster.Name)
 		if err != nil {
-			return fmt.Errorf("failed to add security group for cluster %s: %v", cluster.Name, err)
+			return nil, fmt.Errorf("failed to add security group for cluster %s: %v", cluster.Name, err)
 		}
 		if len(securityGroupID) == 0 {
-			return fmt.Errorf("createSecurityGroup for cluster %s did not return sg id", cluster.Name)
+			return nil, fmt.Errorf("createSecurityGroup for cluster %s did not return sg id", cluster.Name)
 		}
-		err = update(ctx, cluster, func(cluster *kubermaticv1.Cluster) {
+		cluster, err = update(cluster.Name, func(cluster *kubermaticv1.Cluster) {
 			kuberneteshelper.AddFinalizer(cluster, securityGroupCleanupFinalizer)
 			cluster.Spec.Cloud.AWS.SecurityGroupID = securityGroupID
 		})
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
@@ -470,72 +470,72 @@ func (a *AmazonEC2) InitializeCloudProvider(ctx context.Context, cluster *kuberm
 	if cluster.Spec.Cloud.AWS.ControlPlaneRoleARN == "" {
 		controlPlaneRole, err := createControlPlaneRole(client.IAM, cluster.Name)
 		if err != nil {
-			return fmt.Errorf("failed to create control plane role: %v", err)
+			return nil, fmt.Errorf("failed to create control plane role: %v", err)
 		}
-		err = update(ctx, cluster, func(cluster *kubermaticv1.Cluster) {
+		cluster, err = update(cluster.Name, func(cluster *kubermaticv1.Cluster) {
 			kuberneteshelper.AddFinalizer(cluster, controlPlaneRoleCleanupFinalizer)
 			cluster.Spec.Cloud.AWS.ControlPlaneRoleARN = *controlPlaneRole.RoleName
 		})
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	if cluster.Spec.Cloud.AWS.InstanceProfileName == "" {
 		workerInstanceProfile, err := createWorkerInstanceProfile(client.IAM, cluster.Name)
 		if err != nil {
-			return fmt.Errorf("failed to setup the required roles/instance profiles: %v", err)
+			return nil, fmt.Errorf("failed to setup the required roles/instance profiles: %v", err)
 		}
 
-		err = update(ctx, cluster, func(cluster *kubermaticv1.Cluster) {
+		cluster, err = update(cluster.Name, func(cluster *kubermaticv1.Cluster) {
 			kuberneteshelper.AddFinalizer(cluster, instanceProfileCleanupFinalizer)
 			cluster.Spec.Cloud.AWS.InstanceProfileName = *workerInstanceProfile.InstanceProfileName
 		})
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	if cluster.Spec.Cloud.AWS.RouteTableID == "" {
 		routeTable, err := getRouteTable(cluster.Spec.Cloud.AWS.VPCID, client.EC2)
 		if err != nil {
-			return fmt.Errorf("failed to get default RouteTable: %v", err)
+			return nil, fmt.Errorf("failed to get default RouteTable: %v", err)
 		}
-		err = update(ctx, cluster, func(cluster *kubermaticv1.Cluster) {
+		cluster, err = update(cluster.Name, func(cluster *kubermaticv1.Cluster) {
 			cluster.Spec.Cloud.AWS.RouteTableID = *routeTable.RouteTableId
 		})
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	if !kuberneteshelper.HasFinalizer(cluster, tagCleanupFinalizer) {
 		if err := tagResources(cluster, client.EC2); err != nil {
-			return err
+			return nil, err
 		}
-		err = update(ctx, cluster, func(cluster *kubermaticv1.Cluster) {
+		cluster, err = update(cluster.Name, func(cluster *kubermaticv1.Cluster) {
 			kuberneteshelper.AddFinalizer(cluster, tagCleanupFinalizer)
 		})
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	// We put this as an annotation on the cluster to allow addons to read this
 	// information.
 	if cluster.Annotations[regionAnnotationKey] != a.dc.Region {
-		err = update(ctx, cluster, func(cluster *kubermaticv1.Cluster) {
+		cluster, err = update(cluster.Name, func(cluster *kubermaticv1.Cluster) {
 			if cluster.Annotations == nil {
 				cluster.Annotations = map[string]string{}
 			}
 			cluster.Annotations[regionAnnotationKey] = a.dc.Region
 		})
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	return nil
+	return cluster, nil
 }
 
 // GetCredentialsForCluster returns the credentials for the passed in cloud spec or an error
@@ -575,10 +575,10 @@ func (a *AmazonEC2) getClientSet(cloud kubermaticv1.CloudSpec) (*ClientSet, erro
 	return GetClientSet(accessKeyID, secretAccessKey, a.dc.Region)
 }
 
-func (a *AmazonEC2) CleanUpCloudProvider(ctx context.Context, cluster *kubermaticv1.Cluster, updater provider.ClusterUpdater) error {
+func (a *AmazonEC2) CleanUpCloudProvider(cluster *kubermaticv1.Cluster, updater provider.ClusterUpdater) (*kubermaticv1.Cluster, error) {
 	client, err := a.getClientSet(cluster.Spec.Cloud)
 	if err != nil {
-		return fmt.Errorf("failed to get API client: %v", err)
+		return nil, fmt.Errorf("failed to get API client: %v", err)
 	}
 
 	if kuberneteshelper.HasFinalizer(cluster, securityGroupCleanupFinalizer) {
@@ -588,20 +588,20 @@ func (a *AmazonEC2) CleanUpCloudProvider(ctx context.Context, cluster *kubermati
 
 		if err != nil {
 			if err.(awserr.Error).Code() != "InvalidGroup.NotFound" {
-				return fmt.Errorf("failed to delete security group %s: %s", cluster.Spec.Cloud.AWS.SecurityGroupID, err.(awserr.Error).Message())
+				return nil, fmt.Errorf("failed to delete security group %s: %s", cluster.Spec.Cloud.AWS.SecurityGroupID, err.(awserr.Error).Message())
 			}
 		}
-		err = updater(ctx, cluster, func(cluster *kubermaticv1.Cluster) {
+		cluster, err = updater(cluster.Name, func(cluster *kubermaticv1.Cluster) {
 			kuberneteshelper.RemoveFinalizer(cluster, securityGroupCleanupFinalizer)
 		})
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	if kuberneteshelper.HasFinalizer(cluster, instanceProfileCleanupFinalizer) {
 		if err := deleteInstanceProfile(client.IAM, cluster.Spec.Cloud.AWS.InstanceProfileName); err != nil {
-			return fmt.Errorf("failed to delete the instance profile: %v", err)
+			return nil, fmt.Errorf("failed to delete the instance profile: %v", err)
 		}
 
 		rolesToDelete := []string{
@@ -614,44 +614,44 @@ func (a *AmazonEC2) CleanUpCloudProvider(ctx context.Context, cluster *kubermati
 		}
 		for _, role := range rolesToDelete {
 			if err := deleteRole(client.IAM, role); err != nil {
-				return fmt.Errorf("failed to delete role %q: %v", role, err)
+				return nil, fmt.Errorf("failed to delete role %q: %v", role, err)
 			}
 		}
 
-		err = updater(ctx, cluster, func(cluster *kubermaticv1.Cluster) {
+		cluster, err = updater(cluster.Name, func(cluster *kubermaticv1.Cluster) {
 			kuberneteshelper.RemoveFinalizer(cluster, instanceProfileCleanupFinalizer)
 		})
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	if kuberneteshelper.HasFinalizer(cluster, controlPlaneRoleCleanupFinalizer) {
 		roleName := controlPlaneRoleName(cluster.Name)
 		if err := deleteRole(client.IAM, roleName); err != nil {
-			return fmt.Errorf("failed to delete role %q: %v", roleName, err)
+			return nil, fmt.Errorf("failed to delete role %q: %v", roleName, err)
 		}
-		err = updater(ctx, cluster, func(cluster *kubermaticv1.Cluster) {
+		cluster, err = updater(cluster.Name, func(cluster *kubermaticv1.Cluster) {
 			kuberneteshelper.RemoveFinalizer(cluster, controlPlaneRoleCleanupFinalizer)
 		})
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	if kuberneteshelper.HasFinalizer(cluster, tagCleanupFinalizer) {
 		if err := removeTags(cluster, client.EC2); err != nil {
-			return fmt.Errorf("failed to cleanup tags: %v", err)
+			return nil, fmt.Errorf("failed to cleanup tags: %v", err)
 		}
-		err = updater(ctx, cluster, func(cluster *kubermaticv1.Cluster) {
+		cluster, err = updater(cluster.Name, func(cluster *kubermaticv1.Cluster) {
 			kuberneteshelper.RemoveFinalizer(cluster, tagCleanupFinalizer)
 		})
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	return nil
+	return cluster, nil
 }
 
 func isEntityAlreadyExists(err error) bool {
