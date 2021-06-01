@@ -83,7 +83,7 @@ func (d *Deletion) cleanupLB(ctx context.Context, log *zap.SugaredLogger, userCl
 	// We only really know if a LoadBalancer(The cloud provider LB) is gone, until there has been an event stating that.
 	// The event contains the UID of the corresponding, deleted, service.
 	// Upstream changed that recently to use a finalizer - As soon as we only support Kubernetes versions above that, we can remove this
-	if err := d.patchCluster(ctx, cluster, func(c *kubermaticv1.Cluster) {
+	if err := d.updateCluster(ctx, cluster, func(c *kubermaticv1.Cluster) {
 		if c.Annotations == nil {
 			c.Annotations = map[string]string{}
 		}
@@ -155,7 +155,7 @@ func (d *Deletion) checkIfAllLoadbalancersAreGone(ctx context.Context, cluster *
 		}
 	}
 
-	if err := d.patchCluster(ctx, cluster, func(c *kubermaticv1.Cluster) {
+	if err := d.updateCluster(ctx, cluster, func(c *kubermaticv1.Cluster) {
 		if c.Annotations == nil {
 			c.Annotations = make(map[string]string)
 		}

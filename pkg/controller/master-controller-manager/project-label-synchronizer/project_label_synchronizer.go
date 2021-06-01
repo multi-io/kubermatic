@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"time"
 
-	kuberneteshelper "k8c.io/kubermatic/v2/pkg/kubernetes"
-
 	"go.uber.org/zap"
 
 	controllerutil "k8c.io/kubermatic/v2/pkg/controller/util"
@@ -35,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/util/retry"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -195,7 +194,7 @@ func (r *reconciler) reconcile(log *zap.SugaredLogger, request reconcile.Request
 				continue
 			}
 			log.Debug("Updating labels on cluster")
-			if err := kuberneteshelper.PatchCluster(r.ctx, cluster, seedClient, func(c *kubermaticv1.Cluster) {
+			if err := r.updateCluster(cluster.Name, seedClient, func(c *kubermaticv1.Cluster) {
 				c.Labels = newClusterLabels
 				c.Status.InheritedLabels = getInheritedLabels(project.Labels)
 			}); err != nil {
@@ -205,6 +204,20 @@ func (r *reconciler) reconcile(log *zap.SugaredLogger, request reconcile.Request
 	}
 
 	return utilerrors.NewAggregate(errs)
+}
+
+func (r *reconciler) updateCluster(name string, client ctrlruntimeclient.Client, modify func(*kubermaticv1.Cluster)) error {
+	cluster := &kubermaticv1.Cluster{}
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		if err := client.Get(r.ctx, types.NamespacedName{Name: name}, cluster); err != nil {
+			if kerrors.IsNotFound(err) {
+				return nil
+			}
+			return err
+		}
+		modify(cluster)
+		return client.Update(r.ctx, cluster)
+	})
 }
 
 func (r *reconciler) filterClustersByProjectID(

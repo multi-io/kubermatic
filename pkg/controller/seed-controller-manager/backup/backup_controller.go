@@ -280,11 +280,10 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, clus
 
 	// Always add the finalizer first
 	if !kuberneteshelper.HasFinalizer(cluster, cleanupFinalizer) {
-		err := r.patchCluster(ctx, cluster, func(c *kubermaticv1.Cluster) {
-			kuberneteshelper.AddFinalizer(c, cleanupFinalizer)
-		})
-		if err != nil {
-			return fmt.Errorf("failed to update cluster after adding cleanup finalizer: %v", err)
+		oldCluster := cluster.DeepCopy()
+		kuberneteshelper.AddFinalizer(cluster, cleanupFinalizer)
+		if err := r.Patch(ctx, cluster, ctrlruntimeclient.MergeFromWithOptions(oldCluster, ctrlruntimeclient.MergeFromWithOptimisticLock{})); err != nil {
+			return fmt.Errorf("failed to update cluster after adding cleanup finalizer: %w", err)
 		}
 	}
 
@@ -293,10 +292,6 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, clus
 	}
 
 	return reconciling.ReconcileCronJobs(ctx, []reconciling.NamedCronJobCreatorGetter{r.cronjob(cluster)}, metav1.NamespaceSystem, r.Client)
-}
-
-func (r *Reconciler) patchCluster(ctx context.Context, cluster *kubermaticv1.Cluster, modify func(*kubermaticv1.Cluster)) error {
-	return kuberneteshelper.PatchCluster(ctx, cluster, r.Client, modify)
 }
 
 func (r *Reconciler) getEtcdSecretName(cluster *kubermaticv1.Cluster) string {

@@ -41,7 +41,6 @@ import (
 	ossubnets "github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
 	"github.com/gophercloud/gophercloud/pagination"
 	"k8c.io/kubermatic/v2/pkg/provider"
-	"k8c.io/kubermatic/v2/pkg/resources"
 )
 
 const (
@@ -374,16 +373,15 @@ func attachSubnetToRouter(netClient *gophercloud.ServiceClient, subnetID, router
 	return interf, ignoreRouterAlreadyHasPortInSubnetError(err, subnetID)
 }
 
-func createDefaultServerGroup(creds resources.OpenstackCredentials, cluster, authURL, region string) (*osservergroups.ServerGroup, error) {
-	// Create default soft-anti-affinity server group and register finalizer to clean up
-	client, err := getComputeClient(creds.Username, creds.Password, creds.Domain, creds.Tenant, creds.TenantID, authURL, region)
-	if err != nil {
-		return nil, err
-	}
+func createDefaultServerGroup(computeClient *gophercloud.ServiceClient, cluster string) (*osservergroups.ServerGroup, error) {
 	// Microversion 2.15 or later required for 'soft-anti-affinity'
-	client.Microversion = "2.15"
+	microVersionBefore := computeClient.Microversion
+	computeClient.Microversion = "2.15"
+	defer func() {
+		computeClient.Microversion = microVersionBefore
+	}()
 
-	sg, err := osservergroups.Create(client, osservergroups.CreateOpts{
+	sg, err := osservergroups.Create(computeClient, osservergroups.CreateOpts{
 		Name:     fmt.Sprintf("cluster-%s-servergroup", cluster),
 		Policies: []string{"soft-anti-affinity"},
 	}).Extract()
@@ -506,8 +504,8 @@ func isNotFoundErr(err error) bool {
 	return false
 }
 
-func getRouterIDForSubnet(netClient *gophercloud.ServiceClient, subnetID, networkID string) (string, error) {
-	ports, err := getAllNetworkPorts(netClient, networkID)
+func getRouterIDForSubnet(netClient *gophercloud.ServiceClient, subnetID string) (string, error) {
+	ports, err := getAllNetworkPorts(netClient, subnetID)
 	if err != nil {
 		return "", fmt.Errorf("failed to list ports for subnet: %v", err)
 	}
@@ -515,20 +513,16 @@ func getRouterIDForSubnet(netClient *gophercloud.ServiceClient, subnetID, networ
 	for _, port := range ports {
 		if port.DeviceOwner == "network:router_interface" || port.DeviceOwner == "network:router_interface_distributed" {
 			// Check IP for the interface & check if the IP belongs to the subnet
-			for _, ip := range port.FixedIPs {
-				if ip.SubnetID == subnetID {
-					return port.DeviceID, nil
-				}
-			}
+			return port.DeviceID, nil
 		}
 	}
 
 	return "", nil
 }
 
-func getAllNetworkPorts(netClient *gophercloud.ServiceClient, networkID string) ([]osports.Port, error) {
+func getAllNetworkPorts(netClient *gophercloud.ServiceClient, subnetID string) ([]osports.Port, error) {
 	allPages, err := osports.List(netClient, osports.ListOpts{
-		NetworkID: networkID,
+		FixedIPs: []osports.FixedIPOpts{{SubnetID: subnetID}},
 	}).AllPages()
 	if err != nil {
 		return nil, err

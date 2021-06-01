@@ -69,15 +69,41 @@ const (
 
 // CloudProvider declares a set of methods for interacting with a cloud provider
 type CloudProvider interface {
-	InitializeCloudProvider(context.Context, *kubermaticv1.Cluster, ClusterUpdater) error
-	CleanUpCloudProvider(context.Context, *kubermaticv1.Cluster, ClusterUpdater) error
+	InitializeCloudProvider(*kubermaticv1.Cluster, ClusterUpdater) (*kubermaticv1.Cluster, error)
+	CleanUpCloudProvider(*kubermaticv1.Cluster, ClusterUpdater) (*kubermaticv1.Cluster, error)
 	DefaultCloudSpec(spec *kubermaticv1.CloudSpec) error
 	ValidateCloudSpec(spec kubermaticv1.CloudSpec) error
 	ValidateCloudSpecUpdate(oldSpec kubermaticv1.CloudSpec, newSpec kubermaticv1.CloudSpec) error
 }
 
+// UpdaterOption represent an option for the updater function.
+type UpdaterOption string
+
+const (
+	// UpdaterOptionOptimisticLock enables optimistic lock, to fail in case of
+	// potential conflict.
+	UpdaterOptionOptimisticLock UpdaterOption = "OptimisticLock"
+)
+
+// UpdaterOptions holds the options for the updater function.
+type UpdaterOptions struct {
+	OptimisticLock bool
+}
+
+func (c *UpdaterOptions) Apply(opts ...UpdaterOption) *UpdaterOptions {
+	for _, o := range opts {
+		switch o {
+		case UpdaterOptionOptimisticLock:
+			c.OptimisticLock = true
+		default:
+			panic(fmt.Sprintf("unrecognised cluster updater option: %s", o))
+		}
+	}
+	return c
+}
+
 // ClusterUpdater defines a function to persist an update to a cluster
-type ClusterUpdater func(context.Context, *kubermaticv1.Cluster, func(*kubermaticv1.Cluster)) error
+type ClusterUpdater func(string, func(*kubermaticv1.Cluster), ...UpdaterOption) (*kubermaticv1.Cluster, error)
 
 // ClusterListOptions allows to set filters that will be applied to filter the result.
 type ClusterListOptions struct {
