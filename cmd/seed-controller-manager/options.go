@@ -151,7 +151,7 @@ func newControllerRunOptions() (controllerRunOptions, error) {
 	flag.BoolVar(&c.inClusterPrometheusDisableDefaultScrapingConfigs, "in-cluster-prometheus-disable-default-scraping-configs", false, "A flag indicating whether the default scraping configs for the prometheus running in the cluster-foo namespaces should be deployed.")
 	flag.StringVar(&c.inClusterPrometheusScrapingConfigsFile, "in-cluster-prometheus-scraping-configs-file", "", "The file containing the custom scraping configs for the prometheus running in the cluster-foo namespaces.")
 	flag.StringVar(&c.inClusterPrometheusRemoteWriteConfigsFile, "in-cluster-prometheus-remote-write-configs-file", "", "The file containing the remote write configurations for the prometheus running in the customer cluster namespaces.")
-	flag.StringVar(&c.monitoringEnvironmentLabel, "monitoring-environment-label", "", "The label for monitoring environment label. Default: ''")
+	flag.StringVar(&c.monitoringEnvironmentLabel, "monitoring-environment-label", "", "The value is to be set for prometheus config's external label 'metakube_environment'. Default: ''")
 	flag.StringVar(&c.monitoringScrapeAnnotationPrefix, "monitoring-scrape-annotation-prefix", "monitoring.kubermatic.io", "The prefix for monitoring annotations in the user cluster. Default: monitoring.kubermatic.io -> monitoring.kubermatic.io/port, monitoring.kubermatic.io/path")
 	flag.Var(&c.featureGates, "feature-gates", "A set of key=value pairs that describe feature gates for various features.")
 	flag.StringVar(&c.oidcCAFile, "oidc-ca-file", "", "The path to the certificate for the CA that signed your identity provider’s web certificate.")

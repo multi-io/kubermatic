@@ -67,8 +67,12 @@ func SeedControllerManagerDeploymentCreator(workerName string, versions kubermat
 				"-admissionwebhook-cert-dir=/opt/webhook-serving-cert/",
 				fmt.Sprintf("-backup-container=/opt/backup/%s", storeContainerKey),
 				fmt.Sprintf("-cleanup-container=/opt/backup/%s", cleanupContainerKey),
+				fmt.Sprintf("-backup-delete-container=/opt/backup/%s", backupDeleteContainerKey),
 				fmt.Sprintf("-admissionwebhook-cert-name=%s", resources.ServingCertSecretKey),
 				fmt.Sprintf("-admissionwebhook-key-name=%s", resources.ServingCertKeySecretKey),
+				fmt.Sprintf("-keycloak-cache-expiry=%s", cfg.Spec.SeedController.KeycloakCacheExpiry),
+				fmt.Sprintf("-monitoring-environment-label=%s", cfg.Spec.SeedController.MonitoringEnvironmentLabel),
+				fmt.Sprintf("-default-component-settings=/opt/cluster-default-component-settings/%s", defaultComponentSettingsConfigKey),
 				fmt.Sprintf("-namespace=%s", cfg.Namespace),
 				fmt.Sprintf("-external-url=%s", cfg.Spec.Ingress.Domain),
 				fmt.Sprintf("-datacenter-name=%s", seed.Name),
@@ -135,6 +139,16 @@ func SeedControllerManagerDeploymentCreator(workerName string, versions kubermat
 						},
 					},
 				},
+				{
+					Name: "default-cluster-component-settings",
+					VolumeSource: corev1.VolumeSource{
+						ConfigMap: &corev1.ConfigMapVolumeSource{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: defaultComponentSettingsConfigMapName,
+							},
+						},
+					},
+				},
 			}
 
 			volumeMounts := []corev1.VolumeMount{
@@ -151,6 +165,11 @@ func SeedControllerManagerDeploymentCreator(workerName string, versions kubermat
 				{
 					Name:      "webhook-serving-cert",
 					MountPath: "/opt/webhook-serving-cert/",
+					ReadOnly:  true,
+				},
+				{
+					Name:      "default-cluster-component-settings",
+					MountPath: "/opt/cluster-default-component-settings/",
 					ReadOnly:  true,
 				},
 			}
@@ -300,7 +319,7 @@ func SeedControllerManagerDeploymentCreator(workerName string, versions kubermat
 			d.Spec.Template.Spec.Volumes = volumes
 			d.Spec.Template.Spec.InitContainers = []corev1.Container{
 				createKubernetesAddonsInitContainer(cfg.Spec.UserCluster.Addons.Kubernetes, sharedAddonVolume, versions.Kubermatic),
-				createOpenshiftAddonsInitContainer(cfg.Spec.UserCluster.Addons.Openshift, sharedAddonVolume, versions.Kubermatic),
+				//Sys11 disable openshift: createOpenshiftAddonsInitContainer(cfg.Spec.UserCluster.Addons.Openshift, sharedAddonVolume, versions.Kubermatic),
 			}
 			d.Spec.Template.Spec.Containers = []corev1.Container{
 				{
@@ -309,6 +328,7 @@ func SeedControllerManagerDeploymentCreator(workerName string, versions kubermat
 					Command: []string{"seed-controller-manager"},
 					Args:    args,
 					Env:     common.ProxyEnvironmentVars(cfg),
+					EnvFrom: common.EnvFromSecretNames(cfg.Spec.SeedController.EnvFromSecretsNames),
 					Ports: []corev1.ContainerPort{
 						{
 							Name:          "metrics",
@@ -344,23 +364,24 @@ func createKubernetesAddonsInitContainer(cfg operatorv1alpha1.KubermaticAddonCon
 	}
 }
 
-func createOpenshiftAddonsInitContainer(cfg operatorv1alpha1.KubermaticAddonConfiguration, addonVolume string, version string) corev1.Container {
-	return corev1.Container{
-		Name:    "copy-addons-openshift",
-		Image:   cfg.DockerRepository + ":" + getAddonDockerTag(cfg, version),
-		Command: []string{"/bin/sh"},
-		Args: []string{
-			"-c",
-			"mkdir -p /opt/addons/openshift && cp -r /addons/* /opt/addons/openshift",
-		},
-		VolumeMounts: []corev1.VolumeMount{
-			{
-				Name:      addonVolume,
-				MountPath: "/opt/addons/",
-			},
-		},
-	}
-}
+// Sys11: we don't use openshift so we comment this function to avoid dead code lint errors
+//func createOpenshiftAddonsInitContainer(cfg operatorv1alpha1.KubermaticAddonConfiguration, addonVolume string, version string) corev1.Container {
+//	return corev1.Container{
+//		Name:    "copy-addons-openshift",
+//		Image:   cfg.DockerRepository + ":" + getAddonDockerTag(cfg, version),
+//		Command: []string{"/bin/sh"},
+//		Args: []string{
+//			"-c",
+//			"mkdir -p /opt/addons/openshift && cp -r /addons/* /opt/addons/openshift",
+//		},
+//		VolumeMounts: []corev1.VolumeMount{
+//			{
+//				Name:      addonVolume,
+//				MountPath: "/opt/addons/",
+//			},
+//		},
+//	}
+//}
 
 func getAddonDockerTag(cfg operatorv1alpha1.KubermaticAddonConfiguration, version string) string {
 	if cfg.DockerTagSuffix != "" {

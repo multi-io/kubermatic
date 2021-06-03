@@ -287,7 +287,7 @@ func ClustersMutatingAdmissionWebhookCreator(cfg *operatorv1alpha1.KubermaticCon
 							Name:      SeedWebhookServiceName,
 							Namespace: cfg.Namespace,
 							Port:      pointer.Int32Ptr(443),
-							Path:      pointer.StringPtr(cluster.ClusterDefaultComponentSettingsPath),
+							Path:      pointer.StringPtr(cluster.DefaultComponentSettingsPath),
 						},
 					},
 					NamespaceSelector: &metav1.LabelSelector{

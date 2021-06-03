@@ -18,8 +18,8 @@ import (
 )
 
 const (
-	// ClusterDefaultComponentSettingsPath is a path to register webhook at.
-	ClusterDefaultComponentSettingsPath = "/mutate-kubermatic-k8s-io-cluster"
+	// DefaultComponentSettingsPath is a path to register webhook at.
+	DefaultComponentSettingsPath = "/mutate-kubermatic-k8s-io-cluster"
 
 	fieldJSONPath = "/spec/componentsOverride"
 )
@@ -142,5 +142,5 @@ func (h *AdmissionHandler) Handle(ctx context.Context, req webhook.AdmissionRequ
 }
 
 func (h *AdmissionHandler) SetupWebhookWithManager(mgr ctrl.Manager) {
-	mgr.GetWebhookServer().Register(ClusterDefaultComponentSettingsPath, &webhook.Admission{Handler: h})
+	mgr.GetWebhookServer().Register(DefaultComponentSettingsPath, &webhook.Admission{Handler: h})
 }
