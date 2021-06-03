@@ -107,9 +107,11 @@ type kubermaticValues struct {
 			Kubernetes addonValues `yaml:"kubernetes"`
 			Openshift  addonValues `yaml:"openshift"`
 		} `yaml:"addons"`
-		OverwriteRegistry string                      `yaml:"overwriteRegistry"`
-		WorkerCount       int                         `yaml:"workerCount"`
-		Resources         corev1.ResourceRequirements `yaml:"resources"`
+		OverwriteRegistry   string                      `yaml:"overwriteRegistry"`
+		WorkerCount         int                         `yaml:"workerCount"`
+		Resources           corev1.ResourceRequirements `yaml:"resources"`
+		KeycloakCacheExpiry string                      `yaml:"keycloakCacheExpiry"`
+		EnvSecrets          []string                    `yaml:"envSecrets"`
 	} `yaml:"controller"`
 	API struct {
 		FeatureGates     string                      `yaml:"featureGates"`
@@ -118,6 +120,7 @@ type kubermaticValues struct {
 		Image            dockerImage                 `yaml:"image"`
 		PProfEndpoint    string                      `yaml:"pprofEndpoint"`
 		Resources        corev1.ResourceRequirements `yaml:"resources"`
+		EnvSecrets       []string                    `yaml:"envSecrets"`
 	} `yaml:"api"`
 	UI struct {
 		Replicas  *string                     `yaml:"replicas"`
@@ -135,12 +138,17 @@ type kubermaticValues struct {
 	} `yaml:"masterController"`
 	StoreContainer             string `yaml:"storeContainer"`
 	CleanupContainer           string `yaml:"cleanupContainer"`
+	DeleteContainer            string `yaml:"deleteContainer"`
 	ClusterNamespacePrometheus struct {
 		DisableDefaultScrapingConfigs bool          `yaml:"disableDefaultScrapingConfigs"`
 		ScrapingConfigs               []interface{} `yaml:"scrapingConfigs"`
+		RemoteWriteConfigs            []interface{} `yaml:"remoteWriteConfigs"`
 		DisableDefaultRules           bool          `yaml:"disableDefaultRules"`
 		Rules                         interface{}   `yaml:"rules"`
 	} `yaml:"clusterNamespacePrometheus"`
+	MonitoringEnvironmentLabel string                 `yaml:"monitoringEnvironmentLabel"`
+	EtcdLauncherImage          string                 `yaml:"etcdLauncherImage"`
+	DefaultComponentSettings   map[string]interface{} `yaml:"defaultComponentSettings"`
 }
 
 type Options struct {
@@ -403,11 +411,12 @@ func convertAPI(values *kubermaticValues) (*operatorv1alpha1.KubermaticAPIConfig
 	}
 
 	return &operatorv1alpha1.KubermaticAPIConfiguration{
-		DockerRepository: strIfChanged(values.API.Image.Repository, resources.DefaultKubermaticImage),
-		AccessibleAddons: values.API.AccessibleAddons,
-		PProfEndpoint:    getPProfEndpoint(values.API.PProfEndpoint),
-		Replicas:         replicas,
-		Resources:        convertResources(values.API.Resources, common.DefaultAPIResources),
+		DockerRepository:    strIfChanged(values.API.Image.Repository, resources.DefaultKubermaticImage),
+		AccessibleAddons:    values.API.AccessibleAddons,
+		PProfEndpoint:       getPProfEndpoint(values.API.PProfEndpoint),
+		Replicas:            replicas,
+		Resources:           convertResources(values.API.Resources, common.DefaultAPIResources),
+		EnvFromSecretsNames: values.API.EnvSecrets,
 	}, nil
 }
 
@@ -435,14 +444,24 @@ func convertSeedController(values *kubermaticValues) (*operatorv1alpha1.Kubermat
 		}
 	}
 
+	defaultComponentSettingsEncoded, err := yaml.Marshal(values.DefaultComponentSettings)
+	if err != nil {
+		return nil, fmt.Errorf("encode defaultComponentSettings")
+	}
+
 	return &operatorv1alpha1.KubermaticSeedControllerConfiguration{
-		MaximumParallelReconciles: maxParallelReconciles,
-		DockerRepository:          strIfChanged(values.Controller.Image.Repository, resources.DefaultKubermaticImage),
-		BackupStoreContainer:      storeContainer,
-		BackupCleanupContainer:    cleanupContainer,
-		PProfEndpoint:             getPProfEndpoint(values.Controller.PProfEndpoint),
-		Replicas:                  replicas,
-		Resources:                 convertResources(values.Controller.Resources, common.DefaultSeedControllerMgrResources),
+		MaximumParallelReconciles:           maxParallelReconciles,
+		DockerRepository:                    strIfChanged(values.Controller.Image.Repository, resources.DefaultKubermaticImage),
+		BackupStoreContainer:                storeContainer,
+		BackupCleanupContainer:              cleanupContainer,
+		BackupDeleteContainer:               strings.TrimSpace(values.DeleteContainer),
+		PProfEndpoint:                       getPProfEndpoint(values.Controller.PProfEndpoint),
+		Replicas:                            replicas,
+		Resources:                           convertResources(values.Controller.Resources, common.DefaultSeedControllerMgrResources),
+		KeycloakCacheExpiry:                 strings.TrimSpace(values.Controller.KeycloakCacheExpiry),
+		MonitoringEnvironmentLabel:          strings.TrimSpace(values.MonitoringEnvironmentLabel),
+		DefaultClusterComponentSettingsYAML: string(defaultComponentSettingsEncoded),
+		EnvFromSecretsNames:                 values.Controller.EnvSecrets,
 	}, nil
 }
 
@@ -477,6 +496,16 @@ func convertUserCluster(values *kubermaticValues) (*operatorv1alpha1.KubermaticU
 		customScrapingConfigs = string(encoded)
 	}
 
+	customRemoteWriteConfigs := ""
+	if values.ClusterNamespacePrometheus.RemoteWriteConfigs != nil {
+		encoded, err := yaml.Marshal(values.ClusterNamespacePrometheus.RemoteWriteConfigs)
+		if err != nil {
+			return nil, fmt.Errorf("encode Prometheus remote write configs as YAML: %v", err)
+		}
+
+		customRemoteWriteConfigs = string(encoded)
+	}
+
 	apiserverReplicas, err := getReplicas(values.APIServerDefaultReplicas, common.DefaultAPIServerReplicas)
 	if err != nil {
 		return nil, fmt.Errorf("invalid apiserverDefaultReplicas: %v", err)
@@ -485,6 +514,7 @@ func convertUserCluster(values *kubermaticValues) (*operatorv1alpha1.KubermaticU
 	return &operatorv1alpha1.KubermaticUserClusterConfiguration{
 		KubermaticDockerRepository:     strIfChanged(values.KubermaticImage, resources.DefaultKubermaticImage),
 		DNATControllerDockerRepository: strIfChanged(values.DNATControllerImage, resources.DefaultDNATControllerImage),
+		EtcdLauncherDockerRepository:   values.EtcdLauncherImage,
 		NodePortRange:                  strIfChanged(values.Controller.NodeportRange, common.DefaultNodePortRange),
 		EtcdVolumeSize:                 strIfChanged(values.Etcd.DiskSize, common.DefaultEtcdVolumeSize),
 		OverwriteRegistry:              values.Controller.OverwriteRegistry,
@@ -498,6 +528,7 @@ func convertUserCluster(values *kubermaticValues) (*operatorv1alpha1.KubermaticU
 			DisableDefaultScrapingConfigs: values.ClusterNamespacePrometheus.DisableDefaultScrapingConfigs,
 			CustomRules:                   customRules,
 			CustomScrapingConfigs:         customScrapingConfigs,
+			CustomRemoteWriteConfigs:      customRemoteWriteConfigs,
 		},
 		DisableAPIServerEndpointReconciling: values.APIServerEndpointReconcilingDisabled,
 		APIServerReplicas:                   apiserverReplicas,
@@ -543,6 +574,7 @@ func convertUI(values *kubermaticValues) (*operatorv1alpha1.KubermaticUIConfigur
 
 	return &operatorv1alpha1.KubermaticUIConfiguration{
 		DockerRepository: strIfChanged(values.UI.Image.Repository, resources.DefaultDashboardImage),
+		DockerTag:        values.UI.Image.Tag,
 		Config:           values.UI.Config,
 		Replicas:         replicas,
 		Resources:        convertResources(values.UI.Resources, common.DefaultUIResources),

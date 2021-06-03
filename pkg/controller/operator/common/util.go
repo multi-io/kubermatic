@@ -228,3 +228,18 @@ func ProxyEnvironmentVars(cfg *operatorv1alpha1.KubermaticConfiguration) []corev
 
 	return result
 }
+
+// EnvFromSecretNames builds EnvFromSource slice for list of secret names.
+func EnvFromSecretNames(names []string) []corev1.EnvFromSource {
+	var ret []corev1.EnvFromSource
+	for _, n := range names {
+		ret = append(ret, corev1.EnvFromSource{
+			SecretRef: &corev1.SecretEnvSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: n,
+				},
+			},
+		})
+	}
+	return ret
+}

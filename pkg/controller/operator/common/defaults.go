@@ -591,7 +591,10 @@ func defaultDockerRepo(repo *string, defaultRepo string, key string, logger *zap
 	}
 
 	if _, ok := ref.(reference.Tagged); ok {
-		return fmt.Errorf("it is not allowed to specify an image tag for the %s repository", key)
+		// Sys11: We set etcdLauncher image with tag to protect from undesired recreation of etcds
+		if key != "userCluster.etcdLauncher.DockerRepository" {
+			return fmt.Errorf("it is not allowed to specify an image tag for the %s repository", key)
+		}
 	}
 
 	return nil

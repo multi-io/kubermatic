@@ -163,6 +163,7 @@ func APIDeploymentCreator(cfg *operatorv1alpha1.KubermaticConfiguration, workerN
 					Command: []string{"kubermatic-api"},
 					Args:    args,
 					Env:     common.ProxyEnvironmentVars(cfg),
+					EnvFrom: common.EnvFromSecretNames(cfg.Spec.API.EnvFromSecretsNames),
 					Ports: []corev1.ContainerPort{
 						{
 							Name:          "metrics",

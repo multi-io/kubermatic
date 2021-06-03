@@ -29,6 +29,11 @@ func (in *KubermaticAPIConfiguration) DeepCopyInto(out *KubermaticAPIConfigurati
 		*out = new(int32)
 		**out = **in
 	}
+	if in.EnvFromSecretsNames != nil {
+		in, out := &in.EnvFromSecretsNames, &out.EnvFromSecretsNames
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
@@ -280,6 +285,11 @@ func (in *KubermaticSeedControllerConfiguration) DeepCopyInto(out *KubermaticSee
 		in, out := &in.Replicas, &out.Replicas
 		*out = new(int32)
 		**out = **in
+	}
+	if in.EnvFromSecretsNames != nil {
+		in, out := &in.EnvFromSecretsNames, &out.EnvFromSecretsNames
+		*out = make([]string, len(*in))
+		copy(*out, *in)
 	}
 	return
 }
