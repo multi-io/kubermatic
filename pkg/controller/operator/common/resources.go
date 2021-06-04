@@ -265,7 +265,7 @@ func ClustersMutatingAdmissionWebhookCreator(cfg *operatorv1alpha1.KubermaticCon
 		return ClustersMutatingAdmissionWebhookName(cfg), func(hook *admissionregistrationv1.MutatingWebhookConfiguration) (*admissionregistrationv1.MutatingWebhookConfiguration, error) {
 			matchPolicy := admissionregistrationv1.Exact
 			failurePolicy := admissionregistrationv1.Fail
-			sideEffects := admissionregistrationv1.SideEffectClassUnknown
+			sideEffects := admissionregistrationv1.SideEffectClassSome
 			scope := admissionregistrationv1.AllScopes
 
 			ca, err := WebhookCABundle(cfg, client)
