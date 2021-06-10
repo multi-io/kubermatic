@@ -444,24 +444,18 @@ func convertSeedController(values *kubermaticValues) (*operatorv1alpha1.Kubermat
 		}
 	}
 
-	defaultComponentSettingsEncoded, err := yaml.Marshal(values.DefaultComponentSettings)
-	if err != nil {
-		return nil, fmt.Errorf("encode defaultComponentSettings")
-	}
-
 	return &operatorv1alpha1.KubermaticSeedControllerConfiguration{
-		MaximumParallelReconciles:           maxParallelReconciles,
-		DockerRepository:                    strIfChanged(values.Controller.Image.Repository, resources.DefaultKubermaticImage),
-		BackupStoreContainer:                storeContainer,
-		BackupCleanupContainer:              cleanupContainer,
-		BackupDeleteContainer:               strings.TrimSpace(values.DeleteContainer),
-		PProfEndpoint:                       getPProfEndpoint(values.Controller.PProfEndpoint),
-		Replicas:                            replicas,
-		Resources:                           convertResources(values.Controller.Resources, common.DefaultSeedControllerMgrResources),
-		KeycloakCacheExpiry:                 strings.TrimSpace(values.Controller.KeycloakCacheExpiry),
-		MonitoringEnvironmentLabel:          strings.TrimSpace(values.MonitoringEnvironmentLabel),
-		DefaultClusterComponentSettingsYAML: string(defaultComponentSettingsEncoded),
-		EnvFromSecretsNames:                 values.Controller.EnvSecrets,
+		MaximumParallelReconciles:  maxParallelReconciles,
+		DockerRepository:           strIfChanged(values.Controller.Image.Repository, resources.DefaultKubermaticImage),
+		BackupStoreContainer:       storeContainer,
+		BackupCleanupContainer:     cleanupContainer,
+		BackupDeleteContainer:      strings.TrimSpace(values.DeleteContainer),
+		PProfEndpoint:              getPProfEndpoint(values.Controller.PProfEndpoint),
+		Replicas:                   replicas,
+		Resources:                  convertResources(values.Controller.Resources, common.DefaultSeedControllerMgrResources),
+		KeycloakCacheExpiry:        strings.TrimSpace(values.Controller.KeycloakCacheExpiry),
+		MonitoringEnvironmentLabel: strings.TrimSpace(values.MonitoringEnvironmentLabel),
+		EnvFromSecretsNames:        values.Controller.EnvSecrets,
 	}, nil
 }
 
