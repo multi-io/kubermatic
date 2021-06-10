@@ -129,7 +129,7 @@ func (h *AdmissionHandler) Handle(ctx context.Context, req webhook.AdmissionRequ
 		settings.Prometheus.Resources = h.settings.Prometheus.Resources
 	}
 
-	return webhook.Patched("default componentsOverride",
+	response := webhook.Patched("default componentsOverride",
 		jsonpatch.Operation{
 			Operation: "remove",
 			Path:      fieldJSONPath,
@@ -139,6 +139,8 @@ func (h *AdmissionHandler) Handle(ctx context.Context, req webhook.AdmissionRequ
 			Path:      fieldJSONPath,
 			Value:     settings,
 		})
+	response.UID = req.UID
+	return response
 }
 
 func (h *AdmissionHandler) SetupWebhookWithManager(mgr ctrl.Manager) {
