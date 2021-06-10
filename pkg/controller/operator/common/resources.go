@@ -22,7 +22,6 @@ import (
 
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	operatorv1alpha1 "k8c.io/kubermatic/v2/pkg/crd/operator/v1alpha1"
-	"k8c.io/kubermatic/v2/pkg/mutation/cluster"
 	"k8c.io/kubermatic/v2/pkg/resources"
 	"k8c.io/kubermatic/v2/pkg/resources/certificates"
 	"k8c.io/kubermatic/v2/pkg/resources/certificates/servingcerthelper"
@@ -245,67 +244,6 @@ func SeedAdmissionWebhookCreator(cfg *operatorv1alpha1.KubermaticConfiguration, 
 							},
 							Operations: []admissionregistrationv1.OperationType{
 								admissionregistrationv1.OperationAll,
-							},
-						},
-					},
-				},
-			}
-
-			return hook, nil
-		}
-	}
-}
-
-func ClustersMutatingAdmissionWebhookName(cfg *operatorv1alpha1.KubermaticConfiguration) string {
-	return fmt.Sprintf("kubermatic-seeds-clusters-default-components-overrides-%s", cfg.Namespace)
-}
-
-func ClustersMutatingAdmissionWebhookCreator(cfg *operatorv1alpha1.KubermaticConfiguration, client ctrlruntimeclient.Client) reconciling.NamedMutatingWebhookConfigurationCreatorGetter {
-	return func() (string, reconciling.MutatingWebhookConfigurationCreator) {
-		return ClustersMutatingAdmissionWebhookName(cfg), func(hook *admissionregistrationv1.MutatingWebhookConfiguration) (*admissionregistrationv1.MutatingWebhookConfiguration, error) {
-			matchPolicy := admissionregistrationv1.Exact
-			failurePolicy := admissionregistrationv1.Fail
-			sideEffects := admissionregistrationv1.SideEffectClassSome
-			scope := admissionregistrationv1.AllScopes
-
-			ca, err := WebhookCABundle(cfg, client)
-			if err != nil {
-				return nil, fmt.Errorf("cannot find Seed Admission CA bundle: %v", err)
-			}
-
-			hook.Webhooks = []admissionregistrationv1.MutatingWebhook{
-				{
-					Name:                    "clusters.kubermatic.io", // this should be a FQDN
-					AdmissionReviewVersions: []string{admissionregistrationv1.SchemeGroupVersion.Version},
-					MatchPolicy:             &matchPolicy,
-					FailurePolicy:           &failurePolicy,
-					SideEffects:             &sideEffects,
-					TimeoutSeconds:          pointer.Int32Ptr(30),
-					ClientConfig: admissionregistrationv1.WebhookClientConfig{
-						CABundle: ca,
-						Service: &admissionregistrationv1.ServiceReference{
-							Name:      SeedWebhookServiceName,
-							Namespace: cfg.Namespace,
-							Port:      pointer.Int32Ptr(443),
-							Path:      pointer.StringPtr(cluster.DefaultComponentSettingsPath),
-						},
-					},
-					NamespaceSelector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							NameLabel: cfg.Namespace,
-						},
-					},
-					ObjectSelector: &metav1.LabelSelector{},
-					Rules: []admissionregistrationv1.RuleWithOperations{
-						{
-							Rule: admissionregistrationv1.Rule{
-								APIGroups:   []string{kubermaticv1.GroupName},
-								APIVersions: []string{"*"},
-								Resources:   []string{"clusters"},
-								Scope:       &scope,
-							},
-							Operations: []admissionregistrationv1.OperationType{
-								admissionregistrationv1.Create,
 							},
 						},
 					},

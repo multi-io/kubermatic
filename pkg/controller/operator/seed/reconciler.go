@@ -576,7 +576,7 @@ func (r *Reconciler) reconcileAdmissionWebhooks(cfg *operatorv1alpha1.Kubermatic
 	log.Debug("reconciling AdmissionWebhooks")
 
 	mutCreators := []reconciling.NamedMutatingWebhookConfigurationCreatorGetter{
-		common.ClustersMutatingAdmissionWebhookCreator(cfg, client),
+		kubermaticseed.ClustersMutatingAdmissionWebhookCreator(cfg, client),
 	}
 
 	if err := reconciling.ReconcileMutatingWebhookConfigurations(r.ctx, mutCreators, "", client); err != nil {
