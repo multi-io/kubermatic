@@ -7,8 +7,9 @@ import (
 	"testing"
 	"text/template"
 
+	admissionv1 "k8s.io/api/admission/v1"
+
 	logrtesting "github.com/go-logr/logr/testing"
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/pointer"
@@ -80,13 +81,13 @@ func TestHandle(t *testing.T) {
 	handler := AdmissionHandler{
 		log:     &logrtesting.NullLogger{},
 		decoder: newDecoder(t),
-		client: fake.NewFakeClient(
+		client: fake.NewClientBuilder().WithObjects(
 			&kubermaticv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 				Spec: kubermaticv1.ClusterSpec{},
-			}),
+			}).Build(),
 		settings: kubermaticv1.ComponentSettings{
 			Etcd: kubermaticv1.EtcdStatefulSetSettings{
 				DeploymentSettings: kubermaticv1.DeploymentSettings{
@@ -97,13 +98,13 @@ func TestHandle(t *testing.T) {
 	}
 
 	res := handler.Handle(context.Background(), webhook.AdmissionRequest{
-		AdmissionRequest: admissionv1beta1.AdmissionRequest{
+		AdmissionRequest: admissionv1.AdmissionRequest{
 			RequestKind: &metav1.GroupVersionKind{
 				Group:   kubermaticv1.GroupName,
 				Version: kubermaticv1.GroupVersion,
 				Kind:    "Cluster",
 			},
-			Operation: admissionv1beta1.Create,
+			Operation: admissionv1.Create,
 			Object: runtime.RawExtension{
 				Raw: rawClusterGen{Name: "foo", Namespace: "default"}.Do(),
 			},

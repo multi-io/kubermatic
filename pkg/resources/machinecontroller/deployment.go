@@ -52,7 +52,7 @@ var (
 
 const (
 	Name = "machine-controller"
-	Tag  = "v1.24.4-sys11-4"
+	Tag  = "v1.27.6-sys11-1"
 
 	NodeLocalDNSCacheAddress = "169.254.20.10"
 )
@@ -103,7 +103,9 @@ func DeploymentCreatorWithoutInitWrapper(data machinecontrollerData) reconciling
 			}
 			dep.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: resources.ImagePullSecretName}}
 
-			volumes := []corev1.Volume{getKubeconfigVolume()}
+			volumes := []corev1.Volume{getKubeconfigVolume(), getCABundleVolume()}
+			dep.Spec.Template.Spec.Volumes = volumes
+
 			podLabels, err := data.GetPodTemplateLabels(Name, volumes, nil)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create pod labels: %v", err)
@@ -118,8 +120,6 @@ func DeploymentCreatorWithoutInitWrapper(data machinecontrollerData) reconciling
 				},
 			}
 
-			dep.Spec.Template.Spec.Volumes = volumes
-
 			clusterDNSIP := NodeLocalDNSCacheAddress
 			if !data.NodeLocalDNSCacheEnabled() {
 				clusterDNSIP, err = resources.UserClusterDNSResolverIP(data.Cluster())
@@ -133,15 +133,13 @@ func DeploymentCreatorWithoutInitWrapper(data machinecontrollerData) reconciling
 				return nil, err
 			}
 
-			externalCloudProvider := data.Cluster().Spec.Features[kubermaticv1.ClusterFeatureExternalCloudProvider]
-
 			dep.Spec.Template.Spec.InitContainers = []corev1.Container{}
 			dep.Spec.Template.Spec.Containers = []corev1.Container{
 				{
 					Name:    Name,
 					Image:   data.ImageRegistry(resources.RegistryDocker) + "/syseleven/machine-controller:" + Tag,
 					Command: []string{"/usr/local/bin/machine-controller"},
-					Args:    getFlags(clusterDNSIP, data.DC().Node, externalCloudProvider, data.GetCSIMigrationFeatureGates()),
+					Args:    getFlags(clusterDNSIP, data.DC().Node),
 					Env: append(envVars, corev1.EnvVar{
 						Name:  "KUBECONFIG",
 						Value: "/etc/kubernetes/kubeconfig/kubeconfig",
@@ -166,6 +164,11 @@ func DeploymentCreatorWithoutInitWrapper(data machinecontrollerData) reconciling
 							MountPath: "/etc/kubernetes/kubeconfig",
 							ReadOnly:  true,
 						},
+						{
+							Name:      resources.CABundleConfigMapName,
+							MountPath: "/etc/kubernetes/pki/ca-bundle",
+							ReadOnly:  true,
+						},
 					},
 				},
 			}
@@ -176,17 +179,6 @@ func DeploymentCreatorWithoutInitWrapper(data machinecontrollerData) reconciling
 
 			return dep, nil
 		}
-	}
-}
-
-func getKubeconfigVolume() corev1.Volume {
-	return corev1.Volume{
-		Name: resources.MachineControllerKubeconfigSecretName,
-		VolumeSource: corev1.VolumeSource{
-			Secret: &corev1.SecretVolumeSource{
-				SecretName: resources.MachineControllerKubeconfigSecretName,
-			},
-		},
 	}
 }
 
@@ -247,7 +239,7 @@ func getEnvVars(data machinecontrollerData) ([]corev1.EnvVar, error) {
 	return vars, nil
 }
 
-func getFlags(clusterDNSIP string, nodeSettings *kubermaticv1.NodeSettings, externalCloudProvider bool, featureGates []string) []string {
+func getFlags(clusterDNSIP string, nodeSettings *kubermaticv1.NodeSettings) []string {
 	flags := []string{
 		"-kubeconfig", "/etc/kubernetes/kubeconfig/kubeconfig",
 		"-logtostderr",
@@ -256,6 +248,7 @@ func getFlags(clusterDNSIP string, nodeSettings *kubermaticv1.NodeSettings, exte
 		"-cluster-dns", clusterDNSIP,
 		"-health-probe-address", "0.0.0.0:8085",
 		"-metrics-address", "0.0.0.0:8080",
+		"-ca-bundle", "/etc/kubernetes/pki/ca-bundle/ca-bundle.pem",
 	}
 
 	if nodeSettings != nil {
@@ -279,13 +272,6 @@ func getFlags(clusterDNSIP string, nodeSettings *kubermaticv1.NodeSettings, exte
 		if nodeSettings.HyperkubeImage != "" {
 			flags = append(flags, "-node-hyperkube-image", nodeSettings.HyperkubeImage)
 		}
-	}
-
-	if externalCloudProvider {
-		flags = append(flags, "-external-cloud-provider=true")
-	}
-	if len(featureGates) > 0 {
-		flags = append(flags, "-node-kubelet-feature-gates", strings.Join(append(featureGates, "RotateKubeletServerCertificate=true"), ","))
 	}
 
 	return flags

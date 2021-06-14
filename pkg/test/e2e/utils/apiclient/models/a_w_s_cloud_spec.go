@@ -25,6 +25,9 @@ type AWSCloudSpec struct {
 	// instance profile name
 	InstanceProfileName string `json:"instanceProfileName,omitempty"`
 
+	// openstack billing tenant
+	OpenstackBillingTenant string `json:"openstackBillingTenant,omitempty"`
+
 	// DEPRECATED. Don't care for the role name. We only require the ControlPlaneRoleARN to be set so the control plane
 	// can perform the assume-role.
 	// We keep it for backwards compatibility (We use this name for cleanup purpose).

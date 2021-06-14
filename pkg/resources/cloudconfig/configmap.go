@@ -129,6 +129,10 @@ func CloudConfig(
 	case cloud.Openstack != nil:
 		manageSecurityGroups := dc.Spec.Openstack.ManageSecurityGroups
 		trustDevicePath := dc.Spec.Openstack.TrustDevicePath
+		useOctavia := dc.Spec.Openstack.UseOctavia
+		if cluster.Spec.Cloud.Openstack.UseOctavia != nil {
+			useOctavia = cluster.Spec.Cloud.Openstack.UseOctavia
+		}
 		openstackCloudConfig := &openstack.CloudConfig{
 			Global: openstack.GlobalOpts{
 				AuthURL:    dc.Spec.Openstack.AuthURL,
@@ -146,6 +150,7 @@ func CloudConfig(
 			},
 			LoadBalancer: openstack.LoadBalancerOpts{
 				ManageSecurityGroups: manageSecurityGroups == nil || *manageSecurityGroups,
+				UseOctavia:           useOctavia,
 			},
 			Version: cluster.Spec.Version.String(),
 		}

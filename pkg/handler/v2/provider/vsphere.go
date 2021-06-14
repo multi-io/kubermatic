@@ -18,6 +18,8 @@ package provider
 
 import (
 	"context"
+	"crypto/x509"
+	"fmt"
 	"net/http"
 
 	"github.com/go-kit/kit/endpoint"
@@ -27,20 +29,81 @@ import (
 	"k8c.io/kubermatic/v2/pkg/handler/v1/common"
 	"k8c.io/kubermatic/v2/pkg/handler/v2/cluster"
 	"k8c.io/kubermatic/v2/pkg/provider"
+	"k8c.io/kubermatic/v2/pkg/util/errors"
 )
 
-func VsphereNetworksWithClusterCredentialsEndpoint(projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, seedsGetter provider.SeedsGetter, userInfoGetter provider.UserInfoGetter) endpoint.Endpoint {
+func VsphereNetworksWithClusterCredentialsEndpoint(projectProvider provider.ProjectProvider,
+	privilegedProjectProvider provider.PrivilegedProjectProvider, seedsGetter provider.SeedsGetter,
+	userInfoGetter provider.UserInfoGetter, caBundle *x509.CertPool) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(vSphereNoCredentialsReq)
-		return providercommon.VsphereNetworksWithClusterCredentialsEndpoint(ctx, userInfoGetter, projectProvider, privilegedProjectProvider, seedsGetter, req.ProjectID, req.ClusterID)
+		return providercommon.VsphereNetworksWithClusterCredentialsEndpoint(ctx, userInfoGetter, projectProvider,
+			privilegedProjectProvider, seedsGetter, req.ProjectID, req.ClusterID, caBundle)
 	}
 }
 
-func VsphereFoldersWithClusterCredentialsEndpoint(projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, seedsGetter provider.SeedsGetter, userInfoGetter provider.UserInfoGetter) endpoint.Endpoint {
+func VsphereFoldersWithClusterCredentialsEndpoint(projectProvider provider.ProjectProvider,
+	privilegedProjectProvider provider.PrivilegedProjectProvider, seedsGetter provider.SeedsGetter,
+	userInfoGetter provider.UserInfoGetter, caBundle *x509.CertPool) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(vSphereNoCredentialsReq)
-		return providercommon.VsphereFoldersWithClusterCredentialsEndpoint(ctx, userInfoGetter, projectProvider, privilegedProjectProvider, seedsGetter, req.ProjectID, req.ClusterID)
+		return providercommon.VsphereFoldersWithClusterCredentialsEndpoint(ctx, userInfoGetter, projectProvider,
+			privilegedProjectProvider, seedsGetter, req.ProjectID, req.ClusterID, caBundle)
 	}
+}
+
+func VsphereDatastoreEndpoint(seedsGetter provider.SeedsGetter, presetsProvider provider.PresetProvider,
+	userInfoGetter provider.UserInfoGetter, caBundle *x509.CertPool) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (interface{}, error) {
+		req, ok := request.(vSphereDatastoresReq)
+		if !ok {
+			return nil, fmt.Errorf("incorrect type of request, expected = VSphereFoldersReq, got = %T", request)
+		}
+		userInfo, err := userInfoGetter(ctx, "")
+		if err != nil {
+			return nil, common.KubernetesErrorToHTTPError(err)
+		}
+		username := req.Username
+		password := req.Password
+
+		if len(req.Credential) > 0 {
+			preset, err := presetsProvider.GetPreset(userInfo, req.Credential)
+			if err != nil {
+				return nil, errors.New(http.StatusInternalServerError, fmt.Sprintf("can not get preset %s for user %s", req.Credential, userInfo.Email))
+			}
+			if credentials := preset.Spec.VSphere; credentials != nil {
+				username = credentials.Username
+				password = credentials.Password
+			}
+		}
+
+		return providercommon.GetVsphereDatastoreList(userInfo, seedsGetter, username, password, req.DatacenterName, caBundle)
+	}
+}
+
+// VSphereFoldersReq represent a request for vsphere datastores
+// swagger:parameters listVSphereDatastores
+type vSphereDatastoresReq struct {
+	// in: header
+	Username string
+	// in: header
+	Password string
+	// in: header
+	DatacenterName string
+	// in: header
+	// Credential predefined Kubermatic credential name from the presets
+	Credential string
+}
+
+func DecodeVSphereDatastoresReq(_ context.Context, r *http.Request) (interface{}, error) {
+	var req vSphereDatastoresReq
+
+	req.Username = r.Header.Get("Username")
+	req.Password = r.Header.Get("Password")
+	req.DatacenterName = r.Header.Get("DatacenterName")
+	req.Credential = r.Header.Get("Credential")
+
+	return req, nil
 }
 
 // vSphereNoCredentialsReq represent a request for vsphere networks

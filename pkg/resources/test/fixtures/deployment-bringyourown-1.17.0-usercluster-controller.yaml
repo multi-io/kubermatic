@@ -24,6 +24,7 @@ spec:
       creationTimestamp: null
       labels:
         app: usercluster-controller
+        ca-bundle-configmap-revision: "123456"
         cluster: de-test-01
         internal-admin-kubeconfig-secret-revision: "123456"
     spec:
@@ -39,7 +40,7 @@ spec:
         - -timeout
         - "1"
         - -command
-        - '{"command":"/usr/local/bin/user-cluster-controller-manager","args":["-kubeconfig","/etc/kubernetes/kubeconfig/kubeconfig","-metrics-listen-address","0.0.0.0:8085","-health-listen-address","0.0.0.0:8086","-namespace","$(NAMESPACE)","-cluster-url","https://jh8j81chn.europe-west3-c.dev.kubermatic.io:30000","-dns-cluster-ip","10.240.16.10","-openvpn-server-port","30003","-overwrite-registry","","-openshift=false","-version","1.17.0","-cloud-provider-name","","-owner-email","","-enable-ssh-key-agent=false","-opa-integration=false","--ipam-controller-network","192.168.1.1/24,192.168.1.1,8.8.8.8","-cluster-dns-domain","cluster.local","-node-labels","{\"my-label\":\"my-value\"}"]}'
+        - '{"command":"/usr/local/bin/user-cluster-controller-manager","args":["-kubeconfig","/etc/kubernetes/kubeconfig/kubeconfig","-metrics-listen-address","0.0.0.0:8085","-health-listen-address","0.0.0.0:8086","-namespace","$(NAMESPACE)","-cluster-url","https://jh8j81chn.europe-west3-c.dev.kubermatic.io:30000","-dns-cluster-ip","10.240.16.10","-openvpn-server-port","30003","-overwrite-registry","","-version","1.17.0","-cloud-provider-name","","-owner-email","","-enable-ssh-key-agent=false","-opa-integration=false","-user-cluster-monitoring=true","-user-cluster-logging=false","-ca-bundle=/opt/ca-bundle/ca-bundle.pem","--ipam-controller-network","192.168.1.1/24,192.168.1.1,8.8.8.8","-cluster-dns-domain","cluster.local","-node-labels","{\"my-label\":\"my-value\"}"]}'
         command:
         - /http-prober-bin/http-prober
         env:
@@ -53,7 +54,7 @@ spec:
         readinessProbe:
           failureThreshold: 5
           httpGet:
-            path: /ready
+            path: /readyz
             port: 8086
             scheme: HTTP
           periodSeconds: 5
@@ -70,6 +71,9 @@ spec:
         - mountPath: /etc/kubernetes/kubeconfig
           name: internal-admin-kubeconfig
           readOnly: true
+        - mountPath: /opt/ca-bundle/
+          name: ca-bundle
+          readOnly: true
         - mountPath: /http-prober-bin
           name: http-prober-bin
       imagePullSecrets:
@@ -79,7 +83,7 @@ spec:
         - /bin/cp
         - /usr/local/bin/http-prober
         - /http-prober-bin/http-prober
-        image: quay.io/kubermatic/http-prober:v0.3.1
+        image: quay.io/kubermatic/http-prober:v0.3.2
         name: copy-http-prober
         resources: {}
         volumeMounts:
@@ -90,6 +94,9 @@ spec:
       - name: internal-admin-kubeconfig
         secret:
           secretName: internal-admin-kubeconfig
+      - configMap:
+          name: ca-bundle
+        name: ca-bundle
       - emptyDir: {}
         name: http-prober-bin
 status: {}

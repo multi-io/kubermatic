@@ -19,11 +19,12 @@ package coredns
 import (
 	"fmt"
 
+	"k8c.io/kubermatic/v2/pkg/resources/dns"
+
 	"github.com/Masterminds/semver/v3"
 
 	sys11nodereadiness "k8c.io/kubermatic/v2/pkg/controller/sys11-node-readiness"
 	"k8c.io/kubermatic/v2/pkg/resources"
-	"k8c.io/kubermatic/v2/pkg/resources/dns"
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 
 	appsv1 "k8s.io/api/apps/v1"

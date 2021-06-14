@@ -20,12 +20,12 @@ import (
 	"context"
 	"time"
 
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
 	kubermaticapiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	kuberneteshelper "k8c.io/kubermatic/v2/pkg/kubernetes"
 	"k8c.io/kubermatic/v2/pkg/resources"
+
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 const (
@@ -44,12 +44,10 @@ func (r *Reconciler) reconcileCluster(ctx context.Context, cluster *kubermaticv1
 	}
 
 	if !kuberneteshelper.HasFinalizer(cluster, kubermaticapiv1.EtcdBackupConfigCleanupFinalizer) {
-		res, err := r.AddFinalizers(ctx, cluster, kubermaticapiv1.EtcdBackupConfigCleanupFinalizer)
-		if err != nil {
+		if err := r.updateCluster(ctx, cluster, func(c *kubermaticv1.Cluster) {
+			kuberneteshelper.AddFinalizer(c, kubermaticapiv1.EtcdBackupConfigCleanupFinalizer)
+		}); err != nil {
 			return nil, err
-		}
-		if !res.IsZero() {
-			return res, nil
 		}
 	}
 
@@ -89,6 +87,15 @@ func (r *Reconciler) reconcileCluster(ctx context.Context, cluster *kubermaticv1
 
 	if len(finalizers) > 0 {
 		return r.AddFinalizers(ctx, cluster, finalizers...)
+	}
+
+	if !kuberneteshelper.HasFinalizer(cluster, kubermaticapiv1.ClusterRoleBindingsCleanupFinalizer) {
+		err := r.updateCluster(ctx, cluster, func(c *kubermaticv1.Cluster) {
+			kuberneteshelper.AddFinalizer(c, kubermaticapiv1.ClusterRoleBindingsCleanupFinalizer)
+		})
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &reconcile.Result{}, nil

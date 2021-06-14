@@ -117,7 +117,6 @@ func openStackDeploymentCreator(data *resources.TemplateData) reconciling.NamedD
 				ccmContainerName:    osResourceRequirements.DeepCopy(),
 				openvpnSidecar.Name: openvpnSidecar.Resources.DeepCopy(),
 			}
-
 			err = resources.SetResourceRequirements(dep.Spec.Template.Spec.Containers, defResourceRequirements, nil, dep.Annotations)
 			if err != nil {
 				return nil, fmt.Errorf("failed to set resource requirements: %v", err)
@@ -139,6 +138,8 @@ func getOSFlags(data *resources.TemplateData) []string {
 	return flags
 }
 
+const latestCCMVersion = "1.20.2"
+
 func getOSVersion(version semver.Semver) (string, error) {
 	if version.Minor() < 17 {
 		return "", fmt.Errorf("Kubernetes version %s is not supported", version.String())
@@ -152,8 +153,12 @@ func getOSVersion(version semver.Semver) (string, error) {
 	// case 18:
 	// case 19:
 	//	return "1.19.2", nil
+	case 20:
+		return latestCCMVersion, nil
+	case 21:
+		return latestCCMVersion, nil
 	default:
-		return "1.19.2", nil
+		return latestCCMVersion, nil
 	}
 }
 
@@ -162,6 +167,8 @@ func getOSVersion(version semver.Semver) (string, error) {
 // This is not called for now, but it's here so we can use it later to automagically
 // enable external cloud controller support for supported versions.
 func OpenStackCloudControllerSupported(version semver.Semver) bool {
-	_, err := getOSVersion(version)
-	return err == nil
+	if _, err := getOSVersion(version); err != nil {
+		return false
+	}
+	return true
 }

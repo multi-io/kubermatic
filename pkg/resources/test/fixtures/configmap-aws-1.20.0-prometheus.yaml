@@ -9,7 +9,7 @@ data:
         cluster: "de-test-01"
         seed_cluster: "testdc"
         metakube_cluster: "testdc"
-        metakube_environment: "testenv"
+        metakube_environment: ""
 
     rule_files:
     - "/etc/prometheus/config/rules*.yaml"
@@ -228,15 +228,6 @@ data:
     #######################################################################
     # custom scraping configurations
 
-    - job_name: custom-test-config
-      scheme: https
-      metrics_path: '/metrics'
-      static_configs:
-      - targets:
-        - 'foo.bar:12345'
-    #######################################################################
-    # custom remote write configurations
-    remote_write:
     - job_name: custom-test-config
       scheme: https
       metrics_path: '/metrics'
@@ -538,22 +529,6 @@ data:
         annotations:
           message: Kubernetes apiserver has disappeared from Prometheus target discovery.
         expr: absent(up{job="apiserver"} == 1)
-        for: 15m
-        labels:
-          severity: critical
-
-      - alert: KubernetesControllerManagerDown
-        annotations:
-          message: Kubernetes controller-manager has disappeared from Prometheus target discovery.
-        expr: absent(up{job="controller-manager"} == 1) and absent(up{job="openshift-controller-manager"} == 1)
-        for: 15m
-        labels:
-          severity: critical
-
-      - alert: KubernetesSchedulerDown
-        annotations:
-          message: Kubernetes scheduler has disappeared from Prometheus target discovery.
-        expr: absent(up{job="scheduler"} == 1) and absent(up{job="openshift-controller-manager"} == 1)
         for: 15m
         labels:
           severity: critical

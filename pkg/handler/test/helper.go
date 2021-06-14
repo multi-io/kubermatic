@@ -35,6 +35,7 @@ import (
 	constrainttemplatev1beta1 "github.com/open-policy-agent/frameworks/constraint/pkg/apis/templates/v1beta1"
 	gatekeeperconfigv1alpha1 "github.com/open-policy-agent/gatekeeper/apis/config/v1alpha1"
 	prometheusapi "github.com/prometheus/client_golang/api"
+	"k8s.io/utils/pointer"
 
 	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
 	apiv2 "k8c.io/kubermatic/v2/pkg/api/v2"
@@ -194,16 +195,25 @@ type newRoutingFunc func(
 	kubermaticVersions kubermatic.Versions,
 ) http.Handler
 
-func initTestEndpoint(user apiv1.User, seedsGetter provider.SeedsGetter, kubeObjects, machineObjects, kubermaticObjects []runtime.Object, versions []*version.Version, updates []*version.Update, routingFunc newRoutingFunc) (http.Handler, *ClientsSets, error) {
+func getRuntimeObjects(objs ...ctrlruntimeclient.Object) []runtime.Object {
+	runtimeObjects := []runtime.Object{}
+	for _, obj := range objs {
+		runtimeObjects = append(runtimeObjects, obj.(runtime.Object))
+	}
+
+	return runtimeObjects
+}
+
+func initTestEndpoint(user apiv1.User, seedsGetter provider.SeedsGetter, kubeObjects, machineObjects, kubermaticObjects []ctrlruntimeclient.Object, versions []*version.Version, updates []*version.Update, routingFunc newRoutingFunc) (http.Handler, *ClientsSets, error) {
 	if seedsGetter == nil {
 		seedsGetter = BuildSeeds()
 	}
 	allObjects := kubeObjects
 	allObjects = append(allObjects, machineObjects...)
 	allObjects = append(allObjects, kubermaticObjects...)
-	fakeClient := fakectrlruntimeclient.NewFakeClientWithScheme(scheme.Scheme, allObjects...)
-	kubermaticClient := kubermaticfakeclentset.NewSimpleClientset(kubermaticObjects...)
-	kubernetesClient := fakerestclient.NewSimpleClientset(kubeObjects...)
+	fakeClient := fakectrlruntimeclient.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(allObjects...).Build()
+	kubermaticClient := kubermaticfakeclentset.NewSimpleClientset(getRuntimeObjects(kubermaticObjects...)...)
+	kubernetesClient := fakerestclient.NewSimpleClientset(getRuntimeObjects(kubeObjects...)...)
 	fakeImpersonationClient := func(impCfg restclient.ImpersonationConfig) (ctrlruntimeclient.Client, error) {
 		return fakeClient, nil
 	}
@@ -213,7 +223,7 @@ func initTestEndpoint(user apiv1.User, seedsGetter provider.SeedsGetter, kubeObj
 	if err != nil {
 		return nil, nil, err
 	}
-	userProvider := kubernetes.NewUserProvider(fakeClient, kubernetes.IsServiceAccount, kubermaticClient)
+	userProvider := kubernetes.NewUserProvider(fakeClient, kubernetes.IsProjectServiceAccount, kubermaticClient)
 	adminProvider := kubernetes.NewAdminProvider(fakeClient)
 	settingsProvider := kubernetes.NewSettingsProvider(context.Background(), kubermaticClient, fakeClient)
 	addonConfigProvider := kubernetes.NewAddonConfigProvider(fakeClient)
@@ -227,7 +237,7 @@ func initTestEndpoint(user apiv1.User, seedsGetter provider.SeedsGetter, kubeObj
 		return nil, nil, err
 	}
 	serviceAccountProvider := kubernetes.NewServiceAccountProvider(fakeImpersonationClient, fakeClient, "localhost")
-	projectMemberProvider := kubernetes.NewProjectMemberProvider(fakeImpersonationClient, fakeClient, kubernetes.IsServiceAccount)
+	projectMemberProvider := kubernetes.NewProjectMemberProvider(fakeImpersonationClient, fakeClient, kubernetes.IsProjectServiceAccount)
 	userInfoGetter, err := provider.UserInfoGetterFactory(projectMemberProvider)
 	if err != nil {
 		return nil, nil, err
@@ -424,12 +434,12 @@ func (kc *testKeycloak) GetClientData(realmName string, clientID string) (*keycl
 }
 
 // CreateTestEndpointAndGetClients is a convenience function that instantiates fake providers and sets up routes  for the tests
-func CreateTestEndpointAndGetClients(user apiv1.User, seedsGetter provider.SeedsGetter, kubeObjects, machineObjects, kubermaticObjects []runtime.Object, versions []*version.Version, updates []*version.Update, routingFunc newRoutingFunc) (http.Handler, *ClientsSets, error) {
+func CreateTestEndpointAndGetClients(user apiv1.User, seedsGetter provider.SeedsGetter, kubeObjects, machineObjects, kubermaticObjects []ctrlruntimeclient.Object, versions []*version.Version, updates []*version.Update, routingFunc newRoutingFunc) (http.Handler, *ClientsSets, error) {
 	return initTestEndpoint(user, seedsGetter, kubeObjects, machineObjects, kubermaticObjects, versions, updates, routingFunc)
 }
 
 // CreateTestEndpoint does exactly the same as CreateTestEndpointAndGetClients except it omits ClientsSets when returning
-func CreateTestEndpoint(user apiv1.User, kubeObjects, kubermaticObjects []runtime.Object, versions []*version.Version, updates []*version.Update, routingFunc newRoutingFunc) (http.Handler, error) {
+func CreateTestEndpoint(user apiv1.User, kubeObjects, kubermaticObjects []ctrlruntimeclient.Object, versions []*version.Version, updates []*version.Update, routingFunc newRoutingFunc) (http.Handler, error) {
 	router, _, err := CreateTestEndpointAndGetClients(user, nil, kubeObjects, nil, kubermaticObjects, versions, updates, routingFunc)
 	return router, err
 }
@@ -437,7 +447,9 @@ func CreateTestEndpoint(user apiv1.User, kubeObjects, kubermaticObjects []runtim
 func GenTestSeed() *kubermaticv1.Seed {
 	return &kubermaticv1.Seed{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "us-central1",
+			Name:            "us-central1",
+			Namespace:       "kubermatic",
+			ResourceVersion: "999",
 		},
 		Spec: kubermaticv1.SeedSpec{
 			Location: "us-central",
@@ -529,6 +541,24 @@ func BuildSeeds() provider.SeedsGetter {
 		seeds := make(map[string]*kubermaticv1.Seed)
 		seeds["us-central1"] = GenTestSeed()
 		return seeds, nil
+	}
+}
+
+// CreateTestSeedsGetter creates a SeedsGetter only useful for generic tests,
+// as it does not follow the CE/EE conventions and always returns all Seeds.
+func CreateTestSeedsGetter(ctx context.Context, client ctrlruntimeclient.Client) provider.SeedsGetter {
+	listOpts := &ctrlruntimeclient.ListOptions{Namespace: "kubermatic"}
+
+	return func() (map[string]*kubermaticv1.Seed, error) {
+		seeds := &kubermaticv1.SeedList{}
+		if err := client.List(ctx, seeds, listOpts); err != nil {
+			return nil, fmt.Errorf("failed to list the seeds: %v", err)
+		}
+		seedMap := map[string]*kubermaticv1.Seed{}
+		for idx, seed := range seeds.Items {
+			seedMap[seed.Name] = &seeds.Items[idx]
+		}
+		return seedMap, nil
 	}
 }
 
@@ -641,8 +671,8 @@ func GenUser(id, name, email string) *kubermaticv1.User {
 	}
 }
 
-// GenInactiveServiceAccount generates a Service Account resource
-func GenInactiveServiceAccount(id, name, group, projectName string) *kubermaticv1.User {
+// GenInactiveProjectServiceAccount generates a Service Account resource
+func GenInactiveProjectServiceAccount(id, name, group, projectName string) *kubermaticv1.User {
 	user := GenUser(id, name, fmt.Sprintf("serviceaccount-%s@sa.kubermatic.io", id))
 	user.Labels = map[string]string{kubernetes.ServiceAccountLabelGroup: fmt.Sprintf("%s-%s", group, projectName)}
 	user.OwnerReferences = []metav1.OwnerReference{
@@ -660,10 +690,21 @@ func GenInactiveServiceAccount(id, name, group, projectName string) *kubermaticv
 	return user
 }
 
-func GenServiceAccount(id, name, group, projectName string) *kubermaticv1.User {
-	sa := GenInactiveServiceAccount(id, name, group, projectName)
+func GenProjectServiceAccount(id, name, group, projectName string) *kubermaticv1.User {
+	sa := GenInactiveProjectServiceAccount(id, name, group, projectName)
 	sa.Labels = map[string]string{}
 	return sa
+}
+
+func GenMainServiceAccount(id, name, group, ownerEmail string) *kubermaticv1.User {
+	user := GenUser(id, name, fmt.Sprintf("main-serviceaccount-%s@sa.kubermatic.io", id))
+	user.Labels = map[string]string{kubernetes.ServiceAccountLabelGroup: group}
+	user.Annotations = map[string]string{kubernetes.ServiceAccountAnnotationOwner: ownerEmail}
+
+	user.Spec.ID = id
+	user.Name = fmt.Sprintf("main-serviceaccount-%s", id)
+	user.UID = ""
+	return user
 }
 
 // GenAPIUser generates a API user
@@ -761,8 +802,8 @@ func GenDefaultOwnerBinding() *kubermaticv1.UserProjectBinding {
 }
 
 // GenDefaultKubermaticObjects generates default kubermatic object
-func GenDefaultKubermaticObjects(objs ...runtime.Object) []runtime.Object {
-	defaultsObjs := []runtime.Object{
+func GenDefaultKubermaticObjects(objs ...ctrlruntimeclient.Object) []ctrlruntimeclient.Object {
+	defaultsObjs := []ctrlruntimeclient.Object{
 		// add a project
 		GenDefaultProject(),
 		// add a user
@@ -1061,11 +1102,6 @@ func GenDefaultVersions() []*version.Version {
 			Default: false,
 			Type:    apiv1.KubernetesClusterType,
 		},
-		{
-			Version: ver.MustParse("4.1.0"),
-			Default: false,
-			Type:    apiv1.OpenShiftClusterType,
-		},
 	}
 }
 
@@ -1106,6 +1142,10 @@ func GenDefaultGlobalSettings() *kubermaticv1.KubermaticSetting {
 			DisplayAPIDocs:              true,
 			DisplayTermsOfService:       true,
 			EnableExternalClusterImport: true,
+			OpaOptions: kubermaticv1.OpaOptions{
+				Enabled:  true,
+				Enforced: true,
+			},
 		},
 	}
 }
@@ -1128,7 +1168,7 @@ func GenClusterWithOpenstack(cluster *kubermaticv1.Cluster) *kubermaticv1.Cluste
 	return cluster
 }
 
-func GenDefaultExternalClusterNodes() (*corev1.NodeList, error) {
+func GenDefaultExternalClusterNodes() ([]ctrlruntimeclient.Object, error) {
 	cpuQuantity, err := resource.ParseQuantity("290")
 	if err != nil {
 		return nil, err
@@ -1137,8 +1177,8 @@ func GenDefaultExternalClusterNodes() (*corev1.NodeList, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &corev1.NodeList{Items: []corev1.Node{
-		{
+	return []ctrlruntimeclient.Object{
+		&corev1.Node{
 			ObjectMeta: metav1.ObjectMeta{Name: "node1"},
 			Spec: corev1.NodeSpec{
 				PodCIDR:       "abc",
@@ -1164,7 +1204,7 @@ func GenDefaultExternalClusterNodes() (*corev1.NodeList, error) {
 				},
 			},
 		},
-		{
+		&corev1.Node{
 			ObjectMeta: metav1.ObjectMeta{Name: "node2"},
 			Spec: corev1.NodeSpec{
 				PodCIDR:       "def",
@@ -1190,7 +1230,7 @@ func GenDefaultExternalClusterNodes() (*corev1.NodeList, error) {
 				},
 			},
 		},
-	}}, nil
+	}, nil
 }
 
 func GenDefaultExternalClusterNode() (*corev1.Node, error) {
@@ -1257,6 +1297,21 @@ func GenDefaultConstraintTemplate(name string) apiv2.ConstraintTemplate {
         }`,
 				},
 			},
+			Selector: kubermaticv1.ConstraintTemplateSelector{
+				Providers: []string{"aws", "gcp"},
+				LabelSelector: metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "cluster",
+							Operator: metav1.LabelSelectorOpExists,
+						},
+					},
+					MatchLabels: map[string]string{
+						"deployment": "prod",
+						"domain":     "sales",
+					},
+				},
+			},
 		},
 	}
 }
@@ -1292,6 +1347,21 @@ func GenConstraintTemplate(name string) *kubermaticv1.ConstraintTemplate {
           count(missing) > 0
           msg := sprintf("you must provide labels: %v", [missing])
         }`,
+			},
+		},
+		Selector: kubermaticv1.ConstraintTemplateSelector{
+			Providers: []string{"aws", "gcp"},
+			LabelSelector: metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      "cluster",
+						Operator: metav1.LabelSelectorOpExists,
+					},
+				},
+				MatchLabels: map[string]string{
+					"deployment": "prod",
+					"domain":     "sales",
+				},
 			},
 		},
 	}
@@ -1472,6 +1542,7 @@ func GenDefaultAPIConstraint(name, kind string) apiv2.Constraint {
 					Name:              "gatekeeper",
 				},
 			},
+			Synced: pointer.BoolPtr(true),
 		},
 	}
 }

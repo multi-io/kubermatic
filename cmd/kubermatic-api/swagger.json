@@ -6851,6 +6851,32 @@
         }
       }
     },
+    "/api/v1/providers/alibaba/vswitches": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "alibaba"
+        ],
+        "summary": "Lists available Alibaba vSwitches.",
+        "operationId": "listAlibabaVSwitches",
+        "responses": {
+          "200": {
+            "description": "AlibabaVSwitchList",
+            "schema": {
+              "$ref": "#/definitions/AlibabaVSwitchList"
+            }
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
     "/api/v1/providers/alibaba/zones": {
       "get": {
         "produces": [
@@ -6888,6 +6914,87 @@
             "description": "AlibabaZoneList",
             "schema": {
               "$ref": "#/definitions/AlibabaZoneList"
+            }
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/providers/anexia/templates": {
+      "get": {
+        "description": "Lists templates from anexia",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "anexia"
+        ],
+        "operationId": "listAnexiaTemplates",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "Token",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "Credential",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "Location",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "AnexiaTemplateList",
+            "schema": {
+              "$ref": "#/definitions/AnexiaTemplateList"
+            }
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/providers/anexia/vlans": {
+      "get": {
+        "description": "Lists vlans from anexia",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "anexia"
+        ],
+        "operationId": "listAnexiaVlans",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "Token",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "Credential",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "AnexiaVlanList",
+            "schema": {
+              "$ref": "#/definitions/AnexiaVlanList"
             }
           },
           "default": {
@@ -11267,6 +11374,53 @@
         }
       }
     },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/providers/alibaba/vswitches": {
+      "get": {
+        "description": "Lists available Alibaba vSwitches",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "alibaba"
+        ],
+        "operationId": "listAlibabaVSwitchesNoCredentialsV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "Region",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "AlibabaVSwitchList",
+            "schema": {
+              "$ref": "#/definitions/AlibabaVSwitchList"
+            }
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
     "/api/v2/projects/{project_id}/clusters/{cluster_id}/providers/alibaba/zones": {
       "get": {
         "description": "Lists available Alibaba Instance Types",
@@ -11303,6 +11457,90 @@
             "description": "AlibabaZoneList",
             "schema": {
               "$ref": "#/definitions/AlibabaZoneList"
+            }
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/providers/anexia/templates": {
+      "get": {
+        "description": "Lists templates from Anexia",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "anexia"
+        ],
+        "operationId": "listAnexiaTemplatesNoCredentialsV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "AnexiaTemplateList",
+            "schema": {
+              "$ref": "#/definitions/AnexiaTemplateList"
+            }
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/providers/anexia/vlans": {
+      "get": {
+        "description": "Lists vlans from Anexia",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "anexia"
+        ],
+        "operationId": "listAnexiaVlansNoCredentialsV2",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "AnexiaVlanList",
+            "schema": {
+              "$ref": "#/definitions/AnexiaVlanList"
             }
           },
           "default": {
@@ -13510,6 +13748,57 @@
         }
       }
     },
+    "/api/v2/providers/vsphere/datastores": {
+      "get": {
+        "description": "Lists datastores from vsphere datacenter",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "vsphere"
+        ],
+        "operationId": "listVSphereDatastores",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "Username",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "Password",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "DatacenterName",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "Credential",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "VSphereDatastoreList",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/VSphereDatastoreList"
+              }
+            }
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
     "/api/v2/providers/{provider_name}/presets": {
       "get": {
         "description": "Lists presets for the provider",
@@ -13748,6 +14037,11 @@
           "x-go-name": "InstanceType",
           "example": "t2.micro"
         },
+        "isSpotInstance": {
+          "description": "IsSpotInstance indicates whether the created machine is an aws ec2 spot instance or on-demand ec2 instance.",
+          "type": "boolean",
+          "x-go-name": "IsSpotInstance"
+        },
         "subnetID": {
           "description": "The VPC subnet to which the node shall be connected.",
           "type": "string",
@@ -13787,6 +14081,11 @@
       "type": "object",
       "title": "AWSSize represents a object of AWS size.",
       "properties": {
+        "gpus": {
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "GPUs"
+        },
         "memory": {
           "type": "number",
           "format": "float",
@@ -14391,6 +14690,11 @@
           "format": "int64",
           "x-go-name": "CPUCoreCount"
         },
+        "gpuCoreCount": {
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "GPUCoreCount"
+        },
         "id": {
           "type": "string",
           "x-go-name": "ID"
@@ -14446,6 +14750,25 @@
           "type": "string",
           "x-go-name": "ZoneID"
         }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
+    },
+    "AlibabaVSwitch": {
+      "type": "object",
+      "title": "AlibabaVSwitch represents a object of Alibaba vSwitch.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "x-go-name": "ID"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
+    },
+    "AlibabaVSwitchList": {
+      "type": "array",
+      "title": "AlibabaVSwitchList represents an array of Alibaba vSwitches.",
+      "items": {
+        "$ref": "#/definitions/AlibabaVSwitch"
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
     },
@@ -14524,6 +14847,44 @@
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
     },
+    "AnexiaTemplate": {
+      "type": "object",
+      "title": "AnexiaTemplate represents a object of Anexia template.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "x-go-name": "ID"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
+    },
+    "AnexiaTemplateList": {
+      "type": "array",
+      "title": "AnexiaTemplateList represents an array of Anexia templates.",
+      "items": {
+        "$ref": "#/definitions/AnexiaTemplate"
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
+    },
+    "AnexiaVlan": {
+      "type": "object",
+      "title": "AnexiaVlan represents a object of Anexia Vlan.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "x-go-name": "ID"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
+    },
+    "AnexiaVlanList": {
+      "type": "array",
+      "title": "AnexiaVlanList represents an array of Anexia Vlans.",
+      "items": {
+        "$ref": "#/definitions/AnexiaVlan"
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
+    },
     "AuditLoggingSettings": {
       "type": "object",
       "properties": {
@@ -14598,6 +14959,10 @@
         "vnet": {
           "type": "string",
           "x-go-name": "VNetName"
+        },
+        "vnetResourceGroup": {
+          "type": "string",
+          "x-go-name": "VNetResourceGroup"
         }
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
@@ -14719,6 +15084,11 @@
           "type": "integer",
           "format": "int32",
           "x-go-name": "NumberOfCores"
+        },
+        "numberOfGPUs": {
+          "type": "integer",
+          "format": "int32",
+          "x-go-name": "NumberOfGPUs"
         },
         "osDiskSizeInMB": {
           "type": "integer",
@@ -14968,6 +15338,12 @@
         "etcd": {
           "$ref": "#/definitions/HealthStatus"
         },
+        "gatekeeperAudit": {
+          "$ref": "#/definitions/HealthStatus"
+        },
+        "gatekeeperController": {
+          "$ref": "#/definitions/HealthStatus"
+        },
         "machineController": {
           "$ref": "#/definitions/HealthStatus"
         },
@@ -15145,14 +15521,14 @@
           },
           "x-go-name": "MachineNetworks"
         },
+        "mla": {
+          "$ref": "#/definitions/MLASettings"
+        },
         "oidc": {
           "$ref": "#/definitions/OIDCSettings"
         },
         "opaIntegration": {
           "$ref": "#/definitions/OPAIntegrationSettings"
-        },
-        "openshift": {
-          "$ref": "#/definitions/Openshift"
         },
         "podNodeSelectorAdmissionPluginConfig": {
           "description": "PodNodeSelectorAdmissionPluginConfig provides the configuration for the PodNodeSelector.\nIt's used by the backend to create a configuration file for this plugin.\nThe key:value from the map is converted to the namespace:\u003cnode-selectors-labels\u003e in the file.\nThe format in a file:\npodNodeSelectorPluginConfig:\nclusterDefaultNodeSelector: \u003cnode-selectors-labels\u003e\nnamespace1: \u003cnode-selectors-labels\u003e\nnamespace2: \u003cnode-selectors-labels\u003e",
@@ -15254,6 +15630,10 @@
           "type": "string",
           "x-go-name": "Enforcement"
         },
+        "synced": {
+          "type": "boolean",
+          "x-go-name": "Synced"
+        },
         "violations": {
           "type": "array",
           "items": {
@@ -15281,12 +15661,33 @@
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
     },
+    "ConstraintTemplateSelector": {
+      "description": "ConstraintTemplateSelector is the object holding the cluster selection filters",
+      "type": "object",
+      "properties": {
+        "labelSelector": {
+          "$ref": "#/definitions/LabelSelector"
+        },
+        "providers": {
+          "description": "Providers is a list of cloud providers to which the Constraint Template applies to. Empty means all providers are selected.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-go-name": "Providers"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+    },
     "ConstraintTemplateSpec": {
       "description": "ConstraintTemplateSpec is the object representing the gatekeeper constraint template spec and kubermatic related spec",
       "type": "object",
       "properties": {
         "crd": {
           "$ref": "#/definitions/CRD"
+        },
+        "selector": {
+          "$ref": "#/definitions/ConstraintTemplateSelector"
         },
         "targets": {
           "type": "array",
@@ -15315,18 +15716,6 @@
         }
       },
       "x-go-package": "github.com/open-policy-agent/frameworks/constraint/pkg/apis/templates/v1beta1"
-    },
-    "ContainerLinuxSpec": {
-      "description": "ContainerLinuxSpec ubuntu linux specific settings",
-      "type": "object",
-      "properties": {
-        "disableAutoUpdate": {
-          "description": "disable container linux auto-update feature",
-          "type": "boolean",
-          "x-go-name": "DisableAutoUpdate"
-        }
-      },
-      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
     },
     "ControlPlaneMetrics": {
       "description": "ControlPlaneMetrics defines a metric for the user cluster control plane resources",
@@ -15718,6 +16107,14 @@
           },
           "x-go-name": "DNSServers"
         },
+        "enabled_flavors": {
+          "description": "Optional: List of enabled flavors for the given datacenter",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-go-name": "EnabledFlavors"
+        },
         "enforce_floating_ip": {
           "description": "Optional",
           "type": "boolean",
@@ -15752,6 +16149,11 @@
           "description": "Optional: Gets mapped to the \"trust-device-path\" setting in the cloud config.\nSee https://kubernetes.io/docs/concepts/cluster-administration/cloud-providers/#block-storage\nThis setting defaults to false.",
           "type": "boolean",
           "x-go-name": "TrustDevicePath"
+        },
+        "use_octavia": {
+          "description": "Optional: Gets mapped to the \"use-octavia\" setting in the cloud config.\nuse-octavia is enabled by default in CCM since v1.17.0, and disabled by\ndefault with the in-tree cloud provider.",
+          "type": "boolean",
+          "x-go-name": "UseOctavia"
         }
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
@@ -17018,6 +17420,22 @@
       },
       "x-go-package": "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/limits"
     },
+    "MLASettings": {
+      "type": "object",
+      "properties": {
+        "loggingEnabled": {
+          "description": "LoggingEnabled is the flag for enabling logging in user cluster.",
+          "type": "boolean",
+          "x-go-name": "LoggingEnabled"
+        },
+        "monitoringEnabled": {
+          "description": "MonitoringEnabled is the flag for enabling monitoring in user cluster.",
+          "type": "boolean",
+          "x-go-name": "MonitoringEnabled"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+    },
     "MachineDeploymentStatus": {
       "description": "[MachineDeploymentStatus]\nMachineDeploymentStatus defines the observed state of MachineDeployment",
       "type": "object",
@@ -17530,7 +17948,7 @@
           "$ref": "#/definitions/ProxyValue"
         },
         "hyperkube_image": {
-          "description": "Optional: The hyperkube image to use. Currently only Container Linux\nmakes use of this option.",
+          "description": "Optional: The hyperkube image to use. Currently only Flatcar\nmakes use of this option.",
           "type": "string",
           "x-go-name": "HyperkubeImage"
         },
@@ -17868,12 +18286,16 @@
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
     },
-    "Openshift": {
+    "OpaOptions": {
       "type": "object",
       "properties": {
-        "imagePullSecret": {
-          "type": "string",
-          "x-go-name": "ImagePullSecret"
+        "enabled": {
+          "type": "boolean",
+          "x-go-name": "Enabled"
+        },
+        "enforced": {
+          "type": "boolean",
+          "x-go-name": "Enforced"
         }
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
@@ -17943,6 +18365,11 @@
         "tenantID": {
           "type": "string",
           "x-go-name": "TenantID"
+        },
+        "useOctavia": {
+          "description": "Whether or not to use Octavia for LoadBalancer type of Service\nimplementation instead of using Neutron-LBaaS.\nAttention:Openstack CCM use Octavia as default load balancer\nimplementation since v1.17.0\n\nTakes precedence over the 'use_octavia' flag provided at datacenter\nlevel if both are specified.\n+optional",
+          "type": "boolean",
+          "x-go-name": "UseOctavia"
         },
         "username": {
           "type": "string",
@@ -18021,12 +18448,12 @@
           "x-go-name": "Image"
         },
         "instanceReadyCheckPeriod": {
-          "description": "Period of time to check for instance ready status",
+          "description": "Period of time to check for instance ready status, i.e. 10s/1m",
           "type": "string",
           "x-go-name": "InstanceReadyCheckPeriod"
         },
         "instanceReadyCheckTimeout": {
-          "description": "Max time to wait for the instance to be ready",
+          "description": "Max time to wait for the instance to be ready, i.e. 10s/1m",
           "type": "string",
           "x-go-name": "InstanceReadyCheckTimeout"
         },
@@ -18149,9 +18576,6 @@
       "properties": {
         "centos": {
           "$ref": "#/definitions/CentOSSpec"
-        },
-        "containerLinux": {
-          "$ref": "#/definitions/ContainerLinuxSpec"
         },
         "flatcar": {
           "$ref": "#/definitions/FlatcarSpec"
@@ -19190,6 +19614,9 @@
         "machineDeploymentVMResourceQuota": {
           "$ref": "#/definitions/MachineDeploymentVMResourceQuota"
         },
+        "opaOptions": {
+          "$ref": "#/definitions/OpaOptions"
+        },
         "restrictProjectCreation": {
           "type": "boolean",
           "x-go-name": "RestrictProjectCreation"
@@ -19432,6 +19859,10 @@
           "format": "int8",
           "x-go-name": "ItemsPerPage"
         },
+        "lastSeenChangelogVersion": {
+          "type": "string",
+          "x-go-name": "LastSeenChangelogVersion"
+        },
         "selectProjectTableView": {
           "type": "boolean",
           "x-go-name": "SelectProjectTableView"
@@ -19504,6 +19935,20 @@
         }
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+    },
+    "VSphereDatastoreList": {
+      "type": "object",
+      "title": "VSphereDatastoreList is the object representing a vsphere datastores.",
+      "properties": {
+        "datastores": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-go-name": "Datastores"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
     },
     "VSphereFolder": {
       "type": "object",

@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"time"
 
 	providerconfig "github.com/kubermatic/machine-controller/pkg/providerconfig/types"
 	httpproberapi "k8c.io/kubermatic/v2/cmd/http-prober/api"
@@ -48,6 +49,11 @@ const (
 	cloudProviderExternalFlag = "external"
 )
 
+type CABundle interface {
+	CertPool() *x509.CertPool
+	String() string
+}
+
 // TemplateData is a group of data required for template generation
 type TemplateData struct {
 	ctx                      context.Context
@@ -59,14 +65,15 @@ type TemplateData struct {
 	nodePortRange            string
 	nodeAccessNetwork        string
 	etcdDiskSize             resource.Quantity
-	oidcCAFile               string
 	oidcIssuerURL            string
 	oidcIssuerClientID       string
 	nodeLocalDNSCacheEnabled bool
 	kubermaticImage          string
 	etcdLauncherImage        string
 	dnatControllerImage      string
+	backupSchedule           time.Duration
 	versions                 kubermatic.Versions
+	caBundle                 CABundle
 
 	supportsFailureDomainZoneAntiAffinity bool
 
@@ -87,6 +94,26 @@ type TemplateDataBuilder struct {
 
 func NewTemplateDataBuilder() *TemplateDataBuilder {
 	return &TemplateDataBuilder{}
+}
+
+func (td *TemplateDataBuilder) WithMonitoringEnvironmentLabel(label string) *TemplateDataBuilder {
+	td.data.monitoringEnvironmentLabel = label
+	return td
+}
+
+func (td *TemplateDataBuilder) WithInClusterPrometheusRemoteWriteConfigsFile(file string) *TemplateDataBuilder {
+	td.data.inClusterPrometheusRemoteWriteConfigsFile = file
+	return td
+}
+
+func (td *TemplateDataBuilder) WithExternalURL(url string) *TemplateDataBuilder {
+	td.data.ExternalURL = url
+	return td
+}
+
+func (td *TemplateDataBuilder) WithKeycloakFacade(facade keycloak.Facade) *TemplateDataBuilder {
+	td.data.KeycloakFacade = facade
+	return td
 }
 
 func (td *TemplateDataBuilder) WithContext(ctx context.Context) *TemplateDataBuilder {
@@ -139,11 +166,6 @@ func (td *TemplateDataBuilder) WithMonitoringScrapeAnnotationPrefix(prefix strin
 	return td
 }
 
-func (td *TemplateDataBuilder) WithMonitoringEnvironmentLabel(label string) *TemplateDataBuilder {
-	td.data.monitoringEnvironmentLabel = label
-	return td
-}
-
 func (td *TemplateDataBuilder) WithInClusterPrometheusRulesFile(file string) *TemplateDataBuilder {
 	td.data.inClusterPrometheusRulesFile = file
 	return td
@@ -164,23 +186,8 @@ func (td *TemplateDataBuilder) WithInClusterPrometheusScrapingConfigsFile(file s
 	return td
 }
 
-func (td *TemplateDataBuilder) WithInClusterPrometheusRemoteWriteConfigsFile(file string) *TemplateDataBuilder {
-	td.data.inClusterPrometheusRemoteWriteConfigsFile = file
-	return td
-}
-
-func (td *TemplateDataBuilder) WithExternalURL(url string) *TemplateDataBuilder {
-	td.data.ExternalURL = url
-	return td
-}
-
-func (td *TemplateDataBuilder) WithKeycloakFacade(facade keycloak.Facade) *TemplateDataBuilder {
-	td.data.KeycloakFacade = facade
-	return td
-}
-
-func (td *TemplateDataBuilder) WithOIDCCAFile(file string) *TemplateDataBuilder {
-	td.data.oidcCAFile = file
+func (td *TemplateDataBuilder) WithCABundle(bundle CABundle) *TemplateDataBuilder {
+	td.data.caBundle = bundle
 	return td
 }
 
@@ -224,10 +231,10 @@ func (td *TemplateDataBuilder) WithFailureDomainZoneAntiaffinity(enabled bool) *
 	return td
 }
 
-//func (td *TemplateDataBuilder) WithBackupPeriod(backupPeriod time.Duration) *TemplateDataBuilder {
-//	td.data.backupSchedule = backupPeriod
-//	return td
-//}
+func (td *TemplateDataBuilder) WithBackupPeriod(backupPeriod time.Duration) *TemplateDataBuilder {
+	td.data.backupSchedule = backupPeriod
+	return td
+}
 
 func (td TemplateDataBuilder) Build() *TemplateData {
 	//TODO(irozzo): Add validation
@@ -255,15 +262,16 @@ func NewTemplateData(
 	inClusterPrometheusRemoteWriteConfigsFile string,
 	externalURL string,
 	keycloakFacade keycloak.Facade,
-	oidcCAFile string,
 	oidcURL string,
 	oidcIssuerClientID string,
 	nodeLocalDNSCacheEnabled bool,
 	kubermaticImage string,
 	etcdLauncherImage string,
 	dnatControllerImage string,
+	backupSchedule time.Duration,
 	supportsFailureDomainZoneAntiAffinity bool,
-	versions kubermatic.Versions) *TemplateData {
+	versions kubermatic.Versions,
+	caBundle CABundle) *TemplateData {
 	return &TemplateData{
 		ctx:                      ctx,
 		client:                   client,
@@ -274,14 +282,15 @@ func NewTemplateData(
 		nodePortRange:            nodePortRange,
 		nodeAccessNetwork:        nodeAccessNetwork,
 		etcdDiskSize:             etcdDiskSize,
-		oidcCAFile:               oidcCAFile,
 		oidcIssuerURL:            oidcURL,
 		oidcIssuerClientID:       oidcIssuerClientID,
 		nodeLocalDNSCacheEnabled: nodeLocalDNSCacheEnabled,
 		kubermaticImage:          kubermaticImage,
 		etcdLauncherImage:        etcdLauncherImage,
 		dnatControllerImage:      dnatControllerImage,
+		backupSchedule:           backupSchedule,
 		versions:                 versions,
+		caBundle:                 caBundle,
 
 		supportsFailureDomainZoneAntiAffinity: supportsFailureDomainZoneAntiAffinity,
 
@@ -306,14 +315,10 @@ func (d *TemplateData) GetViewerToken() (string, error) {
 	return string(viewerTokenSecret.Data[ViewerTokenSecretKey]), nil
 }
 
-// GetDexCA returns the chain of public certificates of the Dex
-func (d *TemplateData) GetDexCA() ([]*x509.Certificate, error) {
-	return GetDexCAFromFile(d.oidcCAFile)
-}
-
-// OIDCCAFile return CA file
-func (d *TemplateData) OIDCCAFile() string {
-	return d.oidcCAFile
+// GetCABundle returns the set of CA certificates that should be used
+// for all outgoing communication.
+func (d *TemplateData) CABundle() CABundle {
+	return d.caBundle
 }
 
 // OIDCIssuerURL returns URL of the OpenID token issuer
@@ -543,6 +548,10 @@ func (d *TemplateData) DNATControllerImage() string {
 	return d.ImageRegistry(registry) + "/" + imageWithoutRegistry
 }
 
+func (d *TemplateData) BackupSchedule() time.Duration {
+	return d.backupSchedule
+}
+
 func (d *TemplateData) DNATControllerTag() string {
 	return d.versions.Kubermatic
 }
@@ -558,11 +567,6 @@ func (d *TemplateData) GetGlobalSecretKeySelectorValue(configVar *providerconfig
 func (d *TemplateData) GetKubernetesCloudProviderName() string {
 	return GetKubernetesCloudProviderName(d.Cluster(),
 		d.Cluster().Spec.Features[kubermaticv1.ClusterFeatureExternalCloudProvider])
-}
-
-func (d *TemplateData) CloudCredentialSecretTemplate() ([]byte, error) {
-	// This is needed for Openshift only
-	return nil, nil
 }
 
 func (d *TemplateData) GetCSIMigrationFeatureGates() []string {
@@ -582,21 +586,21 @@ func (d *TemplateData) KCMCloudControllersDeactivated() bool {
 		return false
 	}
 	ready, _ := kubernetes.IsDeploymentRolloutComplete(&kcm, 0)
-	klog.Infof("controller-manager deployment rollout complete: %t", ready)
+	klog.V(4).Infof("controller-manager deployment rollout complete: %t", ready)
 	if c := getContainer(&kcm, ControllerManagerDeploymentName); c != nil {
 		if ok, cmd := UnwrapCommand(*c); ok {
-			klog.Infof("controller-manager command %v %d", cmd.Args, len(cmd.Args))
+			klog.V(4).Infof("controller-manager command %v %d", cmd.Args, len(cmd.Args))
 			// If no --cloud-provider flag is provided in-tree cloud provider
 			// is disabled.
-			if ok, val := getArgValue(cmd.Args, "--cloud-provider"); !ok || val == "external" {
-				klog.Info("in-tree cloud provider disabled in controller-manager deployment")
+			if ok, val := getArgValue(cmd.Args, "--cloud-provider"); !ok || val == cloudProviderExternalFlag {
+				klog.V(4).Info("in-tree cloud provider disabled in controller-manager deployment")
 				return ready
 			}
 
 			// Otherwise cloud countrollers could have been explicitly disabled
 			if ok, val := getArgValue(cmd.Args, "--controllers"); ok {
 				controllers := strings.Split(val, ",")
-				klog.Infof("cloud controllers disabled in controller-manager deployment %s", controllers)
+				klog.V(4).Infof("cloud controllers disabled in controller-manager deployment %s", controllers)
 				return ready && sets.NewString(controllers...).HasAll("-cloud-node-lifecycle", "-route", "-service")
 			}
 		}
@@ -607,7 +611,7 @@ func (d *TemplateData) KCMCloudControllersDeactivated() bool {
 
 func UnwrapCommand(container corev1.Container) (found bool, command httpproberapi.Command) {
 	for i, arg := range container.Args {
-		// klog.Infof("unwrap command processing arg: %s", arg)
+		// klog.V(4).Infof("unwrap command processing arg: %s", arg)
 		if arg == "-command" && i < len(container.Args)-1 {
 			if err := json.Unmarshal([]byte(container.Args[i+1]), &command); err != nil {
 				return
@@ -620,9 +624,9 @@ func UnwrapCommand(container corev1.Container) (found bool, command httpproberap
 
 func getArgValue(args []string, argName string) (bool, string) {
 	for i, arg := range args {
-		// klog.Infof("processing arg %s", arg)
+		// klog.V(4).Infof("processing arg %s", arg)
 		if arg == argName {
-			// klog.Infof("found argument %s", argName)
+			// klog.V(4).Infof("found argument %s", argName)
 			if i >= len(args)-1 {
 				return false, ""
 			}
@@ -653,7 +657,7 @@ func GetKubernetesCloudProviderName(cluster *kubermaticv1.Cluster, externalCloud
 		return "gce"
 	case cluster.Spec.Cloud.Openstack != nil:
 		if externalCloudProvider {
-			return "external"
+			return cloudProviderExternalFlag
 		}
 		return "openstack"
 	case cluster.Spec.Cloud.Hetzner != nil:

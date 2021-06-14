@@ -25,6 +25,8 @@ import (
 	"reflect"
 	"strings"
 
+	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
+
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 
@@ -35,7 +37,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/test-infra/pkg/genyaml"
 	"k8s.io/utils/pointer"
@@ -73,7 +74,7 @@ func main() {
 	files = append(files, filepath.Join(root, "vendor/k8s.io/api/core/v1/types.go"))
 
 	cm := genyaml.NewCommentMap(files...)
-	examples := map[string]runtime.Object{
+	examples := map[string]ctrlruntimeclient.Object{
 		"seed":                    createExampleSeed(),
 		"kubermaticConfiguration": createExampleKubermaticConfiguration(),
 	}
@@ -137,8 +138,10 @@ func createExampleSeed() *kubermaticv1.Seed {
 						Openstack: &kubermaticv1.DatacenterSpecOpenstack{
 							Images:               imageList,
 							ManageSecurityGroups: pointer.BoolPtr(true),
+							UseOctavia:           pointer.BoolPtr(true),
 							DNSServers:           []string{},
 							TrustDevicePath:      pointer.BoolPtr(false),
+							EnabledFlavors:       []string{},
 						},
 						Packet: &kubermaticv1.DatacenterSpecPacket{
 							Facilities: []string{},
@@ -216,8 +219,6 @@ func createExampleKubermaticConfiguration() *operatorv1alpha1.KubermaticConfigur
 	}
 
 	setUpdateDefaults(&defaulted.Spec.Versions.Kubernetes)
-	setUpdateDefaults(&defaulted.Spec.Versions.Openshift)
-
 	return defaulted
 }
 

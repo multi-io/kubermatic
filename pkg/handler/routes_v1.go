@@ -56,7 +56,6 @@ import (
 	kubernetesdashboard "k8c.io/kubermatic/v2/pkg/handler/v1/kubernetes-dashboard"
 	"k8c.io/kubermatic/v2/pkg/handler/v1/label"
 	"k8c.io/kubermatic/v2/pkg/handler/v1/node"
-	"k8c.io/kubermatic/v2/pkg/handler/v1/openshift"
 	"k8c.io/kubermatic/v2/pkg/handler/v1/presets"
 	"k8c.io/kubermatic/v2/pkg/handler/v1/project"
 	"k8c.io/kubermatic/v2/pkg/handler/v1/provider"
@@ -223,6 +222,18 @@ func (r Routing) RegisterV1(mux *mux.Router, metrics common.ServerMetrics) {
 	mux.Methods(http.MethodGet).
 		Path("/providers/alibaba/zones").
 		Handler(r.listAlibabaZones())
+
+	mux.Methods(http.MethodGet).
+		Path("/providers/alibaba/vswitches").
+		Handler(r.listAlibabaVSwitches())
+
+	mux.Methods(http.MethodGet).
+		Path("/providers/anexia/vlans").
+		Handler(r.listAnexiaVlans())
+
+	mux.Methods(http.MethodGet).
+		Path("/providers/anexia/templates").
+		Handler(r.listAnexiaTemplates())
 
 	mux.Methods(http.MethodGet).
 		Path("/providers/{provider_name}/presets/credentials").
@@ -580,14 +591,6 @@ func (r Routing) RegisterV1(mux *mux.Router, metrics common.ServerMetrics) {
 		Handler(r.listAlibabaZonesNoCredentials())
 
 	//
-	// Defines a set of openshift-specific endpoints
-	mux.Methods(http.MethodGet).
-		Path("/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/openshift/console/login").
-		Handler(r.openshiftConsoleLogin())
-	mux.PathPrefix("/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/openshift/console/proxy").
-		Handler(r.openshiftConsoleProxy())
-
-	//
 	// Defines a set of kubernetes-dashboard-specific endpoints
 	mux.PathPrefix("/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/dashboard/proxy").
 		Handler(r.kubernetesDashboardProxy())
@@ -798,7 +801,7 @@ func (r Routing) listAWSSizes() http.Handler {
 		endpoint.Chain(
 			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
 			middleware.UserSaver(r.userProvider),
-		)(provider.AWSSizeEndpoint()),
+		)(provider.AWSSizeEndpoint(r.settingsProvider)),
 		provider.DecodeAWSSizesReq,
 		EncodeJSON,
 		r.defaultServerOptions()...,
@@ -908,7 +911,7 @@ func (r Routing) listGCPSizes() http.Handler {
 		endpoint.Chain(
 			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
 			middleware.UserSaver(r.userProvider),
-		)(provider.GCPSizeEndpoint(r.presetsProvider, r.userInfoGetter)),
+		)(provider.GCPSizeEndpoint(r.presetsProvider, r.userInfoGetter, r.settingsProvider)),
 		provider.DecodeGCPTypesReq,
 		EncodeJSON,
 		r.defaultServerOptions()...,
@@ -996,7 +999,7 @@ func (r Routing) listDigitaloceanSizes() http.Handler {
 		endpoint.Chain(
 			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
 			middleware.UserSaver(r.userProvider),
-		)(provider.DigitaloceanSizeEndpoint(r.presetsProvider, r.userInfoGetter)),
+		)(provider.DigitaloceanSizeEndpoint(r.presetsProvider, r.userInfoGetter, r.settingsProvider)),
 		provider.DecodeDoSizesReq,
 		EncodeJSON,
 		r.defaultServerOptions()...,
@@ -1018,7 +1021,7 @@ func (r Routing) listAzureSizes() http.Handler {
 		endpoint.Chain(
 			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
 			middleware.UserSaver(r.userProvider),
-		)(provider.AzureSizeEndpoint(r.presetsProvider, r.userInfoGetter)),
+		)(provider.AzureSizeEndpoint(r.presetsProvider, r.userInfoGetter, r.settingsProvider)),
 		provider.DecodeAzureSizesReq,
 		EncodeJSON,
 		r.defaultServerOptions()...,
@@ -1062,7 +1065,7 @@ func (r Routing) listOpenstackSizes() http.Handler {
 		endpoint.Chain(
 			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
 			middleware.UserSaver(r.userProvider),
-		)(provider.OpenstackSizeEndpoint(r.seedsGetter, r.presetsProvider, r.userInfoGetter)),
+		)(provider.OpenstackSizeEndpoint(r.seedsGetter, r.presetsProvider, r.userInfoGetter, r.settingsProvider, r.caBundle)),
 		provider.DecodeOpenstackReq,
 		EncodeJSON,
 		r.defaultServerOptions()...,
@@ -1084,7 +1087,7 @@ func (r Routing) listVSphereNetworks() http.Handler {
 		endpoint.Chain(
 			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
 			middleware.UserSaver(r.userProvider),
-		)(provider.VsphereNetworksEndpoint(r.seedsGetter, r.presetsProvider, r.userInfoGetter)),
+		)(provider.VsphereNetworksEndpoint(r.seedsGetter, r.presetsProvider, r.userInfoGetter, r.caBundle)),
 		provider.DecodeVSphereNetworksReq,
 		EncodeJSON,
 		r.defaultServerOptions()...,
@@ -1106,7 +1109,7 @@ func (r Routing) listVSphereFolders() http.Handler {
 		endpoint.Chain(
 			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
 			middleware.UserSaver(r.userProvider),
-		)(provider.VsphereFoldersEndpoint(r.seedsGetter, r.presetsProvider, r.userInfoGetter)),
+		)(provider.VsphereFoldersEndpoint(r.seedsGetter, r.presetsProvider, r.userInfoGetter, r.caBundle)),
 		provider.DecodeVSphereFoldersReq,
 		EncodeJSON,
 		r.defaultServerOptions()...,
@@ -1128,7 +1131,7 @@ func (r Routing) listPacketSizes() http.Handler {
 		endpoint.Chain(
 			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
 			middleware.UserSaver(r.userProvider),
-		)(provider.PacketSizesEndpoint(r.presetsProvider, r.userInfoGetter)),
+		)(provider.PacketSizesEndpoint(r.presetsProvider, r.userInfoGetter, r.settingsProvider)),
 		provider.DecodePacketSizesReq,
 		EncodeJSON,
 		r.defaultServerOptions()...,
@@ -1152,7 +1155,7 @@ func (r Routing) listPacketSizesNoCredentials() http.Handler {
 			middleware.UserSaver(r.userProvider),
 			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
 			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-		)(provider.PacketSizesWithClusterCredentialsEndpoint(r.projectProvider, r.privilegedProjectProvider, r.userInfoGetter)),
+		)(provider.PacketSizesWithClusterCredentialsEndpoint(r.projectProvider, r.privilegedProjectProvider, r.userInfoGetter, r.settingsProvider)),
 		provider.DecodePacketSizesNoCredentialsReq,
 		EncodeJSON,
 		r.defaultServerOptions()...,
@@ -1174,7 +1177,7 @@ func (r Routing) listOpenstackTenants() http.Handler {
 		endpoint.Chain(
 			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
 			middleware.UserSaver(r.userProvider),
-		)(provider.OpenstackTenantEndpoint(r.seedsGetter, r.presetsProvider, r.userInfoGetter)),
+		)(provider.OpenstackTenantEndpoint(r.seedsGetter, r.presetsProvider, r.userInfoGetter, r.caBundle)),
 		provider.DecodeOpenstackTenantReq,
 		EncodeJSON,
 		r.defaultServerOptions()...,
@@ -1196,7 +1199,7 @@ func (r Routing) listOpenstackNetworks() http.Handler {
 		endpoint.Chain(
 			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
 			middleware.UserSaver(r.userProvider),
-		)(provider.OpenstackNetworkEndpoint(r.seedsGetter, r.presetsProvider, r.userInfoGetter)),
+		)(provider.OpenstackNetworkEndpoint(r.seedsGetter, r.presetsProvider, r.userInfoGetter, r.caBundle)),
 		provider.DecodeOpenstackReq,
 		EncodeJSON,
 		r.defaultServerOptions()...,
@@ -1218,7 +1221,7 @@ func (r Routing) listOpenstackSubnets() http.Handler {
 		endpoint.Chain(
 			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
 			middleware.UserSaver(r.userProvider),
-		)(provider.OpenstackSubnetsEndpoint(r.seedsGetter, r.presetsProvider, r.userInfoGetter)),
+		)(provider.OpenstackSubnetsEndpoint(r.seedsGetter, r.presetsProvider, r.userInfoGetter, r.caBundle)),
 		provider.DecodeOpenstackSubnetReq,
 		EncodeJSON,
 		r.defaultServerOptions()...,
@@ -1240,7 +1243,7 @@ func (r Routing) listOpenstackSecurityGroups() http.Handler {
 		endpoint.Chain(
 			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
 			middleware.UserSaver(r.userProvider),
-		)(provider.OpenstackSecurityGroupEndpoint(r.seedsGetter, r.presetsProvider, r.userInfoGetter)),
+		)(provider.OpenstackSecurityGroupEndpoint(r.seedsGetter, r.presetsProvider, r.userInfoGetter, r.caBundle)),
 		provider.DecodeOpenstackReq,
 		EncodeJSON,
 		r.defaultServerOptions()...,
@@ -1262,7 +1265,7 @@ func (r Routing) listOpenstackAvailabilityZones() http.Handler {
 		endpoint.Chain(
 			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
 			middleware.UserSaver(r.userProvider),
-		)(provider.OpenstackAvailabilityZoneEndpoint(r.seedsGetter, r.presetsProvider, r.userInfoGetter)),
+		)(provider.OpenstackAvailabilityZoneEndpoint(r.seedsGetter, r.presetsProvider, r.userInfoGetter, r.caBundle)),
 		provider.DecodeOpenstackReq,
 		EncodeJSON,
 		r.defaultServerOptions()...,
@@ -1284,7 +1287,7 @@ func (r Routing) listHetznerSizes() http.Handler {
 		endpoint.Chain(
 			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
 			middleware.UserSaver(r.userProvider),
-		)(provider.HetznerSizeEndpoint(r.presetsProvider, r.userInfoGetter)),
+		)(provider.HetznerSizeEndpoint(r.presetsProvider, r.userInfoGetter, r.settingsProvider)),
 		provider.DecodeHetznerSizesReq,
 		EncodeJSON,
 		r.defaultServerOptions()...,
@@ -1306,7 +1309,7 @@ func (r Routing) listAlibabaInstanceTypes() http.Handler {
 		endpoint.Chain(
 			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
 			middleware.UserSaver(r.userProvider),
-		)(provider.AlibabaInstanceTypesEndpoint(r.presetsProvider, r.userInfoGetter)),
+		)(provider.AlibabaInstanceTypesEndpoint(r.presetsProvider, r.userInfoGetter, r.settingsProvider)),
 		provider.DecodeAlibabaReq,
 		EncodeJSON,
 		r.defaultServerOptions()...,
@@ -1330,6 +1333,72 @@ func (r Routing) listAlibabaZones() http.Handler {
 			middleware.UserSaver(r.userProvider),
 		)(provider.AlibabaZonesEndpoint(r.presetsProvider, r.userInfoGetter)),
 		provider.DecodeAlibabaReq,
+		EncodeJSON,
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route GET /api/v1/providers/alibaba/vswitches alibaba listAlibabaVSwitches
+//
+// Lists available Alibaba vSwitches.
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       200: AlibabaVSwitchList
+func (r Routing) listAlibabaVSwitches() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+		)(provider.AlibabaVSwitchesEndpoint(r.presetsProvider, r.userInfoGetter)),
+		provider.DecodeAlibabaReq,
+		EncodeJSON,
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route GET /api/v1/providers/anexia/vlans anexia listAnexiaVlans
+//
+// Lists vlans from anexia
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       200: AnexiaVlanList
+func (r Routing) listAnexiaVlans() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+		)(provider.AnexiaVlanEndpoint(r.presetsProvider, r.userInfoGetter)),
+		provider.DecodeAnexiaReq,
+		EncodeJSON,
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route GET /api/v1/providers/anexia/templates anexia listAnexiaTemplates
+//
+// Lists templates from anexia
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       200: AnexiaTemplateList
+func (r Routing) listAnexiaTemplates() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+		)(provider.AnexiaTemplateEndpoint(r.presetsProvider, r.userInfoGetter)),
+		provider.DecodeAnexiaTemplateReq,
 		EncodeJSON,
 		r.defaultServerOptions()...,
 	)
@@ -1793,7 +1862,8 @@ func (r Routing) createCluster() http.Handler {
 			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
 			middleware.Keycloak(r.keycloakFacade),
 			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-		)(cluster.CreateEndpoint(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter, r.presetsProvider, r.exposeStrategy, r.userInfoGetter, r.settingsProvider, r.updateManager)),
+		)(cluster.CreateEndpoint(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter, r.presetsProvider,
+			r.exposeStrategy, r.userInfoGetter, r.settingsProvider, r.updateManager, r.caBundle)),
 		cluster.DecodeCreateReq,
 		SetStatusCreatedHeader(EncodeJSON),
 		r.defaultServerOptions()...,
@@ -1895,7 +1965,7 @@ func (r Routing) patchCluster() http.Handler {
 			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
 			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
 			middleware.Keycloak(r.keycloakFacade),
-		)(cluster.PatchEndpoint(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter, r.userInfoGetter)),
+		)(cluster.PatchEndpoint(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter, r.userInfoGetter, r.caBundle)),
 		cluster.DecodePatchReq,
 		EncodeJSON,
 		r.defaultServerOptions()...,
@@ -2706,7 +2776,7 @@ func (r Routing) listAWSSizesNoCredentials() http.Handler {
 			middleware.UserSaver(r.userProvider),
 			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
 			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-		)(provider.AWSSizeNoCredentialsEndpoint(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter, r.userInfoGetter)),
+		)(provider.AWSSizeNoCredentialsEndpoint(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter, r.settingsProvider, r.userInfoGetter)),
 		common.DecodeGetClusterReq,
 		EncodeJSON,
 		r.defaultServerOptions()...,
@@ -2754,7 +2824,7 @@ func (r Routing) listGCPSizesNoCredentials() http.Handler {
 			middleware.UserSaver(r.userProvider),
 			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
 			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-		)(provider.GCPSizeWithClusterCredentialsEndpoint(r.projectProvider, r.privilegedProjectProvider, r.userInfoGetter)),
+		)(provider.GCPSizeWithClusterCredentialsEndpoint(r.projectProvider, r.privilegedProjectProvider, r.userInfoGetter, r.settingsProvider)),
 		provider.DecodeGCPTypesNoCredentialReq,
 		EncodeJSON,
 		r.defaultServerOptions()...,
@@ -2874,7 +2944,7 @@ func (r Routing) listHetznerSizesNoCredentials() http.Handler {
 			middleware.UserSaver(r.userProvider),
 			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
 			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-		)(provider.HetznerSizeWithClusterCredentialsEndpoint(r.projectProvider, r.privilegedProjectProvider, r.userInfoGetter)),
+		)(provider.HetznerSizeWithClusterCredentialsEndpoint(r.projectProvider, r.privilegedProjectProvider, r.userInfoGetter, r.settingsProvider)),
 		provider.DecodeHetznerSizesNoCredentialsReq,
 		EncodeJSON,
 		r.defaultServerOptions()...,
@@ -2898,7 +2968,7 @@ func (r Routing) listDigitaloceanSizesNoCredentials() http.Handler {
 			middleware.UserSaver(r.userProvider),
 			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
 			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-		)(provider.DigitaloceanSizeWithClusterCredentialsEndpoint(r.projectProvider, r.privilegedProjectProvider, r.userInfoGetter)),
+		)(provider.DigitaloceanSizeWithClusterCredentialsEndpoint(r.projectProvider, r.privilegedProjectProvider, r.userInfoGetter, r.settingsProvider)),
 		provider.DecodeDoSizesNoCredentialsReq,
 		EncodeJSON,
 		r.defaultServerOptions()...,
@@ -2922,7 +2992,7 @@ func (r Routing) listAzureSizesNoCredentials() http.Handler {
 			middleware.UserSaver(r.userProvider),
 			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
 			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-		)(provider.AzureSizeWithClusterCredentialsEndpoint(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter, r.userInfoGetter)),
+		)(provider.AzureSizeWithClusterCredentialsEndpoint(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter, r.userInfoGetter, r.settingsProvider)),
 		provider.DecodeAzureSizesNoCredentialsReq,
 		EncodeJSON,
 		r.defaultServerOptions()...,
@@ -2970,7 +3040,8 @@ func (r Routing) listOpenstackSizesNoCredentials() http.Handler {
 			middleware.UserSaver(r.userProvider),
 			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
 			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-		)(provider.OpenstackSizeWithClusterCredentialsEndpoint(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter, r.userInfoGetter)),
+		)(provider.OpenstackSizeWithClusterCredentialsEndpoint(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter,
+			r.userInfoGetter, r.settingsProvider, r.caBundle)),
 		provider.DecodeOpenstackNoCredentialsReq,
 		EncodeJSON,
 		r.defaultServerOptions()...,
@@ -2994,7 +3065,8 @@ func (r Routing) listOpenstackTenantsNoCredentials() http.Handler {
 			middleware.UserSaver(r.userProvider),
 			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
 			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-		)(provider.OpenstackTenantWithClusterCredentialsEndpoint(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter, r.userInfoGetter)),
+		)(provider.OpenstackTenantWithClusterCredentialsEndpoint(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter,
+			r.userInfoGetter, r.caBundle)),
 		provider.DecodeOpenstackNoCredentialsReq,
 		EncodeJSON,
 		r.defaultServerOptions()...,
@@ -3018,7 +3090,8 @@ func (r Routing) listOpenstackNetworksNoCredentials() http.Handler {
 			middleware.UserSaver(r.userProvider),
 			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
 			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-		)(provider.OpenstackNetworkWithClusterCredentialsEndpoint(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter, r.userInfoGetter)),
+		)(provider.OpenstackNetworkWithClusterCredentialsEndpoint(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter,
+			r.userInfoGetter, r.caBundle)),
 		provider.DecodeOpenstackNoCredentialsReq,
 		EncodeJSON,
 		r.defaultServerOptions()...,
@@ -3042,7 +3115,8 @@ func (r Routing) listOpenstackSecurityGroupsNoCredentials() http.Handler {
 			middleware.UserSaver(r.userProvider),
 			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
 			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-		)(provider.OpenstackSecurityGroupWithClusterCredentialsEndpoint(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter, r.userInfoGetter)),
+		)(provider.OpenstackSecurityGroupWithClusterCredentialsEndpoint(r.projectProvider, r.privilegedProjectProvider,
+			r.seedsGetter, r.userInfoGetter, r.caBundle)),
 		provider.DecodeOpenstackNoCredentialsReq,
 		EncodeJSON,
 		r.defaultServerOptions()...,
@@ -3066,7 +3140,8 @@ func (r Routing) listOpenstackSubnetsNoCredentials() http.Handler {
 			middleware.UserSaver(r.userProvider),
 			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
 			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-		)(provider.OpenstackSubnetsWithClusterCredentialsEndpoint(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter, r.userInfoGetter)),
+		)(provider.OpenstackSubnetsWithClusterCredentialsEndpoint(r.projectProvider, r.privilegedProjectProvider,
+			r.seedsGetter, r.userInfoGetter, r.caBundle)),
 		provider.DecodeOpenstackSubnetNoCredentialsReq,
 		EncodeJSON,
 		r.defaultServerOptions()...,
@@ -3090,7 +3165,8 @@ func (r Routing) listOpenstackAvailabilityZonesNoCredentials() http.Handler {
 			middleware.UserSaver(r.userProvider),
 			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
 			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-		)(provider.OpenstackAvailabilityZoneWithClusterCredentialsEndpoint(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter, r.userInfoGetter)),
+		)(provider.OpenstackAvailabilityZoneWithClusterCredentialsEndpoint(r.projectProvider, r.privilegedProjectProvider,
+			r.seedsGetter, r.userInfoGetter, r.caBundle)),
 		provider.DecodeOpenstackNoCredentialsReq,
 		EncodeJSON,
 		r.defaultServerOptions()...,
@@ -3114,7 +3190,7 @@ func (r Routing) listVSphereNetworksNoCredentials() http.Handler {
 			middleware.UserSaver(r.userProvider),
 			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
 			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-		)(provider.VsphereNetworksWithClusterCredentialsEndpoint(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter, r.userInfoGetter)),
+		)(provider.VsphereNetworksWithClusterCredentialsEndpoint(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter, r.userInfoGetter, r.caBundle)),
 		provider.DecodeVSphereNetworksNoCredentialsReq,
 		EncodeJSON,
 		r.defaultServerOptions()...,
@@ -3138,7 +3214,7 @@ func (r Routing) listVSphereFoldersNoCredentials() http.Handler {
 			middleware.UserSaver(r.userProvider),
 			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
 			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-		)(provider.VsphereFoldersWithClusterCredentialsEndpoint(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter, r.userInfoGetter)),
+		)(provider.VsphereFoldersWithClusterCredentialsEndpoint(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter, r.userInfoGetter, r.caBundle)),
 		provider.DecodeVSphereFoldersNoCredentialsReq,
 		EncodeJSON,
 		r.defaultServerOptions()...,
@@ -3162,7 +3238,7 @@ func (r Routing) listAlibabaInstanceTypesNoCredentials() http.Handler {
 			middleware.UserSaver(r.userProvider),
 			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
 			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-		)(provider.AlibabaInstanceTypesWithClusterCredentialsEndpoint(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter, r.userInfoGetter)),
+		)(provider.AlibabaInstanceTypesWithClusterCredentialsEndpoint(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter, r.userInfoGetter, r.settingsProvider)),
 		provider.DecodeAlibabaNoCredentialReq,
 		EncodeJSON,
 		r.defaultServerOptions()...,
@@ -3664,64 +3740,6 @@ func (r Routing) createClusterRole() http.Handler {
 	)
 }
 
-// swagger:route GET /api/v1/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/openshift/console/login
-//
-//    Creates an oauth token for the user and redirects them to the Openshift Console
-//
-//     Consumes:
-//     - application/json
-//
-//     Produces:
-//     - application/json
-//
-//     Responses:
-//       default: errorResponse
-//       302: empty
-//       401: empty
-//       403: empty
-func (r Routing) openshiftConsoleLogin() http.Handler {
-	return openshift.ConsoleLoginEndpoint(
-		r.log,
-		middleware.TokenExtractor(r.tokenExtractors),
-		r.projectProvider,
-		r.privilegedProjectProvider,
-		r.userInfoGetter,
-		endpoint.Chain(
-			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
-			middleware.UserSaver(r.userProvider),
-			// TODO: Instead of using an admin client to talk to the seed, we should provide a seed
-			// client that allows access to the cluster namespace only
-			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-		),
-	)
-}
-
-// swagger:route GET /api/v1/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/openshift/console/proxy
-//
-//    Proxies the Openshift console. Requires a valid OIDC token. The token can be obtained
-//    using the /api/v1/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/openshift/console/login
-//    endpoint.
-//
-//     Responses:
-//       default: empty
-func (r Routing) openshiftConsoleProxy() http.Handler {
-	return openshift.ConsoleProxyEndpoint(
-		r.log,
-		middleware.TokenExtractor(r.tokenExtractors),
-		r.projectProvider,
-		r.privilegedProjectProvider,
-		r.userInfoGetter,
-		endpoint.Chain(
-			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
-			middleware.UserSaver(r.userProvider),
-			// TODO: Instead of using an admin client to talk to the seed, we should provide a seed
-			// client that allows access to the cluster namespace only
-			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-		),
-	)
-}
-
-// swagger:route GET /api/v1/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/openshift/console/proxy
 //
 //    Proxies the Kubernetes Dashboard. Requires a valid bearer token. The token can be obtained
 //    using the /api/v1/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/dashboard/login

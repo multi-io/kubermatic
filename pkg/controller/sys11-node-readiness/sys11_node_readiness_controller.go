@@ -36,17 +36,15 @@ var (
 )
 
 type reconciler struct {
-	ctx      context.Context
 	log      *zap.SugaredLogger
 	client   ctrlruntimeclient.Client
 	recorder record.EventRecorder
 }
 
-func Add(ctx context.Context, mgr manager.Manager, log *zap.SugaredLogger) error {
+func Add(mgr manager.Manager, log *zap.SugaredLogger) error {
 	log = log.Named(ControllerName)
 
 	reconciler := &reconciler{
-		ctx:      ctx,
 		log:      log,
 		client:   mgr.GetClient(),
 		recorder: mgr.GetEventRecorderFor(ControllerName),
@@ -77,19 +75,19 @@ func Add(ctx context.Context, mgr manager.Manager, log *zap.SugaredLogger) error
 	return c.Watch(&source.Kind{Type: &corev1.Node{}}, &handler.EnqueueRequestForObject{}, predicates)
 }
 
-func (r *reconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *reconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log := r.log.With("Node", request.Name)
 	log.Debug("Reconciling")
 
-	err := r.reconcile(log, request.Name)
+	err := r.reconcile(ctx, log, request.Name)
 	if err != nil {
 		log.Errorw("Reconciling failed", zap.Error(err))
 	}
 	return reconcile.Result{}, err
 }
 
-func (r *reconciler) reconcile(log *zap.SugaredLogger, nodeName string) error {
-	return r.updateNode(nodeName, func(node *corev1.Node) bool {
+func (r *reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, nodeName string) error {
+	return r.updateNode(ctx, nodeName, func(node *corev1.Node) bool {
 		cond := getReadinessNodeCondition(node)
 		if cond == nil || cond.Status != corev1.ConditionTrue {
 			// make sure the taint is present
@@ -114,11 +112,11 @@ func (r *reconciler) reconcile(log *zap.SugaredLogger, nodeName string) error {
 	})
 }
 
-func (r *reconciler) updateNode(name string, modify func(*corev1.Node) bool) error {
+func (r *reconciler) updateNode(ctx context.Context, name string, modify func(*corev1.Node) bool) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		// Get latest version
 		node := &corev1.Node{}
-		if err := r.client.Get(r.ctx, types.NamespacedName{Name: name}, node); err != nil {
+		if err := r.client.Get(ctx, types.NamespacedName{Name: name}, node); err != nil {
 			if kerrors.IsNotFound(err) {
 				return nil
 			}
@@ -127,7 +125,7 @@ func (r *reconciler) updateNode(name string, modify func(*corev1.Node) bool) err
 		// Apply modifications
 		if modify(node) {
 			// If the modify function modified the resource, update it
-			return r.client.Update(r.ctx, node)
+			return r.client.Update(ctx, node)
 		} else {
 			return nil
 		}

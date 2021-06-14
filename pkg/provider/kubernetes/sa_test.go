@@ -19,25 +19,23 @@ package kubernetes_test
 import (
 	"testing"
 
-	restclient "k8s.io/client-go/rest"
-	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
-
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/provider"
 	"k8c.io/kubermatic/v2/pkg/provider/kubernetes"
 
 	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/kubernetes/scheme"
+	restclient "k8s.io/client-go/rest"
+	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	fakectrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-func TestCreateServiceAccount(t *testing.T) {
+func TestCreateProjectServiceAccount(t *testing.T) {
 	// test data
 	testcases := []struct {
 		name                      string
-		existingKubermaticObjects []runtime.Object
+		existingKubermaticObjects []ctrlruntimeclient.Object
 		project                   *kubermaticv1.Project
 		userInfo                  *provider.UserInfo
 		saName                    string
@@ -51,13 +49,13 @@ func TestCreateServiceAccount(t *testing.T) {
 			project:  genDefaultProject(),
 			saName:   "test",
 			saGroup:  "editors-my-first-project-ID",
-			existingKubermaticObjects: []runtime.Object{
+			existingKubermaticObjects: []ctrlruntimeclient.Object{
 				createAuthenitactedUser(),
 				genDefaultProject(),
 			},
 			expectedSA: func() *kubermaticv1.User {
 				sa := createSANoPrefix("test", "my-first-project-ID", "editors", "1")
-				sa.ResourceVersion = "1"
+				sa.ResourceVersion = ""
 				return sa
 			}(),
 			expectedSAName: "1",
@@ -66,14 +64,19 @@ func TestCreateServiceAccount(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 
-			fakeClient := fakectrlruntimeclient.NewFakeClientWithScheme(scheme.Scheme, tc.existingKubermaticObjects...)
+			fakeClient := fakectrlruntimeclient.
+				NewClientBuilder().
+				WithScheme(scheme.Scheme).
+				WithObjects(tc.existingKubermaticObjects...).
+				Build()
+
 			fakeImpersonationClient := func(impCfg restclient.ImpersonationConfig) (ctrlruntimeclient.Client, error) {
 				return fakeClient, nil
 			}
 			// act
 			target := kubernetes.NewServiceAccountProvider(fakeImpersonationClient, fakeClient, "localhost")
 
-			sa, err := target.Create(tc.userInfo, tc.project, tc.saName, tc.saGroup)
+			sa, err := target.CreateProjectServiceAccount(tc.userInfo, tc.project, tc.saName, tc.saGroup)
 
 			// validate
 			if err != nil {
@@ -84,6 +87,7 @@ func TestCreateServiceAccount(t *testing.T) {
 			sa.Name = tc.expectedSAName
 			sa.Spec.Email = ""
 			sa.Spec.ID = ""
+			sa.ResourceVersion = ""
 
 			if !equality.Semantic.DeepEqual(sa, tc.expectedSA) {
 				t.Fatalf("%v", diff.ObjectGoPrintSideBySide(tc.expectedSA, sa))
@@ -92,11 +96,11 @@ func TestCreateServiceAccount(t *testing.T) {
 	}
 }
 
-func TestList(t *testing.T) {
+func TestListProjectServiceAccount(t *testing.T) {
 	// test data
 	testcases := []struct {
 		name                      string
-		existingKubermaticObjects []runtime.Object
+		existingKubermaticObjects []ctrlruntimeclient.Object
 		project                   *kubermaticv1.Project
 		saName                    string
 		userInfo                  *provider.UserInfo
@@ -107,11 +111,11 @@ func TestList(t *testing.T) {
 			userInfo: &provider.UserInfo{Email: "john@acme.com", Group: "owners-abcd"},
 			project:  genDefaultProject(),
 			saName:   "test-1",
-			existingKubermaticObjects: []runtime.Object{
+			existingKubermaticObjects: []ctrlruntimeclient.Object{
 				createAuthenitactedUser(),
-				createSA("test-1", "my-first-project-ID", "editors", "1"),
-				createSA("test-2", "abcd", "viewers", "2"),
-				createSA("test-1", "dcba", "viewers", "3"),
+				createProjectSA("test-1", "my-first-project-ID", "editors", "1"),
+				createProjectSA("test-2", "abcd", "viewers", "2"),
+				createProjectSA("test-1", "dcba", "viewers", "3"),
 			},
 			expectedSA: []*kubermaticv1.User{
 				createSANoPrefix("test-1", "my-first-project-ID", "editors", "1"),
@@ -122,28 +126,42 @@ func TestList(t *testing.T) {
 			userInfo: &provider.UserInfo{Email: "john@acme.com", Group: "owners-abcd"},
 			project:  genDefaultProject(),
 			saName:   "test",
-			existingKubermaticObjects: []runtime.Object{
+			existingKubermaticObjects: []ctrlruntimeclient.Object{
 				createAuthenitactedUser(),
-				createSA("test", "bbbb", "editors", "1"),
-				createSA("fake", "abcd", "editors", "2"),
+				createProjectSA("test", "bbbb", "editors", "1"),
+				createProjectSA("fake", "abcd", "editors", "2"),
 			},
 			expectedSA: []*kubermaticv1.User{},
 		},
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			fakeClient := fakectrlruntimeclient.NewFakeClientWithScheme(scheme.Scheme, tc.existingKubermaticObjects...)
+			fakeClient := fakectrlruntimeclient.
+				NewClientBuilder().
+				WithScheme(scheme.Scheme).
+				WithObjects(tc.existingKubermaticObjects...).
+				Build()
+
 			fakeImpersonationClient := func(impCfg restclient.ImpersonationConfig) (ctrlruntimeclient.Client, error) {
 				return fakeClient, nil
 			}
 			// act
 			target := kubernetes.NewServiceAccountProvider(fakeImpersonationClient, fakeClient, "localhost")
 
-			saList, err := target.List(tc.userInfo, tc.project, &provider.ServiceAccountListOptions{ServiceAccountName: tc.saName})
+			saList, err := target.ListProjectServiceAccount(tc.userInfo, tc.project, &provider.ServiceAccountListOptions{ServiceAccountName: tc.saName})
 			// validate
 			if err != nil {
 				t.Fatal(err)
 			}
+
+			for i := range saList {
+				saList[i].ResourceVersion = ""
+			}
+
+			for i := range tc.expectedSA {
+				tc.expectedSA[i].ResourceVersion = ""
+			}
+
 			if !equality.Semantic.DeepEqual(saList, tc.expectedSA) {
 				t.Fatalf("%v", diff.ObjectGoPrintSideBySide(tc.expectedSA, saList))
 			}
@@ -151,11 +169,11 @@ func TestList(t *testing.T) {
 	}
 }
 
-func TestGet(t *testing.T) {
+func TestGetProjectServiceAccount(t *testing.T) {
 	// test data
 	testcases := []struct {
 		name                      string
-		existingKubermaticObjects []runtime.Object
+		existingKubermaticObjects []ctrlruntimeclient.Object
 		project                   *kubermaticv1.Project
 		saName                    string
 		userInfo                  *provider.UserInfo
@@ -166,11 +184,11 @@ func TestGet(t *testing.T) {
 			userInfo: &provider.UserInfo{Email: "john@acme.com", Group: "owners-abcd"},
 			project:  genDefaultProject(),
 			saName:   "1",
-			existingKubermaticObjects: []runtime.Object{
+			existingKubermaticObjects: []ctrlruntimeclient.Object{
 				createAuthenitactedUser(),
-				createSA("test-1", "my-first-project-ID", "editors", "1"),
-				createSA("test-2", "abcd", "viewers", "2"),
-				createSA("test-1", "dcba", "viewers", "3"),
+				createProjectSA("test-1", "my-first-project-ID", "editors", "1"),
+				createProjectSA("test-2", "abcd", "viewers", "2"),
+				createProjectSA("test-1", "dcba", "viewers", "3"),
 			},
 			expectedSA: func() *kubermaticv1.User {
 				sa := createSANoPrefix("test-1", "my-first-project-ID", "editors", "1")
@@ -182,18 +200,26 @@ func TestGet(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			fakeClient := fakectrlruntimeclient.NewFakeClientWithScheme(scheme.Scheme, tc.existingKubermaticObjects...)
+			fakeClient := fakectrlruntimeclient.
+				NewClientBuilder().
+				WithScheme(scheme.Scheme).
+				WithObjects(tc.existingKubermaticObjects...).
+				Build()
+
 			fakeImpersonationClient := func(impCfg restclient.ImpersonationConfig) (ctrlruntimeclient.Client, error) {
 				return fakeClient, nil
 			}
 			// act
 			target := kubernetes.NewServiceAccountProvider(fakeImpersonationClient, fakeClient, "localhost")
 
-			sa, err := target.Get(tc.userInfo, tc.saName, nil)
+			sa, err := target.GetProjectServiceAccount(tc.userInfo, tc.saName, nil)
 			// validate
 			if err != nil {
 				t.Fatal(err)
 			}
+
+			tc.expectedSA.ResourceVersion = sa.ResourceVersion
+
 			if !equality.Semantic.DeepEqual(sa, tc.expectedSA) {
 				t.Fatalf("%v", diff.ObjectGoPrintSideBySide(tc.expectedSA, sa))
 			}
@@ -201,11 +227,11 @@ func TestGet(t *testing.T) {
 	}
 }
 
-func TestUpdate(t *testing.T) {
+func TestUpdateProjectServiceAccount(t *testing.T) {
 	// test data
 	testcases := []struct {
 		name                      string
-		existingKubermaticObjects []runtime.Object
+		existingKubermaticObjects []ctrlruntimeclient.Object
 		project                   *kubermaticv1.Project
 		saName                    string
 		newName                   string
@@ -217,11 +243,11 @@ func TestUpdate(t *testing.T) {
 			userInfo: &provider.UserInfo{Email: "john@acme.com", Group: "owners-abcd"},
 			project:  genDefaultProject(),
 			saName:   "1",
-			existingKubermaticObjects: []runtime.Object{
+			existingKubermaticObjects: []ctrlruntimeclient.Object{
 				createAuthenitactedUser(),
-				createSA("test-1", "my-first-project-ID", "viewers", "1"),
-				createSA("test-2", "abcd", "viewers", "2"),
-				createSA("test-1", "dcba", "viewers", "3"),
+				createProjectSA("test-1", "my-first-project-ID", "viewers", "1"),
+				createProjectSA("test-2", "abcd", "viewers", "2"),
+				createProjectSA("test-1", "dcba", "viewers", "3"),
 			},
 			newName: "new-name",
 			expectedSA: func() *kubermaticv1.User {
@@ -235,24 +261,32 @@ func TestUpdate(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			fakeClient := fakectrlruntimeclient.NewFakeClientWithScheme(scheme.Scheme, tc.existingKubermaticObjects...)
+			fakeClient := fakectrlruntimeclient.
+				NewClientBuilder().
+				WithScheme(scheme.Scheme).
+				WithObjects(tc.existingKubermaticObjects...).
+				Build()
+
 			fakeImpersonationClient := func(impCfg restclient.ImpersonationConfig) (ctrlruntimeclient.Client, error) {
 				return fakeClient, nil
 			}
 			// act
 			target := kubernetes.NewServiceAccountProvider(fakeImpersonationClient, fakeClient, "localhost")
 
-			sa, err := target.Get(tc.userInfo, tc.saName, nil)
+			sa, err := target.GetProjectServiceAccount(tc.userInfo, tc.saName, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			sa.Spec.Name = tc.newName
 
-			expectedSA, err := target.Update(tc.userInfo, sa)
+			expectedSA, err := target.UpdateProjectServiceAccount(tc.userInfo, sa)
 			if err != nil {
 				t.Fatal(err)
 			}
+
+			tc.expectedSA.ResourceVersion = expectedSA.ResourceVersion
+
 			if !equality.Semantic.DeepEqual(expectedSA, tc.expectedSA) {
 				t.Fatalf("%v", diff.ObjectGoPrintSideBySide(tc.expectedSA, expectedSA))
 			}
@@ -260,11 +294,11 @@ func TestUpdate(t *testing.T) {
 	}
 }
 
-func TestDelete(t *testing.T) {
+func TestDeleteProjectServiceAccount(t *testing.T) {
 	// test data
 	testcases := []struct {
 		name                      string
-		existingKubermaticObjects []runtime.Object
+		existingKubermaticObjects []ctrlruntimeclient.Object
 		saName                    string
 		userInfo                  *provider.UserInfo
 	}{
@@ -272,30 +306,34 @@ func TestDelete(t *testing.T) {
 			name:     "scenario 1, delete service account",
 			userInfo: &provider.UserInfo{Email: "john@acme.com", Group: "owners-abcd"},
 			saName:   "1",
-			existingKubermaticObjects: []runtime.Object{
+			existingKubermaticObjects: []ctrlruntimeclient.Object{
 				createAuthenitactedUser(),
-				createSA("test-1", "my-first-project-ID", "viewers", "1"),
-				createSA("test-2", "abcd", "viewers", "2"),
-				createSA("test-1", "dcba", "viewers", "3"),
+				createProjectSA("test-1", "my-first-project-ID", "viewers", "1"),
+				createProjectSA("test-2", "abcd", "viewers", "2"),
+				createProjectSA("test-1", "dcba", "viewers", "3"),
 			},
 		},
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
+			fakeClient := fakectrlruntimeclient.
+				NewClientBuilder().
+				WithScheme(scheme.Scheme).
+				WithObjects(tc.existingKubermaticObjects...).
+				Build()
 
-			fakeClient := fakectrlruntimeclient.NewFakeClientWithScheme(scheme.Scheme, tc.existingKubermaticObjects...)
 			fakeImpersonationClient := func(impCfg restclient.ImpersonationConfig) (ctrlruntimeclient.Client, error) {
 				return fakeClient, nil
 			}
 			// act
 			target := kubernetes.NewServiceAccountProvider(fakeImpersonationClient, fakeClient, "localhost")
 
-			err := target.Delete(tc.userInfo, tc.saName)
+			err := target.DeleteProjectServiceAccount(tc.userInfo, tc.saName)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			_, err = target.Get(tc.userInfo, tc.saName, nil)
+			_, err = target.GetProjectServiceAccount(tc.userInfo, tc.saName, nil)
 			if err == nil {
 				t.Fatal("expected error")
 			}

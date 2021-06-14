@@ -87,10 +87,7 @@ func Add(mgr manager.Manager, numWorkers int, workerName string, updateManager *
 	return nil
 }
 
-func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
+func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	cluster := &kubermaticv1.Cluster{}
 	if err := r.Get(ctx, request.NamespacedName, cluster); err != nil {
 		if kerrors.IsNotFound(err) {
@@ -122,20 +119,14 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 }
 
 func (r *Reconciler) reconcile(ctx context.Context, cluster *kubermaticv1.Cluster) (*reconcile.Result, error) {
-
 	if !cluster.Status.ExtendedHealth.AllHealthy() {
 		// Cluster not healthy yet. Nothing to do.
 		// If it gets healthy we'll get notified by the event. No need to requeue
 		return nil, nil
 	}
 
-	clusterType := v1.KubernetesClusterType
-	if cluster.IsOpenshift() {
-		clusterType = v1.OpenShiftClusterType
-	}
-
 	// NodeUpdate may need the controlplane to be updated first
-	updated, err := r.controlPlaneUpgrade(ctx, cluster, clusterType)
+	updated, err := r.controlPlaneUpgrade(ctx, cluster, v1.KubernetesClusterType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update the controlplane: %v", err)
 	}
@@ -147,7 +138,7 @@ func (r *Reconciler) reconcile(ctx context.Context, cluster *kubermaticv1.Cluste
 		return &reconcile.Result{RequeueAfter: time.Minute}, nil
 	}
 
-	if err := r.nodeUpdate(ctx, cluster, clusterType); err != nil {
+	if err := r.nodeUpdate(ctx, cluster, v1.KubernetesClusterType); err != nil {
 		return nil, fmt.Errorf("failed to update machineDeployments: %v", err)
 	}
 

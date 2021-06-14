@@ -34,7 +34,7 @@ spec:
         - '{"command":"/usr/sbin/openvpn","args":["--client","--proto","tcp","--dev","tun","--auth-nocache","--remote","openvpn-server.cluster-de-test-01.svc.cluster.local.","1194","--nobind","--connect-timeout","5","--connect-retry","1","--ca","/etc/openvpn/pki/client/ca.crt","--cert","/etc/openvpn/pki/client/client.crt","--key","/etc/openvpn/pki/client/client.key","--remote-cert-tls","server","--mssfix","1300","--cipher","AES-256-GCM","--auth","SHA1","--keysize","256","--script-security","2","--status","/run/openvpn-status","--log","/dev/stdout"]}'
         command:
         - /http-prober-bin/http-prober
-        image: quay.io/kubermatic/openvpn:v2.4.8-r1
+        image: quay.io/kubermatic/openvpn:v2.5.0-r1
         name: openvpn-client
         resources:
           limits:
@@ -65,7 +65,7 @@ spec:
         - '{"command":"/bin/openstack-cloud-controller-manager","args":["--kubeconfig=/etc/kubernetes/kubeconfig/kubeconfig","--v=1","--cloud-config=/etc/kubernetes/cloud/config","--cloud-provider=openstack","--cluster-name=de-test-01"]}'
         command:
         - /http-prober-bin/http-prober
-        image: docker.io/k8scloudprovider/openstack-cloud-controller-manager:v1.19.2
+        image: docker.io/k8scloudprovider/openstack-cloud-controller-manager:v1.20.2
         name: cloud-controller-manager
         resources:
           limits:
@@ -99,7 +99,7 @@ spec:
         - /bin/cp
         - /usr/local/bin/http-prober
         - /http-prober-bin/http-prober
-        image: quay.io/kubermatic/http-prober:v0.3.1
+        image: quay.io/kubermatic/http-prober:v0.3.2
         name: copy-http-prober
         resources: {}
         volumeMounts:

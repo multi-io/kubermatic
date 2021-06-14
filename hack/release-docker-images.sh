@@ -18,7 +18,6 @@
 ###
 ### * quay.io/kubermatic/kubermatic[-ee]
 ### * quay.io/kubermatic/addons
-### * quay.io/kubermatic/openshift-addons
 ### * quay.io/kubermatic/nodeport-proxy
 ### * quay.io/kubermatic/kubeletdnat-controller
 ### * quay.io/kubermatic/user-ssh-keys-agent
@@ -34,7 +33,7 @@
 set -euo pipefail
 
 if [ "$#" -lt 1 ] || [ "${1}" == "--help" ]; then
-  cat <<EOF
+  cat << EOF
 Usage: $(basename $0) tag1[ tag2 tagN ...]
 
 Example:
@@ -62,7 +61,6 @@ make -C cmd/nodeport-proxy docker TAG="${PRIMARY_TAG}"
 make -C cmd/kubeletdnat-controller docker TAG="${PRIMARY_TAG}"
 make -C cmd/user-ssh-keys-agent docker TAG="${PRIMARY_TAG}"
 docker build -t "${DOCKER_REPO}/addons:${PRIMARY_TAG}" addons
-docker build -t "${DOCKER_REPO}/openshift-addons:${PRIMARY_TAG}" openshift_addons
 docker build -t "${DOCKER_REPO}/etcd-launcher:${PRIMARY_TAG}" -f cmd/etcd-launcher/Dockerfile .
 
 # keep a mirror of the EE version in the old repo
@@ -78,19 +76,17 @@ for TAG in "$@"; do
 
   echodate "Tagging as ${TAG}"
   docker tag "${DOCKER_REPO}/kubermatic${REPOSUFFIX}:${PRIMARY_TAG}" "${DOCKER_REPO}/kubermatic${REPOSUFFIX}:${TAG}"
-  docker tag "${DOCKER_REPO}/nodeport-proxy:${PRIMARY_TAG}"          "${DOCKER_REPO}/nodeport-proxy:${TAG}"
-  docker tag "${DOCKER_REPO}/kubeletdnat-controller:${PRIMARY_TAG}"  "${DOCKER_REPO}/kubeletdnat-controller:${TAG}"
-  docker tag "${DOCKER_REPO}/addons:${PRIMARY_TAG}"                  "${DOCKER_REPO}/addons:${TAG}"
-  docker tag "${DOCKER_REPO}/openshift-addons:${PRIMARY_TAG}"        "${DOCKER_REPO}/openshift-addons:${TAG}"
-  docker tag "${DOCKER_REPO}/user-ssh-keys-agent:${PRIMARY_TAG}"     "${DOCKER_REPO}/user-ssh-keys-agent:${TAG}"
-  docker tag "${DOCKER_REPO}/etcd-launcher:${PRIMARY_TAG}"           "${DOCKER_REPO}/etcd-launcher:${TAG}"
+  docker tag "${DOCKER_REPO}/nodeport-proxy:${PRIMARY_TAG}" "${DOCKER_REPO}/nodeport-proxy:${TAG}"
+  docker tag "${DOCKER_REPO}/kubeletdnat-controller:${PRIMARY_TAG}" "${DOCKER_REPO}/kubeletdnat-controller:${TAG}"
+  docker tag "${DOCKER_REPO}/addons:${PRIMARY_TAG}" "${DOCKER_REPO}/addons:${TAG}"
+  docker tag "${DOCKER_REPO}/user-ssh-keys-agent:${PRIMARY_TAG}" "${DOCKER_REPO}/user-ssh-keys-agent:${TAG}"
+  docker tag "${DOCKER_REPO}/etcd-launcher:${PRIMARY_TAG}" "${DOCKER_REPO}/etcd-launcher:${TAG}"
 
   echodate "Pushing images"
   docker push "${DOCKER_REPO}/kubermatic${REPOSUFFIX}:${TAG}"
   docker push "${DOCKER_REPO}/nodeport-proxy:${TAG}"
   docker push "${DOCKER_REPO}/kubeletdnat-controller:${TAG}"
   docker push "${DOCKER_REPO}/addons:${TAG}"
-  docker push "${DOCKER_REPO}/openshift-addons:${TAG}"
   docker push "${DOCKER_REPO}/user-ssh-keys-agent:${TAG}"
   docker push "${DOCKER_REPO}/etcd-launcher:${TAG}"
 

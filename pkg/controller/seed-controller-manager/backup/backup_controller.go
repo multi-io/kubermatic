@@ -22,10 +22,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/robfig/cron"
-
 	"go.uber.org/zap"
 
+	"k8c.io/kubermatic/v2/pkg/controller/operator/common"
+	"k8c.io/kubermatic/v2/pkg/controller/util/predicate"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	kubermaticv1helper "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1/helper"
 	kuberneteshelper "k8c.io/kubermatic/v2/pkg/kubernetes"
@@ -42,6 +44,7 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -80,6 +83,7 @@ type Reconciler struct {
 	ctrlruntimeclient.Client
 
 	log              *zap.SugaredLogger
+	scheme           *runtime.Scheme
 	workerName       string
 	storeContainer   corev1.Container
 	cleanupContainer corev1.Container
@@ -89,6 +93,11 @@ type Reconciler struct {
 	// backupContainerImage holds the image used for creating the etcd backup
 	// It must be configurable to cover offline use cases
 	backupContainerImage string
+	// disabled means delete any existing back cronjob, rather than
+	// ensuring they're installed. This is used to permanently delete the backup cronjobs
+	// and disable the controller, usually in favor of the new one (../etcdbackup)
+	disabled bool
+	caBundle resources.CABundle
 
 	recorder record.EventRecorder
 	versions kubermatic.Versions
@@ -106,6 +115,8 @@ func Add(
 	backupSchedule time.Duration,
 	backupContainerImage string,
 	versions kubermatic.Versions,
+	disabled bool,
+	caBundle resources.CABundle,
 ) error {
 	log = log.Named(ControllerName)
 	if err := validateStoreContainer(storeContainer); err != nil {
@@ -127,8 +138,11 @@ func Add(
 		cleanupContainer:     cleanupContainer,
 		backupScheduleString: backupScheduleString,
 		backupContainerImage: backupContainerImage,
+		disabled:             disabled,
 		recorder:             mgr.GetEventRecorderFor(ControllerName),
 		versions:             versions,
+		caBundle:             caBundle,
+		scheme:               mgr.GetScheme(),
 	}
 	c, err := controller.New(ControllerName, mgr, controller.Options{
 		Reconciler:              reconciler,
@@ -138,29 +152,24 @@ func Add(
 		return fmt.Errorf("failed to create controller: %v", err)
 	}
 
-	cronJobMapFn := &handler.EnqueueRequestsFromMapFunc{ToRequests: handler.ToRequestsFunc(func(a handler.MapObject) []reconcile.Request {
-		// We only care about CronJobs that are in the kube-system namespace
-		if a.Meta.GetNamespace() != metav1.NamespaceSystem {
-			return nil
-		}
-
-		if ownerRef := metav1.GetControllerOf(a.Meta); ownerRef != nil && ownerRef.Kind == kubermaticv1.ClusterKindName {
+	cronJobMapFn := handler.EnqueueRequestsFromMapFunc(func(a ctrlruntimeclient.Object) []reconcile.Request {
+		if ownerRef := metav1.GetControllerOf(a); ownerRef != nil && ownerRef.Kind == kubermaticv1.ClusterKindName {
 			return []reconcile.Request{{NamespacedName: types.NamespacedName{Name: ownerRef.Name}}}
 		}
 		return nil
-	})}
+	})
 
 	if err := c.Watch(&source.Kind{Type: &kubermaticv1.Cluster{}}, &handler.EnqueueRequestForObject{}); err != nil {
 		return fmt.Errorf("failed to watch Clusters: %v", err)
 	}
-	if err := c.Watch(&source.Kind{Type: &batchv1beta1.CronJob{}}, cronJobMapFn); err != nil {
+	if err := c.Watch(&source.Kind{Type: &batchv1beta1.CronJob{}}, cronJobMapFn, predicate.ByNamespace(metav1.NamespaceSystem)); err != nil {
 		return fmt.Errorf("failed to watch CronJobs: %v", err)
 	}
 
 	// Cleanup cleanup jobs...
 	if err := mgr.Add(&runnableWrapper{
-		f: func(stopCh <-chan struct{}) {
-			wait.Until(reconciler.cleanupJobs, 30*time.Second, stopCh)
+		f: func(ctx context.Context) {
+			wait.UntilWithContext(ctx, reconciler.cleanupJobs, 30*time.Second)
 		},
 	}); err != nil {
 		return fmt.Errorf("failed to add cleanup jobs runnable to mgr: %v", err)
@@ -170,17 +179,15 @@ func Add(
 }
 
 type runnableWrapper struct {
-	f func(<-chan struct{})
+	f func(context.Context)
 }
 
-func (w *runnableWrapper) Start(stopChan <-chan struct{}) error {
-	w.f(stopChan)
+func (w *runnableWrapper) Start(ctx context.Context) error {
+	w.f(ctx)
 	return nil
 }
 
-func (r *Reconciler) cleanupJobs() {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+func (r *Reconciler) cleanupJobs(ctx context.Context) {
 	log := r.log.Named("job_cleanup")
 
 	selector, err := labels.Parse(fmt.Sprintf("%s=%s", resources.AppLabelKey, backupCleanupJobLabel))
@@ -218,9 +225,7 @@ func (r *Reconciler) cleanupJobs() {
 	}
 }
 
-func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log := r.log.With("request", request)
 	log.Debug("Processing")
 
@@ -256,11 +261,13 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, clus
 	if cluster.DeletionTimestamp != nil {
 		// Need to cleanup
 		if sets.NewString(cluster.Finalizers...).Has(cleanupFinalizer) {
-			if err := r.Create(ctx, r.cleanupJob(cluster)); err != nil {
-				// Otherwise we end up in a loop when we are able to create the job but not
-				// remove the finalizer.
-				if !kerrors.IsAlreadyExists(err) {
-					return err
+			if !r.disabled {
+				if err := r.Create(ctx, r.cleanupJob(cluster)); err != nil {
+					// Otherwise we end up in a loop when we are able to create the job but not
+					// remove the finalizer.
+					if !kerrors.IsAlreadyExists(err) {
+						return err
+					}
 				}
 			}
 
@@ -279,7 +286,7 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, clus
 	}
 
 	// Always add the finalizer first
-	if !kuberneteshelper.HasFinalizer(cluster, cleanupFinalizer) {
+	if !kuberneteshelper.HasFinalizer(cluster, cleanupFinalizer) && !r.disabled {
 		oldCluster := cluster.DeepCopy()
 		kuberneteshelper.AddFinalizer(cluster, cleanupFinalizer)
 		if err := r.Patch(ctx, cluster, ctrlruntimeclient.MergeFromWithOptions(oldCluster, ctrlruntimeclient.MergeFromWithOptimisticLock{})); err != nil {
@@ -287,10 +294,17 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, clus
 		}
 	}
 
-	if err := r.ensureCronJobSecret(ctx, cluster); err != nil {
-		return fmt.Errorf("failed to create backup secret: %v", err)
+	if err := r.ensureCronJobSecrets(ctx, cluster); err != nil {
+		return fmt.Errorf("failed to reconcile secrets: %v", err)
 	}
 
+	if err := r.ensureCronJobConfigMaps(ctx, cluster); err != nil {
+		return fmt.Errorf("failed to reconcile configmaps: %v", err)
+	}
+
+	if r.disabled {
+		return r.deleteCronJob(ctx, cluster)
+	}
 	return reconciling.ReconcileCronJobs(ctx, []reconciling.NamedCronJobCreatorGetter{r.cronjob(cluster)}, metav1.NamespaceSystem, r.Client)
 }
 
@@ -298,34 +312,35 @@ func (r *Reconciler) getEtcdSecretName(cluster *kubermaticv1.Cluster) string {
 	return fmt.Sprintf("cluster-%s-etcd-client-certificate", cluster.Name)
 }
 
-func (r *Reconciler) ensureCronJobSecret(ctx context.Context, cluster *kubermaticv1.Cluster) error {
+func (r *Reconciler) ensureCronJobSecrets(ctx context.Context, cluster *kubermaticv1.Cluster) error {
 	secretName := r.getEtcdSecretName(cluster)
 
 	getCA := func() (*triple.KeyPair, error) {
 		return resources.GetClusterRootCA(ctx, cluster.Status.NamespaceName, r.Client)
 	}
 
-	_, creator := certificates.GetClientCertificateCreator(
-		secretName,
-		"backup",
-		nil,
-		resources.BackupEtcdClientCertificateCertSecretKey,
-		resources.BackupEtcdClientCertificateKeySecretKey,
-		getCA,
-	)()
-
-	wrappedCreator := reconciling.SecretObjectWrapper(creator)
-	wrappedCreator = reconciling.OwnerRefWrapper(resources.GetClusterRef(cluster))(wrappedCreator)
-
-	err := reconciling.EnsureNamedObject(
-		ctx,
-		types.NamespacedName{Namespace: metav1.NamespaceSystem, Name: secretName},
-		wrappedCreator, r.Client, &corev1.Secret{}, false)
-	if err != nil {
-		return fmt.Errorf("failed to ensure Secret %q: %v", secretName, err)
+	creators := []reconciling.NamedSecretCreatorGetter{
+		certificates.GetClientCertificateCreator(
+			secretName,
+			"backup",
+			nil,
+			resources.BackupEtcdClientCertificateCertSecretKey,
+			resources.BackupEtcdClientCertificateKeySecretKey,
+			getCA,
+		),
 	}
 
-	return nil
+	return reconciling.ReconcileSecrets(ctx, creators, metav1.NamespaceSystem, r.Client, common.OwnershipModifierFactory(cluster, r.scheme))
+}
+
+func (r *Reconciler) ensureCronJobConfigMaps(ctx context.Context, cluster *kubermaticv1.Cluster) error {
+	name := resources.BackupCABundleConfigMapName(cluster)
+
+	creators := []reconciling.NamedConfigMapCreatorGetter{
+		certificates.CABundleConfigMapCreator(name, r.caBundle),
+	}
+
+	return reconciling.ReconcileConfigMaps(ctx, creators, metav1.NamespaceSystem, r.Client, common.OwnershipModifierFactory(cluster, r.scheme))
 }
 
 func (r *Reconciler) cleanupJob(cluster *kubermaticv1.Cluster) *batchv1.Job {
@@ -333,6 +348,12 @@ func (r *Reconciler) cleanupJob(cluster *kubermaticv1.Cluster) *batchv1.Job {
 	cleanupContainer.Env = append(cleanupContainer.Env, corev1.EnvVar{
 		Name:  clusterEnvVarKey,
 		Value: cluster.Name,
+	})
+
+	cleanupContainer.VolumeMounts = append(cleanupContainer.VolumeMounts, corev1.VolumeMount{
+		Name:      "ca-bundle",
+		MountPath: "/etc/ca-bundle",
+		ReadOnly:  true,
 	})
 
 	return &batchv1.Job{
@@ -359,6 +380,16 @@ func (r *Reconciler) cleanupJob(cluster *kubermaticv1.Cluster) *batchv1.Job {
 							Name: SharedVolumeName,
 							VolumeSource: corev1.VolumeSource{
 								EmptyDir: &corev1.EmptyDirVolumeSource{},
+							},
+						},
+						{
+							Name: "ca-bundle",
+							VolumeSource: corev1.VolumeSource{
+								ConfigMap: &corev1.ConfigMapVolumeSource{
+									LocalObjectReference: corev1.LocalObjectReference{
+										Name: resources.BackupCABundleConfigMapName(cluster),
+									},
+								},
 							},
 						},
 					},
@@ -420,8 +451,13 @@ func (r *Reconciler) cronjob(cluster *kubermaticv1.Cluster) reconciling.NamedCro
 							MountPath: "/backup",
 						},
 						{
-							Name:      r.getEtcdSecretName(cluster),
+							Name:      "etcd-client-certificate",
 							MountPath: "/etc/etcd/client",
+						},
+						{
+							Name:      "ca-bundle",
+							MountPath: "/etc/ca-bundle",
+							ReadOnly:  true,
 						},
 					},
 				},
@@ -431,6 +467,12 @@ func (r *Reconciler) cronjob(cluster *kubermaticv1.Cluster) reconciling.NamedCro
 			storeContainer.Env = append(storeContainer.Env, corev1.EnvVar{
 				Name:  clusterEnvVarKey,
 				Value: cluster.Name,
+			})
+
+			storeContainer.VolumeMounts = append(storeContainer.VolumeMounts, corev1.VolumeMount{
+				Name:      "ca-bundle",
+				MountPath: "/etc/ca-bundle/",
+				ReadOnly:  true,
 			})
 
 			cronJob.Spec.JobTemplate.Spec.Template.Spec.RestartPolicy = corev1.RestartPolicyNever
@@ -443,10 +485,20 @@ func (r *Reconciler) cronjob(cluster *kubermaticv1.Cluster) reconciling.NamedCro
 					},
 				},
 				{
-					Name: r.getEtcdSecretName(cluster),
+					Name: "etcd-client-certificate",
 					VolumeSource: corev1.VolumeSource{
 						Secret: &corev1.SecretVolumeSource{
 							SecretName: r.getEtcdSecretName(cluster),
+						},
+					},
+				},
+				{
+					Name: "ca-bundle",
+					VolumeSource: corev1.VolumeSource{
+						ConfigMap: &corev1.ConfigMapVolumeSource{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: resources.BackupCABundleConfigMapName(cluster),
+							},
 						},
 					},
 				},
@@ -455,7 +507,22 @@ func (r *Reconciler) cronjob(cluster *kubermaticv1.Cluster) reconciling.NamedCro
 			return cronJob, nil
 		}
 	}
+}
 
+func (r *Reconciler) deleteCronJob(ctx context.Context, cluster *kubermaticv1.Cluster) error {
+	name := fmt.Sprintf("%s-%s", cronJobPrefix, cluster.Name)
+	cj := &batchv1beta1.CronJob{}
+	err := r.Get(ctx, types.NamespacedName{Namespace: metav1.NamespaceSystem, Name: name}, cj)
+	if err != nil {
+		if kerrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	if err := r.Delete(ctx, cj, ctrlruntimeclient.PropagationPolicy(metav1.DeletePropagationBackground)); err != nil && !kerrors.IsNotFound(err) {
+		return errors.Wrapf(err, "failed to delete cronjob %s", name)
+	}
+	return nil
 }
 
 func parseDuration(interval time.Duration) (string, error) {

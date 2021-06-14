@@ -23,6 +23,7 @@ import (
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
 	"k8c.io/kubermatic/v2/pkg/resources"
+	"k8c.io/kubermatic/v2/pkg/resources/certificates"
 	"k8c.io/kubermatic/v2/pkg/resources/certificates/triple"
 	"k8c.io/kubermatic/v2/pkg/semver"
 
@@ -30,6 +31,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes/scheme"
 	certutil "k8s.io/client-go/util/cert"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlruntimefakeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -83,20 +85,23 @@ func TestEnsureBackupCronJob(t *testing.T) {
 		},
 	}
 
+	ctx := context.Background()
 	reconciler := &Reconciler{
 		log:                  kubermaticlog.New(true, kubermaticlog.FormatConsole).Sugar(),
 		storeContainer:       testStoreContainer,
 		cleanupContainer:     testCleanupContainer,
 		backupContainerImage: DefaultBackupContainerImage,
-		Client:               ctrlruntimefakeclient.NewFakeClient(caSecret, cluster),
+		Client:               ctrlruntimefakeclient.NewClientBuilder().WithObjects(caSecret, cluster).Build(),
+		scheme:               scheme.Scheme,
+		caBundle:             certificates.NewFakeCABundle(),
 	}
 
-	if _, err := reconciler.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{Name: cluster.Name}}); err != nil {
+	if _, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: types.NamespacedName{Name: cluster.Name}}); err != nil {
 		t.Fatalf("Error syncing cluster: %v", err)
 	}
 
 	cronJobs := &batchv1beta1.CronJobList{}
-	if err := reconciler.List(context.Background(), cronJobs); err != nil {
+	if err := reconciler.List(ctx, cronJobs); err != nil {
 		t.Fatalf("Error listing cronjobs: %v", err)
 	}
 
@@ -111,14 +116,14 @@ func TestEnsureBackupCronJob(t *testing.T) {
 
 	cronJobs.Items[0].Spec.JobTemplate.Spec.Template.Spec.Containers = []corev1.Container{}
 	cronJobs.Items[0].Spec.JobTemplate.Spec.Template.Spec.InitContainers = []corev1.Container{}
-	if err := reconciler.Update(context.Background(), &cronJobs.Items[0]); err != nil {
+	if err := reconciler.Update(ctx, &cronJobs.Items[0]); err != nil {
 		t.Fatalf("Failed to update cronjob")
 	}
-	if _, err := reconciler.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{Name: cluster.Name}}); err != nil {
+	if _, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: types.NamespacedName{Name: cluster.Name}}); err != nil {
 		t.Fatalf("Error syncin cluster: %v", err)
 	}
 
-	if err := reconciler.List(context.Background(), cronJobs); err != nil {
+	if err := reconciler.List(ctx, cronJobs); err != nil {
 		t.Fatalf("Error listing cronjobs after updating cronJob: %v", err)
 	}
 
@@ -135,7 +140,7 @@ func TestEnsureBackupCronJob(t *testing.T) {
 
 	secrets := &corev1.SecretList{}
 	listOpts := &ctrlruntimeclient.ListOptions{Namespace: metav1.NamespaceSystem}
-	if err := reconciler.List(context.Background(), secrets, listOpts); err != nil {
+	if err := reconciler.List(ctx, secrets, listOpts); err != nil {
 		t.Fatalf("failed to list secrets: %v", err)
 	}
 

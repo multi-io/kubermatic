@@ -64,16 +64,6 @@ spec:
         volumeMounts:
         - name: addons
           mountPath: /opt/addons
-      - name: copy-addons-openshift
-        image: '{{ .Values.kubermatic.controller.addons.openshift.image.repository }}:{{ .Values.kubermatic.controller.addons.openshift.image.tag }}'
-        imagePullPolicy: {{ .Values.kubermatic.controller.addons.openshift.image.pullPolicy }}
-        command: ["/bin/sh"]
-        args:
-        - "-c"
-        - "mkdir -p /opt/addons/openshift && cp -r /addons/* /opt/addons/openshift"
-        volumeMounts:
-        - name: addons
-          mountPath: /opt/addons
       containers:
       - name: seed-controller-manager
         command:
@@ -92,31 +82,28 @@ spec:
         - -updates=/opt/master-files/updates.yaml
         - -internal-address=0.0.0.0:8085
         - -kubernetes-addons-path=/opt/addons/kubernetes
-        - -openshift-addons-path=/opt/addons/openshift
         {{- if .Values.kubermatic.controller.addons.kubernetes.defaultAddonsFile }}
         - -kubernetes-addons-file=/opt/master-files/{{ .Values.kubermatic.controller.addons.kubernetes.defaultAddonsFile }}
         {{- else }}
         - -kubernetes-addons-list={{ join "," .Values.kubermatic.controller.addons.kubernetes.defaultAddons }}
         {{- end }}
-        {{- if .Values.kubermatic.controller.addons.openshift.defaultAddonsFile }}
-        - -openshift-addons-file=/opt/master-files/{{ .Values.kubermatic.controller.addons.openshift.defaultAddonsFile }}
-        {{- else }}
-        - -openshift-addons-list={{ join "," .Values.kubermatic.controller.addons.openshift.defaultAddons }}
-        {{- end }}
         - -overwrite-registry={{ .Values.kubermatic.controller.overwriteRegistry }}
+        {{- if .Values.kubermatic.etcdBackupsRestores.enabled }}
+        - -enable-etcd-backups-restores
+        {{- end }}
         - -backup-container=/opt/backup/store-container.yaml
+        {{- if or .Values.kubermatic.cleanupContainer (not .Values.kubermatic.etcdBackupsRestores.enabled) }}
         - -cleanup-container=/opt/backup/cleanup-container.yaml
-        {{- if .Values.kubermatic.deleteContainer }}
+        {{- end }}
+        {{- if .Values.kubermatic.etcdBackupsRestores.enabled }}
         - -backup-delete-container=/opt/backup/delete-container.yaml
         {{- end }}
         - -nodeport-range={{ .Values.kubermatic.controller.nodeportRange }}
         - -docker-pull-config-json-file=/opt/docker/.dockerconfigjson
         - -keycloak-cache-expiry={{ .Values.kubermatic.controller.keycloakCacheExpiry }}
+        - -ca-bundle=/opt/ca-bundle/ca-bundle.pem
         {{- if regexMatch ".*OpenIDAuthPlugin=true.*" (default "" .Values.kubermatic.controller.featureGates) }}
         # the following flags enable oidc auth plugin on kube-API servers
-        {{- if .Values.kubermatic.auth.caBundle }}
-        - -oidc-ca-file=/opt/dex-ca/caBundle.pem
-        {{- end }}
         - -oidc-issuer-url={{ .Values.kubermatic.auth.tokenIssuer }}
         - -oidc-issuer-client-id={{ .Values.kubermatic.auth.issuerClientID }}
         - -oidc-issuer-client-secret={{ .Values.kubermatic.auth.issuerClientSecret }}
@@ -185,6 +172,9 @@ spec:
           containerPort: 8085
           protocol: TCP
         volumeMounts:
+        - name: ca-bundle
+          mountPath: "/opt/ca-bundle/"
+          readOnly: true
         {{- if .Values.kubermatic.defaultComponentSettings }}
         - name: cluster-component-settings
           mountPath: "/opt/cluster-default-component-settings/"
@@ -241,6 +231,9 @@ spec:
       imagePullSecrets:
       - name: dockercfg
       volumes:
+      - name: ca-bundle
+        configMap:
+          name: ca-bundle
       {{- if .Values.kubermatic.defaultComponentSettings }}
       - name: cluster-component-settings
         configMap:

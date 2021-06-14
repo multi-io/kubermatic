@@ -355,7 +355,6 @@ func generateRBACRoleForClusterNamespaceResource(cluster *kubermaticv1.Cluster, 
 }
 
 // generateRBACRoleBindingForClusterNamespaceResource generates per-cluster RoleBinding for the given cluster in the cluster namespace
-// Note that for some groups we don't want to generate RoleBinding in that case a nil will be returned
 func generateRBACRoleBindingForClusterNamespaceResource(cluster *kubermaticv1.Cluster, groupName, kind string) *rbacv1.RoleBinding {
 	binding := &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{

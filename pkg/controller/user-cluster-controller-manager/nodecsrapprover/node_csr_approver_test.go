@@ -21,16 +21,16 @@ import (
 	"sync"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
 
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/typed/certificates/v1beta1/fake"
 	fakeclienttest "k8s.io/client-go/testing"
-
-	k8sclientfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
+	ctrlruntimefakeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -49,7 +49,7 @@ func TestReconciler_Reconcile(t *testing.T) {
 			name: "test approving a created certificate",
 			reconciler: reconciler{
 				log: kubermaticlog.New(true, kubermaticlog.FormatConsole).Sugar(),
-				Client: k8sclientfake.NewFakeClient(&certificatesv1beta1.CertificateSigningRequest{
+				Client: ctrlruntimefakeclient.NewClientBuilder().WithObjects(&certificatesv1beta1.CertificateSigningRequest{
 					ObjectMeta: metav1.ObjectMeta{
 						ResourceVersion: "123456",
 						Name:            "csr",
@@ -67,7 +67,7 @@ func TestReconciler_Reconcile(t *testing.T) {
 							"system:nodes",
 						},
 					},
-				}),
+				}).Build(),
 				certClient: &fake.FakeCertificateSigningRequests{
 					Fake: &fake.FakeCertificatesV1beta1{
 						Fake: &fakeclienttest.Fake{

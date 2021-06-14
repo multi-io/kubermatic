@@ -97,7 +97,7 @@ func DecodeAlibabaNoCredentialReq(c context.Context, r *http.Request) (interface
 	return req, nil
 }
 
-func AlibabaInstanceTypesEndpoint(presetsProvider provider.PresetProvider, userInfoGetter provider.UserInfoGetter) endpoint.Endpoint {
+func AlibabaInstanceTypesEndpoint(presetsProvider provider.PresetProvider, userInfoGetter provider.UserInfoGetter, settingsProvider provider.SettingsProvider) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(AlibabaReq)
 
@@ -118,14 +118,20 @@ func AlibabaInstanceTypesEndpoint(presetsProvider provider.PresetProvider, userI
 				accessKeySecret = credentials.AccessKeySecret
 			}
 		}
-		return providercommon.ListAlibabaInstanceTypes(ctx, accessKeyID, accessKeySecret, req.Region)
+
+		settings, err := settingsProvider.GetGlobalSettings()
+		if err != nil {
+			return nil, common.KubernetesErrorToHTTPError(err)
+		}
+
+		return providercommon.ListAlibabaInstanceTypes(accessKeyID, accessKeySecret, req.Region, settings.Spec.MachineDeploymentVMResourceQuota)
 	}
 }
 
-func AlibabaInstanceTypesWithClusterCredentialsEndpoint(projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, seedsGetter provider.SeedsGetter, userInfoGetter provider.UserInfoGetter) endpoint.Endpoint {
+func AlibabaInstanceTypesWithClusterCredentialsEndpoint(projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, seedsGetter provider.SeedsGetter, userInfoGetter provider.UserInfoGetter, settingsProvider provider.SettingsProvider) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(AlibabaNoCredentialReq)
-		return providercommon.AlibabaInstanceTypesWithClusterCredentialsEndpoint(ctx, userInfoGetter, projectProvider, privilegedProjectProvider, seedsGetter, req.ProjectID, req.ClusterID, req.Region)
+		return providercommon.AlibabaInstanceTypesWithClusterCredentialsEndpoint(ctx, userInfoGetter, projectProvider, privilegedProjectProvider, seedsGetter, settingsProvider, req.ProjectID, req.ClusterID, req.Region)
 	}
 }
 
@@ -150,7 +156,32 @@ func AlibabaZonesEndpoint(presetsProvider provider.PresetProvider, userInfoGette
 				accessKeySecret = credentials.AccessKeySecret
 			}
 		}
-		return providercommon.ListAlibabaZones(ctx, accessKeyID, accessKeySecret, req.Region)
+		return providercommon.ListAlibabaZones(accessKeyID, accessKeySecret, req.Region)
+	}
+}
+
+func AlibabaVSwitchesEndpoint(presetsProvider provider.PresetProvider, userInfoGetter provider.UserInfoGetter) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (interface{}, error) {
+		req := request.(AlibabaReq)
+
+		accessKeyID := req.AccessKeyID
+		accessKeySecret := req.AccessKeySecret
+
+		userInfo, err := userInfoGetter(ctx, "")
+		if err != nil {
+			return nil, common.KubernetesErrorToHTTPError(err)
+		}
+		if len(req.Credential) > 0 {
+			preset, err := presetsProvider.GetPreset(userInfo, req.Credential)
+			if err != nil {
+				return nil, errors.New(http.StatusInternalServerError, fmt.Sprintf("can not get preset %s for user %s", req.Credential, userInfo.Email))
+			}
+			if credentials := preset.Spec.Alibaba; credentials != nil {
+				accessKeyID = credentials.AccessKeyID
+				accessKeySecret = credentials.AccessKeySecret
+			}
+		}
+		return providercommon.ListAlibabaVSwitches(accessKeyID, accessKeySecret, req.Region)
 	}
 }
 

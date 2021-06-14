@@ -24,6 +24,7 @@ import (
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
 
 	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	handlercommon "k8c.io/kubermatic/v2/pkg/handler/common"
 	"k8c.io/kubermatic/v2/pkg/handler/middleware"
 	"k8c.io/kubermatic/v2/pkg/handler/v1/common"
@@ -37,7 +38,7 @@ import (
 
 const requestScheme = "https"
 
-func AlibabaInstanceTypesWithClusterCredentialsEndpoint(ctx context.Context, userInfoGetter provider.UserInfoGetter, projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, seedsGetter provider.SeedsGetter, projectID, clusterID, region string) (interface{}, error) {
+func AlibabaInstanceTypesWithClusterCredentialsEndpoint(ctx context.Context, userInfoGetter provider.UserInfoGetter, projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, seedsGetter provider.SeedsGetter, settingsProvider provider.SettingsProvider, projectID, clusterID, region string) (interface{}, error) {
 
 	clusterProvider := ctx.Value(middleware.ClusterProviderContextKey).(provider.ClusterProvider)
 
@@ -71,15 +72,21 @@ func AlibabaInstanceTypesWithClusterCredentialsEndpoint(ctx context.Context, use
 		return nil, err
 	}
 
-	return ListAlibabaInstanceTypes(ctx, accessKeyID, accessKeySecret, region)
+	settings, err := settingsProvider.GetGlobalSettings()
+	if err != nil {
+		return nil, common.KubernetesErrorToHTTPError(err)
+	}
+
+	return ListAlibabaInstanceTypes(accessKeyID, accessKeySecret, region, settings.Spec.MachineDeploymentVMResourceQuota)
 
 }
 
-func ListAlibabaInstanceTypes(ctx context.Context, accessKeyID string, accessKeySecret string, region string) (apiv1.AlibabaInstanceTypeList, error) {
+func ListAlibabaInstanceTypes(accessKeyID string, accessKeySecret string, region string, quota kubermaticv1.MachineDeploymentVMResourceQuota) (apiv1.AlibabaInstanceTypeList, error) {
 	// Alibaba has way too many instance types that are not all available in each region
 	// recommendedInstanceFamilies are those families that are recommended in this document:
 	// https://www.alibabacloud.com/help/doc-detail/25378.htm?spm=a2c63.p38356.b99.47.7acf342enhNVmo
 	recommendedInstanceFamilies := sets.NewString("ecs.g6", "ecs.g5", "ecs.g5se", "ecs.g5ne", "ecs.ic5", "ecs.c6", "ecs.c5", "ecs.r6", "ecs.r5", "ecs.d1ne", "ecs.i2", "ecs.i2g", "ecs.hfc6", "ecs.hfg6", "ecs.hfr6")
+	gpuInstanceFamilies := sets.NewString("ecs.gn3", "ecs.ga1", "ecs.gn4", "ecs.gn6i", "ecs.vgn6i", "ecs.gn6e", "ecs.gn6v", "ecs.vgn5i", "ecs.gn5", "ecs.gn5i")
 	availableInstanceFamilies := sets.String{}
 	instanceTypes := apiv1.AlibabaInstanceTypeList{}
 
@@ -96,6 +103,10 @@ func ListAlibabaInstanceTypes(ctx context.Context, accessKeyID string, accessKey
 	instTypeFamilies, err := client.DescribeInstanceTypeFamilies(requestFamilies)
 	if err != nil {
 		return nil, errors.New(http.StatusInternalServerError, fmt.Sprintf("failed to list instance type families: %v", err))
+	}
+
+	if quota.EnableGPU {
+		recommendedInstanceFamilies.Insert(gpuInstanceFamilies.List()...)
 	}
 
 	for _, instanceFamily := range instTypeFamilies.InstanceTypeFamilies.InstanceTypeFamily {
@@ -118,13 +129,37 @@ func ListAlibabaInstanceTypes(ctx context.Context, accessKeyID string, accessKey
 			it := apiv1.AlibabaInstanceType{
 				ID:           instType.InstanceTypeId,
 				CPUCoreCount: instType.CpuCoreCount,
+				GPUCoreCount: instType.GPUAmount,
 				MemorySize:   instType.MemorySize,
 			}
 			instanceTypes = append(instanceTypes, it)
 		}
 	}
 
-	return instanceTypes, nil
+	return filterByQuota(instanceTypes, quota), nil
+}
+
+func filterByQuota(instances apiv1.AlibabaInstanceTypeList, quota kubermaticv1.MachineDeploymentVMResourceQuota) apiv1.AlibabaInstanceTypeList {
+	filteredRecords := apiv1.AlibabaInstanceTypeList{}
+
+	// Range over the records and apply all the filters to each record.
+	// If the record passes all the filters, add it to the final slice.
+	for _, r := range instances {
+		keep := true
+
+		if !handlercommon.FilterCPU(r.CPUCoreCount, quota.MinCPU, quota.MaxCPU) {
+			keep = false
+		}
+		if !handlercommon.FilterMemory(int(r.MemorySize), quota.MinRAM, quota.MaxRAM) {
+			keep = false
+		}
+
+		if keep {
+			filteredRecords = append(filteredRecords, r)
+		}
+	}
+
+	return filteredRecords
 }
 
 func AlibabaZonesWithClusterCredentialsEndpoint(ctx context.Context, userInfoGetter provider.UserInfoGetter, projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, seedsGetter provider.SeedsGetter, projectID, clusterID, region string) (interface{}, error) {
@@ -160,10 +195,10 @@ func AlibabaZonesWithClusterCredentialsEndpoint(ctx context.Context, userInfoGet
 		return nil, err
 	}
 
-	return ListAlibabaZones(ctx, accessKeyID, accessKeySecret, region)
+	return ListAlibabaZones(accessKeyID, accessKeySecret, region)
 }
 
-func ListAlibabaZones(ctx context.Context, accessKeyID string, accessKeySecret string, region string) (apiv1.AlibabaZoneList, error) {
+func ListAlibabaZones(accessKeyID string, accessKeySecret string, region string) (apiv1.AlibabaZoneList, error) {
 	zones := apiv1.AlibabaZoneList{}
 
 	client, err := ecs.NewClientWithAccessKey(region, accessKeyID, accessKeySecret)
@@ -187,4 +222,66 @@ func ListAlibabaZones(ctx context.Context, accessKeyID string, accessKeySecret s
 	}
 
 	return zones, nil
+}
+
+func ListAlibabaVSwitches(accessKeyID string, accessKeySecret string, region string) (apiv1.AlibabaVSwitchList, error) {
+	vSwitches := apiv1.AlibabaVSwitchList{}
+
+	client, err := ecs.NewClientWithAccessKey(region, accessKeyID, accessKeySecret)
+	if err != nil {
+		return nil, errors.New(http.StatusInternalServerError, fmt.Sprintf("failed to create client: %v", err))
+	}
+
+	requestVSwitches := ecs.CreateDescribeVSwitchesRequest()
+	requestVSwitches.Scheme = requestScheme
+
+	responseVswitches, err := client.DescribeVSwitches(requestVSwitches)
+	if err != nil {
+		return nil, errors.New(http.StatusInternalServerError, fmt.Sprintf("failed to list vSwitches: %v", err))
+	}
+
+	for _, vSwitch := range responseVswitches.VSwitches.VSwitch {
+		vs := apiv1.AlibabaVSwitch{
+			ID: vSwitch.VSwitchId,
+		}
+		vSwitches = append(vSwitches, vs)
+	}
+
+	return vSwitches, nil
+}
+
+func AlibabaVswitchesWithClusterCredentialsEndpoint(ctx context.Context, userInfoGetter provider.UserInfoGetter, projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, seedsGetter provider.SeedsGetter, projectID, clusterID, region string) (interface{}, error) {
+	clusterProvider := ctx.Value(middleware.ClusterProviderContextKey).(provider.ClusterProvider)
+
+	cluster, err := handlercommon.GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, projectID, clusterID, &provider.ClusterGetOptions{CheckInitStatus: true})
+	if err != nil {
+		return nil, err
+	}
+	if cluster.Spec.Cloud.Alibaba == nil {
+		return nil, errors.NewNotFound("cloud spec for %s", clusterID)
+	}
+
+	datacenterName := cluster.Spec.Cloud.DatacenterName
+
+	assertedClusterProvider, ok := clusterProvider.(*kubernetesprovider.ClusterProvider)
+	if !ok {
+		return nil, errors.New(http.StatusInternalServerError, "failed to assert clusterProvider")
+	}
+
+	userInfo, err := userInfoGetter(ctx, "")
+	if err != nil {
+		return nil, common.KubernetesErrorToHTTPError(err)
+	}
+	_, datacenter, err := provider.DatacenterFromSeedMap(userInfo, seedsGetter, datacenterName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find Datacenter %q: %v", datacenterName, err)
+	}
+
+	secretKeySelector := provider.SecretKeySelectorValueFuncFactory(ctx, assertedClusterProvider.GetSeedClusterAdminRuntimeClient())
+	accessKeyID, accessKeySecret, err := alibaba.GetCredentialsForCluster(cluster.Spec.Cloud, secretKeySelector, datacenter.Spec.Alibaba)
+	if err != nil {
+		return nil, err
+	}
+
+	return ListAlibabaVSwitches(accessKeyID, accessKeySecret, region)
 }

@@ -20,9 +20,11 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"time"
 
 	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/addon"
 	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/addoninstaller"
+	backupcontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/backup"
 	cloudcontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/cloud"
 	constrainttemplatecontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/constraint-template-controller"
 	etcdbackupcontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/etcdbackup"
@@ -30,8 +32,8 @@ import (
 	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/initialmachinedeployment"
 	kubernetescontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/kubernetes"
 	localstoragepvwatcher "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/localstorage-pvwatcher"
+	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/mla"
 	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/monitoring"
-	openshiftcontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/openshift"
 	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/pvwatcher"
 	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/rancher"
 	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/seedresourcesuptodatecondition"
@@ -57,13 +59,13 @@ var AllControllers = map[string]controllerCreator{
 	// backupcontroller.ControllerName:               createBackupController,
 	monitoring.ControllerName:                     createMonitoringController,
 	cloudcontroller.ControllerName:                createCloudController,
-	openshiftcontroller.ControllerName:            createOpenshiftController,
 	seedresourcesuptodatecondition.ControllerName: createSeedConditionUpToDateController,
 	rancher.ControllerName:                        createRancherController,
 	pvwatcher.ControllerName:                      createPvWatcherController,
 	localstoragepvwatcher.ControllerName:          createLocalStoragePVController,
 	constrainttemplatecontroller.ControllerName:   createConstraintTemplateController,
 	initialmachinedeployment.ControllerName:       createInitialMachineDeploymentController,
+	mla.ControllerName:                            createMLAController,
 }
 
 type controllerCreator func(*controllerContext) error
@@ -96,40 +98,19 @@ func createCloudController(ctrlCtx *controllerContext) error {
 		ctrlCtx.seedGetter,
 		ctrlCtx.runOptions.workerName,
 		ctrlCtx.versions,
+		ctrlCtx.runOptions.caBundle.CertPool(),
 	); err != nil {
 		return fmt.Errorf("failed to add cloud controller to mgr: %v", err)
 	}
 	return nil
 }
 
-func createOpenshiftController(ctrlCtx *controllerContext) error {
-	if err := openshiftcontroller.Add(
-		ctrlCtx.mgr,
-		ctrlCtx.log,
-		ctrlCtx.runOptions.workerCount,
-		ctrlCtx.runOptions.workerName,
-		ctrlCtx.seedGetter,
-		ctrlCtx.clientProvider,
-		ctrlCtx.runOptions.overwriteRegistry,
-		ctrlCtx.runOptions.nodeAccessNetwork,
-		ctrlCtx.runOptions.etcdDiskSize,
-		ctrlCtx.dockerPullConfigJSON,
-		ctrlCtx.runOptions.externalURL,
-		ctrlCtx.runOptions.kubermaticImage,
-		ctrlCtx.runOptions.etcdLauncherImage,
-		ctrlCtx.runOptions.dnatControllerImage,
-		openshiftcontroller.Features{
-			EtcdDataCorruptionChecks: ctrlCtx.runOptions.featureGates.Enabled(features.EtcdDataCorruptionChecks),
-			VPA:                      ctrlCtx.runOptions.featureGates.Enabled(features.VerticalPodAutoscaler),
-		},
-		ctrlCtx.runOptions.concurrentClusterUpdate,
-		ctrlCtx.versions); err != nil {
-		return fmt.Errorf("failed to add openshift controller to mgr: %v", err)
-	}
-	return nil
-}
-
 func createKubernetesController(ctrlCtx *controllerContext) error {
+	backupInterval, err := time.ParseDuration(ctrlCtx.runOptions.backupInterval)
+	if err != nil {
+		return fmt.Errorf("failed to parse %s as duration: %v", ctrlCtx.runOptions.backupInterval, err)
+	}
+
 	return kubernetescontroller.Add(
 		ctrlCtx.mgr,
 		ctrlCtx.log,
@@ -152,7 +133,8 @@ func createKubernetesController(ctrlCtx *controllerContext) error {
 		ctrlCtx.dockerPullConfigJSON,
 		ctrlCtx.runOptions.nodeLocalDNSCacheEnabled(),
 		ctrlCtx.runOptions.concurrentClusterUpdate,
-		ctrlCtx.runOptions.oidcCAFile,
+		ctrlCtx.runOptions.enableEtcdBackupRestoreController,
+		backupInterval,
 		ctrlCtx.runOptions.oidcIssuerURL,
 		ctrlCtx.runOptions.oidcIssuerClientID,
 		ctrlCtx.runOptions.kubermaticImage,
@@ -160,6 +142,7 @@ func createKubernetesController(ctrlCtx *controllerContext) error {
 		ctrlCtx.runOptions.etcdLauncherImage,
 		ctrlCtx.runOptions.dnatControllerImage,
 		ctrlCtx.runOptions.tunnelingAgentIP.String(),
+		ctrlCtx.runOptions.caBundle,
 		kubernetescontroller.Features{
 			VPA:                          ctrlCtx.runOptions.featureGates.Enabled(features.VerticalPodAutoscaler),
 			EtcdDataCorruptionChecks:     ctrlCtx.runOptions.featureGates.Enabled(features.EtcdDataCorruptionChecks),
@@ -171,6 +154,9 @@ func createKubernetesController(ctrlCtx *controllerContext) error {
 }
 
 func createEtcdBackupController(ctrlCtx *controllerContext) error {
+	if !ctrlCtx.runOptions.enableEtcdBackupRestoreController {
+		return nil
+	}
 	storeContainer, err := getContainerFromFile(ctrlCtx.runOptions.backupContainerFile)
 	if err != nil {
 		return err
@@ -199,36 +185,49 @@ func createEtcdBackupController(ctrlCtx *controllerContext) error {
 		cleanupContainer,
 		ctrlCtx.runOptions.backupContainerImage,
 		ctrlCtx.versions,
+		ctrlCtx.runOptions.caBundle,
 	)
 }
 
-// Sys11: disable old backup controller.
-// func createBackupController(ctrlCtx *controllerContext) error {
-// 	storeContainer, err := getContainerFromFile(ctrlCtx.runOptions.backupContainerFile)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	cleanupContainer, err := getContainerFromFile(ctrlCtx.runOptions.cleanupContainerFile)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	backupInterval, err := time.ParseDuration(ctrlCtx.runOptions.backupInterval)
-// 	if err != nil {
-// 		return fmt.Errorf("failed to parse %s as duration: %v", ctrlCtx.runOptions.backupInterval, err)
-// 	}
-// 	return backupcontroller.Add(
-// 		ctrlCtx.log,
-// 		ctrlCtx.mgr,
-// 		ctrlCtx.runOptions.workerCount,
-// 		ctrlCtx.runOptions.workerName,
-// 		*storeContainer,
-// 		*cleanupContainer,
-// 		backupInterval,
-// 		ctrlCtx.runOptions.backupContainerImage,
-// 	)
-// }
+func createBackupController(ctrlCtx *controllerContext) error {
+	storeContainer, err := getContainerFromFile(ctrlCtx.runOptions.backupContainerFile)
+	if err != nil {
+		return err
+	}
+	var cleanupContainer *corev1.Container
+	if !ctrlCtx.runOptions.enableEtcdBackupRestoreController {
+		cleanupContainer, err = getContainerFromFile(ctrlCtx.runOptions.cleanupContainerFile)
+	} else {
+		// new backup controller is enabled, this one will only be run to delete any existing backup cronjob.
+		// cleanupContainer not needed, just pass an empty dummy
+		cleanupContainer = &corev1.Container{}
+	}
+	if err != nil {
+		return err
+	}
+	backupInterval, err := time.ParseDuration(ctrlCtx.runOptions.backupInterval)
+	if err != nil {
+		return fmt.Errorf("failed to parse %s as duration: %v", ctrlCtx.runOptions.backupInterval, err)
+	}
+	return backupcontroller.Add(
+		ctrlCtx.log,
+		ctrlCtx.mgr,
+		ctrlCtx.runOptions.workerCount,
+		ctrlCtx.runOptions.workerName,
+		*storeContainer,
+		*cleanupContainer,
+		backupInterval,
+		ctrlCtx.runOptions.backupContainerImage,
+		ctrlCtx.versions,
+		ctrlCtx.runOptions.enableEtcdBackupRestoreController,
+		ctrlCtx.runOptions.caBundle,
+	)
+}
 
 func createEtcdRestoreController(ctrlCtx *controllerContext) error {
+	if !ctrlCtx.runOptions.enableEtcdBackupRestoreController {
+		return nil
+	}
 	return etcdrestorecontroller.Add(
 		ctrlCtx.mgr,
 		ctrlCtx.log,
@@ -323,7 +322,6 @@ func createAddonController(ctrlCtx *controllerContext) error {
 			},
 		},
 		ctrlCtx.runOptions.kubernetesAddonsPath,
-		ctrlCtx.runOptions.openshiftAddonsPath,
 		ctrlCtx.runOptions.overwriteRegistry,
 		ctrlCtx.runOptions.nodeLocalDNSCacheEnabled(),
 		ctrlCtx.clientProvider,
@@ -340,7 +338,6 @@ func createAddonInstallerController(ctrlCtx *controllerContext) error {
 		ctrlCtx.runOptions.workerCount,
 		ctrlCtx.runOptions.workerName,
 		ctrlCtx.runOptions.kubernetesAddons,
-		ctrlCtx.runOptions.openshiftAddons,
 		ctrlCtx.versions,
 	)
 }
@@ -365,7 +362,6 @@ func createPvWatcherController(ctrlCtx *controllerContext) error {
 
 func createConstraintTemplateController(ctrlCtx *controllerContext) error {
 	return constrainttemplatecontroller.Add(
-		ctrlCtx.ctx,
 		ctrlCtx.mgr,
 		ctrlCtx.clientProvider,
 		ctrlCtx.log,
@@ -392,4 +388,21 @@ func createLocalStoragePVController(ctrlCtx *controllerContext) error {
 		ctrlCtx.log,
 		ctrlCtx.mgr,
 		ctrlCtx.runOptions.workerCount)
+}
+
+func createMLAController(ctrlCtx *controllerContext) error {
+	if !ctrlCtx.runOptions.featureGates.Enabled(features.UserClusterMLA) {
+		return nil
+	}
+	return mla.Add(
+		ctrlCtx.ctx,
+		ctrlCtx.mgr,
+		ctrlCtx.log,
+		ctrlCtx.runOptions.workerCount,
+		ctrlCtx.runOptions.workerName,
+		ctrlCtx.versions,
+		ctrlCtx.runOptions.grafanaURL,
+		ctrlCtx.runOptions.grafanaHeaderName,
+		ctrlCtx.runOptions.grafanaSecret,
+	)
 }

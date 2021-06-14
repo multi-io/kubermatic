@@ -105,8 +105,6 @@ func newRunner(scenarios []testScenario, opts *Opts, log *zap.SugaredLogger) *te
 		seedClusterClient:            opts.seedClusterClient,
 		seedGeneratedClient:          opts.seedGeneratedClient,
 		existingClusterLabel:         opts.existingClusterLabel,
-		openshift:                    opts.openshift,
-		openshiftPullSecret:          opts.openshiftPullSecret,
 		printGinkoLogs:               opts.printGinkoLogs,
 		printContainerLogs:           opts.printContainerLogs,
 		onlyTestCreation:             opts.onlyTestCreation,
@@ -118,21 +116,19 @@ func newRunner(scenarios []testScenario, opts *Opts, log *zap.SugaredLogger) *te
 }
 
 type testRunner struct {
-	log                 *zap.SugaredLogger
-	scenarios           []testScenario
-	secrets             secrets
-	namePrefix          string
-	repoRoot            string
-	reportsRoot         string
-	PublicKeys          [][]byte
-	workerName          string
-	homeDir             string
-	openshift           bool
-	openshiftPullSecret string
-	printGinkoLogs      bool
-	printContainerLogs  bool
-	onlyTestCreation    bool
-	pspEnabled          bool
+	log                *zap.SugaredLogger
+	scenarios          []testScenario
+	secrets            secrets
+	namePrefix         string
+	repoRoot           string
+	reportsRoot        string
+	PublicKeys         [][]byte
+	workerName         string
+	homeDir            string
+	printGinkoLogs     bool
+	printContainerLogs bool
+	onlyTestCreation   bool
+	pspEnabled         bool
 
 	controlPlaneReadyWaitTimeout time.Duration
 	nodeReadyTimeout             time.Duration
@@ -456,10 +452,6 @@ func (r *testRunner) executeTests(
 	}
 
 	overallTimeout := r.nodeReadyTimeout
-	if cluster.IsOpenshift() {
-		// Openshift installs a lot more during node provisioning, hence this may take longer
-		overallTimeout += 5 * time.Minute
-	}
 	// The initialization of the external CCM is super slow
 	if cluster.Spec.Features[kubermaticv1.ClusterFeatureExternalCloudProvider] {
 		overallTimeout += 5 * time.Minute
@@ -663,11 +655,6 @@ func (r *testRunner) testCluster(
 	const maxTestAttempts = 3
 	// var err error
 	log.Info("Starting to test cluster...")
-
-	if r.openshift {
-		// Openshift supports neither the conformance tests nor PVs/LBs yet :/
-		return nil
-	}
 
 	ginkgoRuns, err := r.getGinkgoRuns(log, scenario, kubeconfigFilename, cloudConfigFilename, cluster)
 	if err != nil {
@@ -903,6 +890,7 @@ func (r *testRunner) getKubeconfig(ctx context.Context, log *zap.SugaredLogger, 
 	}); err != nil {
 		return "", fmt.Errorf("failed to wait for kubeconfig: %v", err)
 	}
+
 	filename := path.Join(r.homeDir, fmt.Sprintf("%s-kubeconfig", cluster.Name))
 	if err := ioutil.WriteFile(filename, kubeconfig, 0644); err != nil {
 		return "", fmt.Errorf("failed to write kubeconfig to %s: %v", filename, err)
@@ -944,13 +932,6 @@ func (r *testRunner) createCluster(ctx context.Context, log *zap.SugaredLogger, 
 	log.Info("Creating cluster via Kubermatic API")
 
 	cluster := scenario.Cluster(r.secrets)
-	if r.openshift {
-		cluster.Cluster.Type = "openshift"
-		cluster.Cluster.Spec.Openshift = &apimodels.Openshift{
-			ImagePullSecret: r.openshiftPullSecret,
-		}
-	}
-
 	// The cluster name must be unique per project.
 	// We build up a readable name with the various cli parameters & add a random string in the end to ensure
 	// we really have a unique name
@@ -1158,7 +1139,7 @@ func (r *testRunner) getGinkgoRuns(
 	nodeNumberTotal := int32(r.nodeCount)
 
 	ginkgoSkipParallel := `\[Serial\]`
-	if minor := cluster.Spec.Version.Minor(); minor >= 16 && minor <= 20 {
+	if minor := cluster.Spec.Version.Minor(); minor >= 16 && minor <= 21 {
 		// These require the nodes NodePort to be available from the tester, which is not the case for us.
 		// TODO: Maybe add an option to allow the NodePorts in the SecurityGroup?
 		ginkgoSkipParallel = strings.Join([]string{
@@ -1237,9 +1218,6 @@ func (r *testRunner) getGinkgoRuns(
 		case osSpec.Centos != nil:
 			args = append(args, "--node-os-distro=centos")
 			env = append(env, "KUBE_SSH_USER=centos")
-		case osSpec.ContainerLinux != nil:
-			args = append(args, "--node-os-distro=coreos")
-			env = append(env, "KUBE_SSH_USER=core")
 		case osSpec.Flatcar != nil:
 			args = append(args, "--node-os-distro=flatcar")
 			env = append(env, "KUBE_SSH_USER=core")

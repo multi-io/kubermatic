@@ -29,7 +29,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	fakectrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -106,20 +105,6 @@ func TestReconcile(t *testing.T) {
 			expectedLabels: map[string]string{"x-kubernetes.io/distribution": "centos"},
 		},
 		{
-			name: "container linux label gets added",
-			node: &corev1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: requestName,
-				},
-				Status: corev1.NodeStatus{
-					NodeInfo: corev1.NodeSystemInfo{
-						OSImage: "container linux",
-					},
-				},
-			},
-			expectedLabels: map[string]string{"x-kubernetes.io/distribution": "container-linux"},
-		},
-		{
 			name: "sles label gets added",
 			node: &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
@@ -162,12 +147,13 @@ func TestReconcile(t *testing.T) {
 		tc := testCases[idx]
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			var client ctrlruntimeclient.Client
+
+			clientBuilder := fakectrlruntimeclient.NewClientBuilder()
 			if tc.node != nil {
-				client = fakectrlruntimeclient.NewFakeClient(tc.node)
-			} else {
-				client = fakectrlruntimeclient.NewFakeClient()
+				clientBuilder.WithObjects(tc.node)
 			}
+
+			client := clientBuilder.Build()
 			r := &reconciler{
 				log:      kubermaticlog.Logger,
 				client:   client,
@@ -175,8 +161,9 @@ func TestReconcile(t *testing.T) {
 				labels:   tc.reconcilerLabels,
 			}
 
+			ctx := context.Background()
 			request := reconcile.Request{NamespacedName: types.NamespacedName{Name: requestName}}
-			_, err := r.Reconcile(request)
+			_, err := r.Reconcile(ctx, request)
 			var actualErr string
 			if err != nil {
 				actualErr = err.Error()
@@ -190,7 +177,7 @@ func TestReconcile(t *testing.T) {
 			}
 
 			node := &corev1.Node{}
-			if err := client.Get(context.Background(), request.NamespacedName, node); err != nil {
+			if err := client.Get(ctx, request.NamespacedName, node); err != nil {
 				t.Fatalf("failed to get node: %v", err)
 			}
 
@@ -206,10 +193,6 @@ func TestMatchOSLabels(t *testing.T) {
 		osImage  string
 		expected string
 	}{
-		{
-			osImage:  "container linux",
-			expected: api.ContainerLinuxLabelValue,
-		},
 		{
 			osImage:  "flatcar container linux",
 			expected: api.FlatcarLabelValue,

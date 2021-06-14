@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	controllerruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
+	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -72,7 +72,7 @@ func (d *Deletion) cleanupLBs(ctx context.Context, log *zap.SugaredLogger, clust
 	return deletedSomeLBs, nil
 }
 
-func (d *Deletion) cleanupLB(ctx context.Context, log *zap.SugaredLogger, userClusterClient controllerruntimeclient.Client, service *corev1.Service, cluster *kubermaticv1.Cluster) error {
+func (d *Deletion) cleanupLB(ctx context.Context, log *zap.SugaredLogger, userClusterClient ctrlruntimeclient.Client, service *corev1.Service, cluster *kubermaticv1.Cluster) error {
 	log.Debug("Deleting service...")
 	if err := userClusterClient.Delete(ctx, service); err != nil {
 		return fmt.Errorf("failed to delete service: %v", err)
@@ -145,7 +145,7 @@ func (d *Deletion) checkIfAllLoadbalancersAreGone(ctx context.Context, cluster *
 	for deletedLB := range deletedLoadBalancers {
 		selector := fields.OneTermEqualSelector("involvedObject.uid", deletedLB)
 		events := &corev1.EventList{}
-		if err := userClusterClient.List(context.Background(), events, &controllerruntimeclient.ListOptions{FieldSelector: selector}); err != nil {
+		if err := userClusterClient.List(context.Background(), events, &ctrlruntimeclient.ListOptions{FieldSelector: selector}); err != nil {
 			return false, fmt.Errorf("failed to get service events: %v", err)
 		}
 		for _, event := range events.Items {

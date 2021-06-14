@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM alpine:3.12
+FROM alpine:3.13
+LABEL maintainer="support@kubermatic.com"
 
-ENV MC_VERSION=RELEASE.2020-09-03T00-08-28Z \
-    KUBECTL_VERSION=v1.18.8 \
-    HELM_VERSION=v2.16.9 \
-    VAULT_VERSION=1.5.1 \
-    YQ_VERSION=3.3.4 \
-    WWHRD_VERSION=0.3.0
+ENV MC_VERSION=RELEASE.2021-03-12T03-36-59Z \
+    KUBECTL_VERSION=v1.20.5 \
+    HELM_VERSION=v2.17.0 \
+    VAULT_VERSION=1.6.3 \
+    YQ_VERSION=3.3.4
 
 RUN apk add --no-cache -U \
     bash \
@@ -59,7 +59,3 @@ RUN curl -Lo vault.zip https://releases.hashicorp.com/vault/${VAULT_VERSION}/vau
     rm vault.zip && \
     mv vault /usr/bin/vault && \
     vault version
-
-RUN curl -L https://github.com/frapposelli/wwhrd/releases/download/v{$WWHRD_VERSION}/wwhrd_{$WWHRD_VERSION}_linux_amd64.tar.gz | tar -xvz wwhrd && \
-    mv wwhrd /usr/bin/wwhrd && \
-    wwhrd -v

@@ -63,11 +63,10 @@ type userclusterControllerData interface {
 	KubermaticAPIImage() string
 	KubermaticDockerTag() string
 	GetKubernetesCloudProviderName() string
-	CloudCredentialSecretTemplate() ([]byte, error)
 }
 
 // DeploymentCreator returns the function to create and update the user cluster controller deployment
-func DeploymentCreator(data userclusterControllerData, openshift bool) reconciling.NamedDeploymentCreatorGetter {
+func DeploymentCreator(data userclusterControllerData) reconciling.NamedDeploymentCreatorGetter {
 	return func() (string, reconciling.DeploymentCreator) {
 		return resources.UserClusterControllerDeploymentName, func(dep *appsv1.Deployment) (*appsv1.Deployment, error) {
 			dep.Name = resources.UserClusterControllerDeploymentName
@@ -127,12 +126,14 @@ func DeploymentCreator(data userclusterControllerData, openshift bool) reconcili
 				"-dns-cluster-ip", dnsClusterIP,
 				"-openvpn-server-port", fmt.Sprint(openvpnServerPort),
 				"-overwrite-registry", data.ImageRegistry(""),
-				fmt.Sprintf("-openshift=%t", openshift),
 				"-version", data.Cluster().Spec.Version.String(),
 				"-cloud-provider-name", data.GetKubernetesCloudProviderName(),
 				"-owner-email", data.Cluster().Status.UserEmail,
 				fmt.Sprintf("-enable-ssh-key-agent=%t", data.Cluster().Spec.EnableUserSSHKeyAgent),
 				fmt.Sprintf("-opa-integration=%t", data.Cluster().Spec.OPAIntegration != nil && data.Cluster().Spec.OPAIntegration.Enabled),
+				fmt.Sprintf("-user-cluster-monitoring=%t", data.Cluster().Spec.MLA != nil && data.Cluster().Spec.MLA.MonitoringEnabled),
+				fmt.Sprintf("-user-cluster-logging=%t", data.Cluster().Spec.MLA != nil && data.Cluster().Spec.MLA.LoggingEnabled),
+				fmt.Sprintf("-ca-bundle=/opt/ca-bundle/%s", resources.CABundleConfigMapKey),
 			}, getNetworkArgs(data)...)
 
 			if data.Cluster().Spec.ClusterNetwork.DNSDomain != "" {
@@ -142,10 +143,6 @@ func DeploymentCreator(data userclusterControllerData, openshift bool) reconcili
 			if data.Cluster().Spec.ExposeStrategy == kubermaticv1.ExposeStrategyTunneling {
 				args = append(args, "-tunneling-agent-ip", data.Cluster().Address.IP)
 				args = append(args, "-kas-secure-port", fmt.Sprint(data.Cluster().Address.Port))
-			}
-
-			if openshiftConsoleCallbackURI := data.Cluster().Address.OpenshiftConsoleCallBack; openshiftConsoleCallbackURI != "" {
-				args = append(args, "-openshift-console-callback-uri", openshiftConsoleCallbackURI)
 			}
 
 			if data.Cluster().Spec.UpdateWindow != nil && data.Cluster().Spec.UpdateWindow.Length != "" && data.Cluster().Spec.UpdateWindow.Start != "" {
@@ -162,14 +159,6 @@ func DeploymentCreator(data userclusterControllerData, openshift bool) reconcili
 			}
 			if labelArgsValue != "" {
 				args = append(args, "-node-labels", labelArgsValue)
-			}
-
-			cloudCredentialSecretTemplate, err := data.CloudCredentialSecretTemplate()
-			if err != nil {
-				return nil, fmt.Errorf("failed to get cloud-credential-secret-template: %v", err)
-			}
-			if cloudCredentialSecretTemplate != nil {
-				args = append(args, "-cloud-credential-secret-template", string(cloudCredentialSecretTemplate))
 			}
 
 			dep.Spec.Template.Spec.InitContainers = []corev1.Container{}
@@ -193,7 +182,7 @@ func DeploymentCreator(data userclusterControllerData, openshift bool) reconcili
 					ReadinessProbe: &corev1.Probe{
 						Handler: corev1.Handler{
 							HTTPGet: &corev1.HTTPGetAction{
-								Path:   "/ready",
+								Path:   "/readyz",
 								Port:   intstr.FromInt(8086),
 								Scheme: corev1.URISchemeHTTP,
 							},
@@ -207,6 +196,11 @@ func DeploymentCreator(data userclusterControllerData, openshift bool) reconcili
 						{
 							Name:      resources.InternalUserClusterAdminKubeconfigSecretName,
 							MountPath: "/etc/kubernetes/kubeconfig",
+							ReadOnly:  true,
+						},
+						{
+							Name:      "ca-bundle",
+							MountPath: "/opt/ca-bundle/",
 							ReadOnly:  true,
 						},
 					},
@@ -236,6 +230,16 @@ func getVolumes() []corev1.Volume {
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName: resources.InternalUserClusterAdminKubeconfigSecretName,
+				},
+			},
+		},
+		{
+			Name: "ca-bundle",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: resources.CABundleConfigMapName,
+					},
 				},
 			},
 		},

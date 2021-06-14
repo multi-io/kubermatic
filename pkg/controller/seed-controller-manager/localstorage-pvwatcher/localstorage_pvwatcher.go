@@ -78,9 +78,7 @@ func Add(
 
 // Reconcile check if a node hosting a terminating local storage PV is still present
 // and removes "kubernetes.io/pv-protection" finalizer of PV if it is gone.
-func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log := r.log.With("request", request)
 	log.Debug("Processing")
 

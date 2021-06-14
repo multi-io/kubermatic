@@ -4,7 +4,6 @@ package reconciling
 import (
 	"context"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -32,7 +31,7 @@ type NamedNamespaceCreatorGetter = func() (name string, create NamespaceCreator)
 // NamespaceObjectWrapper adds a wrapper so the NamespaceCreator matches ObjectCreator.
 // This is needed as Go does not support function interface matching.
 func NamespaceObjectWrapper(create NamespaceCreator) ObjectCreator {
-	return func(existing runtime.Object) (runtime.Object, error) {
+	return func(existing ctrlruntimeclient.Object) (ctrlruntimeclient.Object, error) {
 		if existing != nil {
 			return create(existing.(*corev1.Namespace))
 		}
@@ -73,7 +72,7 @@ type NamedServiceCreatorGetter = func() (name string, create ServiceCreator)
 // ServiceObjectWrapper adds a wrapper so the ServiceCreator matches ObjectCreator.
 // This is needed as Go does not support function interface matching.
 func ServiceObjectWrapper(create ServiceCreator) ObjectCreator {
-	return func(existing runtime.Object) (runtime.Object, error) {
+	return func(existing ctrlruntimeclient.Object) (ctrlruntimeclient.Object, error) {
 		if existing != nil {
 			return create(existing.(*corev1.Service))
 		}
@@ -114,7 +113,7 @@ type NamedSecretCreatorGetter = func() (name string, create SecretCreator)
 // SecretObjectWrapper adds a wrapper so the SecretCreator matches ObjectCreator.
 // This is needed as Go does not support function interface matching.
 func SecretObjectWrapper(create SecretCreator) ObjectCreator {
-	return func(existing runtime.Object) (runtime.Object, error) {
+	return func(existing ctrlruntimeclient.Object) (ctrlruntimeclient.Object, error) {
 		if existing != nil {
 			return create(existing.(*corev1.Secret))
 		}
@@ -155,7 +154,7 @@ type NamedConfigMapCreatorGetter = func() (name string, create ConfigMapCreator)
 // ConfigMapObjectWrapper adds a wrapper so the ConfigMapCreator matches ObjectCreator.
 // This is needed as Go does not support function interface matching.
 func ConfigMapObjectWrapper(create ConfigMapCreator) ObjectCreator {
-	return func(existing runtime.Object) (runtime.Object, error) {
+	return func(existing ctrlruntimeclient.Object) (ctrlruntimeclient.Object, error) {
 		if existing != nil {
 			return create(existing.(*corev1.ConfigMap))
 		}
@@ -196,7 +195,7 @@ type NamedServiceAccountCreatorGetter = func() (name string, create ServiceAccou
 // ServiceAccountObjectWrapper adds a wrapper so the ServiceAccountCreator matches ObjectCreator.
 // This is needed as Go does not support function interface matching.
 func ServiceAccountObjectWrapper(create ServiceAccountCreator) ObjectCreator {
-	return func(existing runtime.Object) (runtime.Object, error) {
+	return func(existing ctrlruntimeclient.Object) (ctrlruntimeclient.Object, error) {
 		if existing != nil {
 			return create(existing.(*corev1.ServiceAccount))
 		}
@@ -237,7 +236,7 @@ type NamedStatefulSetCreatorGetter = func() (name string, create StatefulSetCrea
 // StatefulSetObjectWrapper adds a wrapper so the StatefulSetCreator matches ObjectCreator.
 // This is needed as Go does not support function interface matching.
 func StatefulSetObjectWrapper(create StatefulSetCreator) ObjectCreator {
-	return func(existing runtime.Object) (runtime.Object, error) {
+	return func(existing ctrlruntimeclient.Object) (ctrlruntimeclient.Object, error) {
 		if existing != nil {
 			return create(existing.(*appsv1.StatefulSet))
 		}
@@ -279,7 +278,7 @@ type NamedDeploymentCreatorGetter = func() (name string, create DeploymentCreato
 // DeploymentObjectWrapper adds a wrapper so the DeploymentCreator matches ObjectCreator.
 // This is needed as Go does not support function interface matching.
 func DeploymentObjectWrapper(create DeploymentCreator) ObjectCreator {
-	return func(existing runtime.Object) (runtime.Object, error) {
+	return func(existing ctrlruntimeclient.Object) (ctrlruntimeclient.Object, error) {
 		if existing != nil {
 			return create(existing.(*appsv1.Deployment))
 		}
@@ -321,7 +320,7 @@ type NamedDaemonSetCreatorGetter = func() (name string, create DaemonSetCreator)
 // DaemonSetObjectWrapper adds a wrapper so the DaemonSetCreator matches ObjectCreator.
 // This is needed as Go does not support function interface matching.
 func DaemonSetObjectWrapper(create DaemonSetCreator) ObjectCreator {
-	return func(existing runtime.Object) (runtime.Object, error) {
+	return func(existing ctrlruntimeclient.Object) (ctrlruntimeclient.Object, error) {
 		if existing != nil {
 			return create(existing.(*appsv1.DaemonSet))
 		}
@@ -363,7 +362,7 @@ type NamedPodDisruptionBudgetCreatorGetter = func() (name string, create PodDisr
 // PodDisruptionBudgetObjectWrapper adds a wrapper so the PodDisruptionBudgetCreator matches ObjectCreator.
 // This is needed as Go does not support function interface matching.
 func PodDisruptionBudgetObjectWrapper(create PodDisruptionBudgetCreator) ObjectCreator {
-	return func(existing runtime.Object) (runtime.Object, error) {
+	return func(existing ctrlruntimeclient.Object) (ctrlruntimeclient.Object, error) {
 		if existing != nil {
 			return create(existing.(*policyv1beta1.PodDisruptionBudget))
 		}
@@ -404,7 +403,7 @@ type NamedVerticalPodAutoscalerCreatorGetter = func() (name string, create Verti
 // VerticalPodAutoscalerObjectWrapper adds a wrapper so the VerticalPodAutoscalerCreator matches ObjectCreator.
 // This is needed as Go does not support function interface matching.
 func VerticalPodAutoscalerObjectWrapper(create VerticalPodAutoscalerCreator) ObjectCreator {
-	return func(existing runtime.Object) (runtime.Object, error) {
+	return func(existing ctrlruntimeclient.Object) (ctrlruntimeclient.Object, error) {
 		if existing != nil {
 			return create(existing.(*autoscalingv1beta2.VerticalPodAutoscaler))
 		}
@@ -445,7 +444,7 @@ type NamedClusterRoleBindingCreatorGetter = func() (name string, create ClusterR
 // ClusterRoleBindingObjectWrapper adds a wrapper so the ClusterRoleBindingCreator matches ObjectCreator.
 // This is needed as Go does not support function interface matching.
 func ClusterRoleBindingObjectWrapper(create ClusterRoleBindingCreator) ObjectCreator {
-	return func(existing runtime.Object) (runtime.Object, error) {
+	return func(existing ctrlruntimeclient.Object) (ctrlruntimeclient.Object, error) {
 		if existing != nil {
 			return create(existing.(*rbacv1.ClusterRoleBinding))
 		}
@@ -486,7 +485,7 @@ type NamedClusterRoleCreatorGetter = func() (name string, create ClusterRoleCrea
 // ClusterRoleObjectWrapper adds a wrapper so the ClusterRoleCreator matches ObjectCreator.
 // This is needed as Go does not support function interface matching.
 func ClusterRoleObjectWrapper(create ClusterRoleCreator) ObjectCreator {
-	return func(existing runtime.Object) (runtime.Object, error) {
+	return func(existing ctrlruntimeclient.Object) (ctrlruntimeclient.Object, error) {
 		if existing != nil {
 			return create(existing.(*rbacv1.ClusterRole))
 		}
@@ -527,7 +526,7 @@ type NamedRoleCreatorGetter = func() (name string, create RoleCreator)
 // RoleObjectWrapper adds a wrapper so the RoleCreator matches ObjectCreator.
 // This is needed as Go does not support function interface matching.
 func RoleObjectWrapper(create RoleCreator) ObjectCreator {
-	return func(existing runtime.Object) (runtime.Object, error) {
+	return func(existing ctrlruntimeclient.Object) (ctrlruntimeclient.Object, error) {
 		if existing != nil {
 			return create(existing.(*rbacv1.Role))
 		}
@@ -568,7 +567,7 @@ type NamedRoleBindingCreatorGetter = func() (name string, create RoleBindingCrea
 // RoleBindingObjectWrapper adds a wrapper so the RoleBindingCreator matches ObjectCreator.
 // This is needed as Go does not support function interface matching.
 func RoleBindingObjectWrapper(create RoleBindingCreator) ObjectCreator {
-	return func(existing runtime.Object) (runtime.Object, error) {
+	return func(existing ctrlruntimeclient.Object) (ctrlruntimeclient.Object, error) {
 		if existing != nil {
 			return create(existing.(*rbacv1.RoleBinding))
 		}
@@ -609,7 +608,7 @@ type NamedCustomResourceDefinitionCreatorGetter = func() (name string, create Cu
 // CustomResourceDefinitionObjectWrapper adds a wrapper so the CustomResourceDefinitionCreator matches ObjectCreator.
 // This is needed as Go does not support function interface matching.
 func CustomResourceDefinitionObjectWrapper(create CustomResourceDefinitionCreator) ObjectCreator {
-	return func(existing runtime.Object) (runtime.Object, error) {
+	return func(existing ctrlruntimeclient.Object) (ctrlruntimeclient.Object, error) {
 		if existing != nil {
 			return create(existing.(*apiextensionsv1beta1.CustomResourceDefinition))
 		}
@@ -650,7 +649,7 @@ type NamedCronJobCreatorGetter = func() (name string, create CronJobCreator)
 // CronJobObjectWrapper adds a wrapper so the CronJobCreator matches ObjectCreator.
 // This is needed as Go does not support function interface matching.
 func CronJobObjectWrapper(create CronJobCreator) ObjectCreator {
-	return func(existing runtime.Object) (runtime.Object, error) {
+	return func(existing ctrlruntimeclient.Object) (ctrlruntimeclient.Object, error) {
 		if existing != nil {
 			return create(existing.(*batchv1beta1.CronJob))
 		}
@@ -692,7 +691,7 @@ type NamedMutatingWebhookConfigurationCreatorGetter = func() (name string, creat
 // MutatingWebhookConfigurationObjectWrapper adds a wrapper so the MutatingWebhookConfigurationCreator matches ObjectCreator.
 // This is needed as Go does not support function interface matching.
 func MutatingWebhookConfigurationObjectWrapper(create MutatingWebhookConfigurationCreator) ObjectCreator {
-	return func(existing runtime.Object) (runtime.Object, error) {
+	return func(existing ctrlruntimeclient.Object) (ctrlruntimeclient.Object, error) {
 		if existing != nil {
 			return create(existing.(*admissionregistrationv1.MutatingWebhookConfiguration))
 		}
@@ -733,7 +732,7 @@ type NamedValidatingWebhookConfigurationCreatorGetter = func() (name string, cre
 // ValidatingWebhookConfigurationObjectWrapper adds a wrapper so the ValidatingWebhookConfigurationCreator matches ObjectCreator.
 // This is needed as Go does not support function interface matching.
 func ValidatingWebhookConfigurationObjectWrapper(create ValidatingWebhookConfigurationCreator) ObjectCreator {
-	return func(existing runtime.Object) (runtime.Object, error) {
+	return func(existing ctrlruntimeclient.Object) (ctrlruntimeclient.Object, error) {
 		if existing != nil {
 			return create(existing.(*admissionregistrationv1.ValidatingWebhookConfiguration))
 		}
@@ -774,7 +773,7 @@ type NamedAPIServiceCreatorGetter = func() (name string, create APIServiceCreato
 // APIServiceObjectWrapper adds a wrapper so the APIServiceCreator matches ObjectCreator.
 // This is needed as Go does not support function interface matching.
 func APIServiceObjectWrapper(create APIServiceCreator) ObjectCreator {
-	return func(existing runtime.Object) (runtime.Object, error) {
+	return func(existing ctrlruntimeclient.Object) (ctrlruntimeclient.Object, error) {
 		if existing != nil {
 			return create(existing.(*apiregistrationv1beta1.APIService))
 		}
@@ -815,7 +814,7 @@ type NamedIngressCreatorGetter = func() (name string, create IngressCreator)
 // IngressObjectWrapper adds a wrapper so the IngressCreator matches ObjectCreator.
 // This is needed as Go does not support function interface matching.
 func IngressObjectWrapper(create IngressCreator) ObjectCreator {
-	return func(existing runtime.Object) (runtime.Object, error) {
+	return func(existing ctrlruntimeclient.Object) (ctrlruntimeclient.Object, error) {
 		if existing != nil {
 			return create(existing.(*networkingv1beta1.Ingress))
 		}
@@ -856,7 +855,7 @@ type NamedSeedCreatorGetter = func() (name string, create SeedCreator)
 // SeedObjectWrapper adds a wrapper so the SeedCreator matches ObjectCreator.
 // This is needed as Go does not support function interface matching.
 func SeedObjectWrapper(create SeedCreator) ObjectCreator {
-	return func(existing runtime.Object) (runtime.Object, error) {
+	return func(existing ctrlruntimeclient.Object) (ctrlruntimeclient.Object, error) {
 		if existing != nil {
 			return create(existing.(*kubermaticv1.Seed))
 		}
@@ -897,7 +896,7 @@ type NamedCertificateCreatorGetter = func() (name string, create CertificateCrea
 // CertificateObjectWrapper adds a wrapper so the CertificateCreator matches ObjectCreator.
 // This is needed as Go does not support function interface matching.
 func CertificateObjectWrapper(create CertificateCreator) ObjectCreator {
-	return func(existing runtime.Object) (runtime.Object, error) {
+	return func(existing ctrlruntimeclient.Object) (ctrlruntimeclient.Object, error) {
 		if existing != nil {
 			return create(existing.(*certmanagerv1alpha2.Certificate))
 		}
@@ -938,7 +937,7 @@ type NamedEtcdBackupConfigCreatorGetter = func() (name string, create EtcdBackup
 // EtcdBackupConfigObjectWrapper adds a wrapper so the EtcdBackupConfigCreator matches ObjectCreator.
 // This is needed as Go does not support function interface matching.
 func EtcdBackupConfigObjectWrapper(create EtcdBackupConfigCreator) ObjectCreator {
-	return func(existing runtime.Object) (runtime.Object, error) {
+	return func(existing ctrlruntimeclient.Object) (ctrlruntimeclient.Object, error) {
 		if existing != nil {
 			return create(existing.(*kubermaticv1.EtcdBackupConfig))
 		}
@@ -979,7 +978,7 @@ type NamedConstraintTemplateCreatorGetter = func() (name string, create Constrai
 // ConstraintTemplateObjectWrapper adds a wrapper so the ConstraintTemplateCreator matches ObjectCreator.
 // This is needed as Go does not support function interface matching.
 func ConstraintTemplateObjectWrapper(create ConstraintTemplateCreator) ObjectCreator {
-	return func(existing runtime.Object) (runtime.Object, error) {
+	return func(existing ctrlruntimeclient.Object) (ctrlruntimeclient.Object, error) {
 		if existing != nil {
 			return create(existing.(*gatekeeperv1beta1.ConstraintTemplate))
 		}
@@ -1020,7 +1019,7 @@ type NamedKubermaticV1ConstraintTemplateCreatorGetter = func() (name string, cre
 // KubermaticV1ConstraintTemplateObjectWrapper adds a wrapper so the KubermaticV1ConstraintTemplateCreator matches ObjectCreator.
 // This is needed as Go does not support function interface matching.
 func KubermaticV1ConstraintTemplateObjectWrapper(create KubermaticV1ConstraintTemplateCreator) ObjectCreator {
-	return func(existing runtime.Object) (runtime.Object, error) {
+	return func(existing ctrlruntimeclient.Object) (ctrlruntimeclient.Object, error) {
 		if existing != nil {
 			return create(existing.(*kubermaticv1.ConstraintTemplate))
 		}
@@ -1061,7 +1060,7 @@ type NamedKubermaticV1ProjectCreatorGetter = func() (name string, create Kuberma
 // KubermaticV1ProjectObjectWrapper adds a wrapper so the KubermaticV1ProjectCreator matches ObjectCreator.
 // This is needed as Go does not support function interface matching.
 func KubermaticV1ProjectObjectWrapper(create KubermaticV1ProjectCreator) ObjectCreator {
-	return func(existing runtime.Object) (runtime.Object, error) {
+	return func(existing ctrlruntimeclient.Object) (ctrlruntimeclient.Object, error) {
 		if existing != nil {
 			return create(existing.(*kubermaticv1.Project))
 		}
@@ -1086,6 +1085,47 @@ func ReconcileKubermaticV1Projects(ctx context.Context, namedGetters []NamedKube
 			Name:             types.NamespacedName{Namespace: namespace, Name: name},
 			Creator:          createObject,
 			EmptyObj:         &kubermaticv1.Project{},
+			RequiresRecreate: false,
+		})
+	}
+
+	return EnsureNamedObjectsConcurrent(ctx, client, objs)
+}
+
+// KubermaticV1UserProjectBindingCreator defines an interface to create/update UserProjectBindings
+type KubermaticV1UserProjectBindingCreator = func(existing *kubermaticv1.UserProjectBinding) (*kubermaticv1.UserProjectBinding, error)
+
+// NamedKubermaticV1UserProjectBindingCreatorGetter returns the name of the resource and the corresponding creator function
+type NamedKubermaticV1UserProjectBindingCreatorGetter = func() (name string, create KubermaticV1UserProjectBindingCreator)
+
+// KubermaticV1UserProjectBindingObjectWrapper adds a wrapper so the KubermaticV1UserProjectBindingCreator matches ObjectCreator.
+// This is needed as Go does not support function interface matching.
+func KubermaticV1UserProjectBindingObjectWrapper(create KubermaticV1UserProjectBindingCreator) ObjectCreator {
+	return func(existing ctrlruntimeclient.Object) (ctrlruntimeclient.Object, error) {
+		if existing != nil {
+			return create(existing.(*kubermaticv1.UserProjectBinding))
+		}
+		return create(&kubermaticv1.UserProjectBinding{})
+	}
+}
+
+// ReconcileKubermaticV1UserProjectBindings will create and update the KubermaticV1UserProjectBindings coming from the passed KubermaticV1UserProjectBindingCreator slice
+func ReconcileKubermaticV1UserProjectBindings(ctx context.Context, namedGetters []NamedKubermaticV1UserProjectBindingCreatorGetter, namespace string, client ctrlruntimeclient.Client, objectModifiers ...ObjectModifier) error {
+	var objs []EnsureObject
+	for _, get := range namedGetters {
+		name, create := get()
+		createObject := KubermaticV1UserProjectBindingObjectWrapper(create)
+		createObject = createWithNamespace(createObject, namespace)
+		createObject = createWithName(createObject, name)
+
+		for _, objectModifier := range objectModifiers {
+			createObject = objectModifier(createObject)
+		}
+
+		objs = append(objs, EnsureObject{
+			Name:             types.NamespacedName{Namespace: namespace, Name: name},
+			Creator:          createObject,
+			EmptyObj:         &kubermaticv1.UserProjectBinding{},
 			RequiresRecreate: false,
 		})
 	}

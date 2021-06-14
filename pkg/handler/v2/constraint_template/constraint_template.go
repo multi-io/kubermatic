@@ -208,7 +208,8 @@ func PatchEndpoint(userInfoGetter provider.UserInfoGetter, constraintTemplatePro
 
 		patchedCT := &kubermaticv1.ConstraintTemplate{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: patched.Name,
+				Name:            patched.Name,
+				ResourceVersion: originalCT.ResourceVersion,
 			},
 			Spec: patched.Spec,
 		}
@@ -231,6 +232,17 @@ func validateConstraintTemplate(ct *kubermaticv1.ConstraintTemplate) error {
 	if ct.Name != strings.ToLower(ct.Spec.CRD.Spec.Names.Kind) {
 		return fmt.Errorf("template's name %s is not equal to the lowercase of CRD's Kind: %s", ct.Name,
 			ct.Spec.CRD.Spec.Names.Kind)
+	}
+
+	if len(ct.Spec.Targets) >= 1 {
+		if ct.Spec.Targets[0].Rego == "" {
+			return fmt.Errorf("template's rego is empty")
+		}
+		if ct.Spec.Targets[0].Target == "" {
+			return fmt.Errorf("template's target is empty")
+		}
+	} else {
+		return fmt.Errorf("template's target list is empty")
 	}
 	return nil
 }

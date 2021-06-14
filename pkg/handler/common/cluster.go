@@ -18,6 +18,7 @@ package common
 
 import (
 	"context"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -53,7 +54,7 @@ import (
 )
 
 // ClusterTypes holds a list of supported cluster types
-var ClusterTypes = sets.NewString(apiv1.OpenShiftClusterType, apiv1.KubernetesClusterType)
+var ClusterTypes = sets.NewString(apiv1.KubernetesClusterType)
 
 // patchClusterSpec is equivalent of ClusterSpec but it uses default JSON marshalling method instead of custom
 // MarshalJSON defined for ClusterSpec type. This means it should be only used internally as it may contain
@@ -70,7 +71,7 @@ type patchCluster struct {
 func CreateEndpoint(ctx context.Context, projectID string, body apiv1.CreateClusterSpec,
 	projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider,
 	seedsGetter provider.SeedsGetter, credentialManager provider.PresetProvider, exposeStrategy kubermaticv1.ExposeStrategy,
-	userInfoGetter provider.UserInfoGetter) (interface{}, error) {
+	userInfoGetter provider.UserInfoGetter, caBundle *x509.CertPool) (interface{}, error) {
 
 	clusterProvider := ctx.Value(middleware.ClusterProviderContextKey).(provider.ClusterProvider)
 	privilegedClusterProvider := ctx.Value(middleware.PrivilegedClusterProviderContextKey).(provider.PrivilegedClusterProvider)
@@ -99,7 +100,7 @@ func CreateEndpoint(ctx context.Context, projectID string, body apiv1.CreateClus
 
 	// Create the cluster.
 	secretKeyGetter := provider.SecretKeySelectorValueFuncFactory(ctx, privilegedClusterProvider.GetSeedClusterAdminRuntimeClient())
-	spec, err := cluster.Spec(body.Cluster, dc, secretKeyGetter)
+	spec, err := cluster.Spec(body.Cluster, dc, secretKeyGetter, caBundle)
 	if err != nil {
 		return nil, errors.NewBadRequest("invalid cluster: %v", err)
 	}
@@ -170,14 +171,6 @@ func CreateEndpoint(ctx context.Context, projectID string, body apiv1.CreateClus
 	// for example the credentials secret.
 	partialCluster.Labels[kubermaticv1.ProjectIDLabelKey] = projectID
 	partialCluster.Spec = *spec
-	if body.Cluster.Type == "openshift" {
-		if body.Cluster.Spec.Openshift == nil || body.Cluster.Spec.Openshift.ImagePullSecret == "" {
-			return nil, errors.NewBadRequest("openshift clusters must be configured with an imagePullSecret")
-		}
-		partialCluster.Annotations = map[string]string{
-			"kubermatic.io/openshift": "true",
-		}
-	}
 
 	// Enforce audit logging
 	if dc.Spec.EnforceAuditLogging {
@@ -321,7 +314,9 @@ func DeleteEndpoint(ctx context.Context, userInfoGetter provider.UserInfoGetter,
 	return nil, updateAndDeleteCluster(ctx, userInfoGetter, clusterProvider, privilegedClusterProvider, project, existingCluster)
 }
 
-func PatchEndpoint(ctx context.Context, userInfoGetter provider.UserInfoGetter, projectID, clusterID string, patch json.RawMessage, seedsGetter provider.SeedsGetter, projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider) (interface{}, error) {
+func PatchEndpoint(ctx context.Context, userInfoGetter provider.UserInfoGetter, projectID, clusterID string,
+	patch json.RawMessage, seedsGetter provider.SeedsGetter, projectProvider provider.ProjectProvider,
+	privilegedProjectProvider provider.PrivilegedProjectProvider, caBundle *x509.CertPool) (interface{}, error) {
 	clusterProvider := ctx.Value(middleware.ClusterProviderContextKey).(provider.ClusterProvider)
 	privilegedClusterProvider := ctx.Value(middleware.PrivilegedClusterProviderContextKey).(provider.PrivilegedClusterProvider)
 	keycloakFacade := ctx.Value(middleware.KeycloakFacadeContextKey).(keycloak.Facade)
@@ -376,12 +371,19 @@ func PatchEndpoint(ctx context.Context, userInfoGetter provider.UserInfoGetter, 
 	newInternalCluster.Spec.UsePodNodeSelectorAdmissionPlugin = patchedCluster.Spec.UsePodNodeSelectorAdmissionPlugin
 	newInternalCluster.Spec.AdmissionPlugins = patchedCluster.Spec.AdmissionPlugins
 	newInternalCluster.Spec.AuditLogging = patchedCluster.Spec.AuditLogging
-	newInternalCluster.Spec.Openshift = patchedCluster.Spec.Openshift
 	newInternalCluster.Spec.Sys11Auth = patchedCluster.Spec.Sys11Auth
 	newInternalCluster.Spec.UpdateWindow = patchedCluster.Spec.UpdateWindow
 	newInternalCluster.Spec.OPAIntegration = patchedCluster.Spec.OPAIntegration
 	newInternalCluster.Spec.PodNodeSelectorAdmissionPluginConfig = patchedCluster.Spec.PodNodeSelectorAdmissionPluginConfig
 	newInternalCluster.Spec.ServiceAccount = patchedCluster.Spec.ServiceAccount
+	newInternalCluster.Spec.MLA = patchedCluster.Spec.MLA
+
+	// Sys11: The field OpenstackBillingTenant does not exist in upstream version. This field used for billing purposes
+	// by us. If we accidentally delete it during merge we might not notice it. This test ensures field is set.
+	// We ignore Fake cloud spec used in unit tests.
+	if newInternalCluster.Spec.Cloud.Fake == nil && getOpenstackBillingTenant(&newInternalCluster.Spec.Cloud) == "" {
+		return nil, errors.NewBadRequest("openstackBillingTenant is required")
+	}
 
 	incompatibleKubelets, err := common.CheckClusterVersionSkew(ctx, userInfoGetter, clusterProvider, newInternalCluster, projectID)
 	if err != nil {
@@ -420,7 +422,7 @@ func PatchEndpoint(ctx context.Context, userInfoGetter provider.UserInfoGetter, 
 	if !ok {
 		return nil, errors.New(http.StatusInternalServerError, "failed to assert clusterProvider")
 	}
-	if err := validation.ValidateUpdateCluster(ctx, newInternalCluster, oldInternalCluster, dc, assertedClusterProvider); err != nil {
+	if err := validation.ValidateUpdateCluster(ctx, newInternalCluster, oldInternalCluster, dc, assertedClusterProvider, caBundle); err != nil {
 		return nil, errors.NewBadRequest("invalid cluster: %v", err)
 	}
 	if err = validation.ValidateSys11AuthSettings(&newInternalCluster.Spec, keycloakFacade); err != nil {
@@ -494,6 +496,8 @@ func HealthEndpoint(ctx context.Context, userInfoGetter provider.UserInfoGetter,
 		Etcd:                         existingCluster.Status.ExtendedHealth.Etcd,
 		CloudProviderInfrastructure:  existingCluster.Status.ExtendedHealth.CloudProviderInfrastructure,
 		UserClusterControllerManager: existingCluster.Status.ExtendedHealth.UserClusterControllerManager,
+		GatekeeperController:         existingCluster.Status.ExtendedHealth.GatekeeperController,
+		GatekeeperAudit:              existingCluster.Status.ExtendedHealth.GatekeeperAudit,
 	}, nil
 }
 
@@ -870,6 +874,7 @@ func convertInternalClusterToExternal(internalCluster *kubermaticv1.Cluster, fil
 			OPAIntegration:                       internalCluster.Spec.OPAIntegration,
 			PodNodeSelectorAdmissionPluginConfig: internalCluster.Spec.PodNodeSelectorAdmissionPluginConfig,
 			ServiceAccount:                       internalCluster.Spec.ServiceAccount,
+			MLA:                                  internalCluster.Spec.MLA,
 		},
 		Status: apiv1.ClusterStatus{
 			Version: internalCluster.Spec.Version,
@@ -880,9 +885,6 @@ func convertInternalClusterToExternal(internalCluster *kubermaticv1.Cluster, fil
 
 	if filterSystemLabels {
 		cluster.Labels = label.FilterLabels(label.ClusterResourceType, internalCluster.Labels)
-	}
-	if internalCluster.IsOpenshift() {
-		cluster.Type = apiv1.OpenShiftClusterType
 	}
 
 	return cluster

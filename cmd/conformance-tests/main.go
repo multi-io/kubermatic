@@ -48,7 +48,6 @@ import (
 	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
 	"k8c.io/kubermatic/v2/pkg/provider"
 	kubermativsemver "k8c.io/kubermatic/v2/pkg/semver"
-	kubermaticsignals "k8c.io/kubermatic/v2/pkg/signals"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils"
 	apiclient "k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/project"
@@ -61,9 +60,9 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 	metricsv1beta1 "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 )
 
 // Opts represent combination of flags and ENV options
@@ -75,7 +74,6 @@ type Opts struct {
 	customTestTimeout            time.Duration
 	userClusterPollInterval      time.Duration
 	deleteClusterAfterTests      bool
-	kubeconfigPath               string
 	nodeCount                    int
 	publicKeys                   [][]byte
 	reportsRoot                  string
@@ -91,8 +89,6 @@ type Opts struct {
 	versions                     []*kubermativsemver.Semver
 	distributions                map[providerconfig.OperatingSystem]struct{}
 	existingClusterLabel         string
-	openshift                    bool
-	openshiftPullSecret          string
 	printGinkoLogs               bool
 	printContainerLogs           bool
 	onlyTestCreation             bool
@@ -191,7 +187,6 @@ func main() {
 
 	supportedVersions := getLatestMinorVersions(common.DefaultKubernetesVersioning.Versions)
 
-	flag.StringVar(&opts.kubeconfigPath, "kubeconfig", "/config/kubeconfig", "path to kubeconfig file")
 	flag.StringVar(&opts.existingClusterLabel, "existing-cluster-label", "", "label to use to select an existing cluster for testing. If provided, no cluster will be created. Sample: my=cluster")
 	flag.StringVar(&providers, "providers", "aws,digitalocean,openstack,hetzner,vsphere,azure,packet,gcp", "comma separated list of providers to test")
 	flag.StringVar(&opts.namePrefix, "name-prefix", "", "prefix used for all cluster names")
@@ -215,7 +210,6 @@ func main() {
 	flag.StringVar(&sversions, "versions", strings.Join(supportedVersions, ","), "a comma-separated list of versions to test")
 	flag.StringVar(&sdistributions, "distributions", "", "a comma-separated list of distributions to test (cannot be used in conjunction with -exclude-distributions)")
 	flag.StringVar(&sexcludeDistributions, "exclude-distributions", "", "a comma-separated list of distributions that will get excluded from the tests (cannot be used in conjunction with -distributions)")
-	flag.BoolVar(&opts.openshift, "openshift", false, "Whether to create an openshift cluster")
 	flag.BoolVar(&opts.printGinkoLogs, "print-ginkgo-logs", false, "Whether to print ginkgo logs when ginkgo encountered failures")
 	flag.BoolVar(&opts.printContainerLogs, "print-container-logs", false, "Whether to print the logs of all controlplane containers after the test (even in case of success)")
 	flag.BoolVar(&opts.onlyTestCreation, "only-test-creation", false, "Only test if nodes become ready. Does not perform any extended checks like conformance tests")
@@ -270,20 +264,13 @@ func main() {
 		log.Panic("-cluster-parallel-count must be 1 when testing an existing cluster")
 	}
 
-	if opts.openshift {
-		// Openshift is only supported on CentOS
-		opts.distributions = map[providerconfig.OperatingSystem]struct{}{
-			providerconfig.OperatingSystemCentOS: {},
-		}
-	} else {
-		opts.distributions, err = getEffectiveDistributions(sdistributions, sexcludeDistributions)
-		if err != nil {
-			log.Panicw("Failed to determine distribution list", zap.Error(err))
-		}
+	opts.distributions, err = getEffectiveDistributions(sdistributions, sexcludeDistributions)
+	if err != nil {
+		log.Panicw("Failed to determine distribution list", zap.Error(err))
+	}
 
-		if len(opts.distributions) == 0 {
-			log.Panic("No distribution to use in tests remained after evaluating -distributions and -exclude-distributions")
-		}
+	if len(opts.distributions) == 0 {
+		log.Panic("No distribution to use in tests remained after evaluating -distributions and -exclude-distributions")
 	}
 
 	osNames := []string{}
@@ -306,8 +293,7 @@ func main() {
 	opts.kubermaticClient = kubermaticClient
 	opts.secrets.kubermaticClient = opts.kubermaticClient
 
-	rootCtx, rootCancel := context.WithCancel(context.Background())
-	defer rootCancel()
+	rootCtx := signals.SetupSignalHandler()
 
 	// collect runtime metrics if there is a pushgateway URL configured
 	// and these variables are set
@@ -369,15 +355,6 @@ func main() {
 
 	log.Infow("Using project", "project", opts.kubermaticProjectID)
 
-	if opts.openshift {
-		opts.openshiftPullSecret = os.Getenv("OPENSHIFT_IMAGE_PULL_SECRET")
-		if opts.openshiftPullSecret == "" {
-			log.Panic("Testing OpenShift requires the $OPENSHIFT_IMAGE_PULL_SECRET env var to be set")
-		}
-
-		log.Info("Testing OpenShift")
-	}
-
 	for _, s := range strings.Split(providers, ",") {
 		opts.providers.Insert(strings.ToLower(strings.TrimSpace(s)))
 	}
@@ -402,21 +379,9 @@ func main() {
 		log.Panicw("Failed to create SSH keys", zap.Error(err))
 	}
 
-	stopCh := kubermaticsignals.SetupSignalHandler()
-
-	go func() {
-		select {
-		case <-stopCh:
-			rootCancel()
-			log.Info("User requested to stop the application")
-		case <-rootCtx.Done():
-			log.Info("Context has been closed")
-		}
-	}()
-
-	config, err := clientcmd.BuildConfigFromFlags("", opts.kubeconfigPath)
+	_, _, config, err := utils.GetClients()
 	if err != nil {
-		log.Panic(err)
+		log.Panicw("Failed to get client config", zap.Error(err))
 	}
 	opts.seedRestConfig = config
 
@@ -519,9 +484,6 @@ func getScenarios(opts Opts, log *zap.SugaredLogger) []testScenario {
 	for _, scenario := range scenarios {
 		osspec := scenario.OS()
 		if osspec.Ubuntu != nil && hasDistribution(providerconfig.OperatingSystemUbuntu) {
-			filteredScenarios = append(filteredScenarios, scenario)
-		}
-		if osspec.ContainerLinux != nil && hasDistribution(providerconfig.OperatingSystemCoreos) {
 			filteredScenarios = append(filteredScenarios, scenario)
 		}
 		if osspec.Flatcar != nil && hasDistribution(providerconfig.OperatingSystemFlatcar) {

@@ -38,6 +38,11 @@ type KubermaticConfiguration struct {
 
 // KubermaticConfigurationSpec is the spec for a Kubermatic installation.
 type KubermaticConfigurationSpec struct {
+	// CABundle references a ConfigMap in the same namespace as the KubermaticConfiguration.
+	// This ConfigMap must contain a ca-bundle.pem with PEM-encoded certificates. This bundle
+	// automatically synchronized into each seed and each usercluster. APIGroup and Kind are
+	// currently ignored.
+	CABundle corev1.TypedLocalObjectReference `json:"caBundle,omitempty"`
 	// ImagePullSecret is used to authenticate against Docker registries.
 	ImagePullSecret string `json:"imagePullSecret,omitempty"`
 	// Auth defines keys and URLs for Dex.
@@ -60,7 +65,7 @@ type KubermaticConfigurationSpec struct {
 	ExposeStrategy kubermaticv1.ExposeStrategy `json:"exposeStrategy,omitempty"`
 	// Ingress contains settings for making the API and UI accessible remotely.
 	Ingress KubermaticIngressConfiguration `json:"ingress,omitempty"`
-	// Versions configures the available and default Kubernetes/Openshift versions and updates.
+	// Versions configures the available and default Kubernetes versions and updates.
 	Versions KubermaticVersionsConfiguration `json:"versions,omitempty"`
 	// VerticalPodAutoscaler configures the Kubernetes VPA integration.
 	VerticalPodAutoscaler KubermaticVPAConfiguration `json:"verticalPodAutoscaler,omitempty"`
@@ -77,7 +82,6 @@ type KubermaticAuthConfiguration struct {
 	IssuerClientID           string `json:"issuerClientID,omitempty"`
 	IssuerClientSecret       string `json:"issuerClientSecret,omitempty"`
 	IssuerCookieKey          string `json:"issuerCookieKey,omitempty"`
-	CABundle                 string `json:"caBundle,omitempty"`
 	ServiceAccountKey        string `json:"serviceAccountKey,omitempty"`
 	SkipTokenIssuerTLSVerify bool   `json:"skipTokenIssuerTLSVerify,omitempty"`
 }
@@ -125,10 +129,12 @@ type KubermaticSeedControllerConfiguration struct {
 	DockerRepository string `json:"dockerRepository,omitempty"`
 	// BackupStoreContainer is the container used for shipping etcd snapshots to a backup location.
 	BackupStoreContainer string `json:"backupStoreContainer,omitempty"`
+	// BackupDeleteContainer is the container used for deleting etcd snapshots from a backup location.
+	BackupDeleteContainer string `json:"backupDeleteContainer,omitempty"`
 	// BackupCleanupContainer is the container used for removing expired backups from the storage location.
 	BackupCleanupContainer string `json:"backupCleanupContainer,omitempty"`
-	// BackupDeleteContainer is the container used for removing specific backups from the storage location.
-	BackupDeleteContainer string `json:"backupDeleteContainer,omitempty"`
+	// BackupRestore contains the setup of the new backup and restore controllers.
+	BackupRestore KubermaticBackupRestoreConfiguration `json:"backupRestore,omitempty"`
 	// MaximumParallelReconciles limits the number of cluster reconciliations
 	// that are active at any given time.
 	MaximumParallelReconciles int `json:"maximumParallelReconciles,omitempty"`
@@ -149,6 +155,15 @@ type KubermaticSeedControllerConfiguration struct {
 	DefaultClusterComponentSettingsYAML string `json:"defaultClusterComponentSettingsYAML,omitempty"`
 	// EnvFromSecretsNames secrets to source environment variables from
 	EnvFromSecretsNames []string `json:"envFromSecretsNames"`
+}
+
+type KubermaticBackupRestoreConfiguration struct {
+	// Enabled enables the new etcd backup and restore controllers.
+	Enabled bool `json:"enabled,omitempty"`
+	// S3Endpoint is the S3 API endpoint to use for backup and restore. Defaults to s3.amazonaws.com.
+	S3Endpoint string `json:"s3Endpoint,omitempty"`
+	// S3BucketName is the S3 bucket name to use for backup and restore.
+	S3BucketName string `json:"s3BucketName,omitempty"`
 }
 
 // KubermaticUserClusterConfiguration controls various aspects of the user-created clusters.
@@ -185,8 +200,6 @@ type KubermaticUserClusterConfiguration struct {
 type KubermaticAddonsConfiguration struct {
 	// Kubernetes controls the addons for Kubernetes-based clusters.
 	Kubernetes KubermaticAddonConfiguration `json:"kubernetes,omitempty"`
-	// Openshift controls the addons for Openshift-based clusters.
-	Openshift KubermaticAddonConfiguration `json:"openshift,omitempty"`
 }
 
 // KubermaticUserClusterMonitoringConfiguration can be used to fine-tune to in-cluster Prometheus.
@@ -275,15 +288,13 @@ type KubermaticProjectsMigratorConfiguration struct {
 	DryRun bool `json:"dryRun,omitempty"`
 }
 
-// KubermaticVersionsConfiguration configures the available and default Kubernetes/Openshift versions.
+// KubermaticVersionsConfiguration configures the available and default Kubernetes versions.
 type KubermaticVersionsConfiguration struct {
 	// Kubernetes configures the Kubernetes versions and updates.
 	Kubernetes KubermaticVersioningConfiguration `json:"kubernetes,omitempty"`
-	// Openshift configures the Openshift versions and updates.
-	Openshift KubermaticVersioningConfiguration `json:"openshift,omitempty"`
 }
 
-// KubermaticVersioningConfiguration configures the available and default Kubernetes/Openshift versions.
+// KubermaticVersioningConfiguration configures the available and default Kubernetes versions.
 type KubermaticVersioningConfiguration struct {
 	// Versions lists the available versions.
 	Versions []*semver.Version `json:"versions,omitempty"`

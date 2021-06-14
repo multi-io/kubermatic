@@ -31,6 +31,7 @@ import (
 	seedsync "k8c.io/kubermatic/v2/pkg/controller/master-controller-manager/seed-sync"
 	serviceaccount "k8c.io/kubermatic/v2/pkg/controller/master-controller-manager/service-account"
 	userprojectbinding "k8c.io/kubermatic/v2/pkg/controller/master-controller-manager/user-project-binding"
+	userprojectbindingsync "k8c.io/kubermatic/v2/pkg/controller/master-controller-manager/user-project-binding-sync"
 	"k8c.io/kubermatic/v2/pkg/controller/master-controller-manager/usersshkeyssynchronizer"
 	seedcontrollerlifecycle "k8c.io/kubermatic/v2/pkg/controller/shared/seed-controller-lifecycle"
 	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
@@ -84,8 +85,11 @@ func createAllControllers(ctrlCtx *controllerContext) error {
 	if err := masterconstrainttemplatecontroller.Add(ctrlCtx.ctx, ctrlCtx.mgr, ctrlCtx.log, 1, ctrlCtx.namespace, ctrlCtx.seedKubeconfigGetter); err != nil {
 		return fmt.Errorf("failed to create master constraint template controller: %v", err)
 	}
-	if err := projectsync.Add(ctrlCtx.ctx, ctrlCtx.mgr, ctrlCtx.log, 1, ctrlCtx.seedKubeconfigGetter); err != nil {
+	if err := projectsync.Add(ctrlCtx.mgr, ctrlCtx.log, 1, ctrlCtx.seedKubeconfigGetter); err != nil {
 		return fmt.Errorf("failed to create projectsync controller: %v", err)
+	}
+	if err := userprojectbindingsync.Add(ctrlCtx.mgr, ctrlCtx.log, 1, ctrlCtx.seedKubeconfigGetter); err != nil {
+		return fmt.Errorf("failed to create userprojectbindingsync controller: %v", err)
 	}
 
 	return nil
@@ -127,7 +131,6 @@ func projectLabelSynchronizerFactoryCreator(ctrlCtx *controllerContext) seedcont
 func userSSHKeysSynchronizerFactoryCreator(ctrlCtx *controllerContext) seedcontrollerlifecycle.ControllerFactory {
 	return func(ctx context.Context, mgr manager.Manager, seedManagerMap map[string]manager.Manager) (string, error) {
 		return usersshkeyssynchronizer.ControllerName, usersshkeyssynchronizer.Add(
-			ctx,
 			mgr,
 			seedManagerMap,
 			ctrlCtx.log,

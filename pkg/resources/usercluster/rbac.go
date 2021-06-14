@@ -17,10 +17,11 @@ limitations under the License.
 package usercluster
 
 import (
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 
-	openshiftresources "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/openshift/resources"
 	"k8c.io/kubermatic/v2/pkg/resources"
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 )
@@ -64,8 +65,6 @@ func RoleCreator() (string, reconciling.RoleCreator) {
 				Resources: []string{"secrets"},
 				ResourceNames: []string{
 					resources.AdminKubeconfigSecretName,
-					openshiftresources.ConsoleOAuthSecretName,
-					openshiftresources.ConsoleAdminPasswordSecretName,
 				},
 				Verbs: []string{"update"},
 			},
@@ -100,4 +99,47 @@ func RoleBindingCreator() (string, reconciling.RoleBindingCreator) {
 		}
 		return rb, nil
 	}
+}
+
+func ClusterRoleCreator() (string, reconciling.ClusterRoleCreator) {
+	return roleName, func(r *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
+		r.Rules = []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{"kubermatic.k8s.io"},
+				Resources: []string{"clusters"},
+				Verbs: []string{
+					"get",
+					"list",
+					"watch",
+					"patch",
+					"update",
+				},
+			},
+		}
+		return r, nil
+	}
+}
+
+func ClusterRoleBinding(namespace string) reconciling.NamedClusterRoleBindingCreatorGetter {
+	return func() (string, reconciling.ClusterRoleBindingCreator) {
+		return GenClusterRoleBindingName(namespace), func(rb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
+			rb.RoleRef = rbacv1.RoleRef{
+				Name:     roleName,
+				Kind:     "ClusterRole",
+				APIGroup: rbacv1.GroupName,
+			}
+			rb.Subjects = []rbacv1.Subject{
+				{
+					Kind:      rbacv1.ServiceAccountKind,
+					Name:      serviceAccountName,
+					Namespace: namespace,
+				},
+			}
+			return rb, nil
+		}
+	}
+}
+
+func GenClusterRoleBindingName(targetNamespace string) string {
+	return fmt.Sprintf("%s-%s", roleBindingName, targetNamespace)
 }

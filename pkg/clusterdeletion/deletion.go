@@ -29,23 +29,25 @@ import (
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	kuberneteshelper "k8c.io/kubermatic/v2/pkg/kubernetes"
 
-	controllerruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
+	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
 	deletedLBAnnotationName = "kubermatic.io/cleaned-up-loadbalancers"
 )
 
-func New(seedClient controllerruntimeclient.Client, userClusterClientGetter func() (controllerruntimeclient.Client, error)) *Deletion {
+func New(seedClient ctrlruntimeclient.Client, userClusterClientGetter func() (ctrlruntimeclient.Client, error), etcdBackupRestoreController bool) *Deletion {
 	return &Deletion{
-		seedClient:              seedClient,
-		userClusterClientGetter: userClusterClientGetter,
+		seedClient:                  seedClient,
+		userClusterClientGetter:     userClusterClientGetter,
+		etcdBackupRestoreController: etcdBackupRestoreController,
 	}
 }
 
 type Deletion struct {
-	seedClient              controllerruntimeclient.Client
-	userClusterClientGetter func() (controllerruntimeclient.Client, error)
+	seedClient                  ctrlruntimeclient.Client
+	userClusterClientGetter     func() (ctrlruntimeclient.Client, error)
+	etcdBackupRestoreController bool
 }
 
 // CleanupCluster is responsible for cleaning up a cluster.
@@ -66,17 +68,20 @@ func (d *Deletion) CleanupCluster(ctx context.Context, log *zap.SugaredLogger, c
 	// inside the cluster and we delete the nodes, we get stuck.
 	if kuberneteshelper.HasAnyFinalizer(cluster,
 		kubermaticapiv1.InClusterLBCleanupFinalizer,
-		kubermaticapiv1.InClusterPVCleanupFinalizer,
-		kubermaticapiv1.InClusterCredentialsRequestsCleanupFinalizer,
-		kubermaticapiv1.InClusterImageRegistryConfigCleanupFinalizer) {
+		kubermaticapiv1.InClusterPVCleanupFinalizer) {
 		return nil
 	}
 
-	if err := d.cleanupEtcdBackupConfigs(ctx, cluster); err != nil {
+	if err := d.cleanupEtcdBackupConfigs(ctx, cluster, d.etcdBackupRestoreController); err != nil {
 		return err
 	}
 
 	if err := d.cleanupNodes(ctx, cluster); err != nil {
+		return err
+	}
+
+	// Delete ClusterRoleBindings on for the cluster on the seed cluster
+	if err := d.cleanupClusterRoleBindings(ctx, cluster); err != nil {
 		return err
 	}
 
@@ -103,11 +108,9 @@ func (d *Deletion) cleanupInClusterResources(ctx context.Context, log *zap.Sugar
 
 	shouldDeleteLBs := kuberneteshelper.HasFinalizer(cluster, kubermaticapiv1.InClusterLBCleanupFinalizer)
 	shouldDeletePVs := kuberneteshelper.HasFinalizer(cluster, kubermaticapiv1.InClusterPVCleanupFinalizer)
-	shouldDeleteCredentialsRequests := kuberneteshelper.HasFinalizer(cluster, kubermaticapiv1.InClusterCredentialsRequestsCleanupFinalizer)
-	shouldDeleteImageRegistryConfigs := kuberneteshelper.HasFinalizer(cluster, kubermaticapiv1.InClusterImageRegistryConfigCleanupFinalizer)
 
 	// If no relevant finalizer exists, directly return
-	if !shouldDeleteLBs && !shouldDeletePVs && !shouldDeleteCredentialsRequests && !shouldDeleteImageRegistryConfigs {
+	if !shouldDeleteLBs && !shouldDeletePVs {
 		log.Debug("Skipping in-cluster-resources deletion. None of the in-cluster cleanup finalizers is set.")
 		return nil
 	}
@@ -132,27 +135,6 @@ func (d *Deletion) cleanupInClusterResources(ctx context.Context, log *zap.Sugar
 		deletedSomeResource = deletedSomeResource || deletedSomeVolumes
 	}
 
-	if shouldDeleteImageRegistryConfigs {
-		deletedSomeImageRegistryConfigs, err := d.cleanupImageRegistryConfigs(ctx, log, cluster)
-		if err != nil {
-			return fmt.Errorf("failed to cleanup ImageRegistryConfigs: %v", err)
-		}
-		// Prevent the credentials from getting invalidated before cleanup finished
-		if deletedSomeImageRegistryConfigs {
-			return nil
-		}
-	}
-
-	// This must come after the ImageRegistryConfigs deletion, as it uses a credential
-	// obtainted via a CredentialsRequest
-	if shouldDeleteCredentialsRequests {
-		deletedSomeCredentialsRequests, err := d.cleanupCredentialsRequests(ctx, log, cluster)
-		if err != nil {
-			return fmt.Errorf("failed to cleanup CredentialsRequests: %v", err)
-		}
-		deletedSomeResource = deletedSomeResource || deletedSomeCredentialsRequests
-	}
-
 	// If we deleted something it is implied that there was still something left. Just return
 	// here so the finalizers stay, it will make the cluster controller requeue us after a delay
 	// This also means that we may end up issuing multiple DELETE calls against the same resource
@@ -175,9 +157,7 @@ func (d *Deletion) cleanupInClusterResources(ctx context.Context, log *zap.Sugar
 	oldCluster := cluster.DeepCopy()
 	kuberneteshelper.RemoveFinalizer(cluster, kubermaticapiv1.InClusterLBCleanupFinalizer)
 	kuberneteshelper.RemoveFinalizer(cluster, kubermaticapiv1.InClusterPVCleanupFinalizer)
-	kuberneteshelper.RemoveFinalizer(cluster, kubermaticapiv1.InClusterCredentialsRequestsCleanupFinalizer)
-	kuberneteshelper.RemoveFinalizer(cluster, kubermaticapiv1.InClusterImageRegistryConfigCleanupFinalizer)
-	return d.seedClient.Patch(ctx, cluster, controllerruntimeclient.MergeFrom(oldCluster))
+	return d.seedClient.Patch(ctx, cluster, ctrlruntimeclient.MergeFrom(oldCluster))
 }
 
 func (d *Deletion) updateCluster(ctx context.Context, cluster *kubermaticv1.Cluster, modify func(*kubermaticv1.Cluster)) error {

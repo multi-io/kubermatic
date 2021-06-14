@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/util/retry"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -45,7 +44,6 @@ import (
 const ControllerName = "kubermatic_project_label_synchronizer"
 
 type reconciler struct {
-	ctx                     context.Context
 	log                     *zap.SugaredLogger
 	masterClient            ctrlruntimeclient.Client
 	seedClients             map[string]ctrlruntimeclient.Client
@@ -54,24 +52,17 @@ type reconciler struct {
 
 // requestFromCluster returns a reconcile.Request for the project the given
 // cluster belongs to, if any.
-func requestFromCluster(log *zap.SugaredLogger) *handler.EnqueueRequestsFromMapFunc {
-	toRequestFunc := handler.ToRequestsFunc(func(mo handler.MapObject) []reconcile.Request {
-		cluster, ok := mo.Object.(*kubermaticv1.Cluster)
-		if !ok {
-			err := fmt.Errorf("Object was not a cluster but a %T", mo.Object)
-			log.Error(err)
-			utilruntime.HandleError(err)
-			return nil
-		}
-		labelValue, hasLabel := cluster.Labels[kubermaticv1.ProjectIDLabelKey]
+func requestFromCluster(log *zap.SugaredLogger) handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(cluster ctrlruntimeclient.Object) []reconcile.Request {
+		labelValue, hasLabel := cluster.GetLabels()[kubermaticv1.ProjectIDLabelKey]
 		if !hasLabel {
-			log.Debugw("Cluster has no project label", "cluster", cluster.Name)
+			log.Debugw("Cluster has no project label", "cluster", cluster.GetName())
 			return nil
 		}
+
 		log.Debugw("Returning reconcile request for project", kubermaticv1.ProjectIDLabelKey, labelValue)
 		return []reconcile.Request{{NamespacedName: types.NamespacedName{Name: labelValue}}}
 	})
-	return &handler.EnqueueRequestsFromMapFunc{ToRequests: toRequestFunc}
 }
 
 func Add(
@@ -89,7 +80,6 @@ func Add(
 
 	log = log.Named(ControllerName)
 	r := &reconciler{
-		ctx:                     ctx,
 		log:                     log,
 		masterClient:            masterManager.GetClient(),
 		seedClients:             map[string]ctrlruntimeclient.Client{},
@@ -124,11 +114,11 @@ func Add(
 	return nil
 }
 
-func (r *reconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *reconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log := r.log.With(kubermaticv1.ProjectIDLabelKey, request.Name)
 	log.Debug("Processing")
 
-	err := r.reconcile(log, request)
+	err := r.reconcile(ctx, log, request)
 	if controllerutil.IsCacheNotStarted(err) {
 		return reconcile.Result{RequeueAfter: 5 * time.Second}, nil
 	}
@@ -138,9 +128,9 @@ func (r *reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	return reconcile.Result{}, err
 }
 
-func (r *reconciler) reconcile(log *zap.SugaredLogger, request reconcile.Request) error {
+func (r *reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, request reconcile.Request) error {
 	project := &kubermaticv1.Project{}
-	if err := r.masterClient.Get(r.ctx, request.NamespacedName, project); err != nil {
+	if err := r.masterClient.Get(ctx, request.NamespacedName, project); err != nil {
 		if controllerutil.IsCacheNotStarted(err) {
 			return err
 		}
@@ -175,7 +165,7 @@ func (r *reconciler) reconcile(log *zap.SugaredLogger, request reconcile.Request
 		log := log.With("seed", seedName)
 
 		unfilteredClusters := &kubermaticv1.ClusterList{}
-		if err := seedClient.List(r.ctx, unfilteredClusters, listOpts); err != nil {
+		if err := seedClient.List(ctx, unfilteredClusters, listOpts); err != nil {
 			if controllerutil.IsCacheNotStarted(err) {
 				log.Debug("cache for seed client was not yet started, cannot list Clusters")
 			} else {
@@ -194,7 +184,7 @@ func (r *reconciler) reconcile(log *zap.SugaredLogger, request reconcile.Request
 				continue
 			}
 			log.Debug("Updating labels on cluster")
-			if err := r.updateCluster(cluster.Name, seedClient, func(c *kubermaticv1.Cluster) {
+			if err := r.updateCluster(ctx, cluster.Name, seedClient, func(c *kubermaticv1.Cluster) {
 				c.Labels = newClusterLabels
 				c.Status.InheritedLabels = getInheritedLabels(project.Labels)
 			}); err != nil {
@@ -206,17 +196,17 @@ func (r *reconciler) reconcile(log *zap.SugaredLogger, request reconcile.Request
 	return utilerrors.NewAggregate(errs)
 }
 
-func (r *reconciler) updateCluster(name string, client ctrlruntimeclient.Client, modify func(*kubermaticv1.Cluster)) error {
+func (r *reconciler) updateCluster(ctx context.Context, name string, client ctrlruntimeclient.Client, modify func(*kubermaticv1.Cluster)) error {
 	cluster := &kubermaticv1.Cluster{}
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		if err := client.Get(r.ctx, types.NamespacedName{Name: name}, cluster); err != nil {
+		if err := client.Get(ctx, types.NamespacedName{Name: name}, cluster); err != nil {
 			if kerrors.IsNotFound(err) {
 				return nil
 			}
 			return err
 		}
 		modify(cluster)
-		return client.Update(r.ctx, cluster)
+		return client.Update(ctx, cluster)
 	})
 }
 

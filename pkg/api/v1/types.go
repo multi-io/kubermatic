@@ -122,6 +122,7 @@ type AWSSize struct {
 	PrettyName string  `json:"pretty_name"`
 	Memory     float32 `json:"memory"`
 	VCPUs      int     `json:"vcpus"`
+	GPUs       int     `json:"gpus"`
 	Price      float64 `json:"price"`
 }
 
@@ -365,6 +366,7 @@ type AzureSizeList []AzureSize
 type AzureSize struct {
 	Name                 string `json:"name"`
 	NumberOfCores        int32  `json:"numberOfCores"`
+	NumberOfGPUs         int32  `json:"numberOfGPUs"`
 	OsDiskSizeInMB       int32  `json:"osDiskSizeInMB"`
 	ResourceDiskSizeInMB int32  `json:"resourceDiskSizeInMB"`
 	MemoryInMB           int32  `json:"memoryInMB"`
@@ -638,6 +640,12 @@ type VSphereFolder struct {
 	Path string `json:"path"`
 }
 
+// VSphereDatastoreList is the object representing a vsphere datastores.
+// swagger:model VSphereDatastoreList
+type VSphereDatastoreList struct {
+	Datastores []string `json:"datastores"`
+}
+
 // AlibabaInstanceTypeList represents an array of Alibaba instance types.
 // swagger:model AlibabaInstanceTypeList
 type AlibabaInstanceTypeList []AlibabaInstanceType
@@ -647,6 +655,7 @@ type AlibabaInstanceTypeList []AlibabaInstanceType
 type AlibabaInstanceType struct {
 	ID           string  `json:"id"`
 	CPUCoreCount int     `json:"cpuCoreCount"`
+	GPUCoreCount int     `json:"gpuCoreCount"`
 	MemorySize   float64 `json:"memorySize"`
 }
 
@@ -657,6 +666,36 @@ type AlibabaZoneList []AlibabaZone
 // AlibabaZone represents a object of Alibaba zone.
 // swagger:model AlibabaZone
 type AlibabaZone struct {
+	ID string `json:"id"`
+}
+
+// AlibabaVSwitchList represents an array of Alibaba vSwitches.
+// swagger:model AlibabaVSwitchList
+type AlibabaVSwitchList []AlibabaVSwitch
+
+// AlibabaVSwitch represents a object of Alibaba vSwitch.
+// swagger:model AlibabaVSwitch
+type AlibabaVSwitch struct {
+	ID string `json:"id"`
+}
+
+// AnexiaVlanList represents an array of Anexia Vlans.
+// swagger:model AnexiaVlanList
+type AnexiaVlanList []AnexiaVlan
+
+// AnexiaVlan represents a object of Anexia Vlan.
+// swagger:model AnexiaVlan
+type AnexiaVlan struct {
+	ID string `json:"id"`
+}
+
+// AnexiaTemplateList represents an array of Anexia templates.
+// swagger:model AnexiaTemplateList
+type AnexiaTemplateList []AnexiaTemplate
+
+// AnexiaTemplate represents a object of Anexia template.
+// swagger:model AnexiaTemplate
+type AnexiaTemplate struct {
 	ID string `json:"id"`
 }
 
@@ -682,8 +721,6 @@ type CreateClusterSpec struct {
 }
 
 const (
-	// OpenShiftClusterType defines the OpenShift cluster type
-	OpenShiftClusterType string = "openshift"
 	// KubernetesClusterType defines the Kubernetes cluster type
 	KubernetesClusterType string = "kubernetes"
 )
@@ -720,9 +757,10 @@ type ClusterSpec struct {
 	// OIDC settings
 	OIDC kubermaticv1.OIDCSettings `json:"oidc,omitempty"`
 
-	Sys11Auth kubermaticv1.Sys11AuthSettings `json:"sys11auth,omitempty"`
-
+	// Configure cluster upgrade window, currently used for flatcar node reboots
 	UpdateWindow *kubermaticv1.UpdateWindow `json:"updateWindow,omitempty"`
+
+	Sys11Auth kubermaticv1.Sys11AuthSettings `json:"sys11auth,omitempty"`
 
 	// If active the PodSecurityPolicy admission plugin is configured at the apiserver
 	UsePodSecurityPolicyAdmissionPlugin bool `json:"usePodSecurityPolicyAdmissionPlugin,omitempty"`
@@ -756,13 +794,13 @@ type ClusterSpec struct {
 	// ServiceAccount contains service account related settings for the kube-apiserver of user cluster.
 	ServiceAccount *kubermaticv1.ServiceAccountSettings `json:"serviceAccount,omitempty"`
 
-	// Openshift holds all openshift-specific settings
-	Openshift *kubermaticv1.Openshift `json:"openshift,omitempty"`
-
 	// OPAIntegration is a preview feature that enables OPA integration with Kubermatic for the cluster.
 	// Enabling it causes gatekeeper and its resources to be deployed on the user cluster.
 	// By default it is disabled.
 	OPAIntegration *kubermaticv1.OPAIntegrationSettings `json:"opaIntegration,omitempty"`
+
+	//MLA contains monitoring, logging and alerting related settings for the user cluster.
+	MLA *kubermaticv1.MLASettings `json:"mla,omitempty"`
 }
 
 // MarshalJSON marshals ClusterSpec object into JSON. It is overwritten to control data
@@ -784,6 +822,7 @@ func (cs *ClusterSpec) MarshalJSON() ([]byte, error) {
 		PodNodeSelectorAdmissionPluginConfig map[string]string                      `json:"podNodeSelectorAdmissionPluginConfig,omitempty"`
 		ServiceAccount                       *kubermaticv1.ServiceAccountSettings   `json:"serviceAccount,omitempty"`
 		OPAIntegration                       *kubermaticv1.OPAIntegrationSettings   `json:"opaIntegration,omitempty"`
+		MLA                                  *kubermaticv1.MLASettings              `json:"mla,omitempty"`
 	}{
 		Cloud: PublicCloudSpec{
 			DatacenterName: cs.Cloud.DatacenterName,
@@ -815,6 +854,7 @@ func (cs *ClusterSpec) MarshalJSON() ([]byte, error) {
 		PodNodeSelectorAdmissionPluginConfig: cs.PodNodeSelectorAdmissionPluginConfig,
 		ServiceAccount:                       cs.ServiceAccount,
 		OPAIntegration:                       cs.OPAIntegration,
+		MLA:                                  cs.MLA,
 	})
 
 	return ret, err
@@ -1021,6 +1061,8 @@ type ClusterHealth struct {
 	Etcd                         kubermaticv1.HealthStatus `json:"etcd"`
 	CloudProviderInfrastructure  kubermaticv1.HealthStatus `json:"cloudProviderInfrastructure"`
 	UserClusterControllerManager kubermaticv1.HealthStatus `json:"userClusterControllerManager"`
+	GatekeeperController         kubermaticv1.HealthStatus `json:"gatekeeperController,omitempty"`
+	GatekeeperAudit              kubermaticv1.HealthStatus `json:"gatekeeperAudit,omitempty"`
 }
 
 // AccessibleAddons represents an array of addons that can be configured in the user clusters.
@@ -1095,13 +1137,6 @@ type CentOSSpec struct {
 	DistUpgradeOnBoot bool `json:"distUpgradeOnBoot"`
 }
 
-// ContainerLinuxSpec ubuntu linux specific settings
-// swagger:model ContainerLinuxSpec
-type ContainerLinuxSpec struct {
-	// disable container linux auto-update feature
-	DisableAutoUpdate bool `json:"disableAutoUpdate"`
-}
-
 // FlatcarSpec contains Flatcar Linux specific settings
 // swagger:model FlatcarSpec
 type FlatcarSpec struct {
@@ -1133,12 +1168,11 @@ type RHELSpec struct {
 // OperatingSystemSpec represents the collection of os specific settings. Only one must be set at a time.
 // swagger:model OperatingSystemSpec
 type OperatingSystemSpec struct {
-	Ubuntu         *UbuntuSpec         `json:"ubuntu,omitempty"`
-	ContainerLinux *ContainerLinuxSpec `json:"containerLinux,omitempty"`
-	CentOS         *CentOSSpec         `json:"centos,omitempty"`
-	SLES           *SLESSpec           `json:"sles,omitempty"`
-	RHEL           *RHELSpec           `json:"rhel,omitempty"`
-	Flatcar        *FlatcarSpec        `json:"flatcar,omitempty"`
+	Ubuntu  *UbuntuSpec  `json:"ubuntu,omitempty"`
+	CentOS  *CentOSSpec  `json:"centos,omitempty"`
+	SLES    *SLESSpec    `json:"sles,omitempty"`
+	RHEL    *RHELSpec    `json:"rhel,omitempty"`
+	Flatcar *FlatcarSpec `json:"flatcar,omitempty"`
 }
 
 // NodeVersionInfo node version information
@@ -1377,10 +1411,10 @@ type OpenstackNodeSpec struct {
 	// if not set, the default AZ from the Datacenter spec will be used
 	// required: false
 	AvailabilityZone string `json:"availabilityZone"`
-	// Period of time to check for instance ready status
+	// Period of time to check for instance ready status, i.e. 10s/1m
 	// required: false
 	InstanceReadyCheckPeriod string `json:"instanceReadyCheckPeriod"`
-	// Max time to wait for the instance to be ready
+	// Max time to wait for the instance to be ready, i.e. 10s/1m
 	// required: false
 	InstanceReadyCheckTimeout string `json:"instanceReadyCheckTimeout"`
 }
@@ -1447,6 +1481,8 @@ type AWSNodeSpec struct {
 	// assigned during launch overriding a possible setting in the used AWS subnet.
 	// required: false
 	AssignPublicIP *bool `json:"assignPublicIP"`
+	// IsSpotInstance indicates whether the created machine is an aws ec2 spot instance or on-demand ec2 instance.
+	IsSpotInstance *bool `json:"isSpotInstance"`
 }
 
 func (spec *AWSNodeSpec) MarshalJSON() ([]byte, error) {
@@ -1477,6 +1513,7 @@ func (spec *AWSNodeSpec) MarshalJSON() ([]byte, error) {
 		AvailabilityZone string            `json:"availabilityZone"`
 		SubnetID         string            `json:"subnetID"`
 		AssignPublicIP   *bool             `json:"assignPublicIP"`
+		IsSpotInstance   *bool             `json:"isSpotInstance"`
 	}{
 		InstanceType:     spec.InstanceType,
 		VolumeSize:       spec.VolumeSize,
@@ -1486,6 +1523,7 @@ func (spec *AWSNodeSpec) MarshalJSON() ([]byte, error) {
 		AvailabilityZone: spec.AvailabilityZone,
 		SubnetID:         spec.SubnetID,
 		AssignPublicIP:   spec.AssignPublicIP,
+		IsSpotInstance:   spec.IsSpotInstance,
 	}
 
 	return json.Marshal(&res)
@@ -2118,12 +2156,6 @@ const (
 	InClusterPVCleanupFinalizer = "kubermatic.io/cleanup-in-cluster-pv"
 	// InClusterLBCleanupFinalizer indicates that the LBs still need cleanup
 	InClusterLBCleanupFinalizer = "kubermatic.io/cleanup-in-cluster-lb"
-	// InClusterCredentialsRequestsCleanupFinalizer indicates that CredentialsRequests still need cleanup. This
-	// CRD only exists on Openshift and is a no-op for Kubernetes.
-	InClusterCredentialsRequestsCleanupFinalizer = "kubermatic.io/cleanup-credentials-requests"
-	// InClusterImageRegistryConfigCleanupFinalizer indicates that CredentialsRequests still need
-	// cleanup. This CRD only exists on Openshift and is a no-op for Kubernetes.
-	InClusterImageRegistryConfigCleanupFinalizer = "kubermatic.io/cleanup-image-registry-configs"
 	// CredentialsSecretsCleanupFinalizer indicates that secrets for credentials still need cleanup
 	CredentialsSecretsCleanupFinalizer = "kubermatic.io/cleanup-credentials-secrets"
 	// UserClusterRoleCleanupFinalizer indicates that user cluster role still need cleanup
@@ -2142,14 +2174,15 @@ const (
 	KubermaticConstraintCleanupFinalizer = "kubermatic.io/cleanup-kubermatic-constraints"
 	// SeedProjectCleanupFinalizer indicates that Kubermatic Projects on the seed clusters need cleanup
 	SeedProjectCleanupFinalizer = "kubermatic.io/cleanup-seed-projects"
+	// SeedUserProjectBindingCleanupFinalizer indicates that Kubermatic UserProjectBindings on the seed clusters need cleanup
+	SeedUserProjectBindingCleanupFinalizer = "kubermatic.io/cleanup-seed-user-project-bindings"
+	// ClusterRoleBindingsCleanupFinalizer indicates that the cluster ClusterRoleBindings on the seed cluster need cleanup
+	ClusterRoleBindingsCleanupFinalizer = "kubermatic.io/cleanup-cluster-role-bindings"
 )
 
 func ToInternalClusterType(externalClusterType string) kubermaticv1.ClusterType {
 	if externalClusterType == KubernetesClusterType {
 		return kubermaticv1.ClusterTypeKubernetes
-	}
-	if externalClusterType == OpenShiftClusterType {
-		return kubermaticv1.ClusterTypeOpenShift
 	}
 	return kubermaticv1.ClusterTypeAll
 }

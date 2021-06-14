@@ -90,7 +90,7 @@ spec:
         - 255.255.255.0
         command:
         - /usr/sbin/openvpn
-        image: quay.io/kubermatic/openvpn:v2.4.8-r1
+        image: quay.io/kubermatic/openvpn:v2.5.0-r1
         name: openvpn-server
         ports:
         - containerPort: 1194
@@ -109,7 +109,7 @@ spec:
         resources:
           limits:
             cpu: 100m
-            memory: 20Mi
+            memory: 50Mi
           requests:
             cpu: 5m
             memory: 5Mi
@@ -139,7 +139,7 @@ spec:
           done
         command:
         - /bin/bash
-        image: quay.io/kubermatic/openvpn:v2.4.8-r1
+        image: quay.io/kubermatic/openvpn:v2.5.0-r1
         name: ip-fixup
         resources:
           limits:
@@ -164,7 +164,7 @@ spec:
         resources:
           limits:
             cpu: 100m
-            memory: 20Mi
+            memory: 50Mi
           requests:
             cpu: 5m
             memory: 5Mi
@@ -193,12 +193,12 @@ spec:
           iptables -A INPUT -i tun0 -j DROP
         command:
         - /bin/bash
-        image: quay.io/kubermatic/openvpn:v2.4.8-r1
+        image: quay.io/kubermatic/openvpn:v2.5.0-r1
         name: iptables-init
         resources:
           limits:
             cpu: 100m
-            memory: 20Mi
+            memory: 50Mi
           requests:
             cpu: 5m
             memory: 5Mi

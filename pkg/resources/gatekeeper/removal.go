@@ -1,5 +1,5 @@
 /*
-Copyright 2020 The Kubermatic Kubernetes Platform contributors.
+Copyright 2021 The Kubermatic Kubernetes Platform contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,11 +23,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func GetResourcesToRemoveOnDelete(namespace string) []runtime.Object {
-	var toRemove []runtime.Object
+func GetResourcesToRemoveOnDelete(namespace string) []ctrlruntimeclient.Object {
+	var toRemove []ctrlruntimeclient.Object
 
 	// Deployment
 	toRemove = append(toRemove, &appsv1.Deployment{

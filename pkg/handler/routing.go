@@ -17,6 +17,7 @@ limitations under the License.
 package handler
 
 import (
+	"crypto/x509"
 	"os"
 
 	"github.com/go-kit/kit/log"
@@ -78,6 +79,7 @@ type Routing struct {
 	admissionPluginProvider               provider.AdmissionPluginsProvider
 	settingsWatcher                       watcher.SettingsWatcher
 	userWatcher                           watcher.UserWatcher
+	caBundle                              *x509.CertPool
 }
 
 // NewRouting creates a new Routing.
@@ -122,6 +124,7 @@ func NewRouting(routingParams RoutingParams) Routing {
 		settingsWatcher:                       routingParams.SettingsWatcher,
 		userWatcher:                           routingParams.UserWatcher,
 		versions:                              routingParams.Versions,
+		caBundle:                              routingParams.CABundle,
 	}
 }
 
@@ -177,4 +180,5 @@ type RoutingParams struct {
 	ConstraintProvider                    provider.ConstraintProvider
 	PrivilegedConstraintProvider          provider.PrivilegedConstraintProvider
 	Versions                              kubermatic.Versions
+	CABundle                              *x509.CertPool
 }

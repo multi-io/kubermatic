@@ -10,7 +10,7 @@ import (
 
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -52,7 +52,7 @@ func (h *AdmissionHandler) InjectLogger(l logr.Logger) error {
 func (h *AdmissionHandler) Handle(ctx context.Context, req webhook.AdmissionRequest) webhook.AdmissionResponse {
 	cluster := &kubermaticv1.Cluster{}
 
-	if req.Operation != admissionv1beta1.Create {
+	if req.Operation != admissionv1.Create {
 		return admission.Errored(http.StatusBadRequest, fmt.Errorf("%s not supported on cluster resources", req.Operation))
 	}
 
@@ -129,7 +129,7 @@ func (h *AdmissionHandler) Handle(ctx context.Context, req webhook.AdmissionRequ
 		settings.Prometheus.Resources = h.settings.Prometheus.Resources
 	}
 
-	return webhook.Patched("default componentsOverride",
+	response := webhook.Patched("default componentsOverride",
 		jsonpatch.Operation{
 			Operation: "remove",
 			Path:      fieldJSONPath,
@@ -139,6 +139,8 @@ func (h *AdmissionHandler) Handle(ctx context.Context, req webhook.AdmissionRequ
 			Path:      fieldJSONPath,
 			Value:     settings,
 		})
+	response.UID = req.UID
+	return response
 }
 
 func (h *AdmissionHandler) SetupWebhookWithManager(mgr ctrl.Manager) {

@@ -22,7 +22,6 @@ import (
 
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	operatorv1alpha1 "k8c.io/kubermatic/v2/pkg/crd/operator/v1alpha1"
-	"k8c.io/kubermatic/v2/pkg/mutation/cluster"
 	"k8c.io/kubermatic/v2/pkg/resources"
 	"k8c.io/kubermatic/v2/pkg/resources/certificates"
 	"k8c.io/kubermatic/v2/pkg/resources/certificates/servingcerthelper"
@@ -48,23 +47,18 @@ const (
 	VersionLabel = "app.kubernetes.io/version"
 
 	// VersionsFileName is the name of the YAML file containing the enabled and
-	// default Kubernetes and Openshift versions.
+	// default Kubernetes versions.
 	VersionsFileName = "versions.yaml"
 
 	// UpdatesFileName is the name of the YAML file containing the configured
 	// cluster upgrade rules.
 	UpdatesFileName = "updates.yaml"
 
-	// OpenshiftAddonsFileName is the name of the openshift addons manifest file
-	// in the master files.
-	OpenshiftAddonsFileName = "openshift-addons.yaml"
-
 	// KubernetesAddonsFileName is the name of the kubernetes addons manifest file
 	// in the master files.
 	KubernetesAddonsFileName = "kubernetes-addons.yaml"
 
 	DockercfgSecretName  = "dockercfg"
-	DexCASecretName      = "dex-ca"
 	ExtraFilesSecretName = "extra-files"
 
 	SeedWebhookServiceName    = "seed-webhook"
@@ -115,16 +109,6 @@ func DockercfgSecretCreator(cfg *operatorv1alpha1.KubermaticConfiguration) recon
 	}
 }
 
-func DexCASecretCreator(cfg *operatorv1alpha1.KubermaticConfiguration) reconciling.NamedSecretCreatorGetter {
-	return func() (string, reconciling.SecretCreator) {
-		return DexCASecretName, func(s *corev1.Secret) (*corev1.Secret, error) {
-			return createSecretData(s, map[string]string{
-				"caBundle.pem": cfg.Spec.Auth.CABundle,
-			}), nil
-		}
-	}
-}
-
 func ExtraFilesSecretCreator(cfg *operatorv1alpha1.KubermaticConfiguration) reconciling.NamedSecretCreatorGetter {
 	return func() (string, reconciling.SecretCreator) {
 		return ExtraFilesSecretName, func(s *corev1.Secret) (*corev1.Secret, error) {
@@ -139,7 +123,6 @@ func ExtraFilesSecretCreator(cfg *operatorv1alpha1.KubermaticConfiguration) reco
 			}
 
 			data := map[string]string{
-				OpenshiftAddonsFileName:  cfg.Spec.UserCluster.Addons.Openshift.DefaultManifests,
 				KubernetesAddonsFileName: cfg.Spec.UserCluster.Addons.Kubernetes.DefaultManifests,
 				VersionsFileName:         versions,
 				UpdatesFileName:          updates,
@@ -245,67 +228,6 @@ func SeedAdmissionWebhookCreator(cfg *operatorv1alpha1.KubermaticConfiguration, 
 							},
 							Operations: []admissionregistrationv1.OperationType{
 								admissionregistrationv1.OperationAll,
-							},
-						},
-					},
-				},
-			}
-
-			return hook, nil
-		}
-	}
-}
-
-func ClustersMutatingAdmissionWebhookName(cfg *operatorv1alpha1.KubermaticConfiguration) string {
-	return fmt.Sprintf("kubermatic-seeds-clusters-default-components-overrides-%s", cfg.Namespace)
-}
-
-func ClustersMutatingAdmissionWebhookCreator(cfg *operatorv1alpha1.KubermaticConfiguration, client ctrlruntimeclient.Client) reconciling.NamedMutatingWebhookConfigurationCreatorGetter {
-	return func() (string, reconciling.MutatingWebhookConfigurationCreator) {
-		return ClustersMutatingAdmissionWebhookName(cfg), func(hook *admissionregistrationv1.MutatingWebhookConfiguration) (*admissionregistrationv1.MutatingWebhookConfiguration, error) {
-			matchPolicy := admissionregistrationv1.Exact
-			failurePolicy := admissionregistrationv1.Fail
-			sideEffects := admissionregistrationv1.SideEffectClassSome
-			scope := admissionregistrationv1.AllScopes
-
-			ca, err := WebhookCABundle(cfg, client)
-			if err != nil {
-				return nil, fmt.Errorf("cannot find Seed Admission CA bundle: %v", err)
-			}
-
-			hook.Webhooks = []admissionregistrationv1.MutatingWebhook{
-				{
-					Name:                    "clusters.kubermatic.io", // this should be a FQDN
-					AdmissionReviewVersions: []string{admissionregistrationv1.SchemeGroupVersion.Version},
-					MatchPolicy:             &matchPolicy,
-					FailurePolicy:           &failurePolicy,
-					SideEffects:             &sideEffects,
-					TimeoutSeconds:          pointer.Int32Ptr(30),
-					ClientConfig: admissionregistrationv1.WebhookClientConfig{
-						CABundle: ca,
-						Service: &admissionregistrationv1.ServiceReference{
-							Name:      SeedWebhookServiceName,
-							Namespace: cfg.Namespace,
-							Port:      pointer.Int32Ptr(443),
-							Path:      pointer.StringPtr(cluster.DefaultComponentSettingsPath),
-						},
-					},
-					NamespaceSelector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							NameLabel: cfg.Namespace,
-						},
-					},
-					ObjectSelector: &metav1.LabelSelector{},
-					Rules: []admissionregistrationv1.RuleWithOperations{
-						{
-							Rule: admissionregistrationv1.Rule{
-								APIGroups:   []string{kubermaticv1.GroupName},
-								APIVersions: []string{"*"},
-								Resources:   []string{"clusters"},
-								Scope:       &scope,
-							},
-							Operations: []admissionregistrationv1.OperationType{
-								admissionregistrationv1.Create,
 							},
 						},
 					},

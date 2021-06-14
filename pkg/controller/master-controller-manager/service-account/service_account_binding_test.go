@@ -21,43 +21,43 @@ import (
 	"fmt"
 	"testing"
 
+	"k8c.io/kubermatic/v2/pkg/crd/client/clientset/versioned/scheme"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/handler/test"
 	"k8c.io/kubermatic/v2/pkg/provider/kubernetes"
 
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
-
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
+	fakectrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-func TestReconcileBinding(t *testing.T) {
+func TestReconcileBindingForProjectServiceAccount(t *testing.T) {
 
 	tests := []struct {
 		name                      string
 		saName                    string
-		existingKubermaticObjects []runtime.Object
+		existingKubermaticObjects []ctrlruntimeclient.Object
 		expectedBinding           *kubermaticv1.UserProjectBinding
 	}{
 		{
 			name:   "scenario 1: this test creates binding for service account",
 			saName: "serviceaccount-abcd",
-			existingKubermaticObjects: []runtime.Object{
+			existingKubermaticObjects: []ctrlruntimeclient.Object{
 				genProject("my-first-project-ID"),
-				genServiceAccount("abcd", "test", "editors", "my-first-project-ID"),
+				genServiceAccount("abcd", "editors", "my-first-project-ID"),
 			},
 			expectedBinding: genSABinding("my-first-project-ID", "serviceaccount-abcd", "serviceaccount-abcd@sa.kubermatic.io", "editors"),
 		},
 		{
 			name:   "scenario 2: this test update binding group from viewers to editors",
 			saName: "serviceaccount-abcd",
-			existingKubermaticObjects: []runtime.Object{
+			existingKubermaticObjects: []ctrlruntimeclient.Object{
 				genProject("my-first-project-ID"),
-				genServiceAccount("abcd", "test", "editors", "my-first-project-ID"),
+				genServiceAccount("abcd", "editors", "my-first-project-ID"),
 				genSABinding("my-first-project-ID", "serviceaccount-abcd", "serviceaccount-abcd@sa.kubermatic.io", "viewers"),
 			},
 			expectedBinding: genSABinding("my-first-project-ID", "serviceaccount-abcd", "serviceaccount-abcd@sa.kubermatic.io", "editors"),
@@ -67,20 +67,23 @@ func TestReconcileBinding(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// setup the test scenario
-
-			kubermaticFakeClient := fake.NewFakeClient(test.existingKubermaticObjects...)
+			kubermaticFakeClient := fakectrlruntimeclient.NewClientBuilder().
+				WithScheme(scheme.Scheme).
+				WithObjects(test.existingKubermaticObjects...).
+				Build()
 
 			// act
-			target := reconcileServiceAccountProjectBinding{ctx: context.TODO(), Client: kubermaticFakeClient}
+			ctx := context.Background()
+			target := reconcileServiceAccountProjectBinding{Client: kubermaticFakeClient}
 
-			_, err := target.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{Name: test.saName}})
+			_, err := target.Reconcile(ctx, reconcile.Request{NamespacedName: types.NamespacedName{Name: test.saName}})
 
 			// validate
 			if err != nil {
 				t.Fatal(err)
 			}
 			bindings := &kubermaticv1.UserProjectBindingList{}
-			err = kubermaticFakeClient.List(context.TODO(), bindings)
+			err = kubermaticFakeClient.List(ctx, bindings)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -100,7 +103,6 @@ func TestReconcileBinding(t *testing.T) {
 			if !equality.Semantic.DeepEqual(bindings.Items[0].Spec, test.expectedBinding.Spec) {
 				t.Fatalf("%v", diff.ObjectDiff(bindings.Items[0].Spec, test.expectedBinding.Spec))
 			}
-
 		})
 	}
 }
@@ -123,7 +125,7 @@ func genProject(name string) *kubermaticv1.Project {
 	}
 }
 
-func genServiceAccount(id, name, group, projectName string) *kubermaticv1.User {
+func genServiceAccount(id, group, projectName string) *kubermaticv1.User {
 	user := &kubermaticv1.User{}
 	user.Labels = map[string]string{kubernetes.ServiceAccountLabelGroup: fmt.Sprintf("%s-%s", group, projectName)}
 	user.OwnerReferences = []metav1.OwnerReference{

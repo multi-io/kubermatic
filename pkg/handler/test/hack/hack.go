@@ -21,6 +21,7 @@ import (
 
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	v2 "k8c.io/kubermatic/v2/pkg/handler/v2"
+	"k8c.io/kubermatic/v2/pkg/resources/certificates"
 	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 
 	"github.com/gorilla/mux"
@@ -132,6 +133,7 @@ func NewTestRouting(
 		ConstraintProvider:                    constraintProvider,
 		PrivilegedConstraintProvider:          privilegedConstraintProvider,
 		Versions:                              kubermaticVersions,
+		CABundle:                              certificates.NewFakeCABundle().CertPool(),
 	}
 
 	r := handler.NewRouting(routingParams)

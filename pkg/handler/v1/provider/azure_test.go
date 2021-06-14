@@ -24,7 +24,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-06-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2020-12-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-06-01/network"
 	"github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2018-02-01/resources"
 	"github.com/stretchr/testify/assert"
@@ -36,7 +36,7 @@ import (
 	"k8c.io/kubermatic/v2/pkg/provider"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -71,8 +71,8 @@ func TestAzureSizeEndpoint(t *testing.T) {
 			location:   locationUS,
 			secret:     "secret",
 			expectedResponse: `[
-				{"name":"Standard_GS3", "maxDataDiskCount": 3, "memoryInMB": 254, "numberOfCores": 8, "osDiskSizeInMB": 1024, "resourceDiskSizeInMB":1024},
-				{"name":"Standard_A5", "maxDataDiskCount": 3, "memoryInMB": 254, "numberOfCores": 8, "osDiskSizeInMB": 1024, "resourceDiskSizeInMB":1024}
+				{"name":"Standard_GS3", "maxDataDiskCount": 3, "memoryInMB": 2048, "numberOfCores": 8, "numberOfGPUs": 0, "osDiskSizeInMB": 1024, "resourceDiskSizeInMB":1024},
+				{"name":"Standard_A5", "maxDataDiskCount": 3, "memoryInMB": 2048, "numberOfCores": 8, "numberOfGPUs": 0, "osDiskSizeInMB": 1024, "resourceDiskSizeInMB":1024}
 			]`,
 		},
 		{
@@ -81,7 +81,7 @@ func TestAzureSizeEndpoint(t *testing.T) {
 			location:   locationEU,
 			secret:     "secret",
 			expectedResponse: `[
-				{"name":"Standard_GS3", "maxDataDiskCount": 3, "memoryInMB": 254, "numberOfCores": 8, "osDiskSizeInMB": 1024, "resourceDiskSizeInMB":1024}
+				{"name":"Standard_GS3", "maxDataDiskCount": 3, "memoryInMB": 2048, "numberOfCores": 8, "numberOfGPUs": 0, "osDiskSizeInMB": 1024, "resourceDiskSizeInMB":1024}
 			]`,
 		},
 	}
@@ -102,7 +102,7 @@ func TestAzureSizeEndpoint(t *testing.T) {
 			apiUser := test.GetUser(test.UserEmail, test.UserID, test.UserName)
 
 			res := httptest.NewRecorder()
-			router, _, err := test.CreateTestEndpointAndGetClients(apiUser, buildAzureDatacenterMeta(), []runtime.Object{}, []runtime.Object{}, []runtime.Object{test.APIUserToKubermaticUser(apiUser)}, nil, nil, hack.NewTestRouting)
+			router, _, err := test.CreateTestEndpointAndGetClients(apiUser, buildAzureDatacenterMeta(), []ctrlruntimeclient.Object{}, []ctrlruntimeclient.Object{}, []ctrlruntimeclient.Object{test.APIUserToKubermaticUser(apiUser)}, nil, nil, hack.NewTestRouting)
 			if err != nil {
 				t.Fatalf("failed to create test endpoint due to %v\n", err)
 			}
@@ -191,7 +191,7 @@ func (s *mockSizeClientImpl) ListVMSize(ctx context.Context, location string) ([
 	standardGS3 := "Standard_GS3"
 	standardA5 := "Standard_A5"
 	maxDataDiskCount := int32(3)
-	memoryInMB := int32(254)
+	memoryInMB := int32(2048)
 	numberOfCores := int32(8)
 	diskSizeInMB := int32(1024)
 
