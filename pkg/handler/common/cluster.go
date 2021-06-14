@@ -386,7 +386,7 @@ func PatchEndpoint(ctx context.Context, userInfoGetter provider.UserInfoGetter, 
 	// Sys11: The field OpenstackBillingTenant does not exist in upstream version. This field used for billing purposes
 	// by us. If we accidentally delete it during merge we might not notice it. This test ensures field is set.
 	// We ignore Fake cloud spec used in unit tests.
-	if newInternalCluster.Spec.Cloud.Fake == nil && getOpenstackBillingTenant(&newInternalCluster.Spec.Cloud) == "" {
+	if newInternalCluster.Spec.Cloud.Fake == nil && newInternalCluster.Spec.Cloud.Openstack == nil && getOpenstackBillingTenant(&newInternalCluster.Spec.Cloud) == "" {
 		return nil, errors.NewBadRequest("openstackBillingTenant is required")
 	}
 
