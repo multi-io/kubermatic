@@ -24,7 +24,6 @@ import (
 
 	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/addon"
 	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/addoninstaller"
-	backupcontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/backup"
 	cloudcontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/cloud"
 	constrainttemplatecontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/constraint-template-controller"
 	etcdbackupcontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/etcdbackup"
@@ -185,41 +184,6 @@ func createEtcdBackupController(ctrlCtx *controllerContext) error {
 		cleanupContainer,
 		ctrlCtx.runOptions.backupContainerImage,
 		ctrlCtx.versions,
-		ctrlCtx.runOptions.caBundle,
-	)
-}
-
-func createBackupController(ctrlCtx *controllerContext) error {
-	storeContainer, err := getContainerFromFile(ctrlCtx.runOptions.backupContainerFile)
-	if err != nil {
-		return err
-	}
-	var cleanupContainer *corev1.Container
-	if !ctrlCtx.runOptions.enableEtcdBackupRestoreController {
-		cleanupContainer, err = getContainerFromFile(ctrlCtx.runOptions.cleanupContainerFile)
-	} else {
-		// new backup controller is enabled, this one will only be run to delete any existing backup cronjob.
-		// cleanupContainer not needed, just pass an empty dummy
-		cleanupContainer = &corev1.Container{}
-	}
-	if err != nil {
-		return err
-	}
-	backupInterval, err := time.ParseDuration(ctrlCtx.runOptions.backupInterval)
-	if err != nil {
-		return fmt.Errorf("failed to parse %s as duration: %v", ctrlCtx.runOptions.backupInterval, err)
-	}
-	return backupcontroller.Add(
-		ctrlCtx.log,
-		ctrlCtx.mgr,
-		ctrlCtx.runOptions.workerCount,
-		ctrlCtx.runOptions.workerName,
-		*storeContainer,
-		*cleanupContainer,
-		backupInterval,
-		ctrlCtx.runOptions.backupContainerImage,
-		ctrlCtx.versions,
-		ctrlCtx.runOptions.enableEtcdBackupRestoreController,
 		ctrlCtx.runOptions.caBundle,
 	)
 }

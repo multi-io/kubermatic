@@ -304,12 +304,3 @@ func filterAWSByQuota(instances apiv1.AWSSizeList, quota kubermaticv1.MachineDep
 
 	return filteredRecords
 }
-
-func contains(a []string, s string) bool {
-	for _, i := range a {
-		if i == s {
-			return true
-		}
-	}
-	return false
-}

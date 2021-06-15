@@ -144,6 +144,7 @@ func (tc testCase) fixturePath(resType, resName string) string {
 	return b.String()
 }
 
+//nolint:golint,cyclomatic
 func TestLoadFiles(t *testing.T) {
 	versions := []*version.Version{
 		{
