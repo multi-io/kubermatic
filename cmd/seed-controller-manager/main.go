@@ -39,10 +39,10 @@ import (
 	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
 	"k8c.io/kubermatic/v2/pkg/metrics"
 	metricserver "k8c.io/kubermatic/v2/pkg/metrics/server"
-	clustermutation "k8c.io/kubermatic/v2/pkg/mutation/cluster"
 	"k8c.io/kubermatic/v2/pkg/pprof"
 	"k8c.io/kubermatic/v2/pkg/util/cli"
 	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
+	clustermutation "k8c.io/kubermatic/v2/pkg/webhook/cluster/mutation"
 	clustervalidation "k8c.io/kubermatic/v2/pkg/webhook/cluster/validation"
 	"sigs.k8s.io/yaml"
 
@@ -172,6 +172,11 @@ Please install the VerticalPodAutoscaler according to the documentation: https:/
 		if err := options.admissionWebhook.Configure(mgr.GetWebhookServer()); err != nil {
 			log.Fatalw("Failed to configure admission webhook server", zap.Error(err))
 		}
+		// Register Seed validation admission webhook
+		h, err := seedValidationHandler(rootCtx, mgr.GetClient(), options)
+		if err != nil {
+			log.Fatalw("Failed to build Seed validation handler", zap.Error(err))
+		}
 
 		componentsSettings, err := defaultComponentSettings(
 			int32(options.apiServerDefaultReplicas),
@@ -182,19 +187,13 @@ Please install the VerticalPodAutoscaler according to the documentation: https:/
 		if err != nil {
 			log.Panicw("construct default components overrides", zap.Error(err))
 		}
-		// Setup mutation webhook for defaulting componentsOverride of new clusters.
-		clustermutation.NewAdmissionHandler(mgr.GetClient(), componentsSettings).SetupWebhookWithManager(mgr)
-
-		// Register Seed validation admission webhook
-		h, err := seedValidationHandler(rootCtx, mgr.GetClient(), options)
-		if err != nil {
-			log.Fatalw("Failed to build Seed validation handler", zap.Error(err))
-		}
 
 		// Setup the admission handler for kubermatic Seed CRDs
 		h.SetupWebhookWithManager(mgr)
 		// Setup the validation admission handler for kubermatic Cluster CRDs
 		clustervalidation.NewAdmissionHandler(mgr.GetClient(), options.featureGates).SetupWebhookWithManager(mgr)
+		// Setup the mutation admission handler for kubermatic Cluster CRDs
+		clustermutation.NewAdmissionHandler(componentsSettings).SetupWebhookWithManager(mgr)
 	}
 
 	kcInternal := keycloak.NewClient(requireEnv("KEYCLOAK_INTERNAL_URL"), requireEnv("KEYCLOAK_INTERNAL_ADMIN_USER"), requireEnv("KEYCLOAK_INTERNAL_ADMIN_PASSWORD"))

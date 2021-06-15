@@ -408,7 +408,7 @@ func (r *Reconciler) reconcileConfigMaps(ctx context.Context, cfg *operatorv1alp
 
 	creators := []reconciling.NamedConfigMapCreatorGetter{
 		kubermaticseed.BackupContainersConfigMapCreator(cfg),
-		kubermaticseed.DefaultClusterComponentSettingsYAML(cfg),
+		kubermaticseed.DefaultClusterComponentSettingsYAML(seed),
 		kubermaticseed.CABundleConfigMapCreator(caBundle),
 	}
 
@@ -596,7 +596,6 @@ func (r *Reconciler) reconcileAdmissionWebhooks(ctx context.Context, cfg *operat
 
 	mutatingWebhookCreators := []reconciling.NamedMutatingWebhookConfigurationCreatorGetter{
 		kubermaticseed.ClusterMutatingWebhookConfigurationCreator(cfg, client),
-		kubermaticseed.ClustersMutatingAdmissionWebhookCreator(cfg, client),
 	}
 
 	if err := reconciling.ReconcileMutatingWebhookConfigurations(ctx, mutatingWebhookCreators, "", client); err != nil {

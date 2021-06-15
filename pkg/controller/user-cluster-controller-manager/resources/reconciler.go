@@ -666,7 +666,7 @@ func (r *reconciler) reconcileDaemonSet(ctx context.Context) error {
 func (r *reconciler) reconcileNamespaces(ctx context.Context) error {
 
 	creators := []reconciling.NamedNamespaceCreatorGetter{
-		//kubernetesdashboard.NamespaceCreator,
+		kubernetesdashboard.NamespaceCreator,
 		cloudinitsettings.NamespaceCreator,
 	}
 	if r.opaIntegration {
@@ -682,13 +682,13 @@ func (r *reconciler) reconcileNamespaces(ctx context.Context) error {
 }
 
 func (r *reconciler) reconcileDeployments(ctx context.Context) error {
-	// // Kubernetes Dashboard and related resources
-	// creators := []reconciling.NamedDeploymentCreatorGetter{
-	// 	kubernetesdashboard.DeploymentCreator(),
-	// }
-	// if err := reconciling.ReconcileDeployments(ctx, creators, kubernetesdashboard.Namespace, r.Client); err != nil {
-	// 	return fmt.Errorf("failed to reconcile Deployments in namespace %s: %v", kubernetesdashboard.Namespace, err)
-	// }
+	// Kubernetes Dashboard and related resources
+	creators := []reconciling.NamedDeploymentCreatorGetter{
+		kubernetesdashboard.DeploymentCreator(),
+	}
+	if err := reconciling.ReconcileDeployments(ctx, creators, kubernetesdashboard.Namespace, r.Client); err != nil {
+		return fmt.Errorf("failed to reconcile Deployments in namespace %s: %v", kubernetesdashboard.Namespace, err)
+	}
 
 	dnsAutescalerCreators := []reconciling.NamedDeploymentCreatorGetter{dnsautoscaler.DeploymentCreator()}
 	if err := reconciling.ReconcileDeployments(ctx, dnsAutescalerCreators, metav1.NamespaceSystem, r.Client); err != nil {

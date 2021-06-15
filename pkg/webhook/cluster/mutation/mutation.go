@@ -23,6 +23,7 @@ import (
 	"net/http"
 
 	"github.com/go-logr/logr"
+	"gomodules.xyz/jsonpatch/v2"
 
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 
@@ -37,11 +38,13 @@ import (
 type AdmissionHandler struct {
 	log     logr.Logger
 	decoder *admission.Decoder
+
+	defaultSettings kubermaticv1.ComponentSettings
 }
 
 // NewAdmissionHandler returns a new cluster mutation AdmissionHandler.
-func NewAdmissionHandler() *AdmissionHandler {
-	return &AdmissionHandler{}
+func NewAdmissionHandler(s kubermaticv1.ComponentSettings) *AdmissionHandler {
+	return &AdmissionHandler{defaultSettings: s}
 }
 
 func (h *AdmissionHandler) InjectLogger(l logr.Logger) error {
@@ -54,13 +57,97 @@ func (h *AdmissionHandler) InjectDecoder(d *admission.Decoder) error {
 	return nil
 }
 
+//nolint:golint,cyclomatic
 func (h *AdmissionHandler) Handle(ctx context.Context, req webhook.AdmissionRequest) webhook.AdmissionResponse {
 	cluster := &kubermaticv1.Cluster{}
 	oldCluster := &kubermaticv1.Cluster{}
 
 	switch req.Operation {
 	case admissionv1.Create:
-		// NOP
+		if err := h.decoder.Decode(req, cluster); err != nil {
+			return admission.Errored(http.StatusBadRequest, err)
+		}
+		settings := cluster.Spec.ComponentsOverride
+
+		if settings.Apiserver.Replicas == nil {
+			settings.Apiserver.Replicas = h.defaultSettings.Apiserver.Replicas
+		}
+		if settings.Apiserver.Resources == nil {
+			settings.Apiserver.Resources = h.defaultSettings.Apiserver.Resources
+		}
+		if settings.Apiserver.EndpointReconcilingDisabled == nil {
+			settings.Apiserver.EndpointReconcilingDisabled = h.defaultSettings.Apiserver.EndpointReconcilingDisabled
+		}
+		if settings.Apiserver.NodePortRange == "" {
+			settings.Apiserver.NodePortRange = h.defaultSettings.Apiserver.NodePortRange
+		}
+		if settings.ControllerManager.Replicas == nil {
+			settings.ControllerManager.Replicas = h.defaultSettings.ControllerManager.Replicas
+		}
+		if settings.ControllerManager.Resources == nil {
+			settings.ControllerManager.Resources = h.defaultSettings.ControllerManager.Resources
+		}
+		if settings.ControllerManager.Tolerations == nil {
+			settings.ControllerManager.Tolerations = h.defaultSettings.ControllerManager.Tolerations
+		}
+		if settings.ControllerManager.LeaseDurationSeconds == nil {
+			settings.ControllerManager.LeaseDurationSeconds = h.defaultSettings.ControllerManager.LeaseDurationSeconds
+		}
+		if settings.ControllerManager.RenewDeadlineSeconds == nil {
+			settings.ControllerManager.RenewDeadlineSeconds = h.defaultSettings.ControllerManager.RenewDeadlineSeconds
+		}
+		if settings.ControllerManager.RetryPeriodSeconds == nil {
+			settings.ControllerManager.RetryPeriodSeconds = h.defaultSettings.ControllerManager.RetryPeriodSeconds
+		}
+		if settings.Scheduler.Replicas == nil {
+			settings.Scheduler.Replicas = h.defaultSettings.Scheduler.Replicas
+		}
+		if settings.Scheduler.Resources == nil {
+			settings.Scheduler.Resources = h.defaultSettings.Scheduler.Resources
+		}
+		if settings.Scheduler.Tolerations == nil {
+			settings.Scheduler.Tolerations = h.defaultSettings.Scheduler.Tolerations
+		}
+		if settings.Scheduler.LeaseDurationSeconds == nil {
+			settings.Scheduler.LeaseDurationSeconds = h.defaultSettings.Scheduler.LeaseDurationSeconds
+		}
+		if settings.Scheduler.RenewDeadlineSeconds == nil {
+			settings.Scheduler.RenewDeadlineSeconds = h.defaultSettings.Scheduler.RenewDeadlineSeconds
+		}
+		if settings.Scheduler.RetryPeriodSeconds == nil {
+			settings.Scheduler.RetryPeriodSeconds = h.defaultSettings.Scheduler.RetryPeriodSeconds
+		}
+		if settings.Etcd.Replicas == nil {
+			settings.Etcd.Replicas = h.defaultSettings.Etcd.Replicas
+		}
+		if settings.Etcd.Resources == nil {
+			settings.Etcd.Resources = h.defaultSettings.Etcd.Resources
+		}
+		if settings.Etcd.Tolerations == nil {
+			settings.Etcd.Tolerations = h.defaultSettings.Etcd.Tolerations
+		}
+		if settings.Etcd.DiskSize == nil {
+			settings.Etcd.DiskSize = h.defaultSettings.Etcd.DiskSize
+		}
+		if settings.Etcd.StorageClass == "" {
+			settings.Etcd.StorageClass = h.defaultSettings.Etcd.StorageClass
+		}
+		if settings.Prometheus.Resources == nil {
+			settings.Prometheus.Resources = h.defaultSettings.Prometheus.Resources
+		}
+
+		response := webhook.Patched("default componentsOverride",
+			jsonpatch.Operation{
+				Operation: "remove",
+				Path:      "/spec/componentsOverride",
+			},
+			jsonpatch.Operation{
+				Operation: "add",
+				Path:      "/spec/componentsOverride",
+				Value:     settings,
+			})
+		response.UID = req.UID
+		return response
 	case admissionv1.Update:
 		if err := h.decoder.Decode(req, cluster); err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
