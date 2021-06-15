@@ -89,6 +89,8 @@ type SeedSpec struct {
 	ProxySettings *ProxySettings `json:"proxy_settings,omitempty"`
 	// Optional: ExposeStrategy explicitly sets the expose strategy for this seed cluster, if not set, the default provided by the master is used.
 	ExposeStrategy ExposeStrategy `json:"expose_strategy,omitempty"`
+	// DefaultClusterComponentSettingsYAML is a YAML file with default cluster component settings
+	DefaultClusterComponentSettingsYAML string `json:"defaultClusterComponentSettingsYAML,omitempty"`
 }
 
 type NodeportProxyConfig struct {

@@ -145,8 +145,6 @@ type KubermaticSeedControllerConfiguration struct {
 	KeycloakCacheExpiry string `json:"keycloakCacheExpiry,omitempty"`
 	// MonitoringEnvironmentLabel is the value is to be set for prometheus config's external label 'metakube_environment'.
 	MonitoringEnvironmentLabel string `json:"monitoringEnvironmentLabel,omitempty"`
-	// DefaultClusterComponentSettingsYAML is a YAML file with default cluster component settings
-	DefaultClusterComponentSettingsYAML string `json:"defaultClusterComponentSettingsYAML,omitempty"`
 	// EnvFromSecretsNames secrets to source environment variables from
 	EnvFromSecretsNames []string `json:"envFromSecretsNames"`
 }

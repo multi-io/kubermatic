@@ -90,14 +90,14 @@ func BackupContainersConfigMapCreator(cfg *operatorv1alpha1.KubermaticConfigurat
 	}
 }
 
-func DefaultClusterComponentSettingsYAML(cfg *operatorv1alpha1.KubermaticConfiguration) reconciling.NamedConfigMapCreatorGetter {
+func DefaultClusterComponentSettingsYAML(seed *kubermaticv1.Seed) reconciling.NamedConfigMapCreatorGetter {
 	return func() (string, reconciling.ConfigMapCreator) {
 		return defaultComponentSettingsConfigMapName, func(c *corev1.ConfigMap) (*corev1.ConfigMap, error) {
 			if c.Data == nil {
 				c.Data = make(map[string]string)
 			}
 
-			c.Data[defaultComponentSettingsConfigKey] = cfg.Spec.SeedController.DefaultClusterComponentSettingsYAML
+			c.Data[defaultComponentSettingsConfigKey] = seed.Spec.DefaultClusterComponentSettingsYAML
 
 			return c, nil
 		}

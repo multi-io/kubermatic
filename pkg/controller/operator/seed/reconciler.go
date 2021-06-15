@@ -405,7 +405,7 @@ func (r *Reconciler) reconcileConfigMaps(cfg *operatorv1alpha1.KubermaticConfigu
 
 	creators := []reconciling.NamedConfigMapCreatorGetter{
 		kubermaticseed.BackupContainersConfigMapCreator(cfg),
-		kubermaticseed.DefaultClusterComponentSettingsYAML(cfg),
+		kubermaticseed.DefaultClusterComponentSettingsYAML(seed),
 	}
 
 	if creator := kubermaticseed.ClusterNamespacePrometheusScrapingConfigsConfigMapCreator(cfg); creator != nil {
