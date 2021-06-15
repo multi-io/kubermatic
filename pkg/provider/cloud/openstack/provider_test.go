@@ -21,16 +21,15 @@ import (
 	"net/http"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/sets"
-
 	"github.com/go-test/deep"
 	"github.com/gophercloud/gophercloud"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/provider"
 	ostesting "k8c.io/kubermatic/v2/pkg/provider/cloud/openstack/internal/testing"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 func TestIgnoreRouterAlreadyHasPortInSubnetError(t *testing.T) {
@@ -375,6 +374,8 @@ func TestInitializeCloudProvider(t *testing.T) {
 			if tt.wantErr {
 				return
 			}
+			// We cannot guarantee order if finalizers serialized using sets and deep.Equal fails if order is different,
+			// thus we test finalizers equality separately.
 			if w, g := sets.NewString(tt.wantCluster.Finalizers...), sets.NewString(c.Finalizers...); !w.Equal(g) {
 				t.Errorf("Want finalizers: %v, got: %v", w, g)
 			} else {

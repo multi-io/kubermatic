@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"reflect"
 
 	"github.com/go-logr/logr"
 
@@ -31,6 +32,7 @@ import (
 	admissionv1 "k8s.io/api/admission/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrlruntime "sigs.k8s.io/controller-runtime"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -114,6 +116,15 @@ func (h *AdmissionHandler) validateCreateOrUpdate(ctx context.Context, c *kuberm
 		return err
 	}
 
+	specFldPath := field.NewPath("spec")
+	allErrs := validation.ValidateNodePortRange(
+		c.Spec.ComponentsOverride.Apiserver.NodePortRange,
+		specFldPath.Child("componentsOverride", "apiserver", "nodePortRange"))
+
+	if len(allErrs) != 0 {
+		return allErrs.ToAggregate()
+	}
+
 	return nil
 }
 
@@ -156,7 +167,7 @@ func (h *AdmissionHandler) rejectUserSSHKeyAgentChanges(ctx context.Context, clu
 			return fmt.Errorf("failed to fetch cluster name=%s: %v", cluster.Name, err)
 		}
 
-		if oldCluster.Spec.EnableUserSSHKeyAgent != cluster.Spec.EnableUserSSHKeyAgent {
+		if !reflect.DeepEqual(oldCluster.Spec.EnableUserSSHKeyAgent, cluster.Spec.EnableUserSSHKeyAgent) {
 			return errors.New("enableUserSSHKeyAgent field cannot be updated after cluster creation")
 		}
 	}

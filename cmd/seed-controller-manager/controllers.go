@@ -98,6 +98,7 @@ func createCloudController(ctrlCtx *controllerContext) error {
 		ctrlCtx.runOptions.workerName,
 		ctrlCtx.versions,
 		ctrlCtx.runOptions.caBundle.CertPool(),
+		ctrlCtx.runOptions.nodePortRange,
 	); err != nil {
 		return fmt.Errorf("failed to add cloud controller to mgr: %v", err)
 	}
@@ -130,7 +131,7 @@ func createKubernetesController(ctrlCtx *controllerContext) error {
 		ctrlCtx.runOptions.inClusterPrometheusScrapingConfigsFile,
 		ctrlCtx.runOptions.inClusterPrometheusRemoteWriteConfigsFile,
 		ctrlCtx.dockerPullConfigJSON,
-		ctrlCtx.runOptions.nodeLocalDNSCacheEnabled(),
+		ctrlCtx.runOptions.enableNodeLocalDNSCache,
 		ctrlCtx.runOptions.concurrentClusterUpdate,
 		ctrlCtx.runOptions.enableEtcdBackupRestoreController,
 		backupInterval,
@@ -208,7 +209,6 @@ func createMonitoringController(ctrlCtx *controllerContext) error {
 		ctrlCtx.runOptions.workerCount,
 		ctrlCtx.runOptions.workerName,
 		ctrlCtx.clientProvider,
-
 		ctrlCtx.seedGetter,
 		ctrlCtx.runOptions.overwriteRegistry,
 		ctrlCtx.runOptions.nodePortRange,
@@ -287,7 +287,7 @@ func createAddonController(ctrlCtx *controllerContext) error {
 		},
 		ctrlCtx.runOptions.kubernetesAddonsPath,
 		ctrlCtx.runOptions.overwriteRegistry,
-		ctrlCtx.runOptions.nodeLocalDNSCacheEnabled(),
+		ctrlCtx.runOptions.enableNodeLocalDNSCache,
 		ctrlCtx.clientProvider,
 		ctrlCtx.runOptions.externalURL,
 		ctrlCtx.seedGetter,

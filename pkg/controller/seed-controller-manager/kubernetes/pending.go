@@ -44,10 +44,12 @@ func (r *Reconciler) reconcileCluster(ctx context.Context, cluster *kubermaticv1
 	}
 
 	if !kuberneteshelper.HasFinalizer(cluster, kubermaticapiv1.EtcdBackupConfigCleanupFinalizer) {
-		if err := r.updateCluster(ctx, cluster, func(c *kubermaticv1.Cluster) {
-			kuberneteshelper.AddFinalizer(c, kubermaticapiv1.EtcdBackupConfigCleanupFinalizer)
-		}); err != nil {
+		res, err := r.AddFinalizers(ctx, cluster, kubermaticapiv1.EtcdBackupConfigCleanupFinalizer)
+		if err != nil {
 			return nil, err
+		}
+		if !res.IsZero() {
+			return res, nil
 		}
 	}
 
@@ -84,18 +86,12 @@ func (r *Reconciler) reconcileCluster(ctx context.Context, cluster *kubermaticv1
 	if !kuberneteshelper.HasFinalizer(cluster, kubermaticapiv1.KubermaticConstraintCleanupFinalizer) {
 		finalizers = append(finalizers, kubermaticapiv1.KubermaticConstraintCleanupFinalizer)
 	}
+	if !kuberneteshelper.HasFinalizer(cluster, kubermaticapiv1.ClusterRoleBindingsCleanupFinalizer) {
+		finalizers = append(finalizers, kubermaticapiv1.ClusterRoleBindingsCleanupFinalizer)
+	}
 
 	if len(finalizers) > 0 {
 		return r.AddFinalizers(ctx, cluster, finalizers...)
-	}
-
-	if !kuberneteshelper.HasFinalizer(cluster, kubermaticapiv1.ClusterRoleBindingsCleanupFinalizer) {
-		err := r.updateCluster(ctx, cluster, func(c *kubermaticv1.Cluster) {
-			kuberneteshelper.AddFinalizer(c, kubermaticapiv1.ClusterRoleBindingsCleanupFinalizer)
-		})
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	return &reconcile.Result{}, nil
