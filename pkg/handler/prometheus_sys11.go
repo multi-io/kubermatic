@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"k8c.io/kubermatic/v2/pkg/resources"
+	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -18,7 +19,6 @@ import (
 	"k8c.io/kubermatic/v2/pkg/handler/v1/common"
 	"k8c.io/kubermatic/v2/pkg/provider"
 	k8cerrors "k8c.io/kubermatic/v2/pkg/util/errors"
-	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/gorilla/mux"
 )
@@ -112,12 +112,12 @@ func getPrometheusProxyEndpoint(seedsGetter provider.SeedsGetter, userInfoGetter
 			return nil, fmt.Errorf("failed to create a master kubernetes client: %v", err)
 		}
 
-		seedConfigSecret, err := masterKubeClient.CoreV1().Secrets("kubermatic").Get(ctx, "kubeconfig", metaV1.GetOptions{})
+		seedConfigSecret, err := masterKubeClient.CoreV1().Secrets("kubermatic").Get(ctx, "kubeconfig-"+seed.Name, metaV1.GetOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("failed to get kubeconfig secret: %v", err)
 		}
 
-		seedConfig, err := getSeedKubeconfig(seed.Name, seedConfigSecret.Data[resources.KubeconfigSecretKey])
+		seedConfig, err := getSeedKubeconfig(seedConfigSecret.Data[resources.KubeconfigSecretKey])
 		if err != nil {
 			return nil, fmt.Errorf("failed to get seed kubeconfig: %v", err)
 		}
@@ -159,18 +159,13 @@ func getPrometheusProxyEndpoint(seedsGetter provider.SeedsGetter, userInfoGetter
 	}
 }
 
-func getSeedKubeconfig(seedName string, cfg []byte) (*rest.Config, error) {
-	clusterClientCfg, err := clientcmd.Load(cfg)
+func getSeedKubeconfig(cfg []byte) (*rest.Config, error) {
+	clusterClientCfg, err := clientcmd.NewClientConfigFromBytes(cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	return clientcmd.NewNonInteractiveClientConfig(
-		*clusterClientCfg,
-		seedName,
-		&clientcmd.ConfigOverrides{},
-		nil,
-	).ClientConfig()
+	return clusterClientCfg.ClientConfig()
 }
 
 func encodeRawResponse(c context.Context, w http.ResponseWriter, response interface{}) error {
