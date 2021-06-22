@@ -118,14 +118,6 @@ func DeploymentCreator(data *resources.TemplateData) reconciling.NamedDeployment
 
 			dep.Spec.Template.Spec.Volumes = volumes
 
-			if data.Cluster().Spec.Version.Semver().Minor() >= 14 {
-				volumeMounts = append(volumeMounts, corev1.VolumeMount{
-					Name:      resources.SchedulerConfigMapName,
-					MountPath: "/etc/kubernetes/scheduler",
-					ReadOnly:  true,
-				})
-			}
-
 			healthAction := &corev1.HTTPGetAction{
 				Path:   "/healthz",
 				Scheme: corev1.URISchemeHTTPS,
@@ -209,6 +201,11 @@ func getVolumeMounts() []corev1.VolumeMount {
 			MountPath: "/etc/kubernetes/pki/ca-bundle",
 			ReadOnly:  true,
 		},
+		{
+			Name:      resources.SchedulerConfigMapName,
+			MountPath: "/etc/kubernetes/scheduler",
+			ReadOnly:  true,
+		},
 	}
 }
 
@@ -251,6 +248,17 @@ func getVolumes() []corev1.Volume {
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName: resources.SchedulerKubeconfigSecretName,
+				},
+			},
+		},
+		{
+			Name: resources.SchedulerConfigMapName,
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: resources.SchedulerConfigMapName,
+					},
+					DefaultMode: resources.Int32(resources.DefaultOwnerReadOnlyMode),
 				},
 			},
 		},
