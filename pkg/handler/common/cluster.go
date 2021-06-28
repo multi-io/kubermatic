@@ -106,9 +106,9 @@ func CreateEndpoint(ctx context.Context, projectID string, body apiv1.CreateClus
 	}
 
 	// Sys11: The field OpenstackBillingTenant does not exist in upstream version. This field used for billing purposes
-	// by us. If we accidentally delete it during merge we might not notice it. This test ensures field is set.
+	// by us. If we accidentally not set it during creation we might not notice it. This test ensures field is set.
 	// We ignore Fake cloud spec used in unit tests.
-	if spec.Cloud.Fake == nil && getOpenstackBillingTenant(&spec.Cloud) == "" {
+	if spec.Cloud.Fake == nil && ProviderNotSetAtAllOrHasOpenstackBillingTenant(&spec.Cloud) {
 		return nil, errors.NewBadRequest("openstackBillingTenant is required")
 	}
 
@@ -377,20 +377,6 @@ func PatchEndpoint(ctx context.Context, userInfoGetter provider.UserInfoGetter, 
 	newInternalCluster.Spec.PodNodeSelectorAdmissionPluginConfig = patchedCluster.Spec.PodNodeSelectorAdmissionPluginConfig
 	newInternalCluster.Spec.ServiceAccount = patchedCluster.Spec.ServiceAccount
 	newInternalCluster.Spec.MLA = patchedCluster.Spec.MLA
-
-	// Sys11: The field OpenstackBillingTenant does not exist in upstream version. This field used for billing purposes
-	// by us. If we accidentally delete it during merge we might not notice it. This test ensures field is set.
-	// We ignore Fake cloud spec used in unit tests.
-	if newInternalCluster.Spec.Cloud.Fake == nil && getOpenstackBillingTenant(&newInternalCluster.Spec.Cloud) == "" {
-		return nil, errors.NewBadRequest("openstackBillingTenant is required")
-	}
-
-	// Sys11: The field OpenstackBillingTenant does not exist in upstream version. This field used for billing purposes
-	// by us. If we accidentally delete it during merge we might not notice it. This test ensures field is set.
-	// We ignore Fake cloud spec used in unit tests.
-	if newInternalCluster.Spec.Cloud.Fake == nil && newInternalCluster.Spec.Cloud.Openstack == nil && getOpenstackBillingTenant(&newInternalCluster.Spec.Cloud) == "" {
-		return nil, errors.NewBadRequest("openstackBillingTenant is required")
-	}
 
 	incompatibleKubelets, err := common.CheckClusterVersionSkew(ctx, userInfoGetter, clusterProvider, newInternalCluster, projectID)
 	if err != nil {
