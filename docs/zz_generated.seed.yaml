@@ -206,6 +206,8 @@ spec:
             rhel: ""
             sles: ""
             ubuntu: ""
+  # DefaultClusterComponentSettingsYAML is a YAML file with default cluster component settings
+  defaultClusterComponentSettingsYAML: ""
   # Optional: ExposeStrategy explicitly sets the expose strategy for this seed cluster, if not set, the default provided by the master is used.
   expose_strategy: ""
   # A reference to the Kubeconfig of this cluster. The Kubeconfig must
