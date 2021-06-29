@@ -46,9 +46,9 @@ fi
 echodate "Compiling operator..."
 
 if [[ "${DEBUG}" == "true" ]]; then
-    make GOTOOLFLAGS_EXTRA="-gcflags='all=-N -l'" LDFLAGS_EXTRA="" kubermatic-operator
+    make KUBERMATICCOMMIT=$KUBERMATICCOMMIT GOTOOLFLAGS_EXTRA="-gcflags='all=-N -l'" LDFLAGS_EXTRA="" kubermatic-operator
 else
-    make kubermatic-operator
+    make KUBERMATICCOMMIT=$KUBERMATICCOMMIT kubermatic-operator
 fi
 
 echo
