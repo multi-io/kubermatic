@@ -222,6 +222,8 @@ spec:
       requests:
         cpu: 200m
         memory: 512Mi
+    # WorkerCount is the number of workers in the controller.
+    workerCount: 0
   # UI configures the dashboard.
   ui:
     # Config sets flags for various dashboard features.
