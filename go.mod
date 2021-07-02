@@ -112,4 +112,4 @@ replace (
 	sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.6.5
 )
 
-replace github.com/kubermatic/machine-controller => github.com/syseleven/machine-controller v1.24.4-sys11-1
+replace github.com/kubermatic/machine-controller => github.com/syseleven/machine-controller v1.24.4-sys11-2-pp-workaround-1
