@@ -539,7 +539,7 @@ type AzureCloudSpec struct {
 	ClientID       string `json:"clientID,omitempty"`
 	ClientSecret   string `json:"clientSecret,omitempty"`
 
-	OpenstackBillingTenant string `json:"openstackBillingTenant"`
+	OpenstackBillingTenant string `json:"openstackBillingTenant,omitempty"`
 
 	ResourceGroup   string `json:"resourceGroup"`
 	VNetName        string `json:"vnet"`
@@ -605,7 +605,7 @@ type AWSCloudSpec struct {
 	InstanceProfileName string `json:"instanceProfileName"`
 	SecurityGroupID     string `json:"securityGroupID"`
 
-	OpenstackBillingTenant string `json:"openstackBillingTenant"`
+	OpenstackBillingTenant string `json:"openstackBillingTenant,omitempty"`
 
 	// DEPRECATED. Don't care for the role name. We only require the ControlPlaneRoleARN to be set so the control plane
 	// can perform the assume-role.
