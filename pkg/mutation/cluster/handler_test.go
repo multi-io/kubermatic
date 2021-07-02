@@ -30,7 +30,7 @@ func init() {
 func TestNuberOfFields(t *testing.T) {
 	settings := kubermaticv1.ComponentSettings{}
 	t.Log("If this test is failing, you probably added or deleted field from kubermaticv1.ComponentSettings struct, and did not update mutation handler yet.")
-	if want, got := 5, reflect.ValueOf(settings).NumField(); want != got {
+	if want, got := 6, reflect.ValueOf(settings).NumField(); want != got {
 		t.Fatalf("want kubermaticv1.ComponentSettings{}.NumField=%d, got %d", want, got)
 	}
 
