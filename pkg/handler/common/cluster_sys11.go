@@ -167,13 +167,13 @@ func NoDefaultsKubeconfig(clientConfig *clientcmdapi.Config, username string, cl
 
 func ProviderNotSetAtAllOrHasOpenstackBillingTenant(cloudSpec *kubermaticv1.CloudSpec) bool {
 	if cloudSpec.AWS != nil {
-		return cloudSpec.AWS.OpenstackBillingTenant != ""
+		return cloudSpec.AWS.OpenstackBillingTenant == ""
 	}
 	if cloudSpec.Azure != nil {
-		return cloudSpec.Azure.OpenstackBillingTenant != ""
+		return cloudSpec.Azure.OpenstackBillingTenant == ""
 	}
 	if cloudSpec.Openstack != nil {
-		return cloudSpec.Openstack.Tenant != ""
+		return cloudSpec.Openstack.Tenant == ""
 	}
 	// Provider is not set.
 	// Happens whet patch is send that doesn't update provider's fields.

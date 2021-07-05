@@ -138,7 +138,7 @@ func getOSFlags(data *resources.TemplateData) []string {
 	return flags
 }
 
-const latestCCMVersion = "1.20.2"
+const latestCCMVersion = "1.21.0"
 
 func getOSVersion(version semver.Semver) (string, error) {
 	if version.Minor() < 17 {
@@ -148,8 +148,8 @@ func getOSVersion(version semver.Semver) (string, error) {
 	switch version.Minor() {
 	case 17:
 		return "1.17.0", nil
-	// Use cloud-controller 1.19.2 for all clusters with kubernetes version
-	// 1.18.x. This enables the use of rwx (with some limitations).
+	// Use newest cloud controller for all kubermatic version >v1.17
+	// New features and bugfixes don't get backported to older versions
 	// case 18:
 	// case 19:
 	//	return "1.19.2", nil

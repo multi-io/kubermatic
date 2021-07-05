@@ -138,6 +138,8 @@ type KubermaticSeedControllerConfiguration struct {
 	// MaximumParallelReconciles limits the number of cluster reconciliations
 	// that are active at any given time.
 	MaximumParallelReconciles int `json:"maximumParallelReconciles,omitempty"`
+	// WorkerCount is the number of workers in the controller.
+	WorkerCount int `json:"workerCount,omitempty"`
 	// PProfEndpoint controls the port the seed-controller-manager should listen on to provide pprof
 	// data. This port is never exposed from the container and only available via port-forwardings.
 	PProfEndpoint *string `json:"pprofEndpoint,omitempty"`

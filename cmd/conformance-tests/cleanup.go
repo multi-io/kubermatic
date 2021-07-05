@@ -21,8 +21,6 @@ import (
 
 	"go.uber.org/zap"
 
-	kubernetesdashboard "k8c.io/kubermatic/v2/pkg/resources/kubernetes-dashboard"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -35,8 +33,8 @@ var (
 		metav1.NamespaceDefault,
 		metav1.NamespaceSystem,
 		metav1.NamespacePublic,
-		corev1.NamespaceNodeLease,
-		kubernetesdashboard.Namespace)
+		corev1.NamespaceNodeLease)
+	// Sys11 disable kubernetesdashboard.Namespace)
 )
 
 func (r *testRunner) deleteAllNonDefaultNamespaces(ctx context.Context, log *zap.SugaredLogger, client ctrlruntimeclient.Client) error {

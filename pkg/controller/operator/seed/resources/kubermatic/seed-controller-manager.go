@@ -58,12 +58,17 @@ func SeedControllerManagerDeploymentCreator(workerName string, versions kubermat
 
 			d.Spec.Template.Spec.ServiceAccountName = serviceAccountName
 
+			workerCount := 4
+			if cfg.Spec.SeedController.WorkerCount != 0 {
+				workerCount = cfg.Spec.SeedController.WorkerCount
+			}
 			args := []string{
 				"-logtostderr",
 				"-internal-address=0.0.0.0:8085",
 				"-kubernetes-addons-path=/opt/addons/kubernetes",
-				"-worker-count=4",
+				fmt.Sprintf("-worker-count=%d", workerCount),
 				"-admissionwebhook-cert-dir=/opt/webhook-serving-cert/",
+				fmt.Sprintf("-ca-bundle=/opt/ca-bundle/%s", resources.CABundleConfigMapKey),
 				fmt.Sprintf("-ca-bundle=/opt/ca-bundle/%s", resources.CABundleConfigMapKey),
 				fmt.Sprintf("-admissionwebhook-cert-name=%s", resources.ServingCertSecretKey),
 				fmt.Sprintf("-admissionwebhook-key-name=%s", resources.ServingCertKeySecretKey),

@@ -115,4 +115,4 @@ replace (
 	k8s.io/metrics => k8s.io/metrics v0.19.4
 )
 
-replace github.com/kubermatic/machine-controller => github.com/syseleven/machine-controller v1.27.8-sys11-1
+replace github.com/kubermatic/machine-controller => github.com/syseleven/machine-controller v1.27.8-sys11-2

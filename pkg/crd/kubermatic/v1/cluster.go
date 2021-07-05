@@ -373,6 +373,12 @@ type ComponentSettings struct {
 	Scheduler         ControllerSettings      `json:"scheduler"`
 	Etcd              EtcdStatefulSetSettings `json:"etcd"`
 	Prometheus        StatefulSetSettings     `json:"prometheus"`
+
+	Openstack OpenstackSettings `json:"openstack"`
+}
+
+type OpenstackSettings struct {
+	EnableIngressHostname bool `json:"enableIngressHostname,omitempty"`
 }
 
 type APIServerSettings struct {

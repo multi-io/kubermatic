@@ -156,10 +156,11 @@ func CloudConfig(
 		}
 		if cluster.Spec.Version.Minor() >= 18 {
 			openstackCloudConfig.LoadBalancer = openstack.LoadBalancerOpts{
-				CreateMonitor:     true,
-				MonitorDelay:      ini.Duration{Duration: 60 * time.Second},
-				MonitorTimeout:    ini.Duration{Duration: 30 * time.Second},
-				MonitorMaxRetries: 5,
+				CreateMonitor:         true,
+				MonitorDelay:          ini.Duration{Duration: 60 * time.Second},
+				MonitorTimeout:        ini.Duration{Duration: 30 * time.Second},
+				MonitorMaxRetries:     5,
+				EnableIngressHostname: cluster.Spec.ComponentsOverride.Openstack.EnableIngressHostname,
 			}
 		}
 		cloudConfig, err = openstack.CloudConfigToString(openstackCloudConfig)

@@ -146,9 +146,8 @@ type kubermaticValues struct {
 		DisableDefaultRules           bool          `yaml:"disableDefaultRules"`
 		Rules                         interface{}   `yaml:"rules"`
 	} `yaml:"clusterNamespacePrometheus"`
-	MonitoringEnvironmentLabel string                 `yaml:"monitoringEnvironmentLabel"`
-	EtcdLauncherImage          string                 `yaml:"etcdLauncherImage"`
-	DefaultComponentSettings   map[string]interface{} `yaml:"defaultComponentSettings"`
+	MonitoringEnvironmentLabel string `yaml:"monitoringEnvironmentLabel"`
+	EtcdLauncherImage          string `yaml:"etcdLauncherImage"`
 }
 
 type Options struct {

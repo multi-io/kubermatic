@@ -135,6 +135,9 @@ func (h *AdmissionHandler) Handle(ctx context.Context, req webhook.AdmissionRequ
 		if settings.Prometheus.Resources == nil {
 			settings.Prometheus.Resources = h.defaultSettings.Prometheus.Resources
 		}
+		if !settings.Openstack.EnableIngressHostname {
+			settings.Openstack.EnableIngressHostname = h.defaultSettings.Openstack.EnableIngressHostname
+		}
 
 		response := webhook.Patched("default componentsOverride",
 			jsonpatch.Operation{
