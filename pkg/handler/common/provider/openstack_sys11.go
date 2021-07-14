@@ -8,6 +8,7 @@ import (
 
 	"k8c.io/kubermatic/v2/pkg/handler/middleware"
 	"k8c.io/kubermatic/v2/pkg/handler/v1/common"
+	"k8c.io/kubermatic/v2/pkg/resources"
 
 	v1 "k8c.io/kubermatic/v2/pkg/api/v1"
 
@@ -46,7 +47,7 @@ func OpenstackImageNoCredentialsEndpoint(ctx context.Context, projectID, cluster
 		return nil, err
 	}
 
-	return openstack.GetImages(creds.Username, creds.Password, creds.Domain, creds.Tenant, creds.TenantID, datacenter.Spec.Openstack.AuthURL, datacenter.Spec.Openstack.Region, caBundle)
+	return openstack.GetImages(datacenter.Spec.Openstack.AuthURL, datacenter.Spec.Openstack.Region, creds, caBundle)
 }
 
 func OpenstackQuotaLimitNoCredentialsEndpoint(ctx context.Context, projectID, clusterID string, projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, seedsGetter provider.SeedsGetter, userInfoGetter provider.UserInfoGetter, caBundle *x509.CertPool) (interface{}, error) {
@@ -78,21 +79,21 @@ func OpenstackQuotaLimitNoCredentialsEndpoint(ctx context.Context, projectID, cl
 		return nil, err
 	}
 
-	return GetOpenstackQuotaLimits(creds.Username, creds.Password, creds.Domain, creds.Tenant, creds.TenantID, datacenter.Spec.Openstack.AuthURL, datacenter.Spec.Openstack.Region, caBundle)
+	return GetOpenstackQuotaLimits(datacenter.Spec.Openstack.AuthURL, datacenter.Spec.Openstack.Region, creds, caBundle)
 }
 
-func GetOpenstackQuotaLimits(username, password, domain, tenant, tenantID, authURL, region string, caBundle *x509.CertPool) (*v1.Quotas, error) {
-	limits, err := openstack.GetQuotaLimits(username, password, domain, tenant, tenantID, authURL, region, caBundle)
+func GetOpenstackQuotaLimits(authURL, region string, creds *resources.OpenstackCredentials, caBundle *x509.CertPool) (*v1.Quotas, error) {
+	limits, err := openstack.GetQuotaLimits(authURL, region, creds, caBundle)
 	if err != nil {
 		return nil, err
 	}
 
-	usedFloatingIPCount, err := openstack.GetUsedFloatingIPCount(username, password, domain, tenant, tenantID, authURL, region, caBundle)
+	usedFloatingIPCount, err := openstack.GetUsedFloatingIPCount(authURL, region, creds, caBundle)
 	if err != nil {
 		return nil, err
 	}
 
-	floatingIPQuota, err := openstack.GetFloatingIPQuota(username, password, domain, tenant, tenantID, authURL, region, caBundle)
+	floatingIPQuota, err := openstack.GetFloatingIPQuota(authURL, region, creds, caBundle)
 	if err != nil {
 		return nil, err
 	}

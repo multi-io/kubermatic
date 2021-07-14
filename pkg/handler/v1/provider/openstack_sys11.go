@@ -5,6 +5,11 @@ import (
 	"crypto/x509"
 	"fmt"
 
+	"k8c.io/kubermatic/v2/pkg/handler/middleware"
+	k8cerrors "k8c.io/kubermatic/v2/pkg/util/errors"
+
+	"k8c.io/kubermatic/v2/pkg/resources"
+
 	"k8c.io/kubermatic/v2/pkg/handler/v1/common"
 
 	"github.com/go-kit/kit/endpoint"
@@ -30,12 +35,31 @@ func OpenstackImageEndpoint(seedsGetter provider.SeedsGetter, presetsProvider pr
 			return nil, fmt.Errorf("error getting dc: %v", err)
 		}
 
-		username, password, domain, tenant, tenantID, err := getOpenstackCredentials(userInfo, req.Credential, req.Username, req.Password, req.Domain, req.Tenant, req.TenantID, presetsProvider)
-		if err != nil {
-			return nil, fmt.Errorf("error getting OpenStack credentials: %v", err)
+		t := ctx.Value(middleware.RawTokenContextKey)
+		token, ok := t.(string)
+		if !ok || token == "" {
+			return nil, k8cerrors.NewNotAuthorized()
 		}
 
-		return openstack.GetImages(username, password, domain, tenant, tenantID, datacenter.Spec.Openstack.AuthURL, datacenter.Spec.Openstack.Region, caBundle)
+		var cred *resources.OpenstackCredentials
+		if req.Credential == "" {
+			cred = &resources.OpenstackCredentials{
+				Username:                    req.Username,
+				Password:                    req.Password,
+				Tenant:                      req.Tenant,
+				TenantID:                    req.TenantID,
+				Domain:                      req.Domain,
+				ApplicationCredentialID:     req.ApplicationCredentialID,
+				ApplicationCredentialSecret: req.ApplicationCredentialSecret,
+				Token:                       token,
+			}
+		} else {
+			cred, err = getPresetCredentials(userInfo, req.Credential, presetsProvider, token)
+			if err != nil {
+				return nil, fmt.Errorf("error getting preset credentials for OpenStack: %v", err)
+			}
+		}
+		return openstack.GetImages(datacenter.Spec.Openstack.AuthURL, datacenter.Spec.Openstack.Region, cred, caBundle)
 	}
 }
 
@@ -56,12 +80,31 @@ func OpenstackQuotaLimitEndpoint(seedsGetter provider.SeedsGetter, presetsProvid
 			return nil, fmt.Errorf("error getting dc: %v", err)
 		}
 
-		username, password, domain, tenant, tenantID, err := getOpenstackCredentials(userInfo, req.Credential, req.Username, req.Password, req.Domain, req.Tenant, req.TenantID, presetsProvider)
-		if err != nil {
-			return nil, fmt.Errorf("error getting OpenStack credentials: %v", err)
+		t := ctx.Value(middleware.RawTokenContextKey)
+		token, ok := t.(string)
+		if !ok || token == "" {
+			return nil, k8cerrors.NewNotAuthorized()
+		}
+		var cred *resources.OpenstackCredentials
+		if req.Credential == "" {
+			cred = &resources.OpenstackCredentials{
+				Username:                    req.Username,
+				Password:                    req.Password,
+				Tenant:                      req.Tenant,
+				TenantID:                    req.TenantID,
+				Domain:                      req.Domain,
+				ApplicationCredentialID:     req.ApplicationCredentialID,
+				ApplicationCredentialSecret: req.ApplicationCredentialSecret,
+				Token:                       token,
+			}
+		} else {
+			cred, err = getPresetCredentials(userInfo, req.Credential, presetsProvider, token)
+			if err != nil {
+				return nil, fmt.Errorf("error getting preset credentials for OpenStack: %v", err)
+			}
 		}
 
-		return handlercommon.GetOpenstackQuotaLimits(username, password, domain, tenant, tenantID, datacenter.Spec.Openstack.AuthURL, datacenter.Spec.Openstack.Region, caBundle)
+		return handlercommon.GetOpenstackQuotaLimits(datacenter.Spec.Openstack.AuthURL, datacenter.Spec.Openstack.Region, cred, caBundle)
 	}
 }
 

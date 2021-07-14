@@ -61,6 +61,13 @@ const (
 	MaxEtcdClusterSize     = 9
 )
 
+type LBSKU string
+
+const (
+	AzureStandardLBSKU = LBSKU("standard")
+	AzureBasicLBSKU    = LBSKU("basic")
+)
+
 // ProtectedClusterLabels is a set of labels that must not be set by users on clusters,
 // as they are security relevant.
 var ProtectedClusterLabels = sets.NewString(WorkerNameLabelKey, ProjectIDLabelKey)
@@ -171,6 +178,10 @@ const (
 	// only supported on a limited set of providers for a specific set of Kube versions. It must
 	// not be set if its not supported.
 	ClusterFeatureExternalCloudProvider = "externalCloudProvider"
+
+	// ClusterFeatureCCMClusterName sets the cluster-name flag on the external CCM deployment.
+	// The cluster-name flag is often used for naming cloud resources, such as load balancers.
+	ClusterFeatureCCMClusterName = "ccmClusterName"
 
 	// ClusterFeatureRancherIntegration enables the rancher server integration feature.
 	// It will deploy a Rancher Server Managegment plane on the seed cluster and import the user cluster into it.
@@ -547,6 +558,8 @@ type AzureCloudSpec struct {
 	RouteTableName    string `json:"routeTable"`
 	SecurityGroup     string `json:"securityGroup"`
 	AvailabilitySet   string `json:"availabilitySet"`
+	// LoadBalancerSKU sets the LB type that will be used for the Azure cluster, possible values are "basic" and "standard", if empty, "basic" will be used
+	LoadBalancerSKU LBSKU `json:"loadBalancerSKU"`
 }
 
 // VSphereCredentials credentials represents a credential for accessing vSphere
@@ -617,11 +630,17 @@ type AWSCloudSpec struct {
 type OpenstackCloudSpec struct {
 	CredentialsReference *providerconfig.GlobalSecretKeySelector `json:"credentialsReference,omitempty"`
 
-	Username string `json:"username,omitempty"`
-	Password string `json:"password,omitempty"`
-	Tenant   string `json:"tenant,omitempty"`
-	TenantID string `json:"tenantID,omitempty"`
-	Domain   string `json:"domain,omitempty"`
+	Username                    string `json:"username,omitempty"`
+	Password                    string `json:"password,omitempty"`
+	Tenant                      string `json:"tenant,omitempty"`
+	TenantID                    string `json:"tenantID,omitempty"`
+	Domain                      string `json:"domain,omitempty"`
+	ApplicationCredentialID     string `json:"applicationCredentialID,omitempty"`
+	ApplicationCredentialSecret string `json:"applicationCredentialSecret,omitempty"`
+	UseToken                    bool   `json:"useToken,omitempty"`
+	// Used internally during cluster creation
+	Token string `json:"token,omitempty"`
+
 	// Network holds the name of the internal network
 	// When specified, all worker nodes will be attached to this network. If not specified, a network, subnet & router will be created
 	//

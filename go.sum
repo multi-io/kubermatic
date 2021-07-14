@@ -754,8 +754,9 @@ github.com/hashicorp/vault/sdk v0.1.13/go.mod h1:B+hVj7TpuQY1Y/GPbCpffmgd+tSEwvh
 github.com/hashicorp/yamux v0.0.0-20180604194846-3520598351bb/go.mod h1:+NfK9FKeTrX5uv1uIXGdwYDTeHna2qgaIlx54MXqjAM=
 github.com/hashicorp/yamux v0.0.0-20181012175058-2f1d1f20f75d/go.mod h1:+NfK9FKeTrX5uv1uIXGdwYDTeHna2qgaIlx54MXqjAM=
 github.com/heptiolabs/healthcheck v0.0.0-20180807145615-6ff867650f40/go.mod h1:NtmN9h8vrTveVQRLHcX2HQ5wIPBDCsZ351TGbZWgg38=
-github.com/hetznercloud/hcloud-go v1.23.1 h1:SkYdCa6x458cMSDz5GI18iPz5j2hicACiDP6J/s/bTs=
 github.com/hetznercloud/hcloud-go v1.23.1/go.mod h1:xng8lbDUg+xM1dgc0yGHX5EeqbwIq7UYlMWMTx3SQVg=
+github.com/hetznercloud/hcloud-go v1.25.0 h1:QAaFKtGKWRxjwjKJWBGMxGYUxVEQmIkb35j/WXrsazY=
+github.com/hetznercloud/hcloud-go v1.25.0/go.mod h1:2C5uMtBiMoFr3m7lBFPf7wXTdh33CevmZpQIIDPGYJI=
 github.com/howeyc/gopass v0.0.0-20170109162249-bf9dde6d0d2c/go.mod h1:lADxMC39cJJqL93Duh1xhAs4I2Zs8mKS89XWXFGp9cs=
 github.com/hpcloud/tail v1.0.0/go.mod h1:ab1qPbhIpdTxEkNHXyeSf5vhxWSCs/tWer42PpOxQnU=
 github.com/huandu/xstrings v1.3.1/go.mod h1:y5/lhBue+AyNmUVz9RLU9xbLR0o4KIIExikq4ovT0aE=
@@ -1207,8 +1208,9 @@ github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXf
 github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
 github.com/stretchr/testify v1.4.0/go.mod h1:j7eGeouHqKxXV5pUuKE4zz7dFj8WfuZ+81PSLYec5m4=
 github.com/stretchr/testify v1.5.1/go.mod h1:5W2xD1RspED5o8YsWQXVCued0rvSQ+mT+I5cxcmMvtA=
-github.com/stretchr/testify v1.6.1 h1:hDPOHmpOpP40lSULcqw7IrRb/u7w6RpDC9399XyoNd0=
 github.com/stretchr/testify v1.6.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
+github.com/stretchr/testify v1.7.0 h1:nwc3DEeHmmLAfoZucVR881uASk0Mfjw8xYJ99tb5CcY=
+github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/subosito/gotenv v1.2.0 h1:Slr1R9HxAlEKefgq5jn9U+DnETlIUa6HfgEzj0g5d7s=
 github.com/subosito/gotenv v1.2.0/go.mod h1:N0PQaV/YGNqwC0u51sEeR/aUtSLEXKX9iv69rRypqCw=
 github.com/syndtr/goleveldb v1.0.0/go.mod h1:ZVVdQEZoIme9iO1Ch2Jdy24qqXrMMOU6lpPAyBWyWuQ=
@@ -1216,6 +1218,8 @@ github.com/syseleven/machine-controller v1.27.8-sys11-1 h1:mtZXa9o5CoEffWGbU6Pul
 github.com/syseleven/machine-controller v1.27.8-sys11-1/go.mod h1:dcJ+GdDSCxCwM0poxwOK8hVO7epiOORDmNMmb2veyw4=
 github.com/syseleven/machine-controller v1.27.8-sys11-2 h1:+ccsflufc++rLqvgKGs5JwDdPsotIKTZocmygNj+p5A=
 github.com/syseleven/machine-controller v1.27.8-sys11-2/go.mod h1:dcJ+GdDSCxCwM0poxwOK8hVO7epiOORDmNMmb2veyw4=
+github.com/syseleven/machine-controller v1.27.11-sys11-1 h1:qU+sKI7quUGnj+XQ0i0+05CLfAfaAVRGdNo7Li7wTXw=
+github.com/syseleven/machine-controller v1.27.11-sys11-1/go.mod h1:dcJ+GdDSCxCwM0poxwOK8hVO7epiOORDmNMmb2veyw4=
 github.com/tektoncd/pipeline v0.10.1/go.mod h1:D2X0exT46zYx95BU7ByM8+erpjoN7thmUBvlKThOszU=
 github.com/tektoncd/plumbing v0.0.0-20191216083742-847dcf196de9/go.mod h1:QZHgU07PRBTRF6N57w4+ApRu8OgfYLFNqCDlfEZaD9Y=
 github.com/tektoncd/plumbing/pipelinerun-logs v0.0.0-20191206114338-712d544c2c21/go.mod h1:S62EUWtqmejjJgUMOGB1CCCHRp6C706laH06BoALkzU=

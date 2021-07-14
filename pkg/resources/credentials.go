@@ -65,11 +65,14 @@ type HetznerCredentials struct {
 }
 
 type OpenstackCredentials struct {
-	Username string
-	Password string
-	Tenant   string
-	TenantID string
-	Domain   string
+	Username                    string
+	Password                    string
+	Tenant                      string
+	TenantID                    string
+	Domain                      string
+	ApplicationCredentialID     string
+	ApplicationCredentialSecret string
+	Token                       string
 }
 
 type PacketCredentials struct {
@@ -282,6 +285,25 @@ func GetOpenstackCredentials(data CredentialsData) (OpenstackCredentials, error)
 	openstackCredentials := OpenstackCredentials{}
 	var err error
 
+	// needed for cluster creation with other credentials
+	if spec.Domain != "" {
+		openstackCredentials.Domain = spec.Domain
+	} else if openstackCredentials.Domain, err = data.GetGlobalSecretKeySelectorValue(spec.CredentialsReference, OpenstackDomain); err != nil {
+		return OpenstackCredentials{}, err
+	}
+
+	if spec.ApplicationCredentialID != "" {
+		openstackCredentials.ApplicationCredentialID = spec.ApplicationCredentialID
+		openstackCredentials.ApplicationCredentialSecret = spec.ApplicationCredentialSecret
+		return openstackCredentials, err
+	} else if openstackCredentials.ApplicationCredentialID, _ = data.GetGlobalSecretKeySelectorValue(spec.CredentialsReference, OpenstackApplicationCredentialID); openstackCredentials.ApplicationCredentialID != "" {
+		openstackCredentials.ApplicationCredentialSecret, err = data.GetGlobalSecretKeySelectorValue(spec.CredentialsReference, OpenstackApplicationCredentialSecret)
+		if err != nil {
+			return OpenstackCredentials{}, err
+		}
+		return openstackCredentials, err
+	}
+
 	if spec.Username != "" {
 		openstackCredentials.Username = spec.Username
 	} else if openstackCredentials.Username, err = data.GetGlobalSecretKeySelectorValue(spec.CredentialsReference, OpenstackUsername); err != nil {
@@ -308,12 +330,6 @@ func GetOpenstackCredentials(data CredentialsData) (OpenstackCredentials, error)
 		if openstackCredentials.TenantID, err = data.GetGlobalSecretKeySelectorValue(spec.CredentialsReference, OpenstackTenantID); err != nil {
 			return OpenstackCredentials{}, err
 		}
-	}
-
-	if spec.Domain != "" {
-		openstackCredentials.Domain = spec.Domain
-	} else if openstackCredentials.Domain, err = data.GetGlobalSecretKeySelectorValue(spec.CredentialsReference, OpenstackDomain); err != nil {
-		return OpenstackCredentials{}, err
 	}
 
 	return openstackCredentials, nil
