@@ -39,7 +39,7 @@ var (
 			corev1.ResourceCPU:    resource.MustParse("5m"),
 		},
 		Limits: corev1.ResourceList{
-			corev1.ResourceMemory: resource.MustParse("20Mi"),
+			corev1.ResourceMemory: resource.MustParse("50Mi"),
 			corev1.ResourceCPU:    resource.MustParse("100m"),
 		},
 	}
@@ -148,7 +148,7 @@ func DeploymentCreator(data openVPNDeploymentCreatorData) reconciling.NamedDeplo
 			dep.Spec.Template.Spec.InitContainers = []corev1.Container{
 				{
 					Name:    "iptables-init",
-					Image:   data.ImageRegistry(resources.RegistryQuay) + "/kubermatic/openvpn:v2.4.8-r1",
+					Image:   data.ImageRegistry(resources.RegistryQuay) + "/kubermatic/openvpn:v2.5.0-r1",
 					Command: []string{"/bin/bash"},
 					Args: []string{
 						"-c", `# do not give a 10.20.0.0/24 route to clients (nodes) but
@@ -205,7 +205,7 @@ iptables -A INPUT -i tun0 -j DROP
 			dep.Spec.Template.Spec.Containers = []corev1.Container{
 				{
 					Name:    name,
-					Image:   data.ImageRegistry(resources.RegistryQuay) + "/kubermatic/openvpn:v2.4.8-r1",
+					Image:   data.ImageRegistry(resources.RegistryQuay) + "/kubermatic/openvpn:v2.5.0-r1",
 					Command: []string{"/usr/sbin/openvpn"},
 					Args:    vpnArgs,
 					Ports: []corev1.ContainerPort{
@@ -258,7 +258,7 @@ iptables -A INPUT -i tun0 -j DROP
 				},
 				{
 					Name:    "ip-fixup",
-					Image:   data.ImageRegistry(resources.RegistryQuay) + "/kubermatic/openvpn:v2.4.8-r1",
+					Image:   data.ImageRegistry(resources.RegistryQuay) + "/kubermatic/openvpn:v2.5.0-r1",
 					Command: []string{"/bin/bash"},
 					Args: []string{
 						"-c",

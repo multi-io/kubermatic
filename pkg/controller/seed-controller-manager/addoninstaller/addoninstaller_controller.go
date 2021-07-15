@@ -32,7 +32,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -55,7 +54,6 @@ type Reconciler struct {
 
 	log              *zap.SugaredLogger
 	kubernetesAddons kubermaticv1.AddonList
-	openshiftAddons  kubermaticv1.AddonList
 	workerName       string
 	recorder         record.EventRecorder
 	versions         kubermatic.Versions
@@ -67,7 +65,6 @@ func Add(
 	numWorkers int,
 	workerName string,
 	kubernetesAddons kubermaticv1.AddonList,
-	openshiftAddons kubermaticv1.AddonList,
 	versions kubermatic.Versions,
 ) error {
 	log = log.Named(ControllerName)
@@ -77,7 +74,6 @@ func Add(
 		log:              log,
 		workerName:       workerName,
 		kubernetesAddons: kubernetesAddons,
-		openshiftAddons:  openshiftAddons,
 		recorder:         mgr.GetEventRecorderFor(ControllerName),
 		versions:         versions,
 	}
@@ -91,7 +87,7 @@ func Add(
 	}
 
 	// Add index on IsDefault flag
-	if err := mgr.GetFieldIndexer().IndexField(context.TODO(), &kubermaticv1.Addon{}, addonDefaultKey, func(rawObj runtime.Object) []string {
+	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &kubermaticv1.Addon{}, addonDefaultKey, func(rawObj ctrlruntimeclient.Object) []string {
 		a := rawObj.(*kubermaticv1.Addon)
 		return []string{strconv.FormatBool(a.Spec.IsDefault)}
 	}); err != nil {
@@ -102,7 +98,7 @@ func Add(
 		return fmt.Errorf("failed to create watch for clusters: %v", err)
 	}
 
-	enqueueClusterForNamespacedObject := &handler.EnqueueRequestsFromMapFunc{ToRequests: handler.ToRequestsFunc(func(a handler.MapObject) []reconcile.Request {
+	enqueueClusterForNamespacedObject := handler.EnqueueRequestsFromMapFunc(func(a ctrlruntimeclient.Object) []reconcile.Request {
 		clusterList := &kubermaticv1.ClusterList{}
 		if err := mgr.GetClient().List(context.Background(), clusterList); err != nil {
 			utilruntime.HandleError(fmt.Errorf("failed to list Clusters: %v", err))
@@ -110,12 +106,12 @@ func Add(
 			return []reconcile.Request{}
 		}
 		for _, cluster := range clusterList.Items {
-			if cluster.Status.NamespaceName == a.Meta.GetNamespace() {
+			if cluster.Status.NamespaceName == a.GetNamespace() {
 				return []reconcile.Request{{NamespacedName: types.NamespacedName{Name: cluster.Name}}}
 			}
 		}
 		return []reconcile.Request{}
-	})}
+	})
 	if err := c.Watch(&source.Kind{Type: &kubermaticv1.Addon{}}, enqueueClusterForNamespacedObject); err != nil {
 		return fmt.Errorf("failed to create watch for Addons: %v", err)
 	}
@@ -123,9 +119,7 @@ func Add(
 	return nil
 }
 
-func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log := r.log.With("request", request)
 	log.Debug("Processing")
 
@@ -172,16 +166,6 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 }
 
 func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, cluster *kubermaticv1.Cluster) (*reconcile.Result, error) {
-	// This controller handles Kubernetes & OpenShift cluster.
-	// Based on the type we install different default addons
-	var addonsToInstall *kubermaticv1.AddonList
-	if cluster.IsOpenshift() {
-		log = log.With("clustertype", "openshift")
-		addonsToInstall = r.openshiftAddons.DeepCopy()
-	} else {
-		log = log.With("clustertype", "kubernetes")
-		addonsToInstall = r.kubernetesAddons.DeepCopy()
-	}
 
 	// Wait until the Apiserver is running to ensure the namespace exists at least.
 	// Just checking for cluster.status.namespaceName is not enough as it gets set before the namespace exists
@@ -190,7 +174,7 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, clus
 		return &reconcile.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
-	return nil, r.ensureAddons(ctx, log, cluster, *addonsToInstall)
+	return nil, r.ensureAddons(ctx, log, cluster, *r.kubernetesAddons.DeepCopy())
 }
 
 func (r *Reconciler) ensureAddons(ctx context.Context, log *zap.SugaredLogger, cluster *kubermaticv1.Cluster, addons kubermaticv1.AddonList) error {

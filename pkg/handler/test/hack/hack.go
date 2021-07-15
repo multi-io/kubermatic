@@ -21,6 +21,7 @@ import (
 
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	v2 "k8c.io/kubermatic/v2/pkg/handler/v2"
+	"k8c.io/kubermatic/v2/pkg/resources/certificates"
 	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 
 	"github.com/gorilla/mux"
@@ -82,8 +83,7 @@ func NewTestRouting(
 	externalClusterProvider provider.ExternalClusterProvider,
 	privilegedExternalClusterProvider provider.PrivilegedExternalClusterProvider,
 	constraintTemplateProvider provider.ConstraintTemplateProvider,
-	constraintProvider provider.ConstraintProvider,
-	privilegedConstraintProvider provider.PrivilegedConstraintProvider,
+	constraintProviderGetter provider.ConstraintProviderGetter,
 	kubermaticVersions kubermatic.Versions) http.Handler {
 
 	updateManager := version.New(versions, updates)
@@ -129,9 +129,9 @@ func NewTestRouting(
 		ExternalClusterProvider:               externalClusterProvider,
 		PrivilegedExternalClusterProvider:     privilegedExternalClusterProvider,
 		ConstraintTemplateProvider:            constraintTemplateProvider,
-		ConstraintProvider:                    constraintProvider,
-		PrivilegedConstraintProvider:          privilegedConstraintProvider,
+		ConstraintProviderGetter:              constraintProviderGetter,
 		Versions:                              kubermaticVersions,
+		CABundle:                              certificates.NewFakeCABundle().CertPool(),
 	}
 
 	r := handler.NewRouting(routingParams)

@@ -37,7 +37,7 @@ func TestCreateVMFolder(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	session, err := newSession(ctx, dc, vSphereUsername, vSpherePassword)
+	session, err := newSession(ctx, dc, vSphereUsername, vSpherePassword, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +94,7 @@ func TestProvider_GetVMFolders(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			folders, err := GetVMFolders(test.dc, vSphereUsername, vSpherePassword)
+			folders, err := GetVMFolders(test.dc, vSphereUsername, vSpherePassword, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

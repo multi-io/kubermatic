@@ -31,7 +31,6 @@ import (
 	"k8c.io/kubermatic/v2/pkg/handler/test/hack"
 	serviceaccount "k8c.io/kubermatic/v2/pkg/provider/kubernetes"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -47,13 +46,13 @@ func TestCreateServiceAccountProject(t *testing.T) {
 		projectToSync          string
 		httpStatus             int
 		existingAPIUser        apiv1.User
-		existingKubermaticObjs []runtime.Object
+		existingKubermaticObjs []ctrlruntimeclient.Object
 	}{
 		{
 			name:       "scenario 1: create service account 'test' for editors group by project owner john",
 			body:       `{"name":"test", "group":"editors"}`,
 			httpStatus: http.StatusCreated,
-			existingKubermaticObjs: []runtime.Object{
+			existingKubermaticObjs: []ctrlruntimeclient.Object{
 				/*add projects*/
 				test.GenProject("my-first-project", kubermaticapiv1.ProjectActive, test.DefaultCreationTimestamp()),
 				test.GenProject("my-third-project", kubermaticapiv1.ProjectActive, test.DefaultCreationTimestamp()),
@@ -73,7 +72,7 @@ func TestCreateServiceAccountProject(t *testing.T) {
 			name:       "scenario 2: check forbidden owner group",
 			body:       `{"name":"test", "group":"owners"}`,
 			httpStatus: http.StatusBadRequest,
-			existingKubermaticObjs: []runtime.Object{
+			existingKubermaticObjs: []ctrlruntimeclient.Object{
 				/*add projects*/
 				test.GenProject("my-first-project", kubermaticapiv1.ProjectActive, test.DefaultCreationTimestamp()),
 				/*add bindings*/
@@ -89,7 +88,7 @@ func TestCreateServiceAccountProject(t *testing.T) {
 			name:       "scenario 3: check name, group, project ID validator",
 			body:       `{"name":"test"}`,
 			httpStatus: http.StatusBadRequest,
-			existingKubermaticObjs: []runtime.Object{
+			existingKubermaticObjs: []ctrlruntimeclient.Object{
 				/*add projects*/
 				test.GenProject("my-first-project", kubermaticapiv1.ProjectActive, test.DefaultCreationTimestamp()),
 				/*add bindings*/
@@ -105,14 +104,14 @@ func TestCreateServiceAccountProject(t *testing.T) {
 			name:       "scenario 4: check when given name is already reserved",
 			body:       `{"name":"test", "group":"editors"}`,
 			httpStatus: http.StatusConflict,
-			existingKubermaticObjs: []runtime.Object{
+			existingKubermaticObjs: []ctrlruntimeclient.Object{
 				/*add projects*/
 				test.GenProject("my-first-project", kubermaticapiv1.ProjectActive, test.DefaultCreationTimestamp()),
 				/*add bindings*/
 				test.GenBinding("my-first-project-ID", "john@acme.com", "owners"),
 				/*add users*/
 				test.GenUser("", "john", "john@acme.com"),
-				test.GenInactiveServiceAccount("", "test", "editors", "my-first-project-ID"),
+				test.GenInactiveProjectServiceAccount("", "test", "editors", "my-first-project-ID"),
 			},
 			existingAPIUser:  *test.GenAPIUser("john", "john@acme.com"),
 			projectToSync:    "my-first-project-ID",
@@ -122,7 +121,7 @@ func TestCreateServiceAccountProject(t *testing.T) {
 			name:       "scenario 5: the admin Bob can create service account 'test' for editors group",
 			body:       `{"name":"test", "group":"editors"}`,
 			httpStatus: http.StatusCreated,
-			existingKubermaticObjs: []runtime.Object{
+			existingKubermaticObjs: []ctrlruntimeclient.Object{
 				/*add projects*/
 				test.GenProject("my-first-project", kubermaticapiv1.ProjectActive, test.DefaultCreationTimestamp()),
 				test.GenProject("my-third-project", kubermaticapiv1.ProjectActive, test.DefaultCreationTimestamp()),
@@ -143,7 +142,7 @@ func TestCreateServiceAccountProject(t *testing.T) {
 			name:       "scenario 6: the user Bob can not create service account 'test' for editors group for John project",
 			body:       `{"name":"test", "group":"editors"}`,
 			httpStatus: http.StatusForbidden,
-			existingKubermaticObjs: []runtime.Object{
+			existingKubermaticObjs: []ctrlruntimeclient.Object{
 				/*add projects*/
 				test.GenProject("my-first-project", kubermaticapiv1.ProjectActive, test.DefaultCreationTimestamp()),
 				test.GenProject("my-third-project", kubermaticapiv1.ProjectActive, test.DefaultCreationTimestamp()),
@@ -166,7 +165,7 @@ func TestCreateServiceAccountProject(t *testing.T) {
 			req := httptest.NewRequest("POST", fmt.Sprintf("/api/v1/projects/%s/serviceaccounts", tc.projectToSync), strings.NewReader(tc.body))
 			res := httptest.NewRecorder()
 
-			ep, client, err := test.CreateTestEndpointAndGetClients(tc.existingAPIUser, nil, []runtime.Object{}, []runtime.Object{}, tc.existingKubermaticObjs, nil, nil, hack.NewTestRouting)
+			ep, client, err := test.CreateTestEndpointAndGetClients(tc.existingAPIUser, nil, []ctrlruntimeclient.Object{}, []ctrlruntimeclient.Object{}, tc.existingKubermaticObjs, nil, nil, hack.NewTestRouting)
 			if err != nil {
 				t.Fatalf("failed to create test endpoint due to %v", err)
 			}
@@ -222,13 +221,13 @@ func TestList(t *testing.T) {
 		projectToSync          string
 		httpStatus             int
 		existingAPIUser        apiv1.User
-		existingKubermaticObjs []runtime.Object
+		existingKubermaticObjs []ctrlruntimeclient.Object
 	}{
 		{
 			name:          "scenario 1: list active service accounts",
 			projectToSync: "plan9-ID",
 			httpStatus:    http.StatusOK,
-			existingKubermaticObjs: []runtime.Object{
+			existingKubermaticObjs: []ctrlruntimeclient.Object{
 				/*add projects*/
 				test.GenProject("plan9", kubermaticapiv1.ProjectActive, test.DefaultCreationTimestamp()),
 				/*add bindings*/
@@ -237,9 +236,9 @@ func TestList(t *testing.T) {
 				test.GenBinding("plan9-ID", "serviceaccount-3@sa.kubermatic.io", "viewers"),
 				/*add users*/
 				test.GenUser("", "john", "john@acme.com"),
-				test.GenServiceAccount("1", "test-1", "editors", "plan9-ID"),
-				test.GenServiceAccount("2", "test-2", "editors", "test-ID"),
-				test.GenServiceAccount("3", "test-3", "viewers", "plan9-ID"),
+				test.GenProjectServiceAccount("1", "test-1", "editors", "plan9-ID"),
+				test.GenProjectServiceAccount("2", "test-2", "editors", "test-ID"),
+				test.GenProjectServiceAccount("3", "test-3", "viewers", "plan9-ID"),
 			},
 			existingAPIUser: *test.GenAPIUser("john", "john@acme.com"),
 			expectedSA: []apiv1.ServiceAccount{
@@ -265,7 +264,7 @@ func TestList(t *testing.T) {
 			name:          "scenario 2: list active 'test-3' and inactive 'test-1' service accounts",
 			projectToSync: "plan9-ID",
 			httpStatus:    http.StatusOK,
-			existingKubermaticObjs: []runtime.Object{
+			existingKubermaticObjs: []ctrlruntimeclient.Object{
 				/*add projects*/
 				test.GenProject("plan9", kubermaticapiv1.ProjectActive, test.DefaultCreationTimestamp()),
 				/*add bindings*/
@@ -273,9 +272,9 @@ func TestList(t *testing.T) {
 				test.GenBinding("plan9-ID", "serviceaccount-3@sa.kubermatic.io", "viewers"),
 				/*add users*/
 				test.GenUser("", "john", "john@acme.com"),
-				test.GenInactiveServiceAccount("1", "test-1", "editors", "plan9-ID"),
-				test.GenInactiveServiceAccount("2", "test-2", "editors", "test-ID"),
-				test.GenServiceAccount("3", "test-3", "viewers", "plan9-ID"),
+				test.GenInactiveProjectServiceAccount("1", "test-1", "editors", "plan9-ID"),
+				test.GenInactiveProjectServiceAccount("2", "test-2", "editors", "test-ID"),
+				test.GenProjectServiceAccount("3", "test-3", "viewers", "plan9-ID"),
 			},
 			existingAPIUser: *test.GenAPIUser("john", "john@acme.com"),
 			expectedSA: []apiv1.ServiceAccount{
@@ -301,7 +300,7 @@ func TestList(t *testing.T) {
 			name:          "scenario 3: the admin Bob can list active service accounts for any project",
 			projectToSync: "plan9-ID",
 			httpStatus:    http.StatusOK,
-			existingKubermaticObjs: []runtime.Object{
+			existingKubermaticObjs: []ctrlruntimeclient.Object{
 				/*add projects*/
 				test.GenProject("plan9", kubermaticapiv1.ProjectActive, test.DefaultCreationTimestamp()),
 				/*add bindings*/
@@ -311,9 +310,9 @@ func TestList(t *testing.T) {
 				/*add users*/
 				test.GenUser("", "john", "john@acme.com"),
 				genUser("bob", "bob@acme.com", true),
-				test.GenServiceAccount("1", "test-1", "editors", "plan9-ID"),
-				test.GenServiceAccount("2", "test-2", "editors", "test-ID"),
-				test.GenServiceAccount("3", "test-3", "viewers", "plan9-ID"),
+				test.GenProjectServiceAccount("1", "test-1", "editors", "plan9-ID"),
+				test.GenProjectServiceAccount("2", "test-2", "editors", "test-ID"),
+				test.GenProjectServiceAccount("3", "test-3", "viewers", "plan9-ID"),
 			},
 			existingAPIUser: *test.GenAPIUser("bob", "bob@acme.com"),
 			expectedSA: []apiv1.ServiceAccount{
@@ -341,7 +340,7 @@ func TestList(t *testing.T) {
 			req := httptest.NewRequest("GET", fmt.Sprintf("/api/v1/projects/%s/serviceaccounts", tc.projectToSync), nil)
 			res := httptest.NewRecorder()
 
-			ep, _, err := test.CreateTestEndpointAndGetClients(tc.existingAPIUser, nil, []runtime.Object{}, []runtime.Object{}, tc.existingKubermaticObjs, nil, nil, hack.NewTestRouting)
+			ep, _, err := test.CreateTestEndpointAndGetClients(tc.existingAPIUser, nil, []ctrlruntimeclient.Object{}, []ctrlruntimeclient.Object{}, tc.existingKubermaticObjs, nil, nil, hack.NewTestRouting)
 			if err != nil {
 				t.Fatalf("failed to create test endpoint due to %v", err)
 			}
@@ -382,13 +381,13 @@ func TestEdit(t *testing.T) {
 		saToUpdate             string
 		httpStatus             int
 		existingAPIUser        apiv1.User
-		existingKubermaticObjs []runtime.Object
+		existingKubermaticObjs []ctrlruntimeclient.Object
 	}{
 		{
 			name:       "scenario 1: update service account, change name and group",
 			body:       `{"id":"19840801", "name":"newName", "group":"editors"}`,
 			httpStatus: http.StatusOK,
-			existingKubermaticObjs: []runtime.Object{
+			existingKubermaticObjs: []ctrlruntimeclient.Object{
 				/*add projects*/
 				test.GenProject("my-first-project", kubermaticapiv1.ProjectActive, test.DefaultCreationTimestamp()),
 				test.GenProject("my-third-project", kubermaticapiv1.ProjectActive, test.DefaultCreationTimestamp()),
@@ -400,7 +399,7 @@ func TestEdit(t *testing.T) {
 				/*add users*/
 				test.GenUser("", "john", "john@acme.com"),
 				/*add service account*/
-				test.GenServiceAccount("19840801", "test", "viewers", "plan9-ID"),
+				test.GenProjectServiceAccount("19840801", "test", "viewers", "plan9-ID"),
 			},
 			existingAPIUser: *test.GenAPIUser("john", "john@acme.com"),
 			projectToSync:   "plan9-ID",
@@ -412,7 +411,7 @@ func TestEdit(t *testing.T) {
 			name:       "scenario 2: change service account name for already existing in project",
 			body:       `{"id":"19840801", "name":"test-2", "group":"viewers"}`,
 			httpStatus: http.StatusConflict,
-			existingKubermaticObjs: []runtime.Object{
+			existingKubermaticObjs: []ctrlruntimeclient.Object{
 				/*add projects*/
 				test.GenProject("plan9", kubermaticapiv1.ProjectActive, test.DefaultCreationTimestamp()),
 				/*add bindings*/
@@ -422,8 +421,8 @@ func TestEdit(t *testing.T) {
 				/*add users*/
 				test.GenUser("", "john", "john@acme.com"),
 				/*add service account*/
-				test.GenServiceAccount("19840801", "test-1", "viewers", "plan9-ID"),
-				test.GenServiceAccount("2", "test-2", "viewers", "plan9-ID"),
+				test.GenProjectServiceAccount("19840801", "test-1", "viewers", "plan9-ID"),
+				test.GenProjectServiceAccount("2", "test-2", "viewers", "plan9-ID"),
 			},
 			existingAPIUser:       *test.GenAPIUser("john", "john@acme.com"),
 			projectToSync:         "plan9-ID",
@@ -434,7 +433,7 @@ func TestEdit(t *testing.T) {
 			name:       "scenario 3: the admin Bob can update service account for any project",
 			body:       `{"id":"19840801", "name":"newName", "group":"editors"}`,
 			httpStatus: http.StatusOK,
-			existingKubermaticObjs: []runtime.Object{
+			existingKubermaticObjs: []ctrlruntimeclient.Object{
 				/*add projects*/
 				test.GenProject("my-first-project", kubermaticapiv1.ProjectActive, test.DefaultCreationTimestamp()),
 				test.GenProject("my-third-project", kubermaticapiv1.ProjectActive, test.DefaultCreationTimestamp()),
@@ -447,7 +446,7 @@ func TestEdit(t *testing.T) {
 				test.GenUser("", "john", "john@acme.com"),
 				genUser("bob", "bob@acme.com", true),
 				/*add service account*/
-				test.GenServiceAccount("19840801", "test", "viewers", "plan9-ID"),
+				test.GenProjectServiceAccount("19840801", "test", "viewers", "plan9-ID"),
 			},
 			existingAPIUser: *test.GenAPIUser("bob", "bob@acme.com"),
 			projectToSync:   "plan9-ID",
@@ -461,7 +460,7 @@ func TestEdit(t *testing.T) {
 			req := httptest.NewRequest("PUT", fmt.Sprintf("/api/v1/projects/%s/serviceaccounts/%s", tc.projectToSync, tc.saToUpdate), strings.NewReader(tc.body))
 			res := httptest.NewRecorder()
 
-			ep, client, err := test.CreateTestEndpointAndGetClients(tc.existingAPIUser, nil, []runtime.Object{}, []runtime.Object{}, tc.existingKubermaticObjs, nil, nil, hack.NewTestRouting)
+			ep, client, err := test.CreateTestEndpointAndGetClients(tc.existingAPIUser, nil, []ctrlruntimeclient.Object{}, []ctrlruntimeclient.Object{}, tc.existingKubermaticObjs, nil, nil, hack.NewTestRouting)
 			if err != nil {
 				t.Fatalf("failed to create test endpoint due to %v", err)
 			}
@@ -522,14 +521,14 @@ func TestDelete(t *testing.T) {
 		saToDelete             string
 		httpStatus             int
 		existingAPIUser        *apiv1.User
-		existingKubermaticObjs []runtime.Object
+		existingKubermaticObjs []ctrlruntimeclient.Object
 	}{
 		{
 			name:            "scenario 1: the owner of the project delete service account",
 			httpStatus:      http.StatusOK,
 			projectToSync:   test.GenDefaultProject().Name,
 			existingAPIUser: test.GenDefaultAPIUser(),
-			existingKubermaticObjs: []runtime.Object{
+			existingKubermaticObjs: []ctrlruntimeclient.Object{
 				// add a project
 				test.GenDefaultProject(),
 				// add a user
@@ -538,7 +537,7 @@ func TestDelete(t *testing.T) {
 				test.GenDefaultOwnerBinding(),
 				test.GenBinding("my-first-project-ID", "serviceaccount-1@sa.kubermatic.io", "viewers"),
 				/*add service account*/
-				test.GenServiceAccount("19840801", "test", "viewers", "my-first-project-ID"),
+				test.GenProjectServiceAccount("19840801", "test", "viewers", "my-first-project-ID"),
 			},
 			saToDelete: "19840801",
 		},
@@ -547,7 +546,7 @@ func TestDelete(t *testing.T) {
 			httpStatus:      http.StatusOK,
 			projectToSync:   test.GenDefaultProject().Name,
 			existingAPIUser: test.GenAPIUser("john", "john@acme.com"),
-			existingKubermaticObjs: []runtime.Object{
+			existingKubermaticObjs: []ctrlruntimeclient.Object{
 				// add a project
 				test.GenDefaultProject(),
 				// add a user
@@ -557,7 +556,7 @@ func TestDelete(t *testing.T) {
 				test.GenDefaultOwnerBinding(),
 				test.GenBinding("my-first-project-ID", "serviceaccount-1@sa.kubermatic.io", "viewers"),
 				/*add service account*/
-				test.GenServiceAccount("19840801", "test", "viewers", "my-first-project-ID"),
+				test.GenProjectServiceAccount("19840801", "test", "viewers", "my-first-project-ID"),
 			},
 			saToDelete: "19840801",
 		},
@@ -566,7 +565,7 @@ func TestDelete(t *testing.T) {
 			httpStatus:      http.StatusForbidden,
 			projectToSync:   test.GenDefaultProject().Name,
 			existingAPIUser: test.GenAPIUser("john", "john@acme.com"),
-			existingKubermaticObjs: []runtime.Object{
+			existingKubermaticObjs: []ctrlruntimeclient.Object{
 				// add a project
 				test.GenDefaultProject(),
 				// add a user
@@ -576,7 +575,7 @@ func TestDelete(t *testing.T) {
 				test.GenDefaultOwnerBinding(),
 				test.GenBinding("my-first-project-ID", "serviceaccount-1@sa.kubermatic.io", "viewers"),
 				/*add service account*/
-				test.GenServiceAccount("19840801", "test", "viewers", "my-first-project-ID"),
+				test.GenProjectServiceAccount("19840801", "test", "viewers", "my-first-project-ID"),
 			},
 			saToDelete: "19840801",
 		},
@@ -586,7 +585,7 @@ func TestDelete(t *testing.T) {
 			req := httptest.NewRequest("DELETE", fmt.Sprintf("/api/v1/projects/%s/serviceaccounts/%s", tc.projectToSync, tc.saToDelete), strings.NewReader(""))
 			res := httptest.NewRecorder()
 
-			ep, err := test.CreateTestEndpoint(*tc.existingAPIUser, []runtime.Object{}, tc.existingKubermaticObjs, nil, nil, hack.NewTestRouting)
+			ep, err := test.CreateTestEndpoint(*tc.existingAPIUser, []ctrlruntimeclient.Object{}, tc.existingKubermaticObjs, nil, nil, hack.NewTestRouting)
 			if err != nil {
 				t.Fatalf("failed to create test endpoint due to %v", err)
 			}

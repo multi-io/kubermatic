@@ -26,6 +26,8 @@ import (
 	"testing"
 	"time"
 
+	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
+
 	clusterv1alpha1 "github.com/kubermatic/machine-controller/pkg/apis/cluster/v1alpha1"
 	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
@@ -37,7 +39,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	"k8s.io/utils/pointer"
@@ -53,7 +54,7 @@ func TestCreateClusterEndpoint(t *testing.T) {
 		ProjectToSync          string
 		ExistingProject        *kubermaticv1.Project
 		ExistingAPIUser        *apiv1.User
-		ExistingKubermaticObjs []runtime.Object
+		ExistingKubermaticObjs []ctrlruntimeclient.Object
 		RewriteClusterID       bool
 	}{
 		// scenario 1
@@ -118,52 +119,11 @@ func TestCreateClusterEndpoint(t *testing.T) {
 				return project
 			}(),
 			ProjectToSync: test.GenDefaultProject().Name,
-			ExistingKubermaticObjs: []runtime.Object{
+			ExistingKubermaticObjs: []ctrlruntimeclient.Object{
 				test.GenDefaultUser(),
 				test.GenDefaultOwnerBinding(),
 			},
 			ExistingAPIUser: test.GenDefaultAPIUser(),
-		},
-		// scenario 5
-		{
-			Name:                   "scenario 5: openShift cluster is created",
-			Body:                   `{"cluster":{"name":"keen-snyder","type":"openshift","spec":{"version":"4.1.0","openshift":{"imagePullSecret": "some-secret"},"cloud":{"fake":{"token":"dummy_token"},"dc":"fake-dc"}}}}`,
-			ExpectedResponse:       `{"id":"%s","name":"keen-snyder","creationTimestamp":"0001-01-01T00:00:00Z","type":"openshift","spec":{"cloud":{"dc":"fake-dc","fake":{}},"clusterNetwork":{"services":{},"pods":{}},"version":"4.1.0","oidc":{},"sys11auth":{},"enableUserSSHKeyAgent":true},"status":{"version":"4.1.0","url":""}}`,
-			RewriteClusterID:       true,
-			HTTPStatus:             http.StatusCreated,
-			ProjectToSync:          test.GenDefaultProject().Name,
-			ExistingKubermaticObjs: test.GenDefaultKubermaticObjects(test.GenDefaultSettings()),
-			ExistingAPIUser:        test.GenDefaultAPIUser(),
-		},
-		// scenario 6
-		{
-			Name:                   "scenario 6: openShift cluster is created with existing custom credential",
-			Body:                   `{"cluster":{"name":"keen-snyder","type":"openshift","credential":"fake","spec":{"version":"4.1.0","openshift":{"imagePullSecret": "some-secret"},"cloud":{"fake":{},"dc":"fake-dc"}}}}`,
-			ExpectedResponse:       `{"id":"%s","name":"keen-snyder","creationTimestamp":"0001-01-01T00:00:00Z","type":"openshift","spec":{"cloud":{"dc":"fake-dc","fake":{}},"clusterNetwork":{"services":{},"pods":{}},"version":"4.1.0","oidc":{},"sys11auth":{},"enableUserSSHKeyAgent":true},"status":{"version":"4.1.0","url":""}}`,
-			RewriteClusterID:       true,
-			HTTPStatus:             http.StatusCreated,
-			ProjectToSync:          test.GenDefaultProject().Name,
-			ExistingKubermaticObjs: test.GenDefaultKubermaticObjects(test.GenDefaultSettings()),
-			ExistingAPIUser:        test.GenDefaultAPIUser(),
-		},
-		// scenario 7
-		{
-			Name:                   "scenario 7: custom credential doesn't exist for Fake cloud provider",
-			Body:                   `{"cluster":{"name":"keen-snyder","type":"openshift","credential":"default","spec":{"version":"4.1.0","cloud":{"fake":{},"dc":"fake-dc"}}}}`,
-			ExpectedResponse:       `{"error":{"code":400,"message":"invalid credentials: preset.kubermatic.k8s.io \"default\" not found"}}`,
-			HTTPStatus:             http.StatusBadRequest,
-			ProjectToSync:          test.GenDefaultProject().Name,
-			ExistingKubermaticObjs: test.GenDefaultKubermaticObjects(test.GenDefaultSettings()),
-			ExistingAPIUser:        test.GenDefaultAPIUser(),
-		},
-		{
-			Name:                   "scenario 8: openShift cluster creation fails without imagePullSecret",
-			Body:                   `{"cluster":{"name":"keen-snyder","type":"openshift","credential":"fake","spec":{"version":"4.1.0","cloud":{"fake":{},"dc":"fake-dc"}}}}`,
-			ExpectedResponse:       `{"error":{"code":400,"message":"openshift clusters must be configured with an imagePullSecret"}}`,
-			HTTPStatus:             http.StatusBadRequest,
-			ProjectToSync:          test.GenDefaultProject().Name,
-			ExistingKubermaticObjs: test.GenDefaultKubermaticObjects(test.GenDefaultSettings()),
-			ExistingAPIUser:        test.GenDefaultAPIUser(),
 		},
 		{
 			Name:                   "scenario 9a: rejected an attempt to create a cluster in email-restricted datacenter - legacy single domain restriction with requiredEmailDomains",
@@ -277,13 +237,13 @@ func TestCreateClusterEndpoint(t *testing.T) {
 		t.Run(tc.Name, func(t *testing.T) {
 			req := httptest.NewRequest("POST", fmt.Sprintf("/api/v2/projects/%s/clusters", tc.ProjectToSync), strings.NewReader(tc.Body))
 			res := httptest.NewRecorder()
-			var kubermaticObj []runtime.Object
+			var kubermaticObj []ctrlruntimeclient.Object
 			if tc.ExistingProject != nil {
 				kubermaticObj = append(kubermaticObj, tc.ExistingProject)
 			}
 			kubermaticObj = append(kubermaticObj, tc.ExistingKubermaticObjs...)
 
-			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, []runtime.Object{}, kubermaticObj, test.GenDefaultVersions(), nil, hack.NewTestRouting)
+			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, nil, kubermaticObj, test.GenDefaultVersions(), nil, hack.NewTestRouting)
 			if err != nil {
 				t.Fatalf("failed to create test endpoint due to %v", err)
 			}
@@ -317,7 +277,7 @@ func TestListClusters(t *testing.T) {
 		ExpectedClusters       []apiv1.Cluster
 		HTTPStatus             int
 		ExistingAPIUser        *apiv1.User
-		ExistingKubermaticObjs []runtime.Object
+		ExistingKubermaticObjs []ctrlruntimeclient.Object
 	}{
 		// scenario 1
 		{
@@ -488,9 +448,9 @@ func TestListClusters(t *testing.T) {
 		t.Run(tc.Name, func(t *testing.T) {
 			req := httptest.NewRequest("GET", fmt.Sprintf("/api/v2/projects/%s/clusters", test.ProjectName), strings.NewReader(""))
 			res := httptest.NewRecorder()
-			var kubermaticObj []runtime.Object
+			var kubermaticObj []ctrlruntimeclient.Object
 			kubermaticObj = append(kubermaticObj, tc.ExistingKubermaticObjs...)
-			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, []runtime.Object{}, kubermaticObj, nil, nil, hack.NewTestRouting)
+			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, nil, kubermaticObj, nil, nil, hack.NewTestRouting)
 			if err != nil {
 				t.Fatalf("failed to create test endpoint due to %v", err)
 			}
@@ -521,7 +481,7 @@ func TestGetCluster(t *testing.T) {
 		HTTPStatus             int
 		ClusterToGet           string
 		ExistingAPIUser        *apiv1.User
-		ExistingKubermaticObjs []runtime.Object
+		ExistingKubermaticObjs []ctrlruntimeclient.Object
 	}{
 		// scenario 1
 		{
@@ -583,9 +543,9 @@ func TestGetCluster(t *testing.T) {
 		t.Run(tc.Name, func(t *testing.T) {
 			req := httptest.NewRequest("GET", fmt.Sprintf("/api/v2/projects/%s/clusters/%s", test.ProjectName, tc.ClusterToGet), strings.NewReader(tc.Body))
 			res := httptest.NewRecorder()
-			var kubermaticObj []runtime.Object
+			var kubermaticObj []ctrlruntimeclient.Object
 			kubermaticObj = append(kubermaticObj, tc.ExistingKubermaticObjs...)
-			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, []runtime.Object{}, kubermaticObj, nil, nil, hack.NewTestRouting)
+			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, []ctrlruntimeclient.Object{}, kubermaticObj, nil, nil, hack.NewTestRouting)
 			if err != nil {
 				t.Fatalf("failed to create test endpoint due to %v", err)
 			}
@@ -610,7 +570,7 @@ func TestDeleteClusterEndpoint(t *testing.T) {
 		HTTPStatus                    int
 		ProjectToSync                 string
 		ClusterToSync                 string
-		ExistingKubermaticObjs        []runtime.Object
+		ExistingKubermaticObjs        []ctrlruntimeclient.Object
 		ExistingAPIUser               *apiv1.User
 		ExpectedListClusterKeysStatus int
 	}{
@@ -717,9 +677,9 @@ func TestDeleteClusterEndpoint(t *testing.T) {
 			// validate if deletion was successful
 			req := httptest.NewRequest("DELETE", fmt.Sprintf("/api/v2/projects/%s/clusters/%s", tc.ProjectToSync, tc.ClusterToSync), strings.NewReader(tc.Body))
 			res := httptest.NewRecorder()
-			var kubermaticObj []runtime.Object
+			var kubermaticObj []ctrlruntimeclient.Object
 			kubermaticObj = append(kubermaticObj, tc.ExistingKubermaticObjs...)
-			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, []runtime.Object{}, kubermaticObj, nil, nil, hack.NewTestRouting)
+			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, []ctrlruntimeclient.Object{}, kubermaticObj, nil, nil, hack.NewTestRouting)
 			if err != nil {
 				t.Fatalf("failed to create test endpoint due to %v", err)
 			}
@@ -758,7 +718,7 @@ func TestPatchCluster(t *testing.T) {
 		project                   string
 		ExistingAPIUser           *apiv1.User
 		ExistingMachines          []*clusterv1alpha1.Machine
-		ExistingKubermaticObjects []runtime.Object
+		ExistingKubermaticObjects []ctrlruntimeclient.Object
 	}{
 		// scenario 1
 		{
@@ -902,14 +862,14 @@ func TestPatchCluster(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
-			var machineObj []runtime.Object
+			var machineObj []ctrlruntimeclient.Object
 			for _, existingMachine := range tc.ExistingMachines {
 				machineObj = append(machineObj, existingMachine)
 			}
 			// test data
 			req := httptest.NewRequest(http.MethodPatch, fmt.Sprintf("/api/v2/projects/%s/clusters/%s", tc.project, tc.cluster), strings.NewReader(tc.Body))
 			res := httptest.NewRecorder()
-			ep, _, err := test.CreateTestEndpointAndGetClients(*tc.ExistingAPIUser, nil, []runtime.Object{}, machineObj, tc.ExistingKubermaticObjects, nil, nil, hack.NewTestRouting)
+			ep, _, err := test.CreateTestEndpointAndGetClients(*tc.ExistingAPIUser, nil, []ctrlruntimeclient.Object{}, machineObj, tc.ExistingKubermaticObjects, nil, nil, hack.NewTestRouting)
 			if err != nil {
 				t.Fatalf("failed to create test endpoint due to %v", err)
 			}
@@ -938,7 +898,7 @@ func TestGetClusterEventsEndpoint(t *testing.T) {
 		ExistingProject        *kubermaticv1.Project
 		ExistingKubermaticUser *kubermaticv1.User
 		ExistingAPIUser        *apiv1.User
-		ExistingKubermaticObjs []runtime.Object
+		ExistingKubermaticObjs []ctrlruntimeclient.Object
 		ExistingEvents         []*corev1.Event
 		NodeDeploymentID       string
 		QueryParams            string
@@ -1021,9 +981,9 @@ func TestGetClusterEventsEndpoint(t *testing.T) {
 		t.Run(tc.Name, func(t *testing.T) {
 			req := httptest.NewRequest("GET", fmt.Sprintf("/api/v2/projects/%s/clusters/%s/events%s", tc.ProjectIDToSync, tc.ClusterIDToSync, tc.QueryParams), strings.NewReader(""))
 			res := httptest.NewRecorder()
-			kubermaticObj := make([]runtime.Object, 0)
-			machineObj := make([]runtime.Object, 0)
-			kubernetesObj := make([]runtime.Object, 0)
+			kubermaticObj := make([]ctrlruntimeclient.Object, 0)
+			machineObj := make([]ctrlruntimeclient.Object, 0)
+			kubernetesObj := make([]ctrlruntimeclient.Object, 0)
 			for _, existingEvents := range tc.ExistingEvents {
 				kubernetesObj = append(kubernetesObj, existingEvents)
 			}
@@ -1055,7 +1015,7 @@ func TestGetClusterHealth(t *testing.T) {
 		ClusterToGet           string
 		ProjectToSync          string
 		ExistingAPIUser        *apiv1.User
-		ExistingKubermaticObjs []runtime.Object
+		ExistingKubermaticObjs []ctrlruntimeclient.Object
 	}{
 		// scenario 1
 		{
@@ -1148,15 +1108,47 @@ func TestGetClusterHealth(t *testing.T) {
 			),
 			ExistingAPIUser: test.GenAPIUser("John", "john@acme.com"),
 		},
+		// scenario 4
+		{
+			Name:             "scenario 4: get existing cluster health status with opa integration enabled",
+			Body:             ``,
+			ExpectedResponse: `{"apiserver":1,"scheduler":0,"controller":1,"machineController":0,"etcd":1,"cloudProviderInfrastructure":1,"userClusterControllerManager":1,"gatekeeperController":1,"gatekeeperAudit":1}`,
+			HTTPStatus:       http.StatusOK,
+			ClusterToGet:     "keen-snyder",
+			ProjectToSync:    test.GenDefaultProject().Name,
+			ExistingKubermaticObjs: test.GenDefaultKubermaticObjects(
+				// add a cluster
+				test.GenCluster("clusterDefID", "clusterDef", test.GenDefaultProject().Name, time.Date(2013, 02, 04, 01, 54, 0, 0, time.UTC)),
+				// add another cluster
+				func() *kubermaticv1.Cluster {
+					cluster := test.GenCluster("keen-snyder", "clusterAbc", test.GenDefaultProject().Name, time.Date(2013, 02, 03, 19, 54, 0, 0, time.UTC))
+					cluster.Status.ExtendedHealth = kubermaticv1.ExtendedClusterHealth{
+
+						Apiserver:                    kubermaticv1.HealthStatusUp,
+						Scheduler:                    kubermaticv1.HealthStatusDown,
+						Controller:                   kubermaticv1.HealthStatusUp,
+						MachineController:            kubermaticv1.HealthStatusDown,
+						Etcd:                         kubermaticv1.HealthStatusUp,
+						CloudProviderInfrastructure:  kubermaticv1.HealthStatusUp,
+						UserClusterControllerManager: kubermaticv1.HealthStatusUp,
+						GatekeeperAudit:              kubermaticv1.HealthStatusUp,
+						GatekeeperController:         kubermaticv1.HealthStatusUp,
+					}
+					cluster.Spec.OPAIntegration = &kubermaticv1.OPAIntegrationSettings{Enabled: true}
+					return cluster
+				}(),
+			),
+			ExistingAPIUser: test.GenDefaultAPIUser(),
+		},
 	}
 
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
 			req := httptest.NewRequest("GET", fmt.Sprintf("/api/v2/projects/%s/clusters/%s/health", tc.ProjectToSync, tc.ClusterToGet), strings.NewReader(tc.Body))
 			res := httptest.NewRecorder()
-			var kubermaticObj []runtime.Object
+			var kubermaticObj []ctrlruntimeclient.Object
 			kubermaticObj = append(kubermaticObj, tc.ExistingKubermaticObjs...)
-			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, []runtime.Object{}, kubermaticObj, nil, nil, hack.NewTestRouting)
+			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, []ctrlruntimeclient.Object{}, kubermaticObj, nil, nil, hack.NewTestRouting)
 			if err != nil {
 				t.Fatalf("failed to create test endpoint due to %v", err)
 			}
@@ -1189,7 +1181,7 @@ func TestGetClusterMetrics(t *testing.T) {
 		HTTPStatus             int
 		ClusterToGet           string
 		ExistingAPIUser        *apiv1.User
-		ExistingKubermaticObjs []runtime.Object
+		ExistingKubermaticObjs []ctrlruntimeclient.Object
 		ExistingNodes          []*corev1.Node
 		ExistingPodMetrics     []*v1beta1.PodMetrics
 		ExistingNodeMetrics    []*v1beta1.NodeMetrics
@@ -1323,9 +1315,9 @@ func TestGetClusterMetrics(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
-			var kubernetesObj []runtime.Object
-			var kubeObj []runtime.Object
-			var kubermaticObj []runtime.Object
+			var kubernetesObj []ctrlruntimeclient.Object
+			var kubeObj []ctrlruntimeclient.Object
+			var kubermaticObj []ctrlruntimeclient.Object
 			for _, existingMetric := range tc.ExistingPodMetrics {
 				kubernetesObj = append(kubernetesObj, existingMetric)
 			}
@@ -1364,8 +1356,8 @@ func TestListNamespace(t *testing.T) {
 		httpStatus             int
 		clusterToGet           string
 		existingAPIUser        *apiv1.User
-		existingKubermaticObjs []runtime.Object
-		existingKubernrtesObjs []runtime.Object
+		existingKubermaticObjs []ctrlruntimeclient.Object
+		existingKubernrtesObjs []ctrlruntimeclient.Object
 	}{
 		// scenario 1
 		{
@@ -1376,7 +1368,7 @@ func TestListNamespace(t *testing.T) {
 			existingKubermaticObjs: test.GenDefaultKubermaticObjects(
 				test.GenDefaultCluster(),
 			),
-			existingKubernrtesObjs: []runtime.Object{
+			existingKubernrtesObjs: []ctrlruntimeclient.Object{
 				&corev1.Namespace{
 					ObjectMeta: metav1.ObjectMeta{Name: "default"},
 				},
@@ -1396,7 +1388,7 @@ func TestListNamespace(t *testing.T) {
 				test.GenDefaultCluster(),
 				genUser("John", "john@acme.com", true),
 			),
-			existingKubernrtesObjs: []runtime.Object{
+			existingKubernrtesObjs: []ctrlruntimeclient.Object{
 				&corev1.Namespace{
 					ObjectMeta: metav1.ObjectMeta{Name: "default"},
 				},
@@ -1416,7 +1408,7 @@ func TestListNamespace(t *testing.T) {
 				test.GenDefaultCluster(),
 				genUser("John", "john@acme.com", false),
 			),
-			existingKubernrtesObjs: []runtime.Object{
+			existingKubernrtesObjs: []ctrlruntimeclient.Object{
 				&corev1.Namespace{
 					ObjectMeta: metav1.ObjectMeta{Name: "default"},
 				},
@@ -1430,12 +1422,12 @@ func TestListNamespace(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			var kubernetesObj []runtime.Object
-			var kubeObj []runtime.Object
+			var kubernetesObj []ctrlruntimeclient.Object
+			var kubeObj []ctrlruntimeclient.Object
 			kubeObj = append(kubeObj, tc.existingKubernrtesObjs...)
 			req := httptest.NewRequest("GET", fmt.Sprintf("/api/v2/projects/%s/clusters/%s/namespaces", test.ProjectName, tc.clusterToGet), strings.NewReader(""))
 			res := httptest.NewRecorder()
-			var kubermaticObj []runtime.Object
+			var kubermaticObj []ctrlruntimeclient.Object
 			kubermaticObj = append(kubermaticObj, tc.existingKubermaticObjs...)
 			ep, _, err := test.CreateTestEndpointAndGetClients(*tc.existingAPIUser, nil, kubeObj, kubernetesObj, kubermaticObj, nil, nil, hack.NewTestRouting)
 			if err != nil {
@@ -1465,7 +1457,7 @@ func TestDetachSSHKeyFromClusterEndpoint(t *testing.T) {
 		ExpectedDeleteHTTPStatus        int
 		ExistingAPIUser                 *apiv1.User
 		ExistingSSHKeys                 []*kubermaticv1.UserSSHKey
-		ExistingKubermaticObjs          []runtime.Object
+		ExistingKubermaticObjs          []ctrlruntimeclient.Object
 		ExpectedResponseOnGetAfterDelte string
 		ExpectedGetHTTPStatus           int
 	}{
@@ -1633,9 +1625,9 @@ func TestDetachSSHKeyFromClusterEndpoint(t *testing.T) {
 				var err error
 				req := httptest.NewRequest("DELETE", fmt.Sprintf("/api/v2/projects/%s/clusters/%s/sshkeys/%s", tc.ProjectToSync, tc.ClusterToSync, tc.KeyToDelete), strings.NewReader(tc.Body))
 				res := httptest.NewRecorder()
-				var kubermaticObj []runtime.Object
+				var kubermaticObj []ctrlruntimeclient.Object
 				kubermaticObj = append(kubermaticObj, tc.ExistingKubermaticObjs...)
-				ep, err = test.CreateTestEndpoint(*tc.ExistingAPIUser, []runtime.Object{}, kubermaticObj, nil, nil, hack.NewTestRouting)
+				ep, err = test.CreateTestEndpoint(*tc.ExistingAPIUser, []ctrlruntimeclient.Object{}, kubermaticObj, nil, nil, hack.NewTestRouting)
 				if err != nil {
 					t.Fatalf("failed to create test endpoint due to %v", err)
 				}
@@ -1661,7 +1653,7 @@ func TestAssignSSHKeyToClusterEndpoint(t *testing.T) {
 		ProjectToSync          string
 		ClusterToSync          string
 		ExistingAPIUser        *apiv1.User
-		ExistingKubermaticObjs []runtime.Object
+		ExistingKubermaticObjs []ctrlruntimeclient.Object
 		ExpectedSSHKeys        []*kubermaticv1.UserSSHKey
 	}{
 		// scenario 1
@@ -1794,9 +1786,9 @@ func TestAssignSSHKeyToClusterEndpoint(t *testing.T) {
 		t.Run(tc.Name, func(t *testing.T) {
 			req := httptest.NewRequest("PUT", fmt.Sprintf("/api/v2/projects/%s/clusters/%s/sshkeys/%s", tc.ProjectToSync, tc.ClusterToSync, tc.SSHKeyID), nil)
 			res := httptest.NewRecorder()
-			var kubermaticObj []runtime.Object
+			var kubermaticObj []ctrlruntimeclient.Object
 			kubermaticObj = append(kubermaticObj, tc.ExistingKubermaticObjs...)
-			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, []runtime.Object{}, kubermaticObj, nil, nil, hack.NewTestRouting)
+			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, []ctrlruntimeclient.Object{}, kubermaticObj, nil, nil, hack.NewTestRouting)
 			if err != nil {
 				t.Fatalf("failed to create test endpoint due to %v", err)
 			}
@@ -1832,7 +1824,7 @@ func TestListSSHKeysAssignedToClusterEndpoint(t *testing.T) {
 		ExistingAPIUser        *apiv1.User
 		ExistingCluster        *kubermaticv1.Cluster
 		ExistingSSHKeys        []*kubermaticv1.UserSSHKey
-		ExistingKubermaticObjs []runtime.Object
+		ExistingKubermaticObjs []ctrlruntimeclient.Object
 	}{
 		// scenario 1
 		{
@@ -1906,9 +1898,9 @@ func TestListSSHKeysAssignedToClusterEndpoint(t *testing.T) {
 		t.Run(tc.Name, func(t *testing.T) {
 			req := httptest.NewRequest("GET", fmt.Sprintf("/api/v2/projects/%s/clusters/%s/sshkeys", tc.ProjectToSync, tc.ClusterToSync), strings.NewReader(tc.Body))
 			res := httptest.NewRecorder()
-			var kubermaticObj []runtime.Object
+			var kubermaticObj []ctrlruntimeclient.Object
 			kubermaticObj = append(kubermaticObj, tc.ExistingKubermaticObjs...)
-			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, []runtime.Object{}, kubermaticObj, nil, nil, hack.NewTestRouting)
+			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, []ctrlruntimeclient.Object{}, kubermaticObj, nil, nil, hack.NewTestRouting)
 			if err != nil {
 				t.Fatalf("failed to create test endpoint due to %v", err)
 			}
@@ -1940,8 +1932,8 @@ func TestRevokeClusterAdminTokenEndpoint(t *testing.T) {
 		clusterToGet           *kubermaticv1.Cluster
 		projectToSync          string
 		existingAPIUser        *apiv1.User
-		existingKubermaticObjs []runtime.Object
-		existingKubernrtesObjs []runtime.Object
+		existingKubermaticObjs []ctrlruntimeclient.Object
+		existingKubernrtesObjs []ctrlruntimeclient.Object
 	}{
 		// scenario 1
 		{
@@ -1982,7 +1974,7 @@ func TestRevokeClusterAdminTokenEndpoint(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			ep, clientsSets, err := test.CreateTestEndpointAndGetClients(*tc.existingAPIUser, nil, []runtime.Object{}, []runtime.Object{}, tc.existingKubermaticObjs, nil, nil, hack.NewTestRouting)
+			ep, clientsSets, err := test.CreateTestEndpointAndGetClients(*tc.existingAPIUser, nil, []ctrlruntimeclient.Object{}, []ctrlruntimeclient.Object{}, tc.existingKubermaticObjs, nil, nil, hack.NewTestRouting)
 			if err != nil {
 				t.Fatalf("failed to create test endpoint due to %v", err)
 			}

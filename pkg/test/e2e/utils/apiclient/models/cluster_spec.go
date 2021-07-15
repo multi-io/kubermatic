@@ -56,14 +56,14 @@ type ClusterSpec struct {
 	// cluster network
 	ClusterNetwork *ClusterNetworkingConfig `json:"clusterNetwork,omitempty"`
 
+	// mla
+	Mla *MLASettings `json:"mla,omitempty"`
+
 	// oidc
 	Oidc *OIDCSettings `json:"oidc,omitempty"`
 
 	// opa integration
 	OpaIntegration *OPAIntegrationSettings `json:"opaIntegration,omitempty"`
-
-	// openshift
-	Openshift *Openshift `json:"openshift,omitempty"`
 
 	// service account
 	ServiceAccount *ServiceAccountSettings `json:"serviceAccount,omitempty"`
@@ -98,15 +98,15 @@ func (m *ClusterSpec) Validate(formats strfmt.Registry) error {
 		res = append(res, err)
 	}
 
+	if err := m.validateMla(formats); err != nil {
+		res = append(res, err)
+	}
+
 	if err := m.validateOidc(formats); err != nil {
 		res = append(res, err)
 	}
 
 	if err := m.validateOpaIntegration(formats); err != nil {
-		res = append(res, err)
-	}
-
-	if err := m.validateOpenshift(formats); err != nil {
 		res = append(res, err)
 	}
 
@@ -207,6 +207,24 @@ func (m *ClusterSpec) validateClusterNetwork(formats strfmt.Registry) error {
 	return nil
 }
 
+func (m *ClusterSpec) validateMla(formats strfmt.Registry) error {
+
+	if swag.IsZero(m.Mla) { // not required
+		return nil
+	}
+
+	if m.Mla != nil {
+		if err := m.Mla.Validate(formats); err != nil {
+			if ve, ok := err.(*errors.Validation); ok {
+				return ve.ValidateName("mla")
+			}
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (m *ClusterSpec) validateOidc(formats strfmt.Registry) error {
 
 	if swag.IsZero(m.Oidc) { // not required
@@ -235,24 +253,6 @@ func (m *ClusterSpec) validateOpaIntegration(formats strfmt.Registry) error {
 		if err := m.OpaIntegration.Validate(formats); err != nil {
 			if ve, ok := err.(*errors.Validation); ok {
 				return ve.ValidateName("opaIntegration")
-			}
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (m *ClusterSpec) validateOpenshift(formats strfmt.Registry) error {
-
-	if swag.IsZero(m.Openshift) { // not required
-		return nil
-	}
-
-	if m.Openshift != nil {
-		if err := m.Openshift.Validate(formats); err != nil {
-			if ve, ok := err.(*errors.Validation); ok {
-				return ve.ValidateName("openshift")
 			}
 			return err
 		}

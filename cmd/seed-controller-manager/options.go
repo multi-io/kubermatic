@@ -38,14 +38,14 @@ import (
 	"k8c.io/kubermatic/v2/pkg/keycloak"
 	"k8c.io/kubermatic/v2/pkg/provider"
 	"k8c.io/kubermatic/v2/pkg/resources"
+	"k8c.io/kubermatic/v2/pkg/resources/certificates"
 	"k8c.io/kubermatic/v2/pkg/util/flagopts"
-	"k8c.io/kubermatic/v2/pkg/validation"
 	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
+	"k8c.io/kubermatic/v2/pkg/webhook"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	knet "k8s.io/apimachinery/pkg/util/net"
-	certutil "k8s.io/client-go/util/cert"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/yaml"
 )
@@ -64,10 +64,9 @@ type controllerRunOptions struct {
 	overwriteRegistry                                string
 	nodePortRange                                    string
 	nodeAccessNetwork                                string
+	enableNodeLocalDNSCache                          bool
 	kubernetesAddonsPath                             string
-	openshiftAddonsPath                              string
 	kubernetesAddons                                 kubermaticv1.AddonList
-	openshiftAddons                                  kubermaticv1.AddonList
 	backupContainerFile                              string
 	backupDeleteContainerFile                        string
 	cleanupContainerFile                             string
@@ -85,19 +84,20 @@ type controllerRunOptions struct {
 	kubermaticImage                                  string
 	keycloakCacheExpiry                              time.Duration
 	etcdLauncherImage                                string
+	enableEtcdBackupRestoreController                bool
 	dnatControllerImage                              string
 	namespace                                        string
 	apiServerDefaultReplicas                         int
 	apiServerEndpointReconcilingDisabled             bool
 	controllerManagerDefaultReplicas                 int
 	schedulerDefaultReplicas                         int
-	validationWebhook                                validation.WebhookOpts
+	admissionWebhook                                 webhook.Options
 	concurrentClusterUpdate                          int
 	addonEnforceInterval                             int
 	defaultComponentSettings                         string
+	caBundle                                         *certificates.CABundle
 
 	// OIDC configuration
-	oidcCAFile             string
 	oidcIssuerURL          string
 	oidcIssuerClientID     string
 	oidcIssuerClientSecret string
@@ -106,6 +106,11 @@ type controllerRunOptions struct {
 	tunnelingAgentIP flagopts.IPValue
 
 	featureGates features.FeatureGate
+
+	// MLA configuration
+	grafanaURL        string
+	grafanaHeaderName string
+	grafanaSecret     string
 }
 
 func newControllerRunOptions() (controllerRunOptions, error) {
@@ -114,11 +119,13 @@ func newControllerRunOptions() (controllerRunOptions, error) {
 		// Default IP used by tunneling agents
 		tunnelingAgentIP: flagopts.IPValue{IP: net.ParseIP("192.168.30.10")},
 	}
-	var rawEtcdDiskSize string
-	var defaultKubernetesAddonsList string
-	var defaultKubernetesAddonsFile string
-	var defaultOpenshiftAddonList string
-	var defaultOpenshiftAddonsFile string
+
+	var (
+		rawEtcdDiskSize             string
+		caBundleFile                string
+		defaultKubernetesAddonsList string
+		defaultKubernetesAddonsFile string
+	)
 
 	flag.BoolVar(&c.enableLeaderElection, "enable-leader-election", true, "Enable leader election for controller manager. "+
 		"Enabling this will ensure there is only one active controller manager.")
@@ -131,17 +138,15 @@ func newControllerRunOptions() (controllerRunOptions, error) {
 	flag.StringVar(&c.updatesFile, "updates", "updates.yaml", "The updates.yaml file path")
 	flag.IntVar(&c.workerCount, "worker-count", 4, "Number of workers which process the clusters in parallel.")
 	flag.StringVar(&c.overwriteRegistry, "overwrite-registry", "", "registry to use for all images")
-	flag.StringVar(&c.nodePortRange, "nodeport-range", "30000-32767", "NodePort range to use for new clusters. It must be within the NodePort range of the seed-cluster")
+	flag.StringVar(&c.nodePortRange, "nodeport-range", resources.DefaultNodePortRange, "NodePort range to use for new clusters. It must be within the NodePort range of the seed-cluster")
 	flag.StringVar(&c.nodeAccessNetwork, "node-access-network", kubermaticv1.DefaultNodeAccessNetwork, "A network which allows direct access to nodes via VPN. Uses CIDR notation.")
+	flag.BoolVar(&c.enableNodeLocalDNSCache, "enable-nodelocal-dns-cache", true, "Enable NodeLocal DNS Cache in user clusters.")
 	flag.StringVar(&c.kubernetesAddonsPath, "kubernetes-addons-path", "/opt/addons/kubernetes", "Path to addon manifests. Should contain sub-folders for each addon")
-	flag.StringVar(&c.openshiftAddonsPath, "openshift-addons-path", "/opt/addons/openshift", "Path to addon manifests. Should contain sub-folders for each addon")
 	flag.StringVar(&defaultKubernetesAddonsList, "kubernetes-addons-list", "", "Comma separated list of Addons to install into every user-cluster. Mutually exclusive with `--kubernetes-addons-file`")
 	flag.StringVar(&defaultKubernetesAddonsFile, "kubernetes-addons-file", "", "File that contains a list of default kubernetes addons. Mutually exclusive with `--kubernetes-addons-list`")
-	flag.StringVar(&defaultOpenshiftAddonList, "openshift-addons-list", "", "Comma separated list of addons to install into every openshift user cluster. Mutually exclusive with `--openshift-addons-file`")
-	flag.StringVar(&defaultOpenshiftAddonsFile, "openshift-addons-file", "", "File that contains a list of default openshift addons. Mutually exclusive with `--openshift-addons-list`")
 	flag.StringVar(&c.backupContainerFile, "backup-container", "", fmt.Sprintf("[Required] Filepath of a backup container yaml. It must mount a volume named %s from which it reads the etcd backups", backupcontroller.SharedVolumeName))
 	flag.StringVar(&c.backupDeleteContainerFile, "backup-delete-container", "", "Filepath of a backup deletion container yaml. It receives the name of the backup to delete in an env variable ($BACKUP_TO_DELETE). If not specified, the backup container must handle deletion.")
-	flag.StringVar(&c.cleanupContainerFile, "cleanup-container", "", "[Required] Filepath of a cleanup container yaml. The container will be used to cleanup the backup directory for a cluster after it got deleted.")
+	flag.StringVar(&c.cleanupContainerFile, "cleanup-container", "", "(Only required for the old backup controller) Filepath of a cleanup container yaml. The container will be used to cleanup the backup directory for a cluster after it got deleted.")
 	flag.StringVar(&c.backupContainerImage, "backup-container-init-image", backupcontroller.DefaultBackupContainerImage, "Docker image to use for the init container in the backup job, must be an etcd v3 image. Only set this if your cluster can not use the public quay.io registry")
 	flag.StringVar(&c.backupInterval, "backup-interval", backupcontroller.DefaultBackupInterval, "Interval in which the etcd gets backed up")
 	flag.StringVar(&rawEtcdDiskSize, "etcd-disk-size", "5Gi", "Size for the etcd PV's. Only applies to new clusters.")
@@ -154,13 +159,13 @@ func newControllerRunOptions() (controllerRunOptions, error) {
 	flag.StringVar(&c.monitoringEnvironmentLabel, "monitoring-environment-label", "", "The value is to be set for prometheus config's external label 'metakube_environment'. Default: ''")
 	flag.StringVar(&c.monitoringScrapeAnnotationPrefix, "monitoring-scrape-annotation-prefix", "monitoring.kubermatic.io", "The prefix for monitoring annotations in the user cluster. Default: monitoring.kubermatic.io -> monitoring.kubermatic.io/port, monitoring.kubermatic.io/path")
 	flag.Var(&c.featureGates, "feature-gates", "A set of key=value pairs that describe feature gates for various features.")
-	flag.StringVar(&c.oidcCAFile, "oidc-ca-file", "", "The path to the certificate for the CA that signed your identity provider’s web certificate.")
 	flag.StringVar(&c.oidcIssuerURL, "oidc-issuer-url", "", "URL of the OpenID token issuer. Example: http://auth.int.kubermatic.io")
 	flag.StringVar(&c.oidcIssuerClientID, "oidc-issuer-client-id", "", "Issuer client ID")
 	flag.StringVar(&c.oidcIssuerClientSecret, "oidc-issuer-client-secret", "", "OpenID client secret")
 	flag.StringVar(&c.kubermaticImage, "kubermatic-image", resources.DefaultKubermaticImage, "The location from which to pull the Kubermatic image")
 	flag.DurationVar(&c.keycloakCacheExpiry, "keycloak-cache-expiry", 2*time.Hour, "Time duration after which items in the Keycloak client cache expire.")
 	flag.StringVar(&c.etcdLauncherImage, "etcd-launcher-image", resources.DefaultEtcdLauncherImage, "The location from which to pull the etcd launcher image")
+	flag.BoolVar(&c.enableEtcdBackupRestoreController, "enable-etcd-backups-restores", false, "Whether to enable the new etcd backup and restore controllers")
 	flag.StringVar(&c.dnatControllerImage, "dnatcontroller-image", resources.DefaultDNATControllerImage, "The location of the dnatcontroller-image")
 	flag.StringVar(&c.namespace, "namespace", "kubermatic", "The namespace kubermatic runs in, uses to determine where to look for datacenter custom resources")
 	flag.IntVar(&c.apiServerDefaultReplicas, "apiserver-default-replicas", 2, "The default number of replicas for usercluster api servers")
@@ -170,12 +175,16 @@ func newControllerRunOptions() (controllerRunOptions, error) {
 	flag.IntVar(&c.concurrentClusterUpdate, "max-parallel-reconcile", 10, "The default number of resources updates per cluster")
 	flag.IntVar(&c.addonEnforceInterval, "addon-enforce-interval", 5, "Check and ensure default usercluster addons are deployed every interval in minutes. Set to 0 to disable.")
 	flag.StringVar(&c.defaultComponentSettings, "default-component-settings", "", "YAML file with default cluster component settings")
+	flag.StringVar(&caBundleFile, "ca-bundle", "", "File containing the PEM-encoded CA bundle for all userclusters")
 	flag.Var(&c.tunnelingAgentIP, "tunneling-agent-ip", "The address used by the tunneling agents.")
-	c.validationWebhook.AddFlags(flag.CommandLine, true)
+	flag.StringVar(&c.grafanaURL, "grafana-url", "http://grafana.mla.svc.cluster.local", "The URL of Grafana instance which in running for MLA stack.")
+	flag.StringVar(&c.grafanaHeaderName, "grafana-header-name", "X-WEBAUTH-USER", "Grafana Auth Proxy HTTP Header that will contain the username or email")
+	flag.StringVar(&c.grafanaSecret, "grafana-secret-name", "mla/secret", "Grafana secret name in format namespace/secretname, that contains basic auth info")
+	c.admissionWebhook.AddFlags(flag.CommandLine, true)
 	addFlags(flag.CommandLine)
 	flag.Parse()
 
-	if err := c.validationWebhook.Validate(); err != nil {
+	if err := c.admissionWebhook.Validate(); err != nil {
 		return c, fmt.Errorf("invalid admission webhook configuration: %v", err)
 	}
 
@@ -194,16 +203,16 @@ func newControllerRunOptions() (controllerRunOptions, error) {
 		return c, err
 	}
 
-	c.openshiftAddons, err = loadAddons(defaultOpenshiftAddonList, defaultOpenshiftAddonsFile)
+	caBundle, err := certificates.NewCABundleFromFile(caBundleFile)
 	if err != nil {
-		return c, err
+		return c, fmt.Errorf("invalid CA bundle file (%q): %v", caBundleFile, err)
 	}
+	c.caBundle = caBundle
 
 	return c, nil
 }
 
 func (o controllerRunOptions) validate() error {
-
 	if o.featureGates.Enabled(features.OpenIDAuthPlugin) {
 		if len(o.oidcIssuerURL) == 0 {
 			return fmt.Errorf("%s feature is enabled but \"oidc-issuer-url\" flag was not specified", features.OpenIDAuthPlugin)
@@ -250,10 +259,6 @@ func (o controllerRunOptions) validate() error {
 	if o.concurrentClusterUpdate < 1 {
 		return fmt.Errorf("--max-parallel-reconcile must be > 0 (was %d)", o.concurrentClusterUpdate)
 	}
-	// Validate OIDC CA file
-	if err := o.validateCABundle(); err != nil {
-		return fmt.Errorf("validation CA bundle file failed: %v", err)
-	}
 
 	// Validate node-port range
 	if _, err := knet.ParsePortRange(o.nodePortRange); err != nil {
@@ -269,30 +274,6 @@ func (o controllerRunOptions) validate() error {
 	}
 
 	return nil
-}
-
-// validateDexSecretWithCABundle
-func (o controllerRunOptions) validateCABundle() error {
-	if len(o.oidcCAFile) == 0 {
-		return nil
-	}
-
-	bytes, err := ioutil.ReadFile(o.oidcCAFile)
-	if err != nil {
-		return fmt.Errorf("failed to read '%s': %v", o.oidcCAFile, err)
-	}
-
-	_, err = certutil.ParseCertsPEM(bytes)
-	return err
-}
-
-func (o controllerRunOptions) nodeLocalDNSCacheEnabled() bool {
-	for _, addon := range o.kubernetesAddons.Items {
-		if addon.Name == "nodelocal-dns-cache" {
-			return true
-		}
-	}
-	return false
 }
 
 // controllerContext holds all controllerRunOptions plus everything that

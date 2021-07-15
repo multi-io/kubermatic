@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
 )
@@ -54,8 +53,6 @@ var (
 
 const (
 	name = "apiserver"
-
-	defaultNodePortRange = "30000-32767"
 )
 
 func AuditConfigMapCreator() reconciling.NamedConfigMapCreatorGetter {
@@ -93,15 +90,6 @@ func DeploymentCreator(data *resources.TemplateData, enableOIDCAuthentication bo
 
 			volumes := getVolumes()
 			volumeMounts := getVolumeMounts()
-
-			if enableOIDCAuthentication && len(data.OIDCCAFile()) > 0 {
-				volumes = append(volumes, getDexCASecretVolume())
-				volumeMounts = append(volumeMounts, corev1.VolumeMount{
-					Name:      resources.DexCASecretName,
-					MountPath: "/etc/kubernetes/dex/ca",
-					ReadOnly:  true,
-				})
-			}
 
 			podLabels, err := data.GetPodTemplateLabels(name, volumes, nil)
 			if err != nil {
@@ -399,8 +387,11 @@ func getApiserverFlags(data *resources.TemplateData, etcdEndpoints []string, ena
 	}
 
 	if oidcSettings != nil {
-		flags = append(flags, "--oidc-issuer-url", oidcSettings.IssuerURL)
-		flags = append(flags, "--oidc-client-id", oidcSettings.ClientID)
+		flags = append(flags,
+			"--oidc-ca-file", fmt.Sprintf("/etc/kubernetes/pki/ca-bundle/%s", resources.CABundleConfigMapKey),
+			"--oidc-issuer-url", oidcSettings.IssuerURL,
+			"--oidc-client-id", oidcSettings.ClientID,
+		)
 		if oidcSettings.UsernameClaim != "" {
 			flags = append(flags, "--oidc-username-claim", oidcSettings.UsernameClaim)
 		}
@@ -412,15 +403,13 @@ func getApiserverFlags(data *resources.TemplateData, etcdEndpoints []string, ena
 		}
 	} else if enableOIDCAuthentication {
 		flags = append(flags,
+			"--oidc-ca-file", fmt.Sprintf("/etc/kubernetes/pki/ca-bundle/%s", resources.CABundleConfigMapKey),
 			"--oidc-issuer-url", data.OIDCIssuerURL(),
 			"--oidc-client-id", data.OIDCIssuerClientID(),
 			"--oidc-username-claim", "email",
 			"--oidc-groups-prefix", "oidc:",
 			"--oidc-groups-claim", "groups",
 		)
-		if len(data.OIDCCAFile()) > 0 {
-			flags = append(flags, "--oidc-ca-file", "/etc/kubernetes/dex/ca/caBundle.pem")
-		}
 	}
 
 	if fg := data.GetCSIMigrationFeatureGates(); len(fg) > 0 {
@@ -434,18 +423,8 @@ func getApiserverFlags(data *resources.TemplateData, etcdEndpoints []string, ena
 // getApiserverOverrideFlags creates all settings that may be overridden by cluster specific componentsOverrideSettings
 // otherwise global overrides or defaults will be set
 func getApiserverOverrideFlags(data *resources.TemplateData) (kubermaticv1.APIServerSettings, error) {
-	settings := kubermaticv1.APIServerSettings{}
-	// nodePortRange section
-	settings.NodePortRange = data.NodePortRange()
-	overrideNodePortRange := data.Cluster().Spec.ComponentsOverride.Apiserver.NodePortRange
-	if overrideNodePortRange != "" {
-		if _, err := net.ParsePortRange(overrideNodePortRange); err != nil {
-			return kubermaticv1.APIServerSettings{}, fmt.Errorf("node port range format is invalid: %v", err)
-		}
-		settings.NodePortRange = overrideNodePortRange
-	}
-	if settings.NodePortRange == "" {
-		settings.NodePortRange = defaultNodePortRange
+	settings := kubermaticv1.APIServerSettings{
+		NodePortRange: data.ComputedNodePortRange(),
 	}
 
 	// endpointReconcilingDisabled section
@@ -458,7 +437,7 @@ func getApiserverOverrideFlags(data *resources.TemplateData) (kubermaticv1.APISe
 }
 
 func getVolumeMounts() []corev1.VolumeMount {
-	return append([]corev1.VolumeMount{
+	return []corev1.VolumeMount{
 		{
 			MountPath: "/etc/kubernetes/tls",
 			Name:      resources.ApiserverTLSSecretName,
@@ -477,6 +456,11 @@ func getVolumeMounts() []corev1.VolumeMount {
 		{
 			Name:      resources.CASecretName,
 			MountPath: "/etc/kubernetes/pki/ca",
+			ReadOnly:  true,
+		},
+		{
+			Name:      resources.CABundleConfigMapName,
+			MountPath: "/etc/kubernetes/pki/ca-bundle",
 			ReadOnly:  true,
 		},
 		{
@@ -519,11 +503,11 @@ func getVolumeMounts() []corev1.VolumeMount {
 			MountPath: "/etc/kubernetes/adm-control",
 			ReadOnly:  true,
 		},
-	}, resources.GetHostCACertVolumeMounts()...)
+	}
 }
 
 func getVolumes() []corev1.Volume {
-	return append([]corev1.Volume{
+	return []corev1.Volume{
 		{
 			Name: resources.ApiserverTLSSecretName,
 			VolumeSource: corev1.VolumeSource{
@@ -566,6 +550,16 @@ func getVolumes() []corev1.Volume {
 							Path: resources.CACertSecretKey,
 							Key:  resources.CACertSecretKey,
 						},
+					},
+				},
+			},
+		},
+		{
+			Name: resources.CABundleConfigMapName,
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: resources.CABundleConfigMapName,
 					},
 				},
 			},
@@ -647,7 +641,7 @@ func getVolumes() []corev1.Volume {
 				},
 			},
 		},
-	}, resources.GetHostCACertVolumes()...)
+	}
 }
 
 type kubeAPIServerEnvData interface {
@@ -662,22 +656,20 @@ func GetEnvVars(data kubeAPIServerEnvData) ([]corev1.EnvVar, error) {
 	}
 	cluster := data.Cluster()
 
-	var vars []corev1.EnvVar
+	vars := []corev1.EnvVar{
+		// Kubernetes <1.19 did not ship any certificates in their Docker images,
+		// so this not only injects _our_ CA bundle, it injects _the only_ CA bundle for 1.17/1.18 clusters.
+		{
+			Name:  "SSL_CERT_FILE",
+			Value: "/etc/kubernetes/pki/ca-bundle/ca-bundle.pem",
+		},
+	}
+
 	if cluster.Spec.Cloud.AWS != nil {
 		vars = append(vars, corev1.EnvVar{Name: "AWS_ACCESS_KEY_ID", Value: credentials.AWS.AccessKeyID})
 		vars = append(vars, corev1.EnvVar{Name: "AWS_SECRET_ACCESS_KEY", Value: credentials.AWS.SecretAccessKey})
 		vars = append(vars, corev1.EnvVar{Name: "AWS_VPC_ID", Value: cluster.Spec.Cloud.AWS.VPCID})
 	}
-	return append(vars, resources.GetHTTPProxyEnvVarsFromSeed(data.Seed(), data.Cluster().Address.InternalName)...), nil
-}
 
-func getDexCASecretVolume() corev1.Volume {
-	return corev1.Volume{
-		Name: resources.DexCASecretName,
-		VolumeSource: corev1.VolumeSource{
-			Secret: &corev1.SecretVolumeSource{
-				SecretName: resources.DexCASecretName,
-			},
-		},
-	}
+	return append(vars, resources.GetHTTPProxyEnvVarsFromSeed(data.Seed(), data.Cluster().Address.InternalName)...), nil
 }

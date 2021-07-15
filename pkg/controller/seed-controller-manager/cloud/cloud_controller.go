@@ -18,6 +18,7 @@ package cloud
 
 import (
 	"context"
+	"crypto/x509"
 	"fmt"
 	"reflect"
 	"time"
@@ -40,7 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -66,13 +67,16 @@ const (
 var _ reconcile.Reconciler = &Reconciler{}
 
 type Reconciler struct {
-	client.Client
+	ctrlruntimeclient.Client
 
 	log        *zap.SugaredLogger
 	recorder   record.EventRecorder
 	seedGetter provider.SeedGetter
 	workerName string
 	versions   kubermatic.Versions
+	caBundle   *x509.CertPool
+
+	seedNodePortsRange string
 }
 
 func Add(
@@ -82,6 +86,8 @@ func Add(
 	seedGetter provider.SeedGetter,
 	workerName string,
 	versions kubermatic.Versions,
+	caBundle *x509.CertPool,
+	nodePortsRange string,
 ) error {
 	reconciler := &Reconciler{
 		Client:     mgr.GetClient(),
@@ -90,6 +96,9 @@ func Add(
 		seedGetter: seedGetter,
 		workerName: workerName,
 		versions:   versions,
+		caBundle:   caBundle,
+
+		seedNodePortsRange: nodePortsRange,
 	}
 
 	c, err := controller.New(ControllerName, mgr, controller.Options{Reconciler: reconciler, MaxConcurrentReconciles: numWorkers})
@@ -99,9 +108,7 @@ func Add(
 	return c.Watch(&source.Kind{Type: &kubermaticv1.Cluster{}}, &handler.EnqueueRequestForObject{})
 }
 
-func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log := r.log.With("request", request)
 	log.Debug("Processing")
 
@@ -145,7 +152,7 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, clus
 	if !found {
 		return nil, fmt.Errorf("couldn't find datacenter %q for cluster %q", cluster.Spec.Cloud.DatacenterName, cluster.Name)
 	}
-	prov, err := cloud.Provider(datacenter.DeepCopy(), r.getGlobalSecretKeySelectorValue)
+	prov, err := cloud.Provider(datacenter.DeepCopy(), r.getGlobalSecretKeySelectorValue, r.caBundle, r.seedNodePortsRange)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cloud provider: %v", err)
 	}
@@ -258,11 +265,11 @@ func (r *Reconciler) updateCluster(name string, modify func(*kubermaticv1.Cluste
 		return cluster, nil
 	}
 	opts := (&provider.UpdaterOptions{}).Apply(options...)
-	var patch client.Patch
+	var patch ctrlruntimeclient.Patch
 	if opts.OptimisticLock {
-		patch = client.MergeFromWithOptions(oldCluster, client.MergeFromWithOptimisticLock{})
+		patch = ctrlruntimeclient.MergeFromWithOptions(oldCluster, ctrlruntimeclient.MergeFromWithOptimisticLock{})
 	} else {
-		patch = client.MergeFrom(oldCluster)
+		patch = ctrlruntimeclient.MergeFrom(oldCluster)
 	}
 	return cluster, r.Patch(context.Background(), cluster, patch)
 }

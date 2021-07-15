@@ -30,16 +30,17 @@ import (
 
 	"github.com/minio/minio-go"
 	"github.com/pkg/errors"
-	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
-	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
-	"k8c.io/kubermatic/v2/pkg/resources"
-
 	"go.etcd.io/etcd/v3/clientv3"
 	"go.etcd.io/etcd/v3/clientv3/snapshot"
 	"go.etcd.io/etcd/v3/etcdserver/api/v3rpc/rpctypes"
 	"go.etcd.io/etcd/v3/etcdserver/etcdserverpb"
 	"go.etcd.io/etcd/v3/pkg/transport"
 	"go.uber.org/zap"
+
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
+	"k8c.io/kubermatic/v2/pkg/resources"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -88,8 +89,7 @@ func main() {
 		log.Panicw("get user cluster", zap.Error(err))
 	}
 
-	e.initialState = initialStateNew
-	// check if the etcd cluster is initialized succcesfully.
+	// check if the etcd cluster is initialized successfully.
 	if k8cCluster.Status.HasConditionValue(kubermaticv1.ClusterConditionEtcdClusterInitialized, corev1.ConditionTrue) {
 		e.initialState = initialStateExisting
 	} else {
@@ -574,7 +574,7 @@ func (e *etcdCluster) restoreDatadirFromBackupIfNeeded(ctx context.Context, k8cC
 		return fmt.Errorf("error deleting data directory before restore (%s): %w", e.dataDir, err)
 	}
 
-	sp := snapshot.NewV3(nil) // removed the arguments because of dep and go.mod compatibility issues.
+	sp := snapshot.NewV3(log.Desugar())
 
 	return sp.Restore(snapshot.RestoreConfig{
 		SnapshotPath:        downloadedSnapshotFile,

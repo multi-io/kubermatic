@@ -1,14 +1,17 @@
 package openstack
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
+	"net/http"
 
 	"github.com/gophercloud/gophercloud"
 	goopenstack "github.com/gophercloud/gophercloud/openstack"
 )
 
-func getComputeClient(username, password, domain, tenant, tenantID, authURL, region string) (*gophercloud.ServiceClient, error) {
-	authClient, err := getAuthClient(username, password, domain, tenant, tenantID, authURL)
+func getComputeClient(username, password, domain, tenant, tenantID, authURL, region string, caBundle *x509.CertPool) (*gophercloud.ServiceClient, error) {
+	authClient, err := getAuthClient(username, password, domain, tenant, tenantID, authURL, caBundle)
 	if err != nil {
 		return nil, err
 	}
@@ -24,6 +27,11 @@ func getComputeClient(username, password, domain, tenant, tenantID, authURL, reg
 		}
 	} else if err != nil {
 		return nil, fmt.Errorf("couldn't get compute client: %v", err)
+	}
+
+	if computeClient != nil {
+		// overwrite the default host/root CA Bundle with the proper CA Bundle
+		computeClient.HTTPClient.Transport = &http.Transport{TLSClientConfig: &tls.Config{RootCAs: caBundle}}
 	}
 
 	return computeClient, nil

@@ -21,6 +21,8 @@ import (
 	"flag"
 	"fmt"
 
+	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
+
 	"github.com/go-logr/zapr"
 	"go.uber.org/zap"
 
@@ -31,7 +33,6 @@ import (
 	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
 	"k8c.io/kubermatic/v2/pkg/pprof"
 	"k8c.io/kubermatic/v2/pkg/provider"
-	"k8c.io/kubermatic/v2/pkg/signals"
 	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 
 	"k8s.io/klog"
@@ -122,7 +123,6 @@ func main() {
 
 	seedOperatorControllerFactory := func(ctx context.Context, mgr manager.Manager, seedManagerMap map[string]manager.Manager) (string, error) {
 		return seedctrl.ControllerName, seedctrl.Add(
-			ctx,
 			log,
 			opt.namespace,
 			mgr,

@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"crypto/x509"
 	"fmt"
 	"net/http"
 
@@ -16,7 +17,7 @@ import (
 	"k8c.io/kubermatic/v2/pkg/util/errors"
 )
 
-func OpenstackImageNoCredentialsEndpoint(ctx context.Context, projectID, clusterID string, projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, seedsGetter provider.SeedsGetter, userInfoGetter provider.UserInfoGetter) (interface{}, error) {
+func OpenstackImageNoCredentialsEndpoint(ctx context.Context, projectID, clusterID string, projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, seedsGetter provider.SeedsGetter, userInfoGetter provider.UserInfoGetter, caBundle *x509.CertPool) (interface{}, error) {
 	cluster, err := getClusterForOpenstack(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, projectID, clusterID)
 	if err != nil {
 		return nil, err
@@ -45,10 +46,10 @@ func OpenstackImageNoCredentialsEndpoint(ctx context.Context, projectID, cluster
 		return nil, err
 	}
 
-	return openstack.GetImages(creds.Username, creds.Password, creds.Domain, creds.Tenant, creds.TenantID, datacenter.Spec.Openstack.AuthURL, datacenter.Spec.Openstack.Region)
+	return openstack.GetImages(creds.Username, creds.Password, creds.Domain, creds.Tenant, creds.TenantID, datacenter.Spec.Openstack.AuthURL, datacenter.Spec.Openstack.Region, caBundle)
 }
 
-func OpenstackQuotaLimitNoCredentialsEndpoint(ctx context.Context, projectID, clusterID string, projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, seedsGetter provider.SeedsGetter, userInfoGetter provider.UserInfoGetter) (interface{}, error) {
+func OpenstackQuotaLimitNoCredentialsEndpoint(ctx context.Context, projectID, clusterID string, projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, seedsGetter provider.SeedsGetter, userInfoGetter provider.UserInfoGetter, caBundle *x509.CertPool) (interface{}, error) {
 	cluster, err := getClusterForOpenstack(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, projectID, clusterID)
 	if err != nil {
 		return nil, err
@@ -77,21 +78,21 @@ func OpenstackQuotaLimitNoCredentialsEndpoint(ctx context.Context, projectID, cl
 		return nil, err
 	}
 
-	return GetOpenstackQuotaLimits(creds.Username, creds.Password, creds.Domain, creds.Tenant, creds.TenantID, datacenter.Spec.Openstack.AuthURL, datacenter.Spec.Openstack.Region)
+	return GetOpenstackQuotaLimits(creds.Username, creds.Password, creds.Domain, creds.Tenant, creds.TenantID, datacenter.Spec.Openstack.AuthURL, datacenter.Spec.Openstack.Region, caBundle)
 }
 
-func GetOpenstackQuotaLimits(username, password, domain, tenant, tenantID, authURL, region string) (*v1.Quotas, error) {
-	limits, err := openstack.GetQuotaLimits(username, password, domain, tenant, tenantID, authURL, region)
+func GetOpenstackQuotaLimits(username, password, domain, tenant, tenantID, authURL, region string, caBundle *x509.CertPool) (*v1.Quotas, error) {
+	limits, err := openstack.GetQuotaLimits(username, password, domain, tenant, tenantID, authURL, region, caBundle)
 	if err != nil {
 		return nil, err
 	}
 
-	usedFloatingIPCount, err := openstack.GetUsedFloatingIPCount(username, password, domain, tenant, tenantID, authURL, region)
+	usedFloatingIPCount, err := openstack.GetUsedFloatingIPCount(username, password, domain, tenant, tenantID, authURL, region, caBundle)
 	if err != nil {
 		return nil, err
 	}
 
-	floatingIPQuota, err := openstack.GetFloatingIPQuota(username, password, domain, tenant, tenantID, authURL, region)
+	floatingIPQuota, err := openstack.GetFloatingIPQuota(username, password, domain, tenant, tenantID, authURL, region, caBundle)
 	if err != nil {
 		return nil, err
 	}

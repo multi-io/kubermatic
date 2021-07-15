@@ -28,14 +28,17 @@ import (
 )
 
 const (
-	serviceAccountName            = "kubermatic-seed"
-	backupContainersConfigMapName = "backup-containers"
-	storeContainerKey             = "store-container.yaml"
-	cleanupContainerKey           = "cleanup-container.yaml"
-	backupDeleteContainerKey      = "delete-container.yaml"
-
+	serviceAccountName                    = "kubermatic-seed"
+	backupContainersConfigMapName         = "backup-containers"
+	storeContainerKey                     = "store-container.yaml"
+	cleanupContainerKey                   = "cleanup-container.yaml"
 	defaultComponentSettingsConfigMapName = "default-component-settings"
 	defaultComponentSettingsConfigKey     = "config.yaml"
+	restoreS3SettingsConfigMapName        = "s3-settings"
+	deleteContainerKey                    = "delete-container.yaml"
+	s3EndpointKey                         = "ENDPOINT"
+	s3BucketNameKey                       = "BUCKET_NAME"
+	caBundleConfigMapName                 = "ca-bundle"
 )
 
 func ClusterRoleBindingName(cfg *operatorv1alpha1.KubermaticConfiguration) string {
@@ -83,7 +86,9 @@ func BackupContainersConfigMapCreator(cfg *operatorv1alpha1.KubermaticConfigurat
 
 			c.Data[storeContainerKey] = cfg.Spec.SeedController.BackupStoreContainer
 			c.Data[cleanupContainerKey] = cfg.Spec.SeedController.BackupCleanupContainer
-			c.Data[backupDeleteContainerKey] = cfg.Spec.SeedController.BackupDeleteContainer
+			if cfg.Spec.SeedController.BackupRestore.Enabled {
+				c.Data[deleteContainerKey] = cfg.Spec.SeedController.BackupDeleteContainer
+			}
 
 			return c, nil
 		}
@@ -98,6 +103,35 @@ func DefaultClusterComponentSettingsYAML(seed *kubermaticv1.Seed) reconciling.Na
 			}
 
 			c.Data[defaultComponentSettingsConfigKey] = seed.Spec.DefaultClusterComponentSettingsYAML
+
+			return c, nil
+		}
+	}
+}
+
+func RestoreS3SettingsConfigMapCreator(cfg *operatorv1alpha1.KubermaticConfiguration) reconciling.NamedConfigMapCreatorGetter {
+	if !cfg.Spec.SeedController.BackupRestore.Enabled {
+		return nil
+	}
+
+	return func() (string, reconciling.ConfigMapCreator) {
+		return restoreS3SettingsConfigMapName, func(c *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+			if c.Data == nil {
+				c.Data = make(map[string]string)
+			}
+
+			c.Data[s3EndpointKey] = cfg.Spec.SeedController.BackupRestore.S3Endpoint
+			c.Data[s3BucketNameKey] = cfg.Spec.SeedController.BackupRestore.S3BucketName
+
+			return c, nil
+		}
+	}
+}
+
+func CABundleConfigMapCreator(caBundle *corev1.ConfigMap) reconciling.NamedConfigMapCreatorGetter {
+	return func() (string, reconciling.ConfigMapCreator) {
+		return caBundleConfigMapName, func(c *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+			c.Data = caBundle.Data
 
 			return c, nil
 		}

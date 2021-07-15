@@ -66,12 +66,10 @@ func SeedControllerManagerDeploymentCreator(workerName string, versions kubermat
 				"-logtostderr",
 				"-internal-address=0.0.0.0:8085",
 				"-kubernetes-addons-path=/opt/addons/kubernetes",
-				"-openshift-addons-path=/opt/addons/openshift",
 				fmt.Sprintf("-worker-count=%d", workerCount),
 				"-admissionwebhook-cert-dir=/opt/webhook-serving-cert/",
-				fmt.Sprintf("-backup-container=/opt/backup/%s", storeContainerKey),
-				fmt.Sprintf("-cleanup-container=/opt/backup/%s", cleanupContainerKey),
-				fmt.Sprintf("-backup-delete-container=/opt/backup/%s", backupDeleteContainerKey),
+				fmt.Sprintf("-ca-bundle=/opt/ca-bundle/%s", resources.CABundleConfigMapKey),
+				fmt.Sprintf("-ca-bundle=/opt/ca-bundle/%s", resources.CABundleConfigMapKey),
 				fmt.Sprintf("-admissionwebhook-cert-name=%s", resources.ServingCertSecretKey),
 				fmt.Sprintf("-admissionwebhook-key-name=%s", resources.ServingCertKeySecretKey),
 				fmt.Sprintf("-keycloak-cache-expiry=%s", cfg.Spec.SeedController.KeycloakCacheExpiry),
@@ -96,6 +94,16 @@ func SeedControllerManagerDeploymentCreator(workerName string, versions kubermat
 				fmt.Sprintf("-pprof-listen-address=%s", *cfg.Spec.SeedController.PProfEndpoint),
 				fmt.Sprintf("-in-cluster-prometheus-disable-default-rules=%v", cfg.Spec.UserCluster.Monitoring.DisableDefaultRules),
 				fmt.Sprintf("-in-cluster-prometheus-disable-default-scraping-configs=%v", cfg.Spec.UserCluster.Monitoring.DisableDefaultScrapingConfigs),
+				fmt.Sprintf("-backup-container=/opt/backup/%s", storeContainerKey),
+			}
+
+			if !cfg.Spec.SeedController.BackupRestore.Enabled || cfg.Spec.SeedController.BackupCleanupContainer != "" {
+				args = append(args, fmt.Sprintf("-cleanup-container=/opt/backup/%s", cleanupContainerKey))
+			}
+
+			if cfg.Spec.SeedController.BackupRestore.Enabled {
+				args = append(args, "-enable-etcd-backups-restores")
+				args = append(args, fmt.Sprintf("-backup-delete-container=/opt/backup/%s", deleteContainerKey))
 			}
 
 			// Only EE does support dynamic-datacenters
@@ -123,6 +131,16 @@ func SeedControllerManagerDeploymentCreator(workerName string, versions kubermat
 					Name: sharedAddonVolume,
 					VolumeSource: corev1.VolumeSource{
 						EmptyDir: &corev1.EmptyDirVolumeSource{},
+					},
+				},
+				{
+					Name: "ca-bundle",
+					VolumeSource: corev1.VolumeSource{
+						ConfigMap: &corev1.ConfigMapVolumeSource{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: cfg.Spec.CABundle.Name,
+							},
+						},
 					},
 				},
 				{
@@ -159,6 +177,11 @@ func SeedControllerManagerDeploymentCreator(workerName string, versions kubermat
 				{
 					Name:      sharedAddonVolume,
 					MountPath: "/opt/addons/",
+					ReadOnly:  true,
+				},
+				{
+					Name:      "ca-bundle",
+					MountPath: "/opt/ca-bundle/",
 					ReadOnly:  true,
 				},
 				{
@@ -200,12 +223,6 @@ func SeedControllerManagerDeploymentCreator(workerName string, versions kubermat
 				"-updates=/opt/extra-files/updates.yaml",
 			)
 
-			if cfg.Spec.UserCluster.Addons.Openshift.DefaultManifests != "" {
-				args = append(args, "-openshift-addons-file=/opt/extra-files/"+common.OpenshiftAddonsFileName)
-			} else {
-				args = append(args, fmt.Sprintf("-openshift-addons-list=%s", strings.Join(cfg.Spec.UserCluster.Addons.Openshift.Default, ",")))
-			}
-
 			if cfg.Spec.UserCluster.Addons.Kubernetes.DefaultManifests != "" {
 				args = append(args, "-kubernetes-addons-file=/opt/extra-files/"+common.KubernetesAddonsFileName)
 			} else {
@@ -233,25 +250,6 @@ func SeedControllerManagerDeploymentCreator(workerName string, versions kubermat
 					fmt.Sprintf("-oidc-issuer-client-id=%s", cfg.Spec.Auth.IssuerClientID),
 					fmt.Sprintf("-oidc-issuer-client-secret=%s", cfg.Spec.Auth.IssuerClientSecret),
 				)
-
-				if cfg.Spec.Auth.CABundle != "" {
-					args = append(args, "-oidc-ca-file=/opt/dex-ca/caBundle.pem")
-
-					volumes = append(volumes, corev1.Volume{
-						Name: "dex-ca",
-						VolumeSource: corev1.VolumeSource{
-							Secret: &corev1.SecretVolumeSource{
-								SecretName: common.DexCASecretName,
-							},
-						},
-					})
-
-					volumeMounts = append(volumeMounts, corev1.VolumeMount{
-						Name:      "dex-ca",
-						MountPath: "/opt/dex-ca",
-						ReadOnly:  true,
-					})
-				}
 			}
 
 			if len(cfg.Spec.UserCluster.Monitoring.CustomScrapingConfigs) > 0 {
@@ -323,7 +321,6 @@ func SeedControllerManagerDeploymentCreator(workerName string, versions kubermat
 			d.Spec.Template.Spec.Volumes = volumes
 			d.Spec.Template.Spec.InitContainers = []corev1.Container{
 				createKubernetesAddonsInitContainer(cfg.Spec.UserCluster.Addons.Kubernetes, sharedAddonVolume, versions.Kubermatic),
-				//Sys11 disable openshift: createOpenshiftAddonsInitContainer(cfg.Spec.UserCluster.Addons.Openshift, sharedAddonVolume, versions.Kubermatic),
 			}
 			d.Spec.Template.Spec.Containers = []corev1.Container{
 				{
@@ -367,25 +364,6 @@ func createKubernetesAddonsInitContainer(cfg operatorv1alpha1.KubermaticAddonCon
 		},
 	}
 }
-
-// Sys11: we don't use openshift so we comment this function to avoid dead code lint errors
-//func createOpenshiftAddonsInitContainer(cfg operatorv1alpha1.KubermaticAddonConfiguration, addonVolume string, version string) corev1.Container {
-//	return corev1.Container{
-//		Name:    "copy-addons-openshift",
-//		Image:   cfg.DockerRepository + ":" + getAddonDockerTag(cfg, version),
-//		Command: []string{"/bin/sh"},
-//		Args: []string{
-//			"-c",
-//			"mkdir -p /opt/addons/openshift && cp -r /addons/* /opt/addons/openshift",
-//		},
-//		VolumeMounts: []corev1.VolumeMount{
-//			{
-//				Name:      addonVolume,
-//				MountPath: "/opt/addons/",
-//			},
-//		},
-//	}
-//}
 
 func getAddonDockerTag(cfg operatorv1alpha1.KubermaticAddonConfiguration, version string) string {
 	if cfg.DockerTagSuffix != "" {

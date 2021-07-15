@@ -24,28 +24,25 @@ spec:
     plural: etcdbackupconfigs
     singular: etcdbackupconfig
   scope: Namespaced
+  version: v1
   additionalPrinterColumns:
-    - JSONPath: .status.lastBackups[-1].backupPhase
-      name: lastPhase
-      type: string
-    - JSONPath: .status.lastBackups[-1].backupName
-      name: lastBackupName
-      type: string
-      priority: 1
-    - JSONPath: .status.lastBackups[-1].scheduledTime
-      name: lastScheduled
-      type: string
-      format: date-time
-      priority: 1
-    - JSONPath: .status.lastBackups[-1].jobName
-      name: job
-      type: string
-      priority: 1
-    - JSONPath: .status.lastBackups[-1].deleteJobName
-      name: deleteJob
-      type: string
-      priority: 1
-  versions:
-  - name: v1
-    served: true
-    storage: true
+  - JSONPath: .status.lastBackups[-1].backupPhase
+    name: lastPhase
+    type: string
+  - JSONPath: .status.lastBackups[-1].backupName
+    name: lastBackupName
+    type: string
+    priority: 1
+  - JSONPath: .status.lastBackups[-1].scheduledTime
+    name: lastScheduled
+    type: string
+    format: date-time
+    priority: 1
+  - JSONPath: .status.lastBackups[-1].jobName
+    name: job
+    type: string
+    priority: 1
+  - JSONPath: .status.lastBackups[-1].deleteJobName
+    name: deleteJob
+    type: string
+    priority: 1

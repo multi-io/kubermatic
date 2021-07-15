@@ -39,18 +39,18 @@ import (
 	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
 	"k8c.io/kubermatic/v2/pkg/metrics"
 	metricserver "k8c.io/kubermatic/v2/pkg/metrics/server"
-	clustermutation "k8c.io/kubermatic/v2/pkg/mutation/cluster"
 	"k8c.io/kubermatic/v2/pkg/pprof"
 	"k8c.io/kubermatic/v2/pkg/util/cli"
-	clustervalidation "k8c.io/kubermatic/v2/pkg/validation/cluster"
 	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
-	ctrl "sigs.k8s.io/controller-runtime"
+	clustermutation "k8c.io/kubermatic/v2/pkg/webhook/cluster/mutation"
+	clustervalidation "k8c.io/kubermatic/v2/pkg/webhook/cluster/validation"
 	"sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	autoscalingv1beta2 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1beta2"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog"
+	ctrlruntime "sigs.k8s.io/controller-runtime"
 	ctrlruntimelog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
@@ -96,7 +96,11 @@ func main() {
 		electionName += "-" + options.workerName
 	}
 
-	cfg := ctrl.GetConfigOrDie()
+	cfg, err := ctrlruntime.GetConfig()
+	if err != nil {
+		log.Fatalw("Failed to get kubeconfig", zap.Error(err))
+	}
+
 	// Create a manager, disable metrics as we have our own handler that exposes
 	// the metrics of both the ctrltuntime registry and the default registry
 	mgr, err := manager.New(cfg, manager.Options{
@@ -164,9 +168,14 @@ Please install the VerticalPodAutoscaler according to the documentation: https:/
 		log.Fatalw("Failed to get clientProvider", zap.Error(err))
 	}
 
-	if options.validationWebhook.Configured() {
-		if err := options.validationWebhook.Configure(mgr.GetWebhookServer()); err != nil {
+	if options.admissionWebhook.Configured() {
+		if err := options.admissionWebhook.Configure(mgr.GetWebhookServer()); err != nil {
 			log.Fatalw("Failed to configure admission webhook server", zap.Error(err))
+		}
+		// Register Seed validation admission webhook
+		h, err := seedValidationHandler(rootCtx, mgr.GetClient(), options)
+		if err != nil {
+			log.Fatalw("Failed to build Seed validation handler", zap.Error(err))
 		}
 
 		componentsSettings, err := defaultComponentSettings(
@@ -178,19 +187,13 @@ Please install the VerticalPodAutoscaler according to the documentation: https:/
 		if err != nil {
 			log.Panicw("construct default components overrides", zap.Error(err))
 		}
-		// Setup mutation webhook for defaulting componentsOverride of new clusters.
-		clustermutation.NewAdmissionHandler(mgr.GetClient(), componentsSettings).SetupWebhookWithManager(mgr)
-
-		// Register Seed validation admission webhook
-		h, err := seedValidationHandler(rootCtx, mgr.GetClient(), options)
-		if err != nil {
-			log.Fatalw("Failed to build Seed validation handler", zap.Error(err))
-		}
 
 		// Setup the admission handler for kubermatic Seed CRDs
 		h.SetupWebhookWithManager(mgr)
-		// Setup the admission handler for kubermatic Cluster CRDs
+		// Setup the validation admission handler for kubermatic Cluster CRDs
 		clustervalidation.NewAdmissionHandler(mgr.GetClient(), options.featureGates).SetupWebhookWithManager(mgr)
+		// Setup the mutation admission handler for kubermatic Cluster CRDs
+		clustermutation.NewAdmissionHandler(componentsSettings).SetupWebhookWithManager(mgr)
 	}
 
 	kcInternal := keycloak.NewClient(requireEnv("KEYCLOAK_INTERNAL_URL"), requireEnv("KEYCLOAK_INTERNAL_ADMIN_USER"), requireEnv("KEYCLOAK_INTERNAL_ADMIN_PASSWORD"))
@@ -229,7 +232,7 @@ Please install the VerticalPodAutoscaler according to the documentation: https:/
 	}
 
 	log.Info("starting the seed-controller-manager...")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err := mgr.Start(ctrlruntime.SetupSignalHandler()); err != nil {
 		log.Fatalw("problem running manager", zap.Error(err))
 	}
 }

@@ -49,14 +49,14 @@ func CreateEndpoint(projectProvider provider.ProjectProvider, privilegedProjectP
 			return nil, errors.NewBadRequest("the name of the project cannot be empty")
 		}
 
-		user := ctx.Value(middleware.UserCRContextKey).(*kubermaticapiv1.User)
-		if kubernetes.IsServiceAccount(user.Spec.Email) {
-			return nil, errors.New(http.StatusForbidden, "the Service Account is not allowed to create a project")
-		}
-
 		settings, err := settingsProvider.GetGlobalSettings()
 		if err != nil {
 			return nil, common.KubernetesErrorToHTTPError(err)
+		}
+
+		user := ctx.Value(middleware.UserCRContextKey).(*kubermaticapiv1.User)
+		if kubernetes.IsProjectServiceAccount(user.Spec.Email) {
+			return nil, errors.New(http.StatusForbidden, "the Service Account is not allowed to create a project")
 		}
 
 		if err := checkProjectRestriction(user, settings); err != nil {

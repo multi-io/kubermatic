@@ -41,33 +41,28 @@ fi
 # the one creating it in case of openshift. So we just use the internal kubeconfig and replace
 # the apiserver url
 KUBECONFIG_USERCLUSTER_CONTROLLER_FILE=$(mktemp)
-kubectl --namespace "$NAMESPACE" get secret internal-admin-kubeconfig -o json | \
-  jq '.data.kubeconfig' -r | \
-  base64 -d | \
-  yq r --tojson - | \
+kubectl --namespace "$NAMESPACE" get secret internal-admin-kubeconfig -o json |
+  jq '.data.kubeconfig' -r |
+  base64 -d |
+  yq r --tojson - |
   jq --arg url "$CLUSTER_URL" '.clusters[0].cluster.server = $url' \
-  > $KUBECONFIG_USERCLUSTER_CONTROLLER_FILE
+    > $KUBECONFIG_USERCLUSTER_CONTROLLER_FILE
 echo "Using kubeconfig $KUBECONFIG_USERCLUSTER_CONTROLLER_FILE"
 
 OPENVPN_SERVER_SERVICE_RAW="$(kubectl --namespace "$NAMESPACE" get service openvpn-server -o json)"
 
-SEED_SERVICEACCOUNT_TOKEN="$(kubectl --namespace "$NAMESPACE" get secret -o json \
-  | jq -r '.items[]|select(.metadata.annotations["kubernetes.io/service-account.name"] == "kubermatic-usercluster-controller-manager")|.data.token' \
-  | base64 -d)"
+SEED_SERVICEACCOUNT_TOKEN="$(kubectl --namespace "$NAMESPACE" get secret -o json |
+  jq -r '.items[]|select(.metadata.annotations["kubernetes.io/service-account.name"] == "kubermatic-usercluster-controller-manager")|.data.token' |
+  base64 -d)"
 SEED_KUBECONFIG=$(mktemp)
-kubectl config view  --flatten --minify -ojson \
-  | jq --arg token "$SEED_SERVICEACCOUNT_TOKEN" 'del(.users[0].user)|.users[0].user.token = $token' > $SEED_KUBECONFIG
+kubectl config view --flatten --minify -ojson |
+  jq --arg token "$SEED_SERVICEACCOUNT_TOKEN" 'del(.users[0].user)|.users[0].user.token = $token' > $SEED_KUBECONFIG
 
-CLUSTER_VERSION="$(echo $CLUSTER_RAW|jq -r '.spec.version')"
+CLUSTER_VERSION="$(echo $CLUSTER_RAW | jq -r '.spec.version')"
 CLUSTER_URL="$(echo $CLUSTER_RAW | jq -r .address.url)"
 OPENVPN_SERVER_NODEPORT="$(echo ${OPENVPN_SERVER_SERVICE_RAW} | jq -r .spec.ports[0].nodePort)"
-CONSOLE_CALLBACK_URI="$(echo $CLUSTER_RAW | jq -r '.address.openshiftConsoleCallback')"
 
 ARGS=""
-if echo $CLUSTER_RAW | grep openshift -q; then
-  ARGS="-openshift=true"
-fi
-
 if echo $CLUSTER_RAW | grep -i aws -q; then
   ARGS="$ARGS -cloud-provider-name=aws"
 fi
@@ -76,6 +71,7 @@ echodate "Starting user-cluster-controller-manager..."
 set -x
 ./_build/user-cluster-controller-manager \
   -kubeconfig=${KUBECONFIG_USERCLUSTER_CONTROLLER_FILE} \
+  -ca-bundle=charts/kubermatic-operator/static/ca-bundle.pem \
   -metrics-listen-address=127.0.0.1:8087 \
   -health-listen-address=127.0.0.1:8088 \
   -pprof-listen-address=":${PPROF_PORT}" \
@@ -83,7 +79,6 @@ set -x
   -openvpn-server-port=${OPENVPN_SERVER_NODEPORT} \
   -cluster-url=${CLUSTER_URL} \
   -version=${CLUSTER_VERSION} \
-  -openshift-console-callback-uri="${CONSOLE_CALLBACK_URI}" \
   -log-debug=$KUBERMATIC_DEBUG \
   -log-format=Console \
   -logtostderr \

@@ -19,12 +19,12 @@ set -e
 cd $(dirname $0)/..
 . hack/lib.sh
 
-CONTAINERIZE_IMAGE=quay.io/kubermatic/codespell:1.17.1 containerize ./hack/verify-spelling.sh
+CONTAINERIZE_IMAGE=quay.io/kubermatic/build:go-1.16-node-14-0 containerize ./hack/verify-spelling.sh
 
 echodate "Running codespell..."
 
 codespell \
-  --skip .git,_build,_dist,vendor,go.mod,go.sum,swagger.json,*.png,*.woff,*.woff2 \
+  --skip .git,_build,_dist,vendor,go.mod,go.sum,swagger.json,*.jpg,*.jpeg,*.png,*.woff,*.woff2,*.pem,./charts/cert-manager/crd,./charts/backup/velero/crd \
   --ignore-words .codespell.exclude \
   --check-filenames \
   --check-hidden

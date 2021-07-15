@@ -22,28 +22,26 @@ import (
 
 	predicateutil "k8c.io/kubermatic/v2/pkg/controller/util/predicate"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog"
+	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-
-	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog"
 )
 
 type resourcesController struct {
 	projectResourcesQueue workqueue.RateLimitingInterface
-	ctx                   context.Context
 	metrics               *Metrics
 	projectResources      []projectResource
-	client                client.Client
+	client                ctrlruntimeclient.Client
 	restMapper            meta.RESTMapper
 	providerName          string
-	objectType            runtime.Object
+	objectType            ctrlruntimeclient.Object
 }
 
 // newResourcesController creates a new controller for managing RBAC for named resources that belong to project
@@ -52,11 +50,10 @@ func newResourcesControllers(ctx context.Context, metrics *Metrics, mgr manager.
 
 	klog.V(4).Infof("considering master cluster provider for resources")
 	for _, resource := range resources {
-		clonedObject := resource.object.DeepCopyObject()
+		clonedObject := resource.object
 
 		mc := &resourcesController{
 			projectResourcesQueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "rbac_generator_resources"),
-			ctx:                   ctx,
 			metrics:               metrics,
 			projectResources:      resources,
 			client:                mgr.GetClient(),
@@ -82,14 +79,12 @@ func newResourcesControllers(ctx context.Context, metrics *Metrics, mgr manager.
 	}
 
 	for seedName, seedManager := range seedManagerMap {
-
 		klog.V(4).Infof("considering %s provider for resources", seedName)
 		for _, resource := range resources {
-			clonedObject := resource.object.DeepCopyObject()
+			clonedObject := resource.object.DeepCopyObject().(ctrlruntimeclient.Object)
 
 			c := &resourcesController{
 				projectResourcesQueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), fmt.Sprintf("rbac_generator_resources_%s", seedName)),
-				ctx:                   ctx,
 				metrics:               metrics,
 				projectResources:      resources,
 				client:                seedManager.GetClient(),
@@ -120,6 +115,30 @@ func newResourcesControllers(ctx context.Context, metrics *Metrics, mgr manager.
 	return []*resourcesController{}, nil
 }
 
-func (c *resourcesController) Reconcile(req reconcile.Request) (reconcile.Result, error) {
-	return reconcile.Result{}, c.syncProjectResource(req.NamespacedName)
+func (c *resourcesController) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
+	obj := c.objectType.DeepCopyObject().(ctrlruntimeclient.Object)
+	if err := c.client.Get(ctx, req.NamespacedName, obj); err != nil {
+		if kerrors.IsNotFound(err) {
+			return reconcile.Result{}, nil
+		}
+
+		return reconcile.Result{}, err
+	}
+
+	err := c.syncClusterScopedProjectResource(ctx, obj)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	err = c.syncNamespaceScopedProjectResource(ctx, obj)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	err = c.syncClusterResource(ctx, obj)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	return reconcile.Result{}, nil
 }

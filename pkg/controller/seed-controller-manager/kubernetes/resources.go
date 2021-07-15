@@ -91,8 +91,20 @@ func (r *Reconciler) ensureResourcesAreDeployed(ctx context.Context, cluster *ku
 		return err
 	}
 
+	if err := r.ensureClusterRoles(ctx); err != nil {
+		return err
+	}
+
+	if err := r.ensureClusterRoleBindings(ctx, cluster); err != nil {
+		return err
+	}
+
 	// check that all StatefulSets are created
 	if err := r.ensureStatefulSets(ctx, cluster, data); err != nil {
+		return err
+	}
+
+	if err := r.ensureEtcdBackupConfigs(ctx, cluster, data); err != nil {
 		return err
 	}
 
@@ -141,11 +153,9 @@ func (r *Reconciler) ensureResourcesAreDeployed(ctx context.Context, cluster *ku
 		}
 	}
 
-	// Try to remove OPA integration if its disabled
-	if data.Cluster().Spec.OPAIntegration == nil || !data.Cluster().Spec.OPAIntegration.Enabled {
-		if err := r.ensureOPAIntegrationIsRemoved(ctx, data); err != nil {
-			return err
-		}
+	// Remove possible leftovers of older version of Gatekeeper, remove this in 1.19
+	if err := r.ensureOldOPAIntegrationIsRemoved(ctx, data); err != nil {
+		return err
 	}
 
 	return nil
@@ -180,13 +190,14 @@ func (r *Reconciler) getClusterTemplateData(ctx context.Context, cluster *kuberm
 		WithInClusterPrometheusRemoteWriteConfigsFile(r.inClusterPrometheusRemoteWriteConfigsFile).
 		WithExternalURL(r.externalURL).
 		WithKeycloakFacade(r.keycloakFacade).
-		WithOIDCCAFile(r.oidcCAFile).
+		WithCABundle(r.caBundle).
 		WithOIDCIssuerURL(r.oidcIssuerURL).
 		WithOIDCIssuerClientID(r.oidcIssuerClientID).
 		WithNodeLocalDNSCacheEnabled(r.nodeLocalDNSCacheEnabled).
 		WithKubermaticImage(r.kubermaticImage).
 		WithEtcdLauncherImage(r.etcdLauncherImage).
 		WithDnatControllerImage(r.dnatControllerImage).
+		WithBackupPeriod(r.backupSchedule).
 		WithFailureDomainZoneAntiaffinity(supportsFailureDomainZoneAntiAffinity).
 		WithVersions(r.versions).
 		Build(), nil
@@ -239,9 +250,6 @@ func GetServiceCreators(data *resources.TemplateData) []reconciling.NamedService
 	if flag := data.Cluster().Spec.Features[kubermaticv1.ClusterFeatureRancherIntegration]; flag {
 		creators = append(creators, rancherserver.ServiceCreator(data.Cluster().Spec.ExposeStrategy))
 	}
-	if data.Cluster().Spec.OPAIntegration != nil && data.Cluster().Spec.OPAIntegration.Enabled {
-		creators = append(creators, gatekeeper.ServiceCreator())
-	}
 
 	return creators
 }
@@ -262,7 +270,7 @@ func GetDeploymentCreators(data *resources.TemplateData, enableAPIserverOIDCAuth
 		machinecontroller.DeploymentCreator(data),
 		machinecontroller.WebhookDeploymentCreator(data),
 		metricsserver.DeploymentCreator(data),
-		usercluster.DeploymentCreator(data, false),
+		usercluster.DeploymentCreator(data),
 		clusterproxy.DeploymentCreator(data),
 		// kubernetesdashboard.DeploymentCreator(data),
 	}
@@ -276,10 +284,6 @@ func GetDeploymentCreators(data *resources.TemplateData, enableAPIserverOIDCAuth
 		(!metav1.HasAnnotation(data.Cluster().ObjectMeta, kubermaticv1.CCMMigrationNeededAnnotation) ||
 			data.KCMCloudControllersDeactivated()) {
 		deployments = append(deployments, cloudcontroller.DeploymentCreator(data))
-	}
-	if data.Cluster().Spec.OPAIntegration != nil && data.Cluster().Spec.OPAIntegration.Enabled {
-		deployments = append(deployments, gatekeeper.ControllerDeploymentCreator(data))
-		deployments = append(deployments, gatekeeper.AuditDeploymentCreator(data))
 	}
 
 	return deployments
@@ -328,10 +332,6 @@ func (r *Reconciler) GetSecretCreators(data *resources.TemplateData) [][]reconci
 		},
 	}
 
-	if len(data.OIDCCAFile()) > 0 {
-		creators[0] = append(creators[0], apiserver.DexCACertificateCreator(data.GetDexCA))
-	}
-
 	if flag := data.Cluster().Spec.Features[kubermaticv1.ClusterFeatureExternalCloudProvider]; flag {
 		creators[1] = append(creators[1], resources.GetInternalKubeconfigCreator(
 			resources.CloudControllerManagerKubeconfigSecretName, resources.CloudControllerManagerCertUsername, nil, data,
@@ -340,10 +340,6 @@ func (r *Reconciler) GetSecretCreators(data *resources.TemplateData) [][]reconci
 
 	if data.Cluster().Spec.Cloud.GCP != nil {
 		creators[1] = append(creators[1], resources.ServiceAccountSecretCreator(data))
-	}
-
-	if data.Cluster().Spec.OPAIntegration != nil && data.Cluster().Spec.OPAIntegration.Enabled {
-		creators[1] = append(creators[1], gatekeeper.TLSServingCertSecretCreator(data))
 	}
 
 	return creators
@@ -364,9 +360,6 @@ func (r *Reconciler) ensureServiceAccounts(ctx context.Context, c *kubermaticv1.
 		etcd.ServiceAccountCreator,
 		usercluster.ServiceAccountCreator,
 	}
-	if c.Spec.OPAIntegration != nil && c.Spec.OPAIntegration.Enabled {
-		namedServiceAccountCreatorGetters = append(namedServiceAccountCreatorGetters, gatekeeper.ServiceAccountCreator)
-	}
 	if err := reconciling.ReconcileServiceAccounts(ctx, namedServiceAccountCreatorGetters, c.Status.NamespaceName, r.Client); err != nil {
 		return fmt.Errorf("failed to ensure ServiceAccounts: %v", err)
 	}
@@ -377,9 +370,6 @@ func (r *Reconciler) ensureServiceAccounts(ctx context.Context, c *kubermaticv1.
 func (r *Reconciler) ensureRoles(ctx context.Context, c *kubermaticv1.Cluster) error {
 	namedRoleCreatorGetters := []reconciling.NamedRoleCreatorGetter{
 		usercluster.RoleCreator,
-	}
-	if c.Spec.OPAIntegration != nil && c.Spec.OPAIntegration.Enabled {
-		namedRoleCreatorGetters = append(namedRoleCreatorGetters, gatekeeper.RoleCreator)
 	}
 	if err := reconciling.ReconcileRoles(ctx, namedRoleCreatorGetters, c.Status.NamespaceName, r.Client); err != nil {
 		return fmt.Errorf("failed to ensure Roles: %v", err)
@@ -392,12 +382,31 @@ func (r *Reconciler) ensureRoleBindings(ctx context.Context, c *kubermaticv1.Clu
 	namedRoleBindingCreatorGetters := []reconciling.NamedRoleBindingCreatorGetter{
 		usercluster.RoleBindingCreator,
 	}
-	if c.Spec.OPAIntegration != nil && c.Spec.OPAIntegration.Enabled {
-		namedRoleBindingCreatorGetters = append(namedRoleBindingCreatorGetters, gatekeeper.RoleBindingCreator)
-	}
 	if err := reconciling.ReconcileRoleBindings(ctx, namedRoleBindingCreatorGetters, c.Status.NamespaceName, r.Client); err != nil {
 		return fmt.Errorf("failed to ensure RoleBindings: %v", err)
 	}
+	return nil
+}
+
+func (r *Reconciler) ensureClusterRoles(ctx context.Context) error {
+	namedClusterRoleCreatorGetters := []reconciling.NamedClusterRoleCreatorGetter{
+		usercluster.ClusterRoleCreator,
+	}
+	if err := reconciling.ReconcileClusterRoles(ctx, namedClusterRoleCreatorGetters, "", r.Client); err != nil {
+		return fmt.Errorf("failed to ensure Cluster Roles: %v", err)
+	}
+
+	return nil
+}
+
+func (r *Reconciler) ensureClusterRoleBindings(ctx context.Context, c *kubermaticv1.Cluster) error {
+	namedClusterRoleBindingsCreatorGetters := []reconciling.NamedClusterRoleBindingCreatorGetter{
+		usercluster.ClusterRoleBinding(c.Status.NamespaceName),
+	}
+	if err := reconciling.ReconcileClusterRoleBindings(ctx, namedClusterRoleBindingsCreatorGetters, "", r.Client); err != nil {
+		return fmt.Errorf("failed to ensure Cluster Role Bindings: %v", err)
+	}
+
 	return nil
 }
 
@@ -411,6 +420,7 @@ func GetConfigMapCreators(data *resources.TemplateData) []reconciling.NamedConfi
 		scheduler.ConfigMapCreator(data),
 		apiserver.AuditConfigMapCreator(),
 		apiserver.AdmissionControlCreator(data),
+		apiserver.CABundleCreator(data),
 	}
 }
 
@@ -512,10 +522,10 @@ func (r *Reconciler) ensureEtcdBackupConfigs(ctx context.Context, c *kubermaticv
 	return reconciling.ReconcileEtcdBackupConfigs(ctx, creators, c.Status.NamespaceName, r.Client, reconciling.OwnerRefWrapper(resources.GetClusterRef(c)))
 }
 
-func (r *Reconciler) ensureOPAIntegrationIsRemoved(ctx context.Context, data *resources.TemplateData) error {
+func (r *Reconciler) ensureOldOPAIntegrationIsRemoved(ctx context.Context, data *resources.TemplateData) error {
 	for _, resource := range gatekeeper.GetResourcesToRemoveOnDelete(data.Cluster().Status.NamespaceName) {
 		if err := r.Client.Delete(ctx, resource); err != nil && !errors.IsNotFound(err) {
-			return fmt.Errorf("failed to ensure OPA integration is removed/not present: %v", err)
+			return fmt.Errorf("failed to ensure old OPA integration version resources are removed/not present: %v", err)
 		}
 	}
 

@@ -171,6 +171,11 @@ func main() {
 				ImportAlias:      "kubermaticv1",
 				APIVersionPrefix: "KubermaticV1",
 			},
+			{
+				ResourceName:     "UserProjectBinding",
+				ImportAlias:      "kubermaticv1",
+				APIVersionPrefix: "KubermaticV1",
+			},
 		},
 	}
 
@@ -203,7 +208,6 @@ package reconciling
 import (
 	"context"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 {{ range .Resources }}
@@ -280,7 +284,7 @@ type Named{{ .APIVersionPrefix }}{{ .ResourceName }}CreatorGetter = func() (name
 // {{ .APIVersionPrefix }}{{ .ResourceName }}ObjectWrapper adds a wrapper so the {{ .APIVersionPrefix }}{{ .ResourceName }}Creator matches ObjectCreator.
 // This is needed as Go does not support function interface matching.
 func {{ .APIVersionPrefix }}{{ .ResourceName }}ObjectWrapper(create {{ .APIVersionPrefix }}{{ .ResourceName }}Creator) ObjectCreator {
-	return func(existing runtime.Object) (runtime.Object, error) {
+	return func(existing ctrlruntimeclient.Object) (ctrlruntimeclient.Object, error) {
 		if existing != nil {
 			return create(existing.(*{{ .ImportAlias }}.{{ .ResourceName }}))
 		}

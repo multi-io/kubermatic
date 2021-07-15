@@ -1,8 +1,6 @@
 /*
 Copyright 2020 The Kubermatic Kubernetes Platform contributors.
 
-Copyright 2017 the Velero contributors. (func parseCronSchedule)
-
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
@@ -26,11 +24,13 @@ import (
 
 	"github.com/minio/minio-go"
 	"go.uber.org/zap"
+
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	kubermaticv1helper "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1/helper"
 	kuberneteshelper "k8c.io/kubermatic/v2/pkg/kubernetes"
 	"k8c.io/kubermatic/v2/pkg/resources"
 	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
+
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -76,7 +76,7 @@ func Add(
 	log *zap.SugaredLogger,
 	numWorkers int,
 	workerName string,
-	v kubermatic.Versions,
+	versions kubermatic.Versions,
 ) error {
 	log = log.Named(ControllerName)
 	client := mgr.GetClient()
@@ -86,7 +86,7 @@ func Add(
 		Client:     client,
 		workerName: workerName,
 		recorder:   mgr.GetEventRecorderFor(ControllerName),
-		versions:   v,
+		versions:   versions,
 	}
 
 	ctrlOptions := controller.Options{
@@ -112,9 +112,7 @@ func Add(
 	return c.Watch(&source.Kind{Type: &kubermaticv1.EtcdRestore{}}, &handler.EnqueueRequestForObject{}, incompleteRestorePredicates)
 }
 
-func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log := r.log.With("request", request)
 	log.Debug("Processing")
 
@@ -128,9 +126,6 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 
 	cluster := &kubermaticv1.Cluster{}
 	if err := r.Get(ctx, types.NamespacedName{Name: restore.Spec.Cluster.Name}, cluster); err != nil {
-		if kerrors.IsNotFound(err) {
-			return reconcile.Result{}, nil
-		}
 		return reconcile.Result{}, err
 	}
 
@@ -215,7 +210,7 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, rest
 	if err := r.updateRestore(ctx, restore, func(restore *kubermaticv1.EtcdRestore) {
 		restore.Status.Phase = kubermaticv1.EtcdRestorePhaseStarted
 	}); err != nil {
-		return nil, fmt.Errorf("failed to add finalizer: %v", err)
+		return nil, fmt.Errorf("failed to set EtcdRestore started phase: %v", err)
 	}
 
 	// delete etcd sts

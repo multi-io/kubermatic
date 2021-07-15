@@ -18,6 +18,7 @@ package provider
 
 import (
 	"context"
+	"crypto/x509"
 	"fmt"
 	"net/http"
 
@@ -33,7 +34,9 @@ import (
 	"k8c.io/kubermatic/v2/pkg/util/errors"
 )
 
-func OpenstackSizeWithClusterCredentialsEndpoint(ctx context.Context, userInfoGetter provider.UserInfoGetter, projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, seedsGetter provider.SeedsGetter, projectID, clusterID string) (interface{}, error) {
+func OpenstackSizeWithClusterCredentialsEndpoint(ctx context.Context, userInfoGetter provider.UserInfoGetter,
+	projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider,
+	seedsGetter provider.SeedsGetter, settingsProvider provider.SettingsProvider, projectID, clusterID string, caBundle *x509.CertPool) (interface{}, error) {
 	cluster, err := getClusterForOpenstack(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, projectID, clusterID)
 	if err != nil {
 		return nil, err
@@ -56,10 +59,18 @@ func OpenstackSizeWithClusterCredentialsEndpoint(ctx context.Context, userInfoGe
 		return nil, err
 	}
 
-	return GetOpenstackSizes(creds.Username, creds.Password, creds.Tenant, creds.TenantID, creds.Domain, datacenterName, datacenter)
+	settings, err := settingsProvider.GetGlobalSettings()
+	if err != nil {
+		return nil, common.KubernetesErrorToHTTPError(err)
+	}
+
+	return GetOpenstackSizes(creds.Username, creds.Password, creds.Tenant, creds.TenantID, creds.Domain, datacenterName,
+		datacenter, settings.Spec.MachineDeploymentVMResourceQuota, caBundle)
 }
 
-func OpenstackTenantWithClusterCredentialsEndpoint(ctx context.Context, userInfoGetter provider.UserInfoGetter, projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, seedsGetter provider.SeedsGetter, projectID, clusterID string) (interface{}, error) {
+func OpenstackTenantWithClusterCredentialsEndpoint(ctx context.Context, userInfoGetter provider.UserInfoGetter,
+	projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider,
+	seedsGetter provider.SeedsGetter, projectID, clusterID string, caBundle *x509.CertPool) (interface{}, error) {
 	cluster, err := getClusterForOpenstack(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, projectID, clusterID)
 	if err != nil {
 		return nil, err
@@ -76,10 +87,13 @@ func OpenstackTenantWithClusterCredentialsEndpoint(ctx context.Context, userInfo
 	if err != nil {
 		return nil, err
 	}
-	return GetOpenstackTenants(userInfo, seedsGetter, creds.Username, creds.Password, creds.Domain, creds.Tenant, creds.TenantID, datacenterName)
+	return GetOpenstackTenants(userInfo, seedsGetter, creds.Username, creds.Password, creds.Domain, creds.Tenant,
+		creds.TenantID, datacenterName, caBundle)
 }
 
-func OpenstackNetworkWithClusterCredentialsEndpoint(ctx context.Context, userInfoGetter provider.UserInfoGetter, projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, seedsGetter provider.SeedsGetter, projectID, clusterID string) (interface{}, error) {
+func OpenstackNetworkWithClusterCredentialsEndpoint(ctx context.Context, userInfoGetter provider.UserInfoGetter,
+	projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider,
+	seedsGetter provider.SeedsGetter, projectID, clusterID string, caBundle *x509.CertPool) (interface{}, error) {
 	cluster, err := getClusterForOpenstack(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, projectID, clusterID)
 	if err != nil {
 		return nil, err
@@ -96,10 +110,13 @@ func OpenstackNetworkWithClusterCredentialsEndpoint(ctx context.Context, userInf
 	if err != nil {
 		return nil, err
 	}
-	return GetOpenstackNetworks(userInfo, seedsGetter, creds.Username, creds.Password, creds.Tenant, creds.TenantID, creds.Domain, datacenterName)
+	return GetOpenstackNetworks(userInfo, seedsGetter, creds.Username, creds.Password, creds.Tenant, creds.TenantID,
+		creds.Domain, datacenterName, caBundle)
 }
 
-func OpenstackSecurityGroupWithClusterCredentialsEndpoint(ctx context.Context, userInfoGetter provider.UserInfoGetter, projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, seedsGetter provider.SeedsGetter, projectID, clusterID string) (interface{}, error) {
+func OpenstackSecurityGroupWithClusterCredentialsEndpoint(ctx context.Context, userInfoGetter provider.UserInfoGetter,
+	projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider,
+	seedsGetter provider.SeedsGetter, projectID, clusterID string, caBundle *x509.CertPool) (interface{}, error) {
 	cluster, err := getClusterForOpenstack(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, projectID, clusterID)
 	if err != nil {
 		return nil, err
@@ -117,10 +134,13 @@ func OpenstackSecurityGroupWithClusterCredentialsEndpoint(ctx context.Context, u
 		return nil, err
 	}
 
-	return GetOpenstackSecurityGroups(userInfo, seedsGetter, creds.Username, creds.Password, creds.Tenant, creds.TenantID, creds.Domain, datacenterName)
+	return GetOpenstackSecurityGroups(userInfo, seedsGetter, creds.Username, creds.Password, creds.Tenant, creds.TenantID,
+		creds.Domain, datacenterName, caBundle)
 }
 
-func OpenstackSubnetsWithClusterCredentialsEndpoint(ctx context.Context, userInfoGetter provider.UserInfoGetter, projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, seedsGetter provider.SeedsGetter, projectID, clusterID, networkID string) (interface{}, error) {
+func OpenstackSubnetsWithClusterCredentialsEndpoint(ctx context.Context, userInfoGetter provider.UserInfoGetter,
+	projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider,
+	seedsGetter provider.SeedsGetter, projectID, clusterID, networkID string, caBundle *x509.CertPool) (interface{}, error) {
 	cluster, err := getClusterForOpenstack(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, projectID, clusterID)
 	if err != nil {
 		return nil, err
@@ -138,10 +158,13 @@ func OpenstackSubnetsWithClusterCredentialsEndpoint(ctx context.Context, userInf
 		return nil, err
 	}
 
-	return GetOpenstackSubnets(userInfo, seedsGetter, creds.Username, creds.Password, creds.Domain, creds.Tenant, creds.TenantID, networkID, datacenterName)
+	return GetOpenstackSubnets(userInfo, seedsGetter, creds.Username, creds.Password, creds.Domain, creds.Tenant,
+		creds.TenantID, networkID, datacenterName, caBundle)
 }
 
-func OpenstackAvailabilityZoneWithClusterCredentialsEndpoint(ctx context.Context, userInfoGetter provider.UserInfoGetter, projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, seedsGetter provider.SeedsGetter, projectID, clusterID string) (interface{}, error) {
+func OpenstackAvailabilityZoneWithClusterCredentialsEndpoint(ctx context.Context, userInfoGetter provider.UserInfoGetter,
+	projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider,
+	seedsGetter provider.SeedsGetter, projectID, clusterID string, caBundle *x509.CertPool) (interface{}, error) {
 	cluster, err := getClusterForOpenstack(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, projectID, clusterID)
 	if err != nil {
 		return nil, err
@@ -164,11 +187,13 @@ func OpenstackAvailabilityZoneWithClusterCredentialsEndpoint(ctx context.Context
 		return nil, err
 	}
 
-	return GetOpenstackAvailabilityZones(creds.Username, creds.Password, creds.Tenant, creds.TenantID, creds.Domain, datacenterName, datacenter)
+	return GetOpenstackAvailabilityZones(creds.Username, creds.Password, creds.Tenant, creds.TenantID, creds.Domain, datacenterName, datacenter, caBundle)
 }
 
-func GetOpenstackAvailabilityZones(username, password, tenant, tenantID, domain, datacenterName string, datacenter *kubermaticv1.Datacenter) ([]apiv1.OpenstackAvailabilityZone, error) {
-	availabilityZones, err := openstack.GetAvailabilityZones(username, password, domain, tenant, tenantID, datacenter.Spec.Openstack.AuthURL, datacenter.Spec.Openstack.Region)
+func GetOpenstackAvailabilityZones(username, password, tenant, tenantID, domain, datacenterName string,
+	datacenter *kubermaticv1.Datacenter, caBundle *x509.CertPool) ([]apiv1.OpenstackAvailabilityZone, error) {
+	availabilityZones, err := openstack.GetAvailabilityZones(username, password, domain, tenant, tenantID,
+		datacenter.Spec.Openstack.AuthURL, datacenter.Spec.Openstack.Region, caBundle)
 	if err != nil {
 		return nil, err
 	}
@@ -183,13 +208,14 @@ func GetOpenstackAvailabilityZones(username, password, tenant, tenantID, domain,
 	return apiAvailabilityZones, nil
 }
 
-func GetOpenstackSubnets(userInfo *provider.UserInfo, seedsGetter provider.SeedsGetter, username, password, domain, tenant, tenantID, networkID, datacenterName string) ([]apiv1.OpenstackSubnet, error) {
+func GetOpenstackSubnets(userInfo *provider.UserInfo, seedsGetter provider.SeedsGetter, username, password, domain, tenant,
+	tenantID, networkID, datacenterName string, caBundle *x509.CertPool) ([]apiv1.OpenstackSubnet, error) {
 	authURL, region, err := getOpenstackAuthURLAndRegion(userInfo, seedsGetter, datacenterName)
 	if err != nil {
 		return nil, err
 	}
 
-	subnets, err := openstack.GetSubnets(username, password, domain, tenant, tenantID, networkID, authURL, region)
+	subnets, err := openstack.GetSubnets(username, password, domain, tenant, tenantID, networkID, authURL, region, caBundle)
 	if err != nil {
 		return nil, err
 	}
@@ -205,13 +231,14 @@ func GetOpenstackSubnets(userInfo *provider.UserInfo, seedsGetter provider.Seeds
 	return apiSubnetIDs, nil
 }
 
-func GetOpenstackNetworks(userInfo *provider.UserInfo, seedsGetter provider.SeedsGetter, username, password, tenant, tenantID, domain, datacenterName string) ([]apiv1.OpenstackNetwork, error) {
+func GetOpenstackNetworks(userInfo *provider.UserInfo, seedsGetter provider.SeedsGetter, username, password, tenant,
+	tenantID, domain, datacenterName string, caBundle *x509.CertPool) ([]apiv1.OpenstackNetwork, error) {
 	authURL, region, err := getOpenstackAuthURLAndRegion(userInfo, seedsGetter, datacenterName)
 	if err != nil {
 		return nil, err
 	}
 
-	networks, err := openstack.GetNetworks(username, password, domain, tenant, tenantID, authURL, region)
+	networks, err := openstack.GetNetworks(username, password, domain, tenant, tenantID, authURL, region, caBundle)
 	if err != nil {
 		return nil, err
 	}
@@ -230,13 +257,14 @@ func GetOpenstackNetworks(userInfo *provider.UserInfo, seedsGetter provider.Seed
 	return apiNetworks, nil
 }
 
-func GetOpenstackTenants(userInfo *provider.UserInfo, seedsGetter provider.SeedsGetter, username, password, domain, tenant, tenantID, datacenterName string) ([]apiv1.OpenstackTenant, error) {
+func GetOpenstackTenants(userInfo *provider.UserInfo, seedsGetter provider.SeedsGetter, username, password, domain, tenant,
+	tenantID, datacenterName string, caBundle *x509.CertPool) ([]apiv1.OpenstackTenant, error) {
 	authURL, region, err := getOpenstackAuthURLAndRegion(userInfo, seedsGetter, datacenterName)
 	if err != nil {
 		return nil, err
 	}
 
-	tenants, err := openstack.GetTenants(username, password, domain, tenant, tenantID, authURL, region)
+	tenants, err := openstack.GetTenants(username, password, domain, tenant, tenantID, authURL, region, caBundle)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get tenants: %v", err)
 	}
@@ -254,8 +282,10 @@ func GetOpenstackTenants(userInfo *provider.UserInfo, seedsGetter provider.Seeds
 	return apiTenants, nil
 }
 
-func GetOpenstackSizes(username, password, tenant, tenantID, domain, datacenterName string, datacenter *kubermaticv1.Datacenter) ([]apiv1.OpenstackSize, error) {
-	flavors, err := openstack.GetFlavors(username, password, domain, tenant, tenantID, datacenter.Spec.Openstack.AuthURL, datacenter.Spec.Openstack.Region)
+func GetOpenstackSizes(username, password, tenant, tenantID, domain, datacenterName string, datacenter *kubermaticv1.Datacenter,
+	quota kubermaticv1.MachineDeploymentVMResourceQuota, caBundle *x509.CertPool) ([]apiv1.OpenstackSize, error) {
+	flavors, err := openstack.GetFlavors(username, password, domain, tenant, tenantID, datacenter.Spec.Openstack.AuthURL,
+		datacenter.Spec.Openstack.Region, caBundle)
 	if err != nil {
 		return nil, err
 	}
@@ -272,11 +302,36 @@ func GetOpenstackSizes(username, password, tenant, tenantID, domain, datacenterN
 			IsPublic: flavor.IsPublic,
 		}
 		if MeetsOpenstackNodeSizeRequirement(apiSize, datacenter.Spec.Openstack.NodeSizeRequirements) {
-			apiSizes = append(apiSizes, apiSize)
+			if IsFlavorEnabled(apiSize, datacenter.Spec.Openstack.EnabledFlavors) {
+				apiSizes = append(apiSizes, apiSize)
+			}
 		}
 	}
 
-	return apiSizes, nil
+	return filterOpenStackByQuota(apiSizes, quota), nil
+}
+
+func filterOpenStackByQuota(instances []apiv1.OpenstackSize, quota kubermaticv1.MachineDeploymentVMResourceQuota) []apiv1.OpenstackSize {
+	var filteredRecords []apiv1.OpenstackSize
+
+	// Range over the records and apply all the filters to each record.
+	// If the record passes all the filters, add it to the final slice.
+	for _, r := range instances {
+		keep := true
+
+		if !handlercommon.FilterCPU(r.VCPUs, quota.MinCPU, quota.MaxCPU) {
+			keep = false
+		}
+		if !handlercommon.FilterMemory(r.Memory/1024, quota.MinRAM, quota.MaxRAM) {
+			keep = false
+		}
+
+		if keep {
+			filteredRecords = append(filteredRecords, r)
+		}
+	}
+
+	return filteredRecords
 }
 
 func MeetsOpenstackNodeSizeRequirement(apiSize apiv1.OpenstackSize, requirements kubermaticv1.OpenstackNodeSizeRequirements) bool {
@@ -289,13 +344,27 @@ func MeetsOpenstackNodeSizeRequirement(apiSize apiv1.OpenstackSize, requirements
 	return true
 }
 
-func GetOpenstackSecurityGroups(userInfo *provider.UserInfo, seedsGetter provider.SeedsGetter, username, password, tenant, tenantID, domain, datacenterName string) ([]apiv1.OpenstackSecurityGroup, error) {
+func IsFlavorEnabled(apiSize apiv1.OpenstackSize, enabledFlavors []string) bool {
+	if len(enabledFlavors) == 0 {
+		// Flavors are enabled if no restrictions were made.
+		return true
+	}
+	for _, flavor := range enabledFlavors {
+		if flavor == apiSize.Slug {
+			return true
+		}
+	}
+	return false
+}
+
+func GetOpenstackSecurityGroups(userInfo *provider.UserInfo, seedsGetter provider.SeedsGetter, username, password, tenant,
+	tenantID, domain, datacenterName string, caBundle *x509.CertPool) ([]apiv1.OpenstackSecurityGroup, error) {
 	authURL, region, err := getOpenstackAuthURLAndRegion(userInfo, seedsGetter, datacenterName)
 	if err != nil {
 		return nil, err
 	}
 
-	securityGroups, err := openstack.GetSecurityGroups(username, password, domain, tenant, tenantID, authURL, region)
+	securityGroups, err := openstack.GetSecurityGroups(username, password, domain, tenant, tenantID, authURL, region, caBundle)
 	if err != nil {
 		return nil, err
 	}

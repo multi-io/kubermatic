@@ -8,12 +8,12 @@ import (
 	"strings"
 	"testing"
 
+	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
+
 	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/handler/test"
 	"k8c.io/kubermatic/v2/pkg/handler/test/hack"
-
-	"k8s.io/apimachinery/pkg/runtime"
 
 	clusterv1alpha1 "github.com/kubermatic/machine-controller/pkg/apis/cluster/v1alpha1"
 )
@@ -33,7 +33,7 @@ func TestGetNodeDeploymentRequest(t *testing.T) {
 		ExistingCluster        *kubermaticv1.Cluster
 		ExistingMdrs           []*kubermaticv1.MachineDeploymentRequest
 		NdrToGet               string
-		ExistingKubermaticObjs []runtime.Object
+		ExistingKubermaticObjs []ctrlruntimeclient.Object
 		ExpectedHTTPStatus     int
 		ExpectedResponse       apiv1.NodeDeploymentRequest
 	}{
@@ -91,9 +91,9 @@ func TestGetNodeDeploymentRequest(t *testing.T) {
 		t.Run(tc.Name, func(t *testing.T) {
 			req := httptest.NewRequest("GET", fmt.Sprintf("/api/v1/projects/%s/dc/us-central1/clusters/%s/ndrequests/%s", tc.ProjectIDToSync, tc.ClusterIDToSync, tc.NdrToGet), strings.NewReader(""))
 			res := httptest.NewRecorder()
-			kubermaticObj := []runtime.Object{}
-			machineObj := []runtime.Object{}
-			kubernetesObj := []runtime.Object{}
+			kubermaticObj := []ctrlruntimeclient.Object{}
+			machineObj := []ctrlruntimeclient.Object{}
+			kubernetesObj := []ctrlruntimeclient.Object{}
 			kubermaticObj = append(kubermaticObj, tc.ExistingKubermaticObjs...)
 			for _, existingMdr := range tc.ExistingMdrs {
 				kubermaticObj = append(kubermaticObj, existingMdr)
@@ -134,7 +134,7 @@ func TestCreateNodeDeploymentRequest(t *testing.T) {
 		ExistingKubermaticUser *kubermaticv1.User
 		ExistingAPIUser        *apiv1.User
 		ExistingCluster        *kubermaticv1.Cluster
-		ExistingKubermaticObjs []runtime.Object
+		ExistingKubermaticObjs []ctrlruntimeclient.Object
 	}{
 		// scenario 1
 		{
@@ -153,9 +153,9 @@ func TestCreateNodeDeploymentRequest(t *testing.T) {
 		t.Run(tc.Name, func(t *testing.T) {
 			req := httptest.NewRequest("POST", fmt.Sprintf("/api/v1/projects/%s/dc/us-central1/clusters/%s/ndrequests", tc.ProjectID, tc.ClusterID), strings.NewReader(tc.Body))
 			res := httptest.NewRecorder()
-			kubermaticObj := []runtime.Object{}
+			kubermaticObj := []ctrlruntimeclient.Object{}
 			kubermaticObj = append(kubermaticObj, tc.ExistingKubermaticObjs...)
-			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, []runtime.Object{}, kubermaticObj, nil, nil, hack.NewTestRouting)
+			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, []ctrlruntimeclient.Object{}, kubermaticObj, nil, nil, hack.NewTestRouting)
 			if err != nil {
 				t.Fatalf("failed to create test endpoint due to %v", err)
 			}

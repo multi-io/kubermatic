@@ -255,8 +255,6 @@ func StatefulSetCreator(data etcdStatefulSetCreatorData, enableDataCorruptionChe
 				},
 			}
 
-			set.Spec.Template.Spec.Containers[0].VolumeMounts = append(set.Spec.Template.Spec.Containers[0].VolumeMounts, resources.GetHostCACertVolumeMounts()...)
-
 			set.Spec.Template.Spec.Tolerations = data.Cluster().Spec.ComponentsOverride.Etcd.Tolerations
 
 			err = resources.SetResourceRequirements(set.Spec.Template.Spec.Containers, defaultResourceRequirements, resources.GetOverrides(data.Cluster().Spec.ComponentsOverride), set.Annotations)
@@ -313,7 +311,7 @@ func StatefulSetCreator(data etcdStatefulSetCreatorData, enableDataCorruptionChe
 }
 
 func getVolumes() []corev1.Volume {
-	return append([]corev1.Volume{
+	return []corev1.Volume{
 		{
 			Name: resources.EtcdTLSCertificateSecretName,
 			VolumeSource: corev1.VolumeSource{
@@ -350,7 +348,7 @@ func getVolumes() []corev1.Volume {
 				EmptyDir: &corev1.EmptyDirVolumeSource{},
 			},
 		},
-	}, resources.GetHostCACertVolumes()...)
+	}
 }
 
 func getBasePodLabels(cluster *kubermaticv1.Cluster) map[string]string {
@@ -364,7 +362,7 @@ func getBasePodLabels(cluster *kubermaticv1.Cluster) map[string]string {
 // TODO: Other functions use this function, switch them to getLauncherImage
 func ImageTag(c *kubermaticv1.Cluster) string {
 	/* Remove because we use v3.4.X for kubernetes < 1.17 too
-	if c.IsOpenshift() || c.Spec.Version.Minor() < 17 {
+	if c.Spec.Version.Minor() < 17 {
 		return etcdImageTagV33
 	}
 	*/

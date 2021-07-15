@@ -47,23 +47,18 @@ const (
 	VersionLabel = "app.kubernetes.io/version"
 
 	// VersionsFileName is the name of the YAML file containing the enabled and
-	// default Kubernetes and Openshift versions.
+	// default Kubernetes versions.
 	VersionsFileName = "versions.yaml"
 
 	// UpdatesFileName is the name of the YAML file containing the configured
 	// cluster upgrade rules.
 	UpdatesFileName = "updates.yaml"
 
-	// OpenshiftAddonsFileName is the name of the openshift addons manifest file
-	// in the master files.
-	OpenshiftAddonsFileName = "openshift-addons.yaml"
-
 	// KubernetesAddonsFileName is the name of the kubernetes addons manifest file
 	// in the master files.
 	KubernetesAddonsFileName = "kubernetes-addons.yaml"
 
 	DockercfgSecretName  = "dockercfg"
-	DexCASecretName      = "dex-ca"
 	ExtraFilesSecretName = "extra-files"
 
 	SeedWebhookServiceName    = "seed-webhook"
@@ -114,16 +109,6 @@ func DockercfgSecretCreator(cfg *operatorv1alpha1.KubermaticConfiguration) recon
 	}
 }
 
-func DexCASecretCreator(cfg *operatorv1alpha1.KubermaticConfiguration) reconciling.NamedSecretCreatorGetter {
-	return func() (string, reconciling.SecretCreator) {
-		return DexCASecretName, func(s *corev1.Secret) (*corev1.Secret, error) {
-			return createSecretData(s, map[string]string{
-				"caBundle.pem": cfg.Spec.Auth.CABundle,
-			}), nil
-		}
-	}
-}
-
 func ExtraFilesSecretCreator(cfg *operatorv1alpha1.KubermaticConfiguration) reconciling.NamedSecretCreatorGetter {
 	return func() (string, reconciling.SecretCreator) {
 		return ExtraFilesSecretName, func(s *corev1.Secret) (*corev1.Secret, error) {
@@ -138,7 +123,6 @@ func ExtraFilesSecretCreator(cfg *operatorv1alpha1.KubermaticConfiguration) reco
 			}
 
 			data := map[string]string{
-				OpenshiftAddonsFileName:  cfg.Spec.UserCluster.Addons.Openshift.DefaultManifests,
 				KubernetesAddonsFileName: cfg.Spec.UserCluster.Addons.Kubernetes.DefaultManifests,
 				VersionsFileName:         versions,
 				UpdatesFileName:          updates,

@@ -44,6 +44,7 @@ const (
 	DefaultEtcdVolumeSize                         = "5Gi"
 	DefaultAuthClientID                           = "kubermatic"
 	DefaultIngressClass                           = "nginx"
+	DefaultCABundleConfigMapName                  = "ca-bundle"
 	DefaultAPIReplicas                            = 2
 	DefaultUIReplicas                             = 2
 	DefaultSeedControllerMgrReplicas              = 1
@@ -55,6 +56,7 @@ const (
 	DefaultVPAAdmissionControllerDockerRepository = "gcr.io/google_containers/vpa-admission-controller"
 	DefaultEnvoyDockerRepository                  = "docker.io/envoyproxy/envoy-alpine"
 	DefaultMaximumParallelReconciles              = 10
+	DefaultS3Endpoint                             = "s3.amazonaws.com"
 
 	// DefaultNoProxy is a set of domains/networks that should never be
 	// routed through a proxy. All user-supplied values are appended to
@@ -66,6 +68,7 @@ var (
 	DefaultAccessibleAddons = []string{
 		"cluster-autoscaler",
 		"node-exporter",
+		"multus",
 		"gatekeeper",
 	}
 
@@ -188,68 +191,33 @@ var (
 	}
 
 	DefaultKubernetesVersioning = operatorv1alpha1.KubermaticVersioningConfiguration{
-		Default: semver.MustParse("v1.19.3"),
+		Default: semver.MustParse("v1.19.9"),
 		Versions: []*semver.Version{
-			// Kubernetes 1.17
-			semver.MustParse("v1.17.9"),
-			semver.MustParse("v1.17.11"),
-			semver.MustParse("v1.17.12"),
-			semver.MustParse("v1.17.13"),
-			semver.MustParse("v1.17.16"),
 			// Kubernetes 1.18
 			semver.MustParse("v1.18.6"),
 			semver.MustParse("v1.18.8"),
 			semver.MustParse("v1.18.10"),
 			semver.MustParse("v1.18.14"),
+			semver.MustParse("v1.18.17"),
 			// Kubernetes 1.19
 			semver.MustParse("v1.19.0"),
 			semver.MustParse("v1.19.2"),
 			semver.MustParse("v1.19.3"),
+			semver.MustParse("v1.19.8"),
+			semver.MustParse("v1.19.9"),
 			// Kubernetes 1.20
 			semver.MustParse("v1.20.2"),
+			semver.MustParse("v1.20.5"),
+			// Kubernetes 1.21
+			semver.MustParse("v1.21.0"),
 		},
 		Updates: []operatorv1alpha1.Update{
-			{
-				// Auto-upgrade unsupported clusters
-				From:      "1.15.*",
-				To:        "1.16.*",
-				Automatic: pointer.BoolPtr(true),
-			},
-
-			// ======= 1.16 =======
-			{
-				// Allow to change to any patch version
-				From: "1.16.*",
-				To:   "1.16.*",
-			},
-			{
-				// CVE-2019-11253, CVE-2020-8559
-				From:      "<= 1.16.12, >= 1.16.0",
-				To:        "1.16.13",
-				Automatic: pointer.BoolPtr(true),
-			},
-			{
-				// Allow to next minor release
-				From: "1.16.*",
-				To:   "1.17.*",
-			},
-
 			// ======= 1.17 =======
 			{
-				// Allow to change to any patch version
-				From: "1.17.*",
-				To:   "1.17.*",
-			},
-			{
-				// CVE-2020-8559
-				From:      "<= 1.17.8, >= 1.17.0",
-				To:        "1.17.9",
+				// Auto-upgrade unsupported clusters
+				From:      "1.17.*",
+				To:        "1.18.17",
 				Automatic: pointer.BoolPtr(true),
-			},
-			{
-				// Allow to next minor release
-				From: "1.17.*",
-				To:   "1.18.*",
 			},
 
 			// ======= 1.18 =======
@@ -290,31 +258,17 @@ var (
 				From: "1.20.*",
 				To:   "1.20.*",
 			},
-		},
-	}
-
-	// DefaultOpenshiftVersioning contains the supported versions for openshift clusters. The OpenShift 4
-	// minor release is: Kubernetes minor - 12, since we only support openshift v4.1.9 and v4.1.18 only
-	// only cri-o 1.13.x is installed to the provisioned machines.
-	DefaultOpenshiftVersioning = operatorv1alpha1.KubermaticVersioningConfiguration{
-		Default: semver.MustParse("v4.1.18"),
-		Versions: []*semver.Version{
-			// Openshift 4.1.9
-			semver.MustParse("v4.1.9"),
-			// Openshift 4.1.18
-			semver.MustParse("v4.1.18"),
-		},
-		Updates: []operatorv1alpha1.Update{
-			// ======= Openshift 4.1 =======
-			{
-				// Allow to change to any patch version
-				From: "4.1.*",
-				To:   "4.1.*",
-			},
 			{
 				// Allow to next minor release
-				From: "4.1.*",
-				To:   "2.2.*",
+				From: "1.20.*",
+				To:   "1.21.*",
+			},
+
+			// ======= 1.21 =======
+			{
+				// Allow to change to any patch version
+				From: "1.21.*",
+				To:   "1.21.*",
 			},
 		},
 	}
@@ -330,19 +284,41 @@ func DefaultConfiguration(config *operatorv1alpha1.KubermaticConfiguration, logg
 		logger.Debugw("Defaulting field", "field", "exposeStrategy", "value", copy.Spec.ExposeStrategy)
 	}
 
+	if copy.Spec.CABundle.Name == "" {
+		copy.Spec.CABundle.Name = DefaultCABundleConfigMapName
+		logger.Debugw("Defaulting field", "field", "caBundle.name", "value", copy.Spec.CABundle.Name)
+	}
+
 	if copy.Spec.SeedController.MaximumParallelReconciles == 0 {
 		copy.Spec.SeedController.MaximumParallelReconciles = DefaultMaximumParallelReconciles
 		logger.Debugw("Defaulting field", "field", "seedController.maximumParallelReconciles", "value", copy.Spec.SeedController.MaximumParallelReconciles)
 	}
 
 	if copy.Spec.SeedController.BackupStoreContainer == "" {
-		copy.Spec.SeedController.BackupStoreContainer = strings.TrimSpace(DefaultBackupStoreContainer)
+		if copy.Spec.SeedController.BackupRestore.Enabled {
+			copy.Spec.SeedController.BackupStoreContainer = strings.TrimSpace(DefaultNewBackupStoreContainer)
+		} else {
+			copy.Spec.SeedController.BackupStoreContainer = strings.TrimSpace(DefaultBackupStoreContainer)
+		}
 		logger.Debugw("Defaulting field", "field", "seedController.backupStoreContainer")
 	}
 
-	if copy.Spec.SeedController.BackupCleanupContainer == "" {
+	if copy.Spec.SeedController.BackupCleanupContainer == "" && !copy.Spec.SeedController.BackupRestore.Enabled {
 		copy.Spec.SeedController.BackupCleanupContainer = strings.TrimSpace(DefaultBackupCleanupContainer)
 		logger.Debugw("Defaulting field", "field", "seedController.backupCleanupContainer")
+	}
+
+	if copy.Spec.SeedController.BackupRestore.Enabled {
+		if copy.Spec.SeedController.BackupRestore.S3Endpoint == "" {
+			copy.Spec.SeedController.BackupRestore.S3Endpoint = DefaultS3Endpoint
+		}
+		if copy.Spec.SeedController.BackupRestore.S3BucketName == "" {
+			return nil, fmt.Errorf("backupRestore.enabled is set, but s3BucketName is unset")
+		}
+		if copy.Spec.SeedController.BackupDeleteContainer == "" {
+			copy.Spec.SeedController.BackupDeleteContainer = strings.TrimSpace(DefaultNewBackupDeleteContainer)
+			logger.Debugw("Defaulting field", "field", "seedController.backupDeleteContainer")
+		}
 	}
 
 	if copy.Spec.SeedController.Replicas == nil {
@@ -373,11 +349,6 @@ func DefaultConfiguration(config *operatorv1alpha1.KubermaticConfiguration, logg
 	if len(copy.Spec.UserCluster.Addons.Kubernetes.Default) == 0 && copy.Spec.UserCluster.Addons.Kubernetes.DefaultManifests == "" {
 		copy.Spec.UserCluster.Addons.Kubernetes.DefaultManifests = strings.TrimSpace(DefaultKubernetesAddons)
 		logger.Debugw("Defaulting field", "field", "userCluster.addons.kubernetes.defaultManifests")
-	}
-
-	if len(copy.Spec.UserCluster.Addons.Openshift.Default) == 0 && copy.Spec.UserCluster.Addons.Openshift.DefaultManifests == "" {
-		copy.Spec.UserCluster.Addons.Openshift.DefaultManifests = strings.TrimSpace(DefaultOpenshiftAddons)
-		logger.Debugw("Defaulting field", "field", "userCluster.addons.openshift.defaultManifests")
 	}
 
 	if copy.Spec.UserCluster.APIServerReplicas == nil {
@@ -429,10 +400,6 @@ func DefaultConfiguration(config *operatorv1alpha1.KubermaticConfiguration, logg
 	}
 
 	if err := defaultVersioning(&copy.Spec.Versions.Kubernetes, DefaultKubernetesVersioning, "versions.kubernetes", logger); err != nil {
-		return copy, err
-	}
-
-	if err := defaultVersioning(&copy.Spec.Versions.Openshift, DefaultOpenshiftVersioning, "versions.openshift", logger); err != nil {
 		return copy, err
 	}
 
@@ -489,10 +456,6 @@ func DefaultConfiguration(config *operatorv1alpha1.KubermaticConfiguration, logg
 	}
 
 	if err := defaultDockerRepo(&copy.Spec.UserCluster.Addons.Kubernetes.DockerRepository, resources.DefaultKubernetesAddonImage, "userCluster.addons.kubernetes.dockerRepository", logger); err != nil {
-		return copy, err
-	}
-
-	if err := defaultDockerRepo(&copy.Spec.UserCluster.Addons.Openshift.DockerRepository, resources.DefaultOpenshiftAddonImage, "userCluster.addons.openshift.dockerRepository", logger); err != nil {
 		return copy, err
 	}
 
@@ -657,7 +620,7 @@ func defaultVersioning(settings *operatorv1alpha1.KubermaticVersioningConfigurat
 
 const DefaultBackupStoreContainer = `
 name: store-container
-image: quay.io/kubermatic/s3-storer:v0.1.4
+image: quay.io/kubermatic/s3-storer:v0.1.6
 command:
 - /bin/sh
 - -c
@@ -667,8 +630,20 @@ command:
   endpoint=minio.minio.svc.cluster.local:9000
   bucket=kubermatic-etcd-backups
 
-  s3-storeuploader store --file /backup/snapshot.db --endpoint "$endpoint" --bucket "$bucket" --create-bucket --prefix $CLUSTER
-  s3-storeuploader delete-old-revisions --max-revisions 20 --endpoint "$endpoint" --bucket "$bucket" --prefix $CLUSTER
+  s3-storeuploader store \
+    --ca-bundle=/etc/ca-bundle/ca-bundle.pem \
+    --file /backup/snapshot.db \
+    --endpoint "$endpoint" \
+    --bucket "$bucket" \
+    --create-bucket \
+    --prefix $CLUSTER
+
+  s3-storeuploader delete-old-revisions \
+    --ca-bundle=/etc/ca-bundle/ca-bundle.pem \
+    --max-revisions 20 \
+    --endpoint "$endpoint" \
+    --bucket "$bucket" \
+    --prefix $CLUSTER
 env:
 - name: ACCESS_KEY_ID
   valueFrom:
@@ -685,9 +660,100 @@ volumeMounts:
   mountPath: /backup
 `
 
+const DefaultNewBackupStoreContainer = `
+name: store-container
+image: d3fk/s3cmd@sha256:2061883abbf0ebcf0ea3d5d218558c9c229f212e9c08af4acdaa3758980eb67a
+command:
+- /bin/sh
+- -c
+- |
+  set -e
+  s3cmd \
+    --ca-certs=/etc/ca-bundle/ca-bundle.pem \
+    --access_key=$ACCESS_KEY_ID \
+    --secret_key=$SECRET_ACCESS_KEY \
+    --host=$ENDPOINT \
+    --host-bucket='%(bucket).'$ENDPOINT \
+    put /backup/snapshot.db s3://$BUCKET_NAME/$CLUSTER-$BACKUP_TO_CREATE
+env:
+- name: ACCESS_KEY_ID
+  valueFrom:
+    secretKeyRef:
+      name: s3-credentials
+      key: ACCESS_KEY_ID
+- name: SECRET_ACCESS_KEY
+  valueFrom:
+    secretKeyRef:
+      name: s3-credentials
+      key: SECRET_ACCESS_KEY
+- name: BUCKET_NAME
+  valueFrom:
+    configMapKeyRef:
+      name: s3-settings
+      key: BUCKET_NAME
+- name: ENDPOINT
+  valueFrom:
+    configMapKeyRef:
+      name: s3-settings
+      key: ENDPOINT
+volumeMounts:
+- name: etcd-backup
+  mountPath: /backup
+`
+
+const DefaultNewBackupDeleteContainer = `
+name: delete-container
+image: d3fk/s3cmd@sha256:2061883abbf0ebcf0ea3d5d218558c9c229f212e9c08af4acdaa3758980eb67a
+command:
+- /bin/sh
+- -c
+- |
+  s3cmd \
+    --ca-certs=/etc/ca-bundle/ca-bundle.pem \
+    --access_key=$ACCESS_KEY_ID \
+    --secret_key=$SECRET_ACCESS_KEY \
+    --host=$ENDPOINT \
+    --host-bucket='%(bucket).'$ENDPOINT \
+    del s3://$BUCKET_NAME/$CLUSTER-$BACKUP_TO_DELETE
+
+  case $? in
+  12)
+    # backup no longer exists, which is fine
+    exit 0
+    ;;
+  0)
+    exit 0
+    ;;
+  *)
+    exit $?
+    ;;
+  esac
+env:
+- name: ACCESS_KEY_ID
+  valueFrom:
+    secretKeyRef:
+      name: s3-credentials
+      key: ACCESS_KEY_ID
+- name: SECRET_ACCESS_KEY
+  valueFrom:
+    secretKeyRef:
+      name: s3-credentials
+      key: SECRET_ACCESS_KEY
+- name: BUCKET_NAME
+  valueFrom:
+    configMapKeyRef:
+      name: s3-settings
+      key: BUCKET_NAME
+- name: ENDPOINT
+  valueFrom:
+    configMapKeyRef:
+      name: s3-settings
+      key: ENDPOINT
+`
+
 const DefaultBackupCleanupContainer = `
 name: cleanup-container
-image: quay.io/kubermatic/s3-storer:v0.1.4
+image: quay.io/kubermatic/s3-storer:v0.1.6
 command:
 - /bin/sh
 - -c
@@ -698,10 +764,19 @@ command:
   bucket=kubermatic-etcd-backups
 
   # by default, we keep the most recent backup for every user cluster
-  s3-storeuploader delete-old-revisions --max-revisions 1 --endpoint "$endpoint" --bucket "$bucket" --prefix $CLUSTER
+  s3-storeuploader delete-old-revisions \
+    --ca-bundle=/etc/ca-bundle/ca-bundle.pem \
+    --max-revisions 1 \
+    --endpoint "$endpoint" \
+    --bucket "$bucket" \
+    --prefix $CLUSTER
 
   # alternatively, delete all backups for this cluster
-  #s3-storeuploader delete-all --endpoint "$endpoint" --bucket "$bucket" --prefix $CLUSTER
+  #s3-storeuploader delete-all \
+  # --ca-bundle=/etc/ca-bundle/ca-bundle.pem \
+  # --endpoint "$endpoint" \
+  # --bucket "$bucket" \
+  # --prefix $CLUSTER
 env:
 - name: ACCESS_KEY_ID
   valueFrom:
@@ -824,50 +899,6 @@ items:
       addons.kubermatic.io/ensure: true
 `
 
-const DefaultOpenshiftAddons = `
-apiVersion: v1
-kind: List
-items:
-- apiVersion: kubermatic.k8s.io/v1
-  kind: Addon
-  metadata:
-    name: crd
-- apiVersion: kubermatic.k8s.io/v1
-  kind: Addon
-  metadata:
-    name: default-storage-class
-- apiVersion: kubermatic.k8s.io/v1
-  kind: Addon
-  metadata:
-    name: logrotate
-- apiVersion: kubermatic.k8s.io/v1
-  kind: Addon
-  metadata:
-    name: network
-  spec:
-    requiredResourceTypes:
-    - Group: config.openshift.io
-      Kind: Network
-      Version: v1
-- apiVersion: kubermatic.k8s.io/v1
-  kind: Addon
-  metadata:
-    name: openvpn
-- apiVersion: kubermatic.k8s.io/v1
-  kind: Addon
-  metadata:
-    name: rbac
-- apiVersion: kubermatic.k8s.io/v1
-  kind: Addon
-  metadata:
-    name: registry
-  spec:
-    requiredResourceTypes:
-    - Group: cloudcredential.openshift.io
-      Kind: CredentialsRequest
-      Version: v1
-`
-
 type versionsYAML struct {
 	Versions []*version.Version `json:"versions"`
 }
@@ -888,8 +919,6 @@ func CreateVersionsYAML(config *operatorv1alpha1.KubermaticVersionsConfiguration
 	}
 
 	appendOrchestrator(&config.Kubernetes, kubermaticapiv1.KubernetesClusterType)
-	appendOrchestrator(&config.Openshift, kubermaticapiv1.OpenShiftClusterType)
-
 	return toYAML(output)
 }
 
@@ -920,8 +949,6 @@ func CreateUpdatesYAML(config *operatorv1alpha1.KubermaticVersionsConfiguration)
 	}
 
 	appendOrchestrator(&config.Kubernetes, kubermaticapiv1.KubernetesClusterType)
-	appendOrchestrator(&config.Openshift, kubermaticapiv1.OpenShiftClusterType)
-
 	return toYAML(output)
 }
 

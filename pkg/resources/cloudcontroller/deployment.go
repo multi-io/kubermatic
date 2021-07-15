@@ -72,7 +72,7 @@ func DeploymentCreator(data *resources.TemplateData) reconciling.NamedDeployment
 	}
 
 	return func() (name string, create reconciling.DeploymentCreator) {
-		return OpenstackCCMDeploymentName, func(dep *appsv1.Deployment) (*appsv1.Deployment, error) {
+		return "unsupported", func(dep *appsv1.Deployment) (*appsv1.Deployment, error) {
 			return nil, errors.New("unsupported external cloud controller")
 		}
 	}

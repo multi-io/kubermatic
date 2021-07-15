@@ -29,7 +29,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
+	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
+
+	e2eutils "k8c.io/kubermatic/v2/pkg/test/e2e/utils"
 )
 
 // Based on:
@@ -37,7 +39,7 @@ import (
 // ServiceJig is a jig to help service testing.
 type ServiceJig struct {
 	Log       *zap.SugaredLogger
-	Client    ctrlclient.Client
+	Client    ctrlruntimeclient.Client
 	Namespace string
 
 	Services    []*corev1.Service
@@ -81,11 +83,11 @@ func (n *ServiceJig) CreateServiceWithPods(svc *corev1.Service, numPods int32, h
 	}
 
 	// Wait for the pod to be ready
-	pods, err := WaitForPodsCreated(n.Client, int(*rc.Spec.Replicas), rc.Namespace, svc.Spec.Selector)
+	pods, err := e2eutils.WaitForPodsCreated(n.Client, int(*rc.Spec.Replicas), rc.Namespace, svc.Spec.Selector)
 	if err != nil {
 		return svc, errors.Wrap(err, "error occurred while waiting for pods to be ready")
 	}
-	if !CheckPodsRunningReady(n.Client, n.Namespace, pods, podReadinessTimeout) {
+	if !e2eutils.CheckPodsRunningReady(n.Client, n.Namespace, pods, podReadinessTimeout) {
 		return svc, fmt.Errorf("timeout waiting for %d pods to be ready", len(pods))
 	}
 	if n.ServicePods == nil {

@@ -31,6 +31,7 @@ import (
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/resources"
 	"k8c.io/kubermatic/v2/pkg/resources/apiserver"
+	"k8c.io/kubermatic/v2/pkg/resources/certificates"
 	"k8c.io/kubermatic/v2/pkg/resources/cloudcontroller"
 )
 
@@ -41,6 +42,9 @@ func init() {
 }
 
 func TestCloudControllerManagerDeployment(t *testing.T) {
+	// these tests use openstack as an example for a provider that has
+	// a CCM; the logic tested here is independent of the provider itself
+
 	testCases := []struct {
 		name                string
 		cluster             *kubermaticv1.Cluster
@@ -60,6 +64,9 @@ func TestCloudControllerManagerDeployment(t *testing.T) {
 				Spec: kubermaticv1.ClusterSpec{
 					Features: map[string]bool{
 						kubermaticv1.ClusterFeatureExternalCloudProvider: true,
+					},
+					Cloud: kubermaticv1.CloudSpec{
+						Openstack: &kubermaticv1.OpenstackCloudSpec{},
 					},
 				},
 				Status: kubermaticv1.ClusterStatus{
@@ -94,6 +101,9 @@ func TestCloudControllerManagerDeployment(t *testing.T) {
 					Features: map[string]bool{
 						kubermaticv1.ClusterFeatureExternalCloudProvider: true,
 					},
+					Cloud: kubermaticv1.CloudSpec{
+						Openstack: &kubermaticv1.OpenstackCloudSpec{},
+					},
 				},
 				Status: kubermaticv1.ClusterStatus{
 					NamespaceName: "test",
@@ -126,6 +136,9 @@ func TestCloudControllerManagerDeployment(t *testing.T) {
 				Spec: kubermaticv1.ClusterSpec{
 					Features: map[string]bool{
 						kubermaticv1.ClusterFeatureExternalCloudProvider: true,
+					},
+					Cloud: kubermaticv1.CloudSpec{
+						Openstack: &kubermaticv1.OpenstackCloudSpec{},
 					},
 				},
 				Status: kubermaticv1.ClusterStatus{
@@ -163,6 +176,9 @@ func TestCloudControllerManagerDeployment(t *testing.T) {
 					Features: map[string]bool{
 						kubermaticv1.ClusterFeatureExternalCloudProvider: true,
 					},
+					Cloud: kubermaticv1.CloudSpec{
+						Openstack: &kubermaticv1.OpenstackCloudSpec{},
+					},
 				},
 				Status: kubermaticv1.ClusterStatus{
 					NamespaceName: "test",
@@ -196,6 +212,9 @@ func TestCloudControllerManagerDeployment(t *testing.T) {
 					Features: map[string]bool{
 						kubermaticv1.ClusterFeatureExternalCloudProvider: true,
 					},
+					Cloud: kubermaticv1.CloudSpec{
+						Openstack: &kubermaticv1.OpenstackCloudSpec{},
+					},
 				},
 				Status: kubermaticv1.ClusterStatus{
 					NamespaceName: "test",
@@ -225,6 +244,9 @@ func TestCloudControllerManagerDeployment(t *testing.T) {
 					Features: map[string]bool{
 						kubermaticv1.ClusterFeatureExternalCloudProvider: true,
 					},
+					Cloud: kubermaticv1.CloudSpec{
+						Openstack: &kubermaticv1.OpenstackCloudSpec{},
+					},
 				},
 				Status: kubermaticv1.ClusterStatus{
 					NamespaceName: "test",
@@ -253,6 +275,11 @@ func TestCloudControllerManagerDeployment(t *testing.T) {
 				Status: kubermaticv1.ClusterStatus{
 					NamespaceName: "test",
 				},
+				Spec: kubermaticv1.ClusterSpec{
+					Cloud: kubermaticv1.CloudSpec{
+						Openstack: &kubermaticv1.OpenstackCloudSpec{},
+					},
+				},
 			},
 			kcmDeploymentConfig: KCMDeploymentConfig{
 				Flags: []string{},
@@ -270,16 +297,28 @@ func TestCloudControllerManagerDeployment(t *testing.T) {
 		},
 	}
 
+	caBundle := certificates.NewFakeCABundle()
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
 
-			// fc := fake.NewClientBuilder().Build()
-			fc := fake.NewFakeClient()
+			caBundleConfigMap := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: tc.cluster.Status.NamespaceName,
+					Name:      resources.CABundleConfigMapName,
+				},
+				Data: map[string]string{
+					resources.CABundleConfigMapKey: caBundle.String(),
+				},
+			}
+
+			fc := fake.NewClientBuilder().WithObjects(caBundleConfigMap).Build()
 			td := resources.NewTemplateDataBuilder().
 				WithContext(ctx).
 				WithClient(fc).
 				WithCluster(tc.cluster).
+				WithCABundle(caBundle).
 				Build()
 			// Add the KCM deployment
 			if err := fc.Create(ctx, tc.kcmDeploymentConfig.Create(td)); err != nil {

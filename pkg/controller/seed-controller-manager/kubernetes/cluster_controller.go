@@ -33,6 +33,7 @@ import (
 	kubermaticv1helper "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1/helper"
 	kuberneteshelper "k8c.io/kubermatic/v2/pkg/kubernetes"
 	"k8c.io/kubermatic/v2/pkg/provider"
+	"k8c.io/kubermatic/v2/pkg/resources/certificates"
 	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -43,7 +44,6 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	autoscalingv1beta2 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1beta2"
 	"k8s.io/client-go/tools/record"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -99,8 +99,9 @@ type Reconciler struct {
 	etcdLauncherImage                                string
 	dnatControllerImage                              string
 	concurrentClusterUpdates                         int
+	etcdBackupRestoreController                      bool
+	backupSchedule                                   time.Duration
 
-	oidcCAFile         string
 	oidcIssuerURL      string
 	oidcIssuerClientID string
 
@@ -110,6 +111,7 @@ type Reconciler struct {
 	versions kubermatic.Versions
 
 	tunnelingAgentIP string
+	caBundle         *certificates.CABundle
 }
 
 // NewController creates a cluster controller.
@@ -135,8 +137,9 @@ func Add(
 	dockerPullConfigJSON []byte,
 	nodeLocalDNSCacheEnabled bool,
 	concurrentClusterUpdates int,
+	etcdBackupRestoreController bool,
+	backupSchedule time.Duration,
 
-	oidcCAFile string,
 	oidcIssuerURL string,
 	oidcIssuerClientID string,
 	kubermaticImage string,
@@ -145,6 +148,7 @@ func Add(
 	dnatControllerImage string,
 
 	tunnelingAgentIP string,
+	caBundle *certificates.CABundle,
 
 	features Features,
 	versions kubermatic.Versions) error {
@@ -174,19 +178,22 @@ func Add(
 		etcdLauncherImage:                                etcdLauncherImage,
 		dnatControllerImage:                              dnatControllerImage,
 		concurrentClusterUpdates:                         concurrentClusterUpdates,
+		etcdBackupRestoreController:                      etcdBackupRestoreController,
+		backupSchedule:                                   backupSchedule,
 
 		externalURL: externalURL,
 		seedGetter:  seedGetter,
 
-		oidcCAFile:         oidcCAFile,
 		oidcIssuerURL:      oidcIssuerURL,
 		oidcIssuerClientID: oidcIssuerClientID,
 
 		keycloakFacade: keycloakFacade,
 
 		tunnelingAgentIP: tunnelingAgentIP,
-		features:         features,
-		versions:         versions,
+		caBundle:         caBundle,
+
+		features: features,
+		versions: versions,
 	}
 
 	c, err := controller.New(ControllerName, mgr, controller.Options{Reconciler: reconciler, MaxConcurrentReconciles: numWorkers})
@@ -194,7 +201,7 @@ func Add(
 		return err
 	}
 
-	typesToWatch := []runtime.Object{
+	typesToWatch := []ctrlruntimeclient.Object{
 		&corev1.Service{},
 		&corev1.ServiceAccount{},
 		&corev1.ConfigMap{},
@@ -218,9 +225,7 @@ func Add(
 	return c.Watch(&source.Kind{Type: &kubermaticv1.Cluster{}}, &handler.EnqueueRequestForObject{})
 }
 
-func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log := r.log.With("request", request)
 	log.Debug("Processing")
 
@@ -233,11 +238,6 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 		return reconcile.Result{}, err
 	}
 	log = log.With("cluster", cluster.Name)
-
-	if !cluster.IsKubernetes() {
-		log.Debug("Skipping because the cluster is not a Kubernetes cluster")
-		return reconcile.Result{}, nil
-	}
 
 	// Add a wrapping here so we can emit an event on error
 	result, err := kubermaticv1helper.ClusterReconcileWrapper(
@@ -289,7 +289,7 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, clus
 			return client, nil
 		}
 		// Always requeue a cluster after we executed the cleanup.
-		return &reconcile.Result{RequeueAfter: 10 * time.Second}, clusterdeletion.New(r.Client, userClusterClientGetter).CleanupCluster(ctx, log, cluster)
+		return &reconcile.Result{RequeueAfter: 10 * time.Second}, clusterdeletion.New(r.Client, userClusterClientGetter, r.etcdBackupRestoreController).CleanupCluster(ctx, log, cluster)
 	}
 
 	res, err := r.reconcileCluster(ctx, cluster)

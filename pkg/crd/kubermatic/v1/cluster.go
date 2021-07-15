@@ -22,7 +22,6 @@ import (
 	"fmt"
 
 	providerconfig "github.com/kubermatic/machine-controller/pkg/providerconfig/types"
-
 	"k8c.io/kubermatic/v2/pkg/semver"
 
 	corev1 "k8s.io/api/core/v1"
@@ -128,9 +127,6 @@ type ClusterSpec struct {
 
 	UpdateWindow *UpdateWindow `json:"updateWindow,omitempty"`
 
-	// Openshift holds all openshift-specific settings
-	Openshift *Openshift `json:"openshift,omitempty"`
-
 	UsePodSecurityPolicyAdmissionPlugin bool `json:"usePodSecurityPolicyAdmissionPlugin,omitempty"`
 	UsePodNodeSelectorAdmissionPlugin   bool `json:"usePodNodeSelectorAdmissionPlugin,omitempty"`
 
@@ -139,7 +135,7 @@ type ClusterSpec struct {
 	// to the created cluster. If the agent was disabled, it won't be deployed in the user cluster, thus after
 	// the cluster creation any attached ssh keys won't be synced to the worker nodes. Once the agent is enabled/disabled
 	// it cannot be changed after the cluster is being created.
-	EnableUserSSHKeyAgent bool `json:"enableUserSSHKeyAgent,omitempty"`
+	EnableUserSSHKeyAgent *bool `json:"enableUserSSHKeyAgent,omitempty"`
 
 	// PodNodeSelectorAdmissionPluginConfig provides the configuration for the PodNodeSelector.
 	// It's used by the backend to create a configuration file for this plugin.
@@ -161,6 +157,9 @@ type ClusterSpec struct {
 
 	// ServiceAccount contains service account related settings for the kube-apiserver of user cluster.
 	ServiceAccount *ServiceAccountSettings `json:"serviceAccount,omitempty"`
+
+	//MLA contains monitoring, logging and alerting related settings for the user cluster.
+	MLA *MLASettings `json:"mla,omitempty"`
 }
 
 type Sys11AuthSettings struct {
@@ -208,8 +207,8 @@ const (
 	ClusterConditionComponentDefaulterReconcilingSuccess          ClusterConditionType = "ComponentDefaulterReconciledSuccessfully"
 	ClusterConditionUpdateControllerReconcilingSuccess            ClusterConditionType = "UpdateControllerReconciledSuccessfully"
 	ClusterConditionMonitoringControllerReconcilingSuccess        ClusterConditionType = "MonitoringControllerReconciledSuccessfully"
-	ClusterConditionOpenshiftControllerReconcilingSuccess         ClusterConditionType = "OpenshiftControllerReconciledSuccessfully"
 	ClusterConditionMachineDeploymentControllerReconcilingSuccess ClusterConditionType = "MachineDeploymentReconciledSuccessfully"
+	ClusterConditionMLAControllerReconcilingSuccess               ClusterConditionType = "MLAControllerReconciledSuccessfully"
 	ClusterConditionClusterInitialized                            ClusterConditionType = "ClusterInitialized"
 
 	ClusterConditionRancherInitialized     ClusterConditionType = "RancherInitializedSuccessfully"
@@ -242,7 +241,6 @@ var AllClusterConditionTypes = []ClusterConditionType{
 	ClusterConditionComponentDefaulterReconcilingSuccess,
 	ClusterConditionUpdateControllerReconcilingSuccess,
 	ClusterConditionMonitoringControllerReconcilingSuccess,
-	ClusterConditionOpenshiftControllerReconcilingSuccess,
 }
 
 type ClusterCondition struct {
@@ -330,10 +328,6 @@ const (
 	ReconcileClusterError            ClusterStatusError = "ReconcileError"
 )
 
-type Openshift struct {
-	ImagePullSecret string `json:"imagePullSecret,omitempty"`
-}
-
 type OIDCSettings struct {
 	IssuerURL     string `json:"issuerUrl,omitempty"`
 	ClientID      string `json:"clientId,omitempty"`
@@ -364,6 +358,13 @@ type ServiceAccountSettings struct {
 	// APIAudiences are the Identifiers of the API
 	// If this is not specified, it will be set to a single element list containing the issuer URL
 	APIAudiences []string `json:"apiAudiences,omitempty"`
+}
+
+type MLASettings struct {
+	// MonitoringEnabled is the flag for enabling monitoring in user cluster.
+	MonitoringEnabled bool `json:"monitoringEnabled,omitempty"`
+	// LoggingEnabled is the flag for enabling logging in user cluster.
+	LoggingEnabled bool `json:"loggingEnabled,omitempty"`
 }
 
 type ComponentSettings struct {
@@ -467,8 +468,6 @@ type ClusterAddress struct {
 	AdminToken string `json:"adminToken"`
 	// IP is the external IP under which the apiserver is available
 	IP string `json:"ip"`
-	// OpenshiftConsoleCallBack is the callback address for the Openshift console
-	OpenshiftConsoleCallBack string `json:"openshiftConsoleCallback,omitempty"`
 }
 
 // CloudSpec mutually stores access data to a cloud provider.
@@ -541,12 +540,13 @@ type AzureCloudSpec struct {
 
 	OpenstackBillingTenant string `json:"openstackBillingTenant,omitempty"`
 
-	ResourceGroup   string `json:"resourceGroup"`
-	VNetName        string `json:"vnet"`
-	SubnetName      string `json:"subnet"`
-	RouteTableName  string `json:"routeTable"`
-	SecurityGroup   string `json:"securityGroup"`
-	AvailabilitySet string `json:"availabilitySet"`
+	ResourceGroup     string `json:"resourceGroup"`
+	VNetResourceGroup string `json:"vnetResourceGroup"`
+	VNetName          string `json:"vnet"`
+	SubnetName        string `json:"subnet"`
+	RouteTableName    string `json:"routeTable"`
+	SecurityGroup     string `json:"securityGroup"`
+	AvailabilitySet   string `json:"availabilitySet"`
 }
 
 // VSphereCredentials credentials represents a credential for accessing vSphere
@@ -642,6 +642,15 @@ type OpenstackCloudSpec struct {
 	// ServerGroupID used as schedule hint shared between all machines in the cluster,
 	// When not specified, soft-anti-affinity server group will be automatically created
 	ServerGroupID string `json:"serverGroupID"`
+	// Whether or not to use Octavia for LoadBalancer type of Service
+	// implementation instead of using Neutron-LBaaS.
+	// Attention:Openstack CCM use Octavia as default load balancer
+	// implementation since v1.17.0
+	//
+	// Takes precedence over the 'use_octavia' flag provided at datacenter
+	// level if both are specified.
+	// +optional
+	UseOctavia *bool `json:"useOctavia,omitempty"`
 }
 
 // PacketCloudSpec specifies access data to a Packet cloud.
@@ -702,9 +711,12 @@ type ExtendedClusterHealth struct {
 	OpenVPN                      HealthStatus `json:"openvpn"`
 	CloudProviderInfrastructure  HealthStatus `json:"cloudProviderInfrastructure"`
 	UserClusterControllerManager HealthStatus `json:"userClusterControllerManager"`
+	GatekeeperController         HealthStatus `json:"gatekeeperController,omitempty"`
+	GatekeeperAudit              HealthStatus `json:"gatekeeperAudit,omitempty"`
 }
 
-// AllHealthy returns if all components are healthy
+// AllHealthy returns if all components are healthy. Gatekeeper components not included as they are optional and not
+// crucial for cluster functioning
 func (h *ExtendedClusterHealth) AllHealthy() bool {
 	return h.Etcd == HealthStatusUp &&
 		h.MachineController == HealthStatusUp &&
@@ -792,12 +804,4 @@ func (cluster *Cluster) GetSecretName() string {
 		return fmt.Sprintf("%s-anexia-%s", CredentialPrefix, cluster.Name)
 	}
 	return ""
-}
-
-func (cluster *Cluster) IsOpenshift() bool {
-	return cluster.Annotations["kubermatic.io/openshift"] != ""
-}
-
-func (cluster *Cluster) IsKubernetes() bool {
-	return !cluster.IsOpenshift()
 }

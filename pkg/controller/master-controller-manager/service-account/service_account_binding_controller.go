@@ -37,10 +37,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-const controllerName = "kubermatic_serviceaccount_projectbinding_controller"
+const (
+	controllerName    = "kubermatic_serviceaccount_projectbinding_controller"
+	ServiceAcountName = "serviceaccount"
+)
 
 func Add(mgr manager.Manager) error {
-	r := &reconcileServiceAccountProjectBinding{Client: mgr.GetClient(), ctx: context.TODO()}
+	r := &reconcileServiceAccountProjectBinding{Client: mgr.GetClient()}
 	// Create a new controller
 	c, err := controller.New(controllerName, mgr, controller.Options{Reconciler: r})
 	if err != nil {
@@ -57,27 +60,26 @@ func Add(mgr manager.Manager) error {
 
 // reconcileServiceAccountProjectBinding reconciles User objects
 type reconcileServiceAccountProjectBinding struct {
-	ctx context.Context
 	client.Client
 }
 
-func (r *reconcileServiceAccountProjectBinding) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *reconcileServiceAccountProjectBinding) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	resourceName := request.Name
-	if !strings.HasPrefix(resourceName, "serviceaccount") {
-		return reconcile.Result{}, nil
+	// project service account
+	if strings.HasPrefix(resourceName, ServiceAcountName) {
+		if err := r.ensureServiceAccountProjectBinding(ctx, resourceName); err != nil {
+			logger := log.Logger.With("controller", controllerName)
+			logger.Errorw("failed to reconcile in controller", "error", err)
+			return reconcile.Result{}, err
+		}
 	}
 
-	if err := r.ensureServiceAccountProjectBinding(resourceName); err != nil {
-		logger := log.Logger.With("controller", controllerName)
-		logger.Errorw("failed to reconcile in controller", "error", err)
-		return reconcile.Result{}, err
-	}
 	return reconcile.Result{}, nil
 }
 
-func (r *reconcileServiceAccountProjectBinding) ensureServiceAccountProjectBinding(saName string) error {
+func (r *reconcileServiceAccountProjectBinding) ensureServiceAccountProjectBinding(ctx context.Context, saName string) error {
 	sa := &kubermaticv1.User{}
-	if err := r.Get(r.ctx, client.ObjectKey{Namespace: metav1.NamespaceAll, Name: saName}, sa); err != nil {
+	if err := r.Get(ctx, client.ObjectKey{Namespace: metav1.NamespaceAll, Name: saName}, sa); err != nil {
 		if kerrors.IsNotFound(err) {
 			return nil
 		}
@@ -107,7 +109,7 @@ func (r *reconcileServiceAccountProjectBinding) ensureServiceAccountProjectBindi
 	}
 
 	bindings := &kubermaticv1.UserProjectBindingList{}
-	if err := r.List(r.ctx, bindings, &client.ListOptions{LabelSelector: labelSelector}); err != nil {
+	if err := r.List(ctx, bindings, &client.ListOptions{LabelSelector: labelSelector}); err != nil {
 		return err
 	}
 
@@ -124,18 +126,18 @@ func (r *reconcileServiceAccountProjectBinding) ensureServiceAccountProjectBindi
 		group, ok := sa.Labels[serviceaccount.ServiceAccountLabelGroup]
 		if ok {
 			existingBinding.Spec.Group = group
-			if err := r.Update(r.ctx, &existingBinding); err != nil {
+			if err := r.Update(ctx, &existingBinding); err != nil {
 				return err
 			}
 		}
-	} else if err := r.createBinding(sa, projectName); err != nil {
+	} else if err := r.createBinding(ctx, sa, projectName); err != nil {
 		return err
 	}
 
 	// remove labelGroup from sa
 	if _, ok := sa.Labels[serviceaccount.ServiceAccountLabelGroup]; ok {
 		delete(sa.Labels, serviceaccount.ServiceAccountLabelGroup)
-		if err := r.Update(r.ctx, sa); err != nil {
+		if err := r.Update(ctx, sa); err != nil {
 			return err
 		}
 	}
@@ -143,7 +145,7 @@ func (r *reconcileServiceAccountProjectBinding) ensureServiceAccountProjectBindi
 	return nil
 }
 
-func (r *reconcileServiceAccountProjectBinding) createBinding(sa *kubermaticv1.User, projectName string) error {
+func (r *reconcileServiceAccountProjectBinding) createBinding(ctx context.Context, sa *kubermaticv1.User, projectName string) error {
 	group, ok := sa.Labels[serviceaccount.ServiceAccountLabelGroup]
 	if !ok {
 		return fmt.Errorf("label %s not found for sa %s", serviceaccount.ServiceAccountLabelGroup, sa.Name)
@@ -169,5 +171,5 @@ func (r *reconcileServiceAccountProjectBinding) createBinding(sa *kubermaticv1.U
 		},
 	}
 
-	return r.Create(r.ctx, binding)
+	return r.Create(ctx, binding)
 }

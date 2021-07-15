@@ -212,12 +212,18 @@ type DatacenterSpecOpenstack struct {
 	// See https://kubernetes.io/docs/concepts/cluster-administration/cloud-providers/#load-balancer
 	// This setting defaults to true.
 	ManageSecurityGroups *bool `json:"manage_security_groups"`
+	// Optional: Gets mapped to the "use-octavia" setting in the cloud config.
+	// use-octavia is enabled by default in CCM since v1.17.0, and disabled by
+	// default with the in-tree cloud provider.
+	UseOctavia *bool `json:"use_octavia"`
 	// Optional: Gets mapped to the "trust-device-path" setting in the cloud config.
 	// See https://kubernetes.io/docs/concepts/cluster-administration/cloud-providers/#block-storage
 	// This setting defaults to false.
 	TrustDevicePath       *bool                         `json:"trust_device_path"`
 	NodeSizeRequirements  OpenstackNodeSizeRequirements `json:"node_size_requirements"`
 	NodeVolumeAttachLimit *uint                         `json:"node_volume_attach_limit"`
+	// Optional: List of enabled flavors for the given datacenter
+	EnabledFlavors []string `json:"enabled_flavors"`
 }
 
 type OpenstackNodeSizeRequirements struct {
@@ -399,7 +405,7 @@ type NodeSettings struct {
 	// Optional: Translates to --pod-infra-container-image on the kubelet.
 	// If not set, the kubelet will default it.
 	PauseImage string `json:"pause_image,omitempty"`
-	// Optional: The hyperkube image to use. Currently only Container Linux
+	// Optional: The hyperkube image to use. Currently only Flatcar
 	// makes use of this option.
 	HyperkubeImage string `json:"hyperkube_image,omitempty"`
 }

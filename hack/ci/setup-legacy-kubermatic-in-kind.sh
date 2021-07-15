@@ -68,9 +68,9 @@ fi
 
 echodate "Creating StorageClass kubermatic-fast "
 TEST_NAME="Create StorageClass kubermatic-fast"
-retry 5 kubectl get storageclasses.storage.k8s.io standard -o json \
-  | jq 'del(.metadata)|.metadata.name = "kubermatic-fast"'\
-  | kubectl apply -f -
+retry 5 kubectl get storageclasses.storage.k8s.io standard -o json |
+  jq 'del(.metadata)|.metadata.name = "kubermatic-fast"' |
+  kubectl apply -f -
 echodate "Successfully created StorageClass"
 
 TEST_NAME="Deploy Dex"
@@ -106,14 +106,6 @@ beforeDockerBuild=$(nowms)
   TEST_NAME="Build addons Docker image"
   cd addons
   IMAGE_NAME="quay.io/kubermatic/addons:$KUBERMATIC_VERSION"
-  time retry 5 docker build -t "${IMAGE_NAME}" .
-  time retry 5 kind load docker-image "$IMAGE_NAME" --name "$KIND_CLUSTER_NAME"
-)
-(
-  echodate "Building openshift addons image"
-  TEST_NAME="Build openshift Docker image"
-  cd openshift_addons
-  IMAGE_NAME="quay.io/kubermatic/openshift-addons:$KUBERMATIC_VERSION"
   time retry 5 docker build -t "${IMAGE_NAME}" .
   time retry 5 kind load docker-image "$IMAGE_NAME" --name "$KIND_CLUSTER_NAME"
 )
@@ -160,12 +152,13 @@ echodate "Deploying Kubermatic using Helm..."
 beforeDeployment=$(nowms)
 
 SEED_KUBECONFIG="$(cat $KUBECONFIG | sed 's/127.0.0.1.*/kubernetes.default.svc.cluster.local./' | base64 -w0)"
+KUBERMATIC_DOMAIN="${KUBERMATIC_DOMAIN:-ci.kubermatic.io}"
 
 # we always override the quay repositories so we don't have to care if the
 # Helm chart is made for CE or EE
 retry 3 kubectl create ns kubermatic
 retry 3 helm3 --namespace kubermatic install --atomic --timeout 5m \
-  --set=kubermatic.domain=ci.kubermatic.io \
+  --set=kubermatic.domain="$KUBERMATIC_DOMAIN" \
   --set=kubermatic.isMaster=true \
   --set=kubermatic.imagePullSecretData="$IMAGE_PULL_SECRET_DATA" \
   --set-string=kubermatic.controller.image.repository="quay.io/kubermatic/kubermatic$REPOSUFFIX" \
@@ -174,7 +167,6 @@ retry 3 helm3 --namespace kubermatic install --atomic --timeout 5m \
   --set-string=kubermatic.ui.image.repository="quay.io/kubermatic/dashboard$REPOSUFFIX" \
   --set-string=kubermatic.controller.addons.kubernetes.image.tag="$KUBERMATIC_VERSION" \
   --set-string=kubermatic.controller.image.tag="$KUBERMATIC_VERSION" \
-  --set-string=kubermatic.controller.addons.openshift.image.tag="$KUBERMATIC_VERSION" \
   --set-string=kubermatic.api.image.tag="$KUBERMATIC_VERSION" \
   --set=kubermatic.controller.datacenterName="$SEED_NAME" \
   --set=kubermatic.api.replicas=1 \
@@ -220,9 +212,9 @@ kubectl port-forward --address 0.0.0.0 -n kubermatic svc/kubermatic-api 8080:80 
 echodate "Finished exposing components"
 
 echodate "Waiting for Dex to be ready"
-retry 5 curl -sSf  http://127.0.0.1:5556/dex/healthz
+retry 5 curl -sSf http://127.0.0.1:5556/dex/healthz
 echodate "Dex became ready"
 
 echodate "Waiting for Kubermatic API to be ready"
-retry 5 curl -sSf  http://127.0.0.1:8080/api/v1/healthz
+retry 5 curl -sSf http://127.0.0.1:8080/api/v1/healthz
 echodate "API became ready"

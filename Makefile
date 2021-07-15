@@ -34,7 +34,7 @@ LDFLAGS += -extldflags '-static' \
 LDFLAGS_EXTRA?=-w
 BUILD_DEST ?= _build
 GOTOOLFLAGS ?= $(GOBUILDFLAGS) -ldflags '$(LDFLAGS_EXTRA) $(LDFLAGS)' $(GOTOOLFLAGS_EXTRA)
-GOBUILDIMAGE ?= golang:1.15.1
+GOBUILDIMAGE ?= golang:1.16.1
 DOCKER_BIN := $(shell which docker)
 
 .PHONY: all
@@ -94,12 +94,8 @@ test-integration: download-gocache
 
 .PHONY: test-update
 test-update:
-	-go test ./pkg/userdata/openshift -update
 	-go test ./pkg/resources/test -update
 	-go test ./pkg/provider/cloud/aws -update
-	-go test ./pkg/controller/seed-controller-manager/openshift -update
-	-go test ./pkg/controller/seed-controller-manager/openshift/resources -update
-	-go test ./codegen/openshift_versions -update
 
 .PHONY: clean
 clean:
@@ -125,7 +121,11 @@ endif
 
 .PHONY: lint
 lint:
-	./hack/ci/run-lint.sh
+	golangci-lint run \
+		--verbose \
+		--build-tags "$(KUBERMATIC_EDITION)" \
+		--print-resources-usage \
+		./pkg/... ./cmd/... ./codegen/...
 
 .PHONY: shellcheck
 shellcheck:
@@ -158,9 +158,12 @@ run-master-controller-manager:
 	./hack/run-master-controller-manager.sh
 
 .PHONY: run-nodeport-proxy-e2e-test-in-kind
-run-nodeport-proxy-e2e-test-in-kind: CGO_ENABLED=1
 run-nodeport-proxy-e2e-test-in-kind:
 	./hack/run-nodeport-proxy-e2e-test-in-kind.sh
+
+.PHONY: run-expose-strategy-e2e-test-in-kind
+run-expose-strategy-e2e-test-in-kind:
+	./hack/run-expose-strategy-e2e-test-in-kind.sh
 
 .PHONY: verify
 verify:
@@ -177,3 +180,7 @@ check-dependencies:
 .PHONY: gen-api-client
 gen-api-client:
 	./hack/gen-api-client.sh
+
+.PHONY: shfmt
+shfmt:
+	shfmt -w -sr -i 2 hack

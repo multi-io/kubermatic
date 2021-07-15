@@ -32,15 +32,16 @@ import (
 	"k8c.io/kubermatic/v2/pkg/provider"
 	"k8c.io/kubermatic/v2/pkg/util/cli"
 	"k8c.io/kubermatic/v2/pkg/util/workerlabel"
-	"k8c.io/kubermatic/v2/pkg/validation"
+	"k8c.io/kubermatic/v2/pkg/webhook"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/klog"
-	ctrl "sigs.k8s.io/controller-runtime"
+	ctrlruntime "sigs.k8s.io/controller-runtime"
 	ctrlruntimelog "sigs.k8s.io/controller-runtime/pkg/log"
 	ctrlruntimezaplog "sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
@@ -50,7 +51,7 @@ const (
 
 type controllerRunOptions struct {
 	internalAddr            string
-	validationHook          validation.WebhookOpts
+	admissionWebhook        webhook.Options
 	enableLeaderElection    bool
 	leaderElectionNamespace string
 	featureGates            features.FeatureGate
@@ -81,7 +82,7 @@ func main() {
 	pprofOpts.AddFlags(flag.CommandLine)
 	logOpts := kubermaticlog.NewDefaultOptions()
 	logOpts.AddFlags(flag.CommandLine)
-	runOpts.validationHook.AddFlags(flag.CommandLine, true)
+	runOpts.admissionWebhook.AddFlags(flag.CommandLine, true)
 	flag.StringVar(&runOpts.workerName, "worker-name", "", "The name of the worker that will only processes resources with label=worker-name.")
 	flag.IntVar(&ctrlCtx.workerCount, "worker-count", 4, "Number of workers which process the clusters in parallel.")
 	flag.StringVar(&runOpts.internalAddr, "internal-address", "127.0.0.1:8085", "The address on which the /metrics endpoint will be served.")
@@ -93,7 +94,7 @@ func main() {
 	addFlags(flag.CommandLine)
 	flag.Parse()
 
-	ctrlruntimelog.SetLogger(ctrlruntimezaplog.Logger(false))
+	ctrlruntimelog.SetLogger(ctrlruntimezaplog.New(ctrlruntimezaplog.UseDevMode(false)))
 	rawLog := kubermaticlog.New(logOpts.Debug, logOpts.Format)
 	log := rawLog.Sugar()
 	defer func() {
@@ -108,7 +109,7 @@ func main() {
 
 	cli.Hello(log, "Master Controller-Manager", logOpts.Debug, nil)
 
-	if err := runOpts.validationHook.Validate(); err != nil {
+	if err := runOpts.admissionWebhook.Validate(); err != nil {
 		log.Fatalw("invalid admission webhook configuration", zap.Error(err))
 	}
 
@@ -125,8 +126,7 @@ func main() {
 	metrics.RegisterRuntimErrorMetricCounter("kubermatic_master_controller_manager", prometheus.DefaultRegisterer)
 
 	// prepare a context to use throughout the controller manager
-	ctx, ctxCancel := context.WithCancel(context.Background())
-	defer ctxCancel()
+	ctx := signals.SetupSignalHandler()
 	ctrlCtx.ctx = ctx
 
 	ctrlCtx.labelSelectorFunc = func(listOpts *metav1.ListOptions) {
@@ -137,7 +137,7 @@ func main() {
 	if runOpts.workerName != "" {
 		electionName += "-" + runOpts.workerName
 	}
-	mgr, err := manager.New(ctrl.GetConfigOrDie(), manager.Options{
+	mgr, err := manager.New(ctrlruntime.GetConfigOrDie(), manager.Options{
 		LeaderElection:          runOpts.enableLeaderElection,
 		LeaderElectionNamespace: runOpts.leaderElectionNamespace,
 		LeaderElectionID:        electionName,
@@ -163,8 +163,8 @@ func main() {
 		log.Fatalw("failed to construct seedKubeconfigGetter", zap.Error(err))
 	}
 
-	if runOpts.validationHook.Configured() {
-		if err := runOpts.validationHook.Configure(mgr.GetWebhookServer()); err != nil {
+	if runOpts.admissionWebhook.Configured() {
+		if err := runOpts.admissionWebhook.Configure(mgr.GetWebhookServer()); err != nil {
 			log.Fatalw("failed to configure admission webhook server", zap.Error(err))
 		}
 
@@ -187,8 +187,7 @@ func main() {
 	}
 
 	log.Info("starting the master-controller-manager...")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err := mgr.Start(ctx); err != nil {
 		log.Fatalw("problem running manager", zap.Error(err))
 	}
-
 }

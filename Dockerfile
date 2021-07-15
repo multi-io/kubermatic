@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM alpine:3.12
+FROM alpine:3.13
 LABEL maintainer="support@kubermatic.com"
 
 ENV KUBERMATIC_CHARTS_DIRECTORY=/opt/charts/
 
 SHELL ["/bin/ash", "-o", "pipefail", "-c"]
-ADD https://storage.googleapis.com/kubernetes-release/release/v1.18.8/bin/linux/amd64/kubectl /usr/local/bin/kubectl
-RUN wget -q -O- https://get.helm.sh/helm-v3.3.1-linux-amd64.tar.gz | tar xzOf - linux-amd64/helm > /usr/local/bin/helm
+ADD https://storage.googleapis.com/kubernetes-release/release/v1.20.5/bin/linux/amd64/kubectl /usr/local/bin/kubectl
+RUN wget -q -O- https://get.helm.sh/helm-v3.5.0-linux-amd64.tar.gz | tar xzOf - linux-amd64/helm > /usr/local/bin/helm
 
 # We need the ca-certs so they api doesn't crash because it can't verify the certificate of Dex
 RUN chmod +x /usr/local/bin/kubectl /usr/local/bin/helm && apk --no-cache add ca-certificates=~20191127
@@ -33,7 +33,6 @@ COPY ./_build/image-loader \
      ./_build/owner-remover \
      ./_build/seed-controller-manager \
      ./_build/user-cluster-controller-manager \
-     ./_build/userdata-openshift \
      /usr/local/bin/
 
 COPY ./cmd/kubermatic-api/swagger.json /opt/swagger.json

@@ -25,6 +25,9 @@ type DatacenterSpecOpenstack struct {
 	// Used for automatic network creation
 	DNSServers []string `json:"dns_servers"`
 
+	// Optional: List of enabled flavors for the given datacenter
+	EnabledFlavors []string `json:"enabled_flavors"`
+
 	// Optional
 	EnforceFloatingIP bool `json:"enforce_floating_ip,omitempty"`
 
@@ -46,6 +49,11 @@ type DatacenterSpecOpenstack struct {
 	// See https://kubernetes.io/docs/concepts/cluster-administration/cloud-providers/#block-storage
 	// This setting defaults to false.
 	TrustDevicePath bool `json:"trust_device_path,omitempty"`
+
+	// Optional: Gets mapped to the "use-octavia" setting in the cloud config.
+	// use-octavia is enabled by default in CCM since v1.17.0, and disabled by
+	// default with the in-tree cloud provider.
+	UseOctavia bool `json:"use_octavia,omitempty"`
 
 	// images
 	Images ImageList `json:"images,omitempty"`

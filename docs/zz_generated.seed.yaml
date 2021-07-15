@@ -24,7 +24,7 @@ spec:
       node:
         # Optional: If set, this proxy will be configured for both HTTP and HTTPS.
         http_proxy: ""
-        # Optional: The hyperkube image to use. Currently only Container Linux
+        # Optional: The hyperkube image to use. Currently only Flatcar
         # makes use of this option.
         hyperkube_image: ""
         # Optional: These image registries will be configured as insecure
@@ -57,7 +57,6 @@ spec:
           # to define the AMIs statically.
           images:
             centos: ""
-            coreos: ""
             flatcar: ""
             rhel: ""
             sles: ""
@@ -130,6 +129,8 @@ spec:
           availability_zone: ""
           # Used for automatic network creation
           dns_servers: []
+          # Optional: List of enabled flavors for the given datacenter
+          enabled_flavors: []
           # Optional
           enforce_floating_ip: false
           # Optional
@@ -137,7 +138,6 @@ spec:
           # Images to use for each supported operating system.
           images:
             centos: ""
-            coreos: ""
             flatcar: ""
             rhel: ""
             sles: ""
@@ -157,6 +157,10 @@ spec:
           # See https://kubernetes.io/docs/concepts/cluster-administration/cloud-providers/#block-storage
           # This setting defaults to false.
           trust_device_path: false
+          # Optional: Gets mapped to the "use-octavia" setting in the cloud config.
+          # use-octavia is enabled by default in CCM since v1.17.0, and disabled by
+          # default with the in-tree cloud provider.
+          use_octavia: true
         packet:
           # The list of enabled facilities, for example "ams1", for a full list of available
           # facilities see https://support.packet.com/kb/articles/data-centers
@@ -201,7 +205,6 @@ spec:
           # See: https://github.com/kubermatic/machine-controller/blob/master/docs/vsphere.md#template-vms-preparation
           templates:
             centos: ""
-            coreos: ""
             flatcar: ""
             rhel: ""
             sles: ""

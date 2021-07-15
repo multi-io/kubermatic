@@ -92,14 +92,6 @@ beforeDockerBuild=$(nowms)
   time retry 5 kind load docker-image "$IMAGE_NAME" --name "$KIND_CLUSTER_NAME"
 )
 (
-  echodate "Building openshift addons image"
-  TEST_NAME="Build openshift Docker image"
-  cd openshift_addons
-  IMAGE_NAME="quay.io/kubermatic/openshift-addons:$KUBERMATIC_VERSION"
-  time retry 5 docker build -t "${IMAGE_NAME}" .
-  time retry 5 kind load docker-image "$IMAGE_NAME" --name "$KIND_CLUSTER_NAME"
-)
-(
   echodate "Building nodeport-proxy image"
   TEST_NAME="Build nodeport-proxy Docker image"
   cd cmd/nodeport-proxy
@@ -141,14 +133,16 @@ echodate "Successfully built and loaded all images"
 # prepare to run kubermatic-installer
 KUBERMATIC_CONFIG="$(mktemp)"
 IMAGE_PULL_SECRET_INLINE="$(echo "$IMAGE_PULL_SECRET_DATA" | base64 --decode | jq --compact-output --monochrome-output '.')"
+KUBERMATIC_DOMAIN="${KUBERMATIC_DOMAIN:-ci.kubermatic.io}"
 
 cp hack/ci/testdata/kubermatic.yaml $KUBERMATIC_CONFIG
 
 sed -i "s;__SERVICE_ACCOUNT_KEY__;$SERVICE_ACCOUNT_KEY;g" $KUBERMATIC_CONFIG
 sed -i "s;__IMAGE_PULL_SECRET__;$IMAGE_PULL_SECRET_INLINE;g" $KUBERMATIC_CONFIG
+sed -i "s;__KUBERMATIC_DOMAIN__;$KUBERMATIC_DOMAIN;g" $KUBERMATIC_CONFIG
 
 HELM_VALUES_FILE="$(mktemp)"
-cat <<EOF >$HELM_VALUES_FILE
+cat << EOF > $HELM_VALUES_FILE
 kubermaticOperator:
   image:
     repository: "quay.io/kubermatic/kubermatic$REPOSUFFIX"
@@ -200,6 +194,6 @@ appendTrap cleanup_kubermatic_clusters_in_kind EXIT
 
 TEST_NAME="Expose Dex and Kubermatic API"
 echodate "Exposing Dex and Kubermatic API to localhost..."
-kubectl port-forward --address 0.0.0.0 -n oauth svc/dex 5556 >/dev/null &
-kubectl port-forward --address 0.0.0.0 -n kubermatic svc/kubermatic-api 8080:80 >/dev/null &
+kubectl port-forward --address 0.0.0.0 -n oauth svc/dex 5556 > /dev/null &
+kubectl port-forward --address 0.0.0.0 -n kubermatic svc/kubermatic-api 8080:80 > /dev/null &
 echodate "Finished exposing components"

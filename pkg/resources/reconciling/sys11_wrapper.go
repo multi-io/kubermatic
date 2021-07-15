@@ -6,7 +6,6 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	kubeerrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -14,7 +13,7 @@ import (
 // number to match what is configured in a deployment if it exists.
 func SetRunningReplicasNumberIfExistsWrapper(ctx context.Context, client ctrlruntimeclient.Client) ObjectModifier {
 	return func(create ObjectCreator) ObjectCreator {
-		return func(existing runtime.Object) (runtime.Object, error) {
+		return func(existing ctrlruntimeclient.Object) (ctrlruntimeclient.Object, error) {
 			obj, err := create(existing)
 			if err != nil {
 				return obj, err

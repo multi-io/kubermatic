@@ -17,10 +17,12 @@ limitations under the License.
 package openstack
 
 import (
+	"crypto/tls"
 	"crypto/x509"
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"strings"
 
 	"github.com/gophercloud/gophercloud"
@@ -66,21 +68,32 @@ type getClientFunc func(cluster kubermaticv1.CloudSpec, dc *kubermaticv1.Datacen
 
 // Provider is a struct that implements CloudProvider interface
 type Provider struct {
-	dc                   *kubermaticv1.DatacenterSpecOpenstack
-	secretKeySelector    provider.SecretKeySelectorValueFunc
-	getClientFunc        getClientFunc
+	dc                *kubermaticv1.DatacenterSpecOpenstack
+	secretKeySelector provider.SecretKeySelectorValueFunc
+	caBundle          *x509.CertPool
+	nodePortsRange    string
+	getClientFunc     getClientFunc
+
 	getComputeClientFunc getClientFunc
 }
 
 // NewCloudProvider creates a new openstack provider.
-func NewCloudProvider(dc *kubermaticv1.Datacenter, secretKeyGetter provider.SecretKeySelectorValueFunc) (*Provider, error) {
+func NewCloudProvider(
+	dc *kubermaticv1.Datacenter,
+	secretKeyGetter provider.SecretKeySelectorValueFunc,
+	caBundle *x509.CertPool,
+	nodePortsRange string,
+) (*Provider, error) {
 	if dc.Spec.Openstack == nil {
 		return nil, errors.New("datacenter is not an Openstack datacenter")
 	}
 	return &Provider{
-		dc:                   dc.Spec.Openstack,
-		secretKeySelector:    secretKeyGetter,
-		getClientFunc:        getNetClientForCluster,
+		dc:                dc.Spec.Openstack,
+		secretKeySelector: secretKeyGetter,
+		caBundle:          caBundle,
+		nodePortsRange:    nodePortsRange,
+		getClientFunc:     getNetClientForCluster,
+
 		getComputeClientFunc: getComputeClientForCluster,
 	}, nil
 }
@@ -92,7 +105,7 @@ func (os *Provider) DefaultCloudSpec(spec *kubermaticv1.CloudSpec) error {
 
 // ValidateCloudSpec validates the given CloudSpec
 func (os *Provider) ValidateCloudSpec(spec kubermaticv1.CloudSpec) error {
-	netClient, err := os.getClientFunc(spec, os.dc, os.secretKeySelector, nil)
+	netClient, err := os.getClientFunc(spec, os.dc, os.secretKeySelector, os.caBundle)
 	if err != nil {
 		return err
 	}
@@ -162,7 +175,8 @@ func validateExistingSubnetOverlap(networkID string, netClient *gophercloud.Serv
 // InitializeCloudProvider initializes a cluster, in particular
 // creates security group and network configuration
 func (os *Provider) InitializeCloudProvider(cluster *kubermaticv1.Cluster, update provider.ClusterUpdater) (*kubermaticv1.Cluster, error) {
-	netClient, err := os.getClientFunc(cluster.Spec.Cloud, os.dc, os.secretKeySelector, nil)
+
+	netClient, err := os.getClientFunc(cluster.Spec.Cloud, os.dc, os.secretKeySelector, os.caBundle)
 	if err != nil {
 		return nil, err
 	}
@@ -228,7 +242,21 @@ func (os *Provider) InitializeCloudProvider(cluster *kubermaticv1.Cluster, updat
 	}
 
 	if cluster.Spec.Cloud.Openstack.SecurityGroups == "" {
-		secGroupName, err := createKubermaticSecurityGroup(netClient, cluster.Name, cluster.Spec.Cloud.Openstack.SubnetCIDR)
+		lowPort, highPort := resources.NewTemplateDataBuilder().
+			WithNodePortRange(os.nodePortsRange).
+			WithCluster(cluster).
+			Build().
+			NodePorts()
+
+		req := createKubermaticSecurityGroupRequest{
+			clusterName: cluster.Name,
+			lowPort:     lowPort,
+			highPort:    highPort,
+
+			customSubnetCIDR: cluster.Spec.Cloud.Openstack.SubnetCIDR,
+		}
+
+		secGroupName, err := createKubermaticSecurityGroup(netClient, req)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create the kubermatic security group: %v", err)
 		}
@@ -335,7 +363,7 @@ func (os *Provider) InitializeCloudProvider(cluster *kubermaticv1.Cluster, updat
 // CleanUpCloudProvider does the clean-up in particular:
 // removes security group and network configuration
 func (os *Provider) CleanUpCloudProvider(cluster *kubermaticv1.Cluster, update provider.ClusterUpdater) (*kubermaticv1.Cluster, error) {
-	netClient, err := os.getClientFunc(cluster.Spec.Cloud, os.dc, os.secretKeySelector, nil)
+	netClient, err := os.getClientFunc(cluster.Spec.Cloud, os.dc, os.secretKeySelector, os.caBundle)
 	if err != nil {
 		return nil, err
 	}
@@ -382,6 +410,19 @@ func (os *Provider) CleanUpCloudProvider(cluster *kubermaticv1.Cluster, update p
 		}
 	}
 
+	if kubernetes.HasAnyFinalizer(cluster, ServerGroupCleanupFinalizer) {
+		computeClient, err := os.getClientFunc(cluster.Spec.Cloud, os.dc, os.secretKeySelector, nil)
+		if err != nil {
+			return nil, fmt.Errorf("get compute client: %v", err)
+		}
+		id := cluster.Spec.Cloud.Openstack.ServerGroupID
+		if err := deleteServerGroup(computeClient, id); err != nil {
+			if !isNotFoundErr(err) {
+				return cluster, fmt.Errorf("delete server group for cluster '%s': %v", cluster.Name, err)
+			}
+		}
+	}
+
 	// Relying on the idempotence of the clean-up steps we remove all finalizers in
 	// one shot only when the clean-up is completed.
 	cluster, err = update(cluster.Name, func(cluster *kubermaticv1.Cluster) {
@@ -393,32 +434,13 @@ func (os *Provider) CleanUpCloudProvider(cluster *kubermaticv1.Cluster, update p
 			NetworkCleanupFinalizer,
 			RouterCleanupFinalizer,
 			OldNetworkCleanupFinalizer,
+			ServerGroupCleanupFinalizer,
 		)
 	}, provider.UpdaterOptionOptimisticLock)
 	if err != nil {
 		return nil, err
 	}
 
-	computeClient, err := os.getClientFunc(cluster.Spec.Cloud, os.dc, os.secretKeySelector, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return cleanUpServerGroup(cluster, computeClient, update, os.dc.AuthURL, os.dc.Region)
-}
-
-func cleanUpServerGroup(cluster *kubermaticv1.Cluster, client *gophercloud.ServiceClient, update provider.ClusterUpdater, authURL, region string) (*kubermaticv1.Cluster, error) {
-	if kubernetes.HasAnyFinalizer(cluster, ServerGroupCleanupFinalizer) {
-		id := cluster.Spec.Cloud.Openstack.ServerGroupID
-		if err := deleteServerGroup(client, id); err != nil {
-			if !isNotFoundErr(err) {
-				return cluster, err
-			}
-		}
-		return update(cluster.Name, func(cluster *kubermaticv1.Cluster) {
-			kubernetes.RemoveFinalizer(cluster, ServerGroupCleanupFinalizer)
-		})
-	}
 	return cluster, nil
 }
 
@@ -430,8 +452,8 @@ func deleteServerGroup(client *gophercloud.ServiceClient, id string) error {
 }
 
 // GetFlavors lists available flavors for the given CloudSpec.DatacenterName and OpenstackSpec.Region
-func GetFlavors(username, password, domain, tenant, tenantID, authURL, region string) ([]osflavors.Flavor, error) {
-	authClient, err := getAuthClient(username, password, domain, tenant, tenantID, authURL)
+func GetFlavors(username, password, domain, tenant, tenantID, authURL, region string, caBundle *x509.CertPool) ([]osflavors.Flavor, error) {
+	authClient, err := getAuthClient(username, password, domain, tenant, tenantID, authURL, caBundle)
 	if err != nil {
 		return nil, err
 	}
@@ -444,8 +466,8 @@ func GetFlavors(username, password, domain, tenant, tenantID, authURL, region st
 }
 
 // GetTenants lists all available tenents for the given CloudSpec.DatacenterName
-func GetTenants(username, password, domain, tenant, tenantID, authURL, region string) ([]osprojects.Project, error) {
-	authClient, err := getAuthClient(username, password, domain, tenant, tenantID, authURL)
+func GetTenants(username, password, domain, tenant, tenantID, authURL, region string, caBundle *x509.CertPool) ([]osprojects.Project, error) {
+	authClient, err := getAuthClient(username, password, domain, tenant, tenantID, authURL, caBundle)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get auth client: %v", err)
 	}
@@ -459,8 +481,8 @@ func GetTenants(username, password, domain, tenant, tenantID, authURL, region st
 }
 
 // GetNetworks lists all available networks for the given CloudSpec.DatacenterName
-func GetNetworks(username, password, domain, tenant, tenantID, authURL, region string) ([]NetworkWithExternalExt, error) {
-	authClient, err := getNetClient(username, password, domain, tenant, tenantID, authURL, region)
+func GetNetworks(username, password, domain, tenant, tenantID, authURL, region string, caBundle *x509.CertPool) ([]NetworkWithExternalExt, error) {
+	authClient, err := getNetClient(username, password, domain, tenant, tenantID, authURL, region, caBundle)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get auth client: %v", err)
 	}
@@ -474,8 +496,8 @@ func GetNetworks(username, password, domain, tenant, tenantID, authURL, region s
 }
 
 // GetSecurityGroups lists all available security groups for the given CloudSpec.DatacenterName
-func GetSecurityGroups(username, password, domain, tenant, tenantID, authURL, region string) ([]ossecuritygroups.SecGroup, error) {
-	netClient, err := getNetClient(username, password, domain, tenant, tenantID, authURL, region)
+func GetSecurityGroups(username, password, domain, tenant, tenantID, authURL, region string, caBundle *x509.CertPool) ([]ossecuritygroups.SecGroup, error) {
+	netClient, err := getNetClient(username, password, domain, tenant, tenantID, authURL, region, caBundle)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get auth client: %v", err)
 	}
@@ -492,8 +514,8 @@ func GetSecurityGroups(username, password, domain, tenant, tenantID, authURL, re
 }
 
 // GetAvailabilityZones lists availability zones for the given CloudSpec.DatacenterName and OpenstackSpec.Region
-func GetAvailabilityZones(username, password, domain, tenant, tenantID, authURL, region string) ([]osavailabilityzones.AvailabilityZone, error) {
-	computeClient, err := getComputeClient(username, password, domain, tenant, tenantID, authURL, region)
+func GetAvailabilityZones(username, password, domain, tenant, tenantID, authURL, region string, caBundle *x509.CertPool) ([]osavailabilityzones.AvailabilityZone, error) {
+	computeClient, err := getComputeClient(username, password, domain, tenant, tenantID, authURL, region, caBundle)
 	if err != nil {
 		return nil, err
 	}
@@ -505,7 +527,7 @@ func GetAvailabilityZones(username, password, domain, tenant, tenantID, authURL,
 	return availabilityZones, nil
 }
 
-func getAuthClient(username, password, domain, tenant, tenantID, authURL string) (*gophercloud.ProviderClient, error) {
+func getAuthClient(username, password, domain, tenant, tenantID, authURL string, caBundle *x509.CertPool) (*gophercloud.ProviderClient, error) {
 	opts := gophercloud.AuthOptions{
 		IdentityEndpoint: authURL,
 		Username:         username,
@@ -515,15 +537,26 @@ func getAuthClient(username, password, domain, tenant, tenantID, authURL string)
 		TenantID:         tenantID,
 	}
 
-	client, err := goopenstack.AuthenticatedClient(opts)
+	client, err := goopenstack.NewClient(authURL)
 	if err != nil {
 		return nil, err
 	}
+
+	if client != nil {
+		// overwrite the default host/root CA Bundle with the proper CA Bundle
+		client.HTTPClient.Transport = &http.Transport{TLSClientConfig: &tls.Config{RootCAs: caBundle}}
+	}
+
+	err = goopenstack.Authenticate(client, opts)
+	if err != nil {
+		return nil, err
+	}
+
 	return client, nil
 }
 
-func getNetClient(username, password, domain, tenant, tenantID, authURL, region string) (*gophercloud.ServiceClient, error) {
-	authClient, err := getAuthClient(username, password, domain, tenant, tenantID, authURL)
+func getNetClient(username, password, domain, tenant, tenantID, authURL, region string, caBundle *x509.CertPool) (*gophercloud.ServiceClient, error) {
+	authClient, err := getAuthClient(username, password, domain, tenant, tenantID, authURL, caBundle)
 	if err != nil {
 		return nil, err
 	}
@@ -546,8 +579,8 @@ func getNetClient(username, password, domain, tenant, tenantID, authURL, region 
 }
 
 // GetSubnets list all available subnet ids for a given CloudSpec
-func GetSubnets(username, password, domain, tenant, tenantID, networkID, authURL, region string) ([]ossubnets.Subnet, error) {
-	serviceClient, err := getNetClient(username, password, domain, tenant, tenantID, authURL, region)
+func GetSubnets(username, password, domain, tenant, tenantID, networkID, authURL, region string, caBundle *x509.CertPool) ([]ossubnets.Subnet, error) {
+	serviceClient, err := getNetClient(username, password, domain, tenant, tenantID, authURL, region, caBundle)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get auth client: %v", err)
 	}
@@ -642,7 +675,7 @@ func getNetClientForCluster(cluster kubermaticv1.CloudSpec, dc *kubermaticv1.Dat
 		return nil, fmt.Errorf("failed to get credentials: %v", err)
 	}
 
-	netClient, err := getNetClient(creds.Username, creds.Password, creds.Domain, creds.Tenant, creds.TenantID, dc.AuthURL, dc.Region)
+	netClient, err := getNetClient(creds.Username, creds.Password, creds.Domain, creds.Tenant, creds.TenantID, dc.AuthURL, dc.Region, caBundle)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create a authenticated openstack client: %v", err)
 	}
@@ -655,7 +688,7 @@ func getComputeClientForCluster(cluster kubermaticv1.CloudSpec, dc *kubermaticv1
 		return nil, fmt.Errorf("failed to get credentials: %v", err)
 	}
 
-	ret, err := getComputeClient(creds.Username, creds.Password, creds.Domain, creds.Tenant, creds.TenantID, dc.AuthURL, dc.Region)
+	ret, err := getComputeClient(creds.Username, creds.Password, creds.Domain, creds.Tenant, creds.TenantID, dc.AuthURL, dc.Region, caBundle)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create a authenticated openstack client: %v", err)
 	}
