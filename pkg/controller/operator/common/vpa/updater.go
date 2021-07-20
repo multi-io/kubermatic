@@ -66,7 +66,8 @@ func UpdaterDeploymentCreator(cfg *operatorv1alpha1.KubermaticConfiguration, ver
 					Command: []string{"/updater"},
 					Args: []string{
 						fmt.Sprintf("--address=:%d", updaterPort),
-						"--evict-after-oom-treshold=30m",
+						"--evict-after-oom-threshold=30m",
+						"--min-replicas=1", // TODO: extract as KubermaticConfiguration option
 						"--updater-interval=10m",
 						"--logtostderr",
 					},
