@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -77,7 +78,7 @@ func podIsReady(p *corev1.Pod) bool {
 type testScenario interface {
 	Name() string
 	Cluster(secrets secrets) *apimodels.CreateClusterSpec
-	NodeDeployments(ctx context.Context, num int, secrets secrets) ([]apimodels.NodeDeployment, error)
+	NodeDeployments(ctx context.Context, num int, secrets secrets, image string) ([]apimodels.NodeDeployment, error)
 	OS() apimodels.OperatingSystemSpec
 }
 
@@ -112,6 +113,8 @@ func newRunner(scenarios []testScenario, opts *Opts, log *zap.SugaredLogger) *te
 		kubermaticProjectID:          opts.kubermaticProjectID,
 		kubermaticClient:             opts.kubermaticClient,
 		kubermaticAuthenticator:      opts.kubermaticAuthenticator,
+
+		sys11NodeImage: opts.sys11NodeImage,
 	}
 }
 
@@ -151,6 +154,8 @@ type testRunner struct {
 	kubermaticProjectID     string
 	kubermaticClient        *apiclient.MetaKubeAPI
 	kubermaticAuthenticator runtime.ClientAuthInfoWriter
+
+	sys11NodeImage string
 }
 
 type testResult struct {
@@ -298,7 +303,8 @@ func (r *testRunner) executeScenario(ctx context.Context, log *zap.SugaredLogger
 				cluster, err = r.createCluster(ctx, log, scenario)
 				return err
 			}); err != nil {
-			return report, fmt.Errorf("failed to create cluster: %v", err)
+			data, _ := json.Marshal(err)
+			return report, fmt.Errorf("failed to create cluster: %v", string(data))
 		}
 	} else {
 		log.Info("Using existing cluster")
@@ -551,6 +557,12 @@ func (r *testRunner) deleteCluster(ctx context.Context, report *reporters.JUnitT
 					return fmt.Errorf("failed to parse selector: %v", err)
 				}
 			}
+			projectIDReq, err := labels.ParseToRequirements("project-id=" + r.kubermaticProjectID)
+			if err != nil {
+				log.Panic(err)
+			}
+			selector = selector.Add(projectIDReq...)
+			log.Infof("using selector %v", selector)
 			return wait.PollImmediate(5*time.Second, deleteTimeout, func() (bool, error) {
 				clusterList := &kubermaticv1.ClusterList{}
 				listOpts := &ctrlruntimeclient.ListOptions{LabelSelector: selector}
@@ -844,7 +856,7 @@ func (r *testRunner) createNodeDeployments(ctx context.Context, log *zap.Sugared
 	var nodeDeployments []apimodels.NodeDeployment
 	if err := wait.PollImmediate(10*time.Second, time.Minute, func() (bool, error) {
 		var err error
-		nodeDeployments, err = scenario.NodeDeployments(ctx, nodeCount, r.secrets)
+		nodeDeployments, err = scenario.NodeDeployments(ctx, nodeCount, r.secrets, r.sys11NodeImage)
 		if err != nil {
 			log.Warnw("Getting NodeDeployments from scenario failed", zap.Error(err))
 			return false, nil

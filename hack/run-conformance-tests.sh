@@ -104,10 +104,14 @@ openstack)
   OS_TENANT_NAME="${OS_TENANT_NAME:-$(vault kv get -field=OS_TENANT_NAME dev/syseleven-openstack)}"
   OS_USERNAME="${OS_USERNAME:-$(vault kv get -field=username dev/syseleven-openstack)}"
   OS_PASSWORD="${OS_PASSWORD:-$(vault kv get -field=password dev/syseleven-openstack)}"
+  if [ -z "${OS_NODE_IMAGE:-}" ]; then
+    echo "OS_NODE_IMAGE is not set" && exit 1
+  fi
   extraArgs="-openstack-domain=$OS_DOMAIN
       -openstack-tenant=$OS_TENANT_NAME
       -openstack-username=$OS_USERNAME
-      -openstack-password=$OS_PASSWORD"
+      -openstack-password=$OS_PASSWORD
+      -sys11-node-image=$OS_NODE_IMAGE"
   ;;
 
 packet)
@@ -201,6 +205,6 @@ else
     -kubermatic-oidc-token="$oidcToken" \
     -kubermatic-delete-cluster=true \
     -providers="$provider" \
-    -distributions="flatcar" \
+    -distributions="ubuntu" \
     $@
 fi
