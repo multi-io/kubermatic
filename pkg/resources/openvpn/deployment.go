@@ -36,7 +36,7 @@ var (
 	openvpnResourceRequirements = corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
 			corev1.ResourceMemory: resource.MustParse("5Mi"),
-			corev1.ResourceCPU:    resource.MustParse("5m"),
+			corev1.ResourceCPU:    resource.MustParse("50m"),
 		},
 		Limits: corev1.ResourceList{
 			corev1.ResourceMemory: resource.MustParse("50Mi"),
