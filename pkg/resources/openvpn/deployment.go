@@ -18,6 +18,7 @@ package openvpn
 
 import (
 	"fmt"
+	autoscalingv1beta2 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1beta2"
 	"net"
 	"path"
 
@@ -57,6 +58,23 @@ var (
 			},
 		},
 		"openvpn-exporter": openvpnResourceRequirements.DeepCopy(),
+	}
+
+	// Limits are understood as limit only for recommendation (requests)
+	// This means actual container limits = VPA limit * (limit to requests ratio)
+	// This is always equal or higher than VPA limit
+	vpaContainerPolicies = []autoscalingv1beta2.ContainerResourcePolicy{
+		{
+			ContainerName: name,
+			MinAllowed: corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse("5Mi"),
+				corev1.ResourceCPU:    resource.MustParse("5m"),
+			},
+			MaxAllowed: corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse("10Mi"),
+				corev1.ResourceCPU:    resource.MustParse("100m"),
+			},
+		},
 	}
 )
 

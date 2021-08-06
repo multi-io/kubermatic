@@ -18,6 +18,7 @@ package apiserver
 
 import (
 	"fmt"
+	autoscalingv1beta2 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1beta2"
 	"path/filepath"
 	"strings"
 
@@ -47,6 +48,23 @@ var (
 		Limits: corev1.ResourceList{
 			corev1.ResourceMemory: resource.MustParse("4Gi"),
 			corev1.ResourceCPU:    resource.MustParse("2"),
+		},
+	}
+
+	// Limits are understood as limit only for recommendation (requests)
+	// This means actual container limits = VPA limit * (limit to requests ratio)
+	// This is always equal or higher than VPA limit
+	vpaContainerPolicies = []autoscalingv1beta2.ContainerResourcePolicy{
+		{
+			ContainerName: resources.ApiserverDeploymentName,
+			MinAllowed: corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse("200Mi"),
+				corev1.ResourceCPU:    resource.MustParse("50m"),
+			},
+			MaxAllowed: corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse("3Gi"),
+				corev1.ResourceCPU:    resource.MustParse("600m"),
+			},
 		},
 	}
 )

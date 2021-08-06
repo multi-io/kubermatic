@@ -18,6 +18,7 @@ package controllermanager
 
 import (
 	"fmt"
+	autoscalingv1beta2 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1beta2"
 	"strings"
 
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
@@ -46,6 +47,23 @@ var (
 		Limits: corev1.ResourceList{
 			corev1.ResourceMemory: resource.MustParse("2Gi"),
 			corev1.ResourceCPU:    resource.MustParse("2"),
+		},
+	}
+
+	// Limits are understood as limit only for recommendation (requests)
+	// This means actual container limits = VPA limit * (limit to requests ratio)
+	// This is always equal or higher than VPA limit
+	vpaContainerPolicies = []autoscalingv1beta2.ContainerResourcePolicy{
+		{
+			ContainerName: resources.ControllerManagerDeploymentName,
+			MinAllowed: corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse("50Mi"),
+				corev1.ResourceCPU:    resource.MustParse("25m"),
+			},
+			MaxAllowed: corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse("350Mi"),
+				corev1.ResourceCPU:    resource.MustParse("200m"),
+			},
 		},
 	}
 )

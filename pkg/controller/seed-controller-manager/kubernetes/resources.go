@@ -40,11 +40,13 @@ import (
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 	"k8c.io/kubermatic/v2/pkg/resources/scheduler"
 	"k8c.io/kubermatic/v2/pkg/resources/usercluster"
+	appsv1 "k8s.io/api/apps/v1"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	autoscalingv1beta2 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1beta2"
 )
 
 func (r *Reconciler) ensureResourcesAreDeployed(ctx context.Context, cluster *kubermaticv1.Cluster) error {
@@ -491,20 +493,84 @@ func (r *Reconciler) ensureCronJobs(ctx context.Context, c *kubermaticv1.Cluster
 }
 
 func (r *Reconciler) ensureVerticalPodAutoscalers(ctx context.Context, c *kubermaticv1.Cluster, data *resources.TemplateData) error {
-	controlPlaneDeploymentNames := []string{
-		resources.DNSResolverDeploymentName,
-		resources.MachineControllerDeploymentName,
-		resources.MachineControllerWebhookDeploymentName,
-		resources.OpenVPNServerDeploymentName,
-		resources.ApiserverDeploymentName,
-		resources.ControllerManagerDeploymentName,
-		resources.SchedulerDeploymentName,
-		resources.MetricsServerDeploymentName,
+	namespace := c.Status.NamespaceName
+
+	// K8s-5637: There's an exact of these two functions in `monitoring` package.
+	// Discussion: https://gitlab.syseleven.de/kubernetes/kubermatic/-/merge_requests/190#note_197206
+	//FIXME: Extract as one function once generics are GA
+	getDeploymentOwnerReference := func(name string) (*metav1.OwnerReference, error) {
+		var obj appsv1.Deployment
+		if err := r.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, &obj); err != nil {
+			if errors.IsNotFound(err) {
+				return nil, fmt.Errorf("failed to get owner reference of deployment '%s' for vpa: not found", name)
+			}
+			return nil, fmt.Errorf("failed to get owner reference of deployment '%s' for vpa: %v", name, err)
+		}
+		return metav1.NewControllerRef(&obj, obj.GroupVersionKind()), nil
+	}
+	getStatefulSetOwnerReference := func(name string) (*metav1.OwnerReference, error) {
+		var obj appsv1.StatefulSet
+		if err := r.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, &obj); err != nil {
+			if errors.IsNotFound(err) {
+				return nil, fmt.Errorf("failed to get owner reference of statefulset '%s' for vpa: not found", name)
+			}
+			return nil, fmt.Errorf("failed to get owner reference of statefulset '%s' for vpa: %v", name, err)
+		}
+		return metav1.NewControllerRef(&obj, obj.GroupVersionKind()), nil
 	}
 
-	creators, err := resources.GetVerticalPodAutoscalersForAll(ctx, r.Client, controlPlaneDeploymentNames, []string{resources.EtcdStatefulSetName}, c.Status.NamespaceName, r.features.VPA)
+	updateMode := autoscalingv1beta2.UpdateModeOff
+	if r.features.VPA {
+		updateMode = autoscalingv1beta2.UpdateModeAuto
+	}
+
+	apiServerOwnerRef, err := getDeploymentOwnerReference(resources.ApiserverDeploymentName)
 	if err != nil {
-		return fmt.Errorf("failed to create the functions to handle VPA resources: %v", err)
+		return err
+	}
+	controllerManagerOwnerRef, err := getDeploymentOwnerReference(resources.ControllerManagerDeploymentName)
+	if err != nil {
+		return err
+	}
+	schedulerOwnerRef, err := getDeploymentOwnerReference(resources.SchedulerDeploymentName)
+	if err != nil {
+		return err
+	}
+	etcdOwnerRef, err := getStatefulSetOwnerReference(resources.EtcdStatefulSetName)
+	if err != nil {
+		return err
+	}
+	machineControllerOwnerRef, err := getDeploymentOwnerReference(resources.MachineControllerDeploymentName)
+	if err != nil {
+		return err
+	}
+	machineControllerWebhookOwnerRef, err := getDeploymentOwnerReference(resources.MachineControllerWebhookDeploymentName)
+	if err != nil {
+		return err
+	}
+	userClusterControllerOwnerRef, err := getDeploymentOwnerReference(resources.UserClusterControllerDeploymentName)
+	if err != nil {
+		return err
+	}
+	openvpnServerOwnerRef, err := getDeploymentOwnerReference(resources.OpenVPNServerDeploymentName)
+	if err != nil {
+		return err
+	}
+	dnsResolverOwnerRef, err := getDeploymentOwnerReference(resources.DNSResolverDeploymentName)
+	if err != nil {
+		return err
+	}
+
+	creators := []reconciling.NamedVerticalPodAutoscalerCreatorGetter{
+		apiserver.VPACreator(apiServerOwnerRef, updateMode),
+		controllermanager.VPACreator(controllerManagerOwnerRef, updateMode),
+		scheduler.VPACreator(schedulerOwnerRef, updateMode),
+		etcd.VPACreator(etcdOwnerRef, updateMode),
+		machinecontroller.VPACreator(machineControllerOwnerRef, updateMode),
+		machinecontroller.WebhookVPACreator(machineControllerWebhookOwnerRef, updateMode),
+		usercluster.VPACreator(userClusterControllerOwnerRef, updateMode),
+		openvpn.VPACreator(openvpnServerOwnerRef, updateMode),
+		dns.VPACreator(dnsResolverOwnerRef, updateMode),
 	}
 
 	return reconciling.ReconcileVerticalPodAutoscalers(ctx, creators, c.Status.NamespaceName, r.Client)

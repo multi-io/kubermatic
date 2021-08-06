@@ -19,6 +19,11 @@ package monitoring
 import (
 	"context"
 	"fmt"
+	appsv1 "k8s.io/api/apps/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	autoscalingv1beta2 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1beta2"
 
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/resources"
@@ -149,23 +154,51 @@ func (r *Reconciler) ensureStatefulSets(ctx context.Context, cluster *kubermatic
 }
 
 func (r *Reconciler) ensureVerticalPodAutoscalers(ctx context.Context, cluster *kubermaticv1.Cluster) error {
-	deploymentNames := []string{
-		resources.KubeStateMetricsDeploymentName,
+	namespace := cluster.Status.NamespaceName
+
+	// K8s-5637: There's an exact of these two functions in `kubernetes` package.
+	// Discussion: https://gitlab.syseleven.de/kubernetes/kubermatic/-/merge_requests/190#note_197206
+	//FIXME: Extract as one function once generics are GA
+	getDeploymentOwnerReference := func(name string) (*metav1.OwnerReference, error) {
+		var obj appsv1.Deployment
+		if err := r.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, &obj); err != nil {
+			if errors.IsNotFound(err) {
+				return nil, fmt.Errorf("failed to get owner reference of deployment '%s' for vpa: not found", name)
+			}
+			return nil, fmt.Errorf("failed to get owner reference of deployment '%s' for vpa: %v", name, err)
+		}
+		return metav1.NewControllerRef(&obj, obj.GroupVersionKind()), nil
 	}
-	statefulSetNames := []string{
-		resources.PrometheusStatefulSetName,
+	getStatefulSetOwnerReference := func(name string) (*metav1.OwnerReference, error) {
+		var obj appsv1.StatefulSet
+		if err := r.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, &obj); err != nil {
+			if errors.IsNotFound(err) {
+				return nil, fmt.Errorf("failed to get owner reference of statefulset '%s' for vpa: not found", name)
+			}
+			return nil, fmt.Errorf("failed to get owner reference of statefulset '%s' for vpa: %v", name, err)
+		}
+		return metav1.NewControllerRef(&obj, obj.GroupVersionKind()), nil
 	}
 
-	creators, err := resources.GetVerticalPodAutoscalersForAll(
-		ctx,
-		r.Client,
-		deploymentNames,
-		statefulSetNames,
-		cluster.Status.NamespaceName,
-		r.features.VPA)
-	if err != nil {
-		return fmt.Errorf("failed to create the functions to handle VPA resources: %v", err)
+	updateMode := autoscalingv1beta2.UpdateModeOff
+	if r.features.VPA {
+		updateMode = autoscalingv1beta2.UpdateModeAuto
 	}
+
+	kubeStateMetricsOwnerRef, err := getDeploymentOwnerReference(resources.KubeStateMetricsDeploymentName)
+	if err != nil {
+		return err
+	}
+	prometheusOwnerRef, err := getStatefulSetOwnerReference(resources.PrometheusStatefulSetName)
+	if err != nil {
+		return err
+	}
+
+	creators := []reconciling.NamedVerticalPodAutoscalerCreatorGetter{
+		kubestatemetrics.VPACreator(kubeStateMetricsOwnerRef, updateMode),
+		prometheus.VPACreator(prometheusOwnerRef, updateMode),
+	}
+
 	return reconciling.ReconcileVerticalPodAutoscalers(ctx, creators, cluster.Status.NamespaceName, r.Client)
 }
 
