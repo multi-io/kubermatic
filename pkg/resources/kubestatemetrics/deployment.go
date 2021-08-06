@@ -18,6 +18,7 @@ package kubestatemetrics
 
 import (
 	"fmt"
+	autoscalingv1beta2 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1beta2"
 
 	"k8c.io/kubermatic/v2/pkg/resources"
 	"k8c.io/kubermatic/v2/pkg/resources/apiserver"
@@ -41,6 +42,23 @@ var (
 			Limits: corev1.ResourceList{
 				corev1.ResourceMemory: resource.MustParse("1Gi"),
 				corev1.ResourceCPU:    resource.MustParse("100m"),
+			},
+		},
+	}
+
+	// Limits are understood as limit only for recommendation (requests)
+	// This means actual container limits = VPA limit * (limit to requests ratio)
+	// This is always equal or higher than VPA limit
+	vpaContainerPolicies = []autoscalingv1beta2.ContainerResourcePolicy{
+		{
+			ContainerName: name,
+			MinAllowed: corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse("10Mi"),
+				corev1.ResourceCPU:    resource.MustParse("5m"),
+			},
+			MaxAllowed: corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse("100Mi"),
+				corev1.ResourceCPU:    resource.MustParse("25m"),
 			},
 		},
 	}

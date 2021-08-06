@@ -18,6 +18,7 @@ package dns
 
 import (
 	"fmt"
+	autoscalingv1beta2 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1beta2"
 
 	"github.com/Masterminds/semver/v3"
 
@@ -43,6 +44,23 @@ var (
 		Limits: corev1.ResourceList{
 			corev1.ResourceMemory: resource.MustParse("128Mi"),
 			corev1.ResourceCPU:    resource.MustParse("100m"),
+		},
+	}
+
+	// Limits are understood as limit only for recommendation (requests)
+	// This means actual container limits = VPA limit * (limit to requests ratio)
+	// This is always equal or higher than VPA limit
+	vpaContainerPolicies = []autoscalingv1beta2.ContainerResourcePolicy{
+		{
+			ContainerName: resources.DNSResolverDeploymentName,
+			MinAllowed: corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse("10Mi"),
+				corev1.ResourceCPU:    resource.MustParse("5m"),
+			},
+			MaxAllowed: corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse("50Mi"),
+				corev1.ResourceCPU:    resource.MustParse("10m"),
+			},
 		},
 	}
 )
@@ -280,4 +298,9 @@ func PodDisruptionBudgetCreator() reconciling.NamedPodDisruptionBudgetCreatorGet
 			return pdb, nil
 		}
 	}
+}
+
+// VPACreator returns a func to create/update the VPA
+func VPACreator(ownerRef *metav1.OwnerReference, mode autoscalingv1beta2.UpdateMode) reconciling.NamedVerticalPodAutoscalerCreatorGetter {
+	return resources.GetVerticalPodAutoscalerWithPolicies(resources.DNSResolverDeploymentName, ownerRef, mode, vpaContainerPolicies)
 }
