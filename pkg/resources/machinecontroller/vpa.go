@@ -14,5 +14,5 @@ func VPACreator(ownerRef *metav1.OwnerReference, mode autoscalingv1beta2.UpdateM
 
 // WebhookVPACreator returns a func to create/update the VPA for the webhook deployment
 func WebhookVPACreator(ownerRef *metav1.OwnerReference, mode autoscalingv1beta2.UpdateMode) reconciling.NamedVerticalPodAutoscalerCreatorGetter {
-	return resources.GetVerticalPodAutoscalerWithPolicies(Name, ownerRef, mode, webhookVpaContainerPolicies)
+	return resources.GetVerticalPodAutoscalerWithPolicies(resources.MachineControllerWebhookDeploymentName, ownerRef, mode, webhookVpaContainerPolicies)
 }
