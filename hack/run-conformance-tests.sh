@@ -110,8 +110,7 @@ openstack)
   extraArgs="-openstack-domain=$OS_DOMAIN
       -openstack-tenant=$OS_TENANT_NAME
       -openstack-username=$OS_USERNAME
-      -openstack-password=$OS_PASSWORD
-      -sys11-node-image=$OS_NODE_IMAGE"
+      -openstack-password=$OS_PASSWORD"
   ;;
 
 packet)
@@ -182,6 +181,7 @@ else
   GOOS=linux GOARCH=amd64 make conformance-tests
 
   echodate "Starting conformance-tests in Docker..."
+  echo $extraArgs
   docker run \
     --rm \
     --interactive \
@@ -206,5 +206,6 @@ else
     -kubermatic-delete-cluster=true \
     -providers="$provider" \
     -distributions="ubuntu" \
+    -syseleven-node-image="$OS_NODE_IMAGE" \
     $@
 fi
