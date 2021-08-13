@@ -79,7 +79,7 @@ func (s *kubevirtScenario) Cluster(secrets secrets) *apimodels.CreateClusterSpec
 	}
 }
 
-func (s *kubevirtScenario) NodeDeployments(_ context.Context, num int, _ secrets) ([]apimodels.NodeDeployment, error) {
+func (s *kubevirtScenario) NodeDeployments(_ context.Context, num int, _ secrets, _ string) ([]apimodels.NodeDeployment, error) {
 	var sourceURL string
 
 	switch {
