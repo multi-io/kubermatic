@@ -121,20 +121,3 @@ func OpenstackQuotaLimitNoCredentialsEndpoint(projectProvider provider.ProjectPr
 		return handlercommon.OpenstackQuotaLimitNoCredentialsEndpoint(ctx, req.ProjectID, req.ClusterID, projectProvider, privilegedProjectProvider, seedsGetter, userInfoGetter, caBundle)
 	}
 }
-
-func getOpenstackCredentials(userInfo *provider.UserInfo, credentialName, username, password, domain, tenant, tenantID string, presetProvider provider.PresetProvider) (string, string, string, string, string, error) {
-	if len(credentialName) > 0 {
-		preset, err := presetProvider.GetPreset(userInfo, credentialName)
-		if err != nil {
-			return "", "", "", "", "", fmt.Errorf("can not get preset %s for the user %s", credentialName, userInfo.Email)
-		}
-		if credentials := preset.Spec.Openstack; credentials != nil {
-			username = credentials.Username
-			password = credentials.Password
-			tenant = credentials.Tenant
-			tenantID = credentials.TenantID
-			domain = credentials.Domain
-		}
-	}
-	return username, password, domain, tenant, tenantID, nil
-}
