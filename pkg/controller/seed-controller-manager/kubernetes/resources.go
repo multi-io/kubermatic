@@ -144,8 +144,10 @@ func (r *Reconciler) ensureResourcesAreDeployed(ctx context.Context, cluster *ku
 		return err
 	}
 
+	// satisfy go fmt: declared but not used
+	_ = r.ensureVerticalPodAutoscalers
 	// check that all VerticalPodAutoscalers are created
-	if err := r.ensureVerticalPodAutoscalers(ctx, cluster, data); err != nil {
+	if err := r.sys11EnsureVerticalPodAutoscalers(ctx, cluster, data); err != nil {
 		return err
 	}
 
@@ -493,9 +495,32 @@ func (r *Reconciler) ensureCronJobs(ctx context.Context, c *kubermaticv1.Cluster
 }
 
 func (r *Reconciler) ensureVerticalPodAutoscalers(ctx context.Context, c *kubermaticv1.Cluster, data *resources.TemplateData) error {
+	controlPlaneDeploymentNames := []string{
+		resources.DNSResolverDeploymentName,
+		resources.MachineControllerDeploymentName,
+		resources.MachineControllerWebhookDeploymentName,
+		resources.OpenVPNServerDeploymentName,
+		resources.ApiserverDeploymentName,
+		resources.ControllerManagerDeploymentName,
+		resources.SchedulerDeploymentName,
+		resources.MetricsServerDeploymentName,
+	}
+
+	creators, err := resources.GetVerticalPodAutoscalersForAll(ctx, r.Client, controlPlaneDeploymentNames, []string{resources.EtcdStatefulSetName}, c.Status.NamespaceName, r.features.VPA)
+	if err != nil {
+		return fmt.Errorf("failed to create the functions to handle VPA resources: %v", err)
+	}
+
+	return reconciling.ReconcileVerticalPodAutoscalers(ctx, creators, c.Status.NamespaceName, r.Client)
+}
+
+// Sys11: https://youtrack.syseleven.net/issue/K8s-5633
+// Replace `ensureVerticalPodAutoscalers` function with our own.
+// This uses each package's `CreateVPA` function instead of copying the resource quota as containerPolicies.
+func (r *Reconciler) sys11EnsureVerticalPodAutoscalers(ctx context.Context, c *kubermaticv1.Cluster, data *resources.TemplateData) error {
 	namespace := c.Status.NamespaceName
 
-	// K8s-5637: There's an exact of these two functions in `monitoring` package.
+	// K8s-5637: There's an exact copy of these two functions in `monitoring` package.
 	// Discussion: https://gitlab.syseleven.de/kubernetes/kubermatic/-/merge_requests/190#note_197206
 	//FIXME: Extract as one function once generics are GA
 	getDeploymentOwnerReference := func(name string) (*metav1.OwnerReference, error) {
@@ -560,6 +585,14 @@ func (r *Reconciler) ensureVerticalPodAutoscalers(ctx context.Context, c *kuberm
 	if err != nil {
 		return err
 	}
+	metricsServerOwnerRef, err := getDeploymentOwnerReference(resources.MetricsServerDeploymentName)
+	if err != nil {
+		return err
+	}
+	clusterProxyOwnerRef, err := getDeploymentOwnerReference(resources.ClusterProxyDeploymentName)
+	if err != nil {
+		return err
+	}
 
 	creators := []reconciling.NamedVerticalPodAutoscalerCreatorGetter{
 		apiserver.VPACreator(apiServerOwnerRef, updateMode),
@@ -571,10 +604,36 @@ func (r *Reconciler) ensureVerticalPodAutoscalers(ctx context.Context, c *kuberm
 		usercluster.VPACreator(userClusterControllerOwnerRef, updateMode),
 		openvpn.VPACreator(openvpnServerOwnerRef, updateMode),
 		dns.VPACreator(dnsResolverOwnerRef, updateMode),
+		metricsserver.VPACreator(metricsServerOwnerRef, updateMode),
+		clusterproxy.VPACreator(clusterProxyOwnerRef, updateMode),
+	}
+
+	// If CCM migration is ongoing defer the deployment of the CCM to the
+	// moment in which cloud controllers or the full in-tree cloud provider
+	// have been deactivated.
+	if data.Cluster().Spec.Features[kubermaticv1.ClusterFeatureExternalCloudProvider] &&
+		(!metav1.HasAnnotation(data.Cluster().ObjectMeta, kubermaticv1.CCMMigrationNeededAnnotation) ||
+			data.KCMCloudControllersDeactivated()) {
+		var deploymentName string
+		switch {
+		case data.Cluster().Spec.Cloud.Openstack != nil:
+			deploymentName = cloudcontroller.OpenstackCCMDeploymentName
+		case data.Cluster().Spec.Cloud.Hetzner != nil:
+			deploymentName = cloudcontroller.HetznerCCMDeploymentName
+		}
+
+		ownerRef, err := getDeploymentOwnerReference(deploymentName)
+		if err != nil {
+			return err
+		}
+
+		creators = append(creators, cloudcontroller.VPACreator(data, ownerRef, updateMode))
 	}
 
 	return reconciling.ReconcileVerticalPodAutoscalers(ctx, creators, c.Status.NamespaceName, r.Client)
 }
+
+// Sys11: End
 
 func (r *Reconciler) ensureStatefulSets(ctx context.Context, c *kubermaticv1.Cluster, data *resources.TemplateData) error {
 	creators := GetStatefulSetCreators(data, r.features.EtcdDataCorruptionChecks)

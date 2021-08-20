@@ -18,7 +18,6 @@ package machinecontroller
 
 import (
 	"fmt"
-	autoscalingv1beta2 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1beta2"
 	"strings"
 
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
@@ -46,23 +45,6 @@ var (
 			Limits: corev1.ResourceList{
 				corev1.ResourceMemory: resource.MustParse("512Mi"),
 				corev1.ResourceCPU:    resource.MustParse("100m"),
-			},
-		},
-	}
-
-	// Limits are understood as limit only for recommendation (requests)
-	// This means actual container limits = VPA limit * (limit to requests ratio)
-	// This is always equal or higher than VPA limit
-	webhookVpaContainerPolicies = []autoscalingv1beta2.ContainerResourcePolicy{
-		{
-			ContainerName: Name,
-			MinAllowed: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("10m"),
-				corev1.ResourceMemory: resource.MustParse("15Mi"),
-			},
-			MaxAllowed: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("100m"),
-				corev1.ResourceMemory: resource.MustParse("200Mi"),
 			},
 		},
 	}

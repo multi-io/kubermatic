@@ -154,9 +154,33 @@ func (r *Reconciler) ensureStatefulSets(ctx context.Context, cluster *kubermatic
 }
 
 func (r *Reconciler) ensureVerticalPodAutoscalers(ctx context.Context, cluster *kubermaticv1.Cluster) error {
+	deploymentNames := []string{
+		resources.KubeStateMetricsDeploymentName,
+	}
+	statefulSetNames := []string{
+		resources.PrometheusStatefulSetName,
+	}
+
+	creators, err := resources.GetVerticalPodAutoscalersForAll(
+		ctx,
+		r.Client,
+		deploymentNames,
+		statefulSetNames,
+		cluster.Status.NamespaceName,
+		r.features.VPA)
+	if err != nil {
+		return fmt.Errorf("failed to create the functions to handle VPA resources: %v", err)
+	}
+	return reconciling.ReconcileVerticalPodAutoscalers(ctx, creators, cluster.Status.NamespaceName, r.Client)
+}
+
+// Sys11: https://youtrack.syseleven.net/issue/K8s-5633
+// Replace `ensureVerticalPodAutoscalers` function with our own.
+// This uses each package's `CreateVPA` function instead of copying the resource quota as containerPolicies.
+func (r *Reconciler) sys11EnsureVerticalPodAutoscalers(ctx context.Context, cluster *kubermaticv1.Cluster) error {
 	namespace := cluster.Status.NamespaceName
 
-	// K8s-5637: There's an exact of these two functions in `kubernetes` package.
+	// K8s-5637: There's an exact copy of these two functions in `kubernetes` package.
 	// Discussion: https://gitlab.syseleven.de/kubernetes/kubermatic/-/merge_requests/190#note_197206
 	//FIXME: Extract as one function once generics are GA
 	getDeploymentOwnerReference := func(name string) (*metav1.OwnerReference, error) {
@@ -201,6 +225,8 @@ func (r *Reconciler) ensureVerticalPodAutoscalers(ctx context.Context, cluster *
 
 	return reconciling.ReconcileVerticalPodAutoscalers(ctx, creators, cluster.Status.NamespaceName, r.Client)
 }
+
+// Sys11: End
 
 // GetServiceCreators returns all service creators that are currently in use
 func GetServiceCreators(data *resources.TemplateData) []reconciling.NamedServiceCreatorGetter {
