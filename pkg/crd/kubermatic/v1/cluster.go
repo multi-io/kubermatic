@@ -212,10 +212,7 @@ const (
 	ClusterConditionAddonControllerReconcilingSuccess             ClusterConditionType = "AddonControllerReconciledSuccessfully"
 	ClusterConditionAddonInstallerControllerReconcilingSuccess    ClusterConditionType = "AddonInstallerControllerReconciledSuccessfully"
 	ClusterConditionBackupControllerReconcilingSuccess            ClusterConditionType = "BackupControllerReconciledSuccessfully"
-	ClusterConditionEtcdRestoreControllerReconcilingSuccess       ClusterConditionType = "EtcdRestoreControllerReconciledSuccessfully"
-	ClusterConditionBackupScheduleControllerReconcilingSuccess    ClusterConditionType = "BackupScheduleControllerReconciledSuccessfully"
 	ClusterConditionCloudControllerReconcilingSuccess             ClusterConditionType = "CloudControllerReconcilledSuccessfully"
-	ClusterConditionComponentDefaulterReconcilingSuccess          ClusterConditionType = "ComponentDefaulterReconciledSuccessfully"
 	ClusterConditionUpdateControllerReconcilingSuccess            ClusterConditionType = "UpdateControllerReconciledSuccessfully"
 	ClusterConditionMonitoringControllerReconcilingSuccess        ClusterConditionType = "MonitoringControllerReconciledSuccessfully"
 	ClusterConditionMachineDeploymentControllerReconcilingSuccess ClusterConditionType = "MachineDeploymentReconciledSuccessfully"
@@ -245,11 +242,8 @@ var AllClusterConditionTypes = []ClusterConditionType{
 	ClusterConditionSeedResourcesUpToDate,
 	ClusterConditionClusterControllerReconcilingSuccess,
 	ClusterConditionAddonControllerReconcilingSuccess,
-	ClusterConditionBackupControllerReconcilingSuccess,
-	ClusterConditionEtcdRestoreControllerReconcilingSuccess,
-	ClusterConditionBackupScheduleControllerReconcilingSuccess,
+	//ClusterConditionBackupControllerReconcilingSuccess,
 	ClusterConditionCloudControllerReconcilingSuccess,
-	ClusterConditionComponentDefaulterReconcilingSuccess,
 	ClusterConditionUpdateControllerReconcilingSuccess,
 	ClusterConditionMonitoringControllerReconcilingSuccess,
 }

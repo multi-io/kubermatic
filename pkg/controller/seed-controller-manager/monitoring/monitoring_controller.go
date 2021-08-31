@@ -276,8 +276,10 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, clus
 		return nil, err
 	}
 
+	// satisfy go fmt: declared but not used
+	_ = r.ensureVerticalPodAutoscalers
 	// check that all VerticalPodAutoscaler's are created
-	if err := r.ensureVerticalPodAutoscalers(ctx, cluster); err != nil {
+	if err := r.sys11EnsureVerticalPodAutoscalers(ctx, cluster); err != nil {
 		return nil, err
 	}
 

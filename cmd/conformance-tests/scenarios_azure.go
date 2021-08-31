@@ -39,7 +39,9 @@ func getAzureScenarios(versions []*semver.Semver) []testScenario {
 		scenarios = append(scenarios, &azureScenario{
 			version: v,
 			nodeOsSpec: apimodels.OperatingSystemSpec{
-				Centos: &apimodels.CentOSSpec{},
+				Flatcar: &apimodels.FlatcarSpec{
+					DisableAutoUpdate: true,
+				},
 			},
 		})
 	}
@@ -61,12 +63,13 @@ func (s *azureScenario) Cluster(secrets secrets) *apimodels.CreateClusterSpec {
 			Type: "kubernetes",
 			Spec: &apimodels.ClusterSpec{
 				Cloud: &apimodels.CloudSpec{
-					DatacenterName: "azure-westeurope",
+					DatacenterName: "syseleven-azure-westcentralus",
 					Azure: &apimodels.AzureCloudSpec{
-						ClientID:       secrets.Azure.ClientID,
-						ClientSecret:   secrets.Azure.ClientSecret,
-						SubscriptionID: secrets.Azure.SubscriptionID,
-						TenantID:       secrets.Azure.TenantID,
+						ClientID:               secrets.Azure.ClientID,
+						ClientSecret:           secrets.Azure.ClientSecret,
+						SubscriptionID:         secrets.Azure.SubscriptionID,
+						TenantID:               secrets.Azure.TenantID,
+						OpenstackBillingTenant: "syseleven-kubermatic-test",
 					},
 				},
 				Version: s.version.String(),
@@ -75,7 +78,7 @@ func (s *azureScenario) Cluster(secrets secrets) *apimodels.CreateClusterSpec {
 	}
 }
 
-func (s *azureScenario) NodeDeployments(_ context.Context, num int, _ secrets) ([]apimodels.NodeDeployment, error) {
+func (s *azureScenario) NodeDeployments(_ context.Context, num int, _ secrets, _ string) ([]apimodels.NodeDeployment, error) {
 	replicas := int32(num)
 	size := "Standard_F2"
 	return []apimodels.NodeDeployment{

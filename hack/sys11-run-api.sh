@@ -9,8 +9,8 @@ set -x
 : "${INSTALLER_DIR:="$(go env GOPATH)/src/gitlab.syseleven.de/kubernetes/kubermatic-installer"}"
 : "${KUBERMATIC_ENV:=dev}"
 : "${KUBERMATIC_CLUSTER:=dbl1}"
-: "${RESOURCES_DIR:=${INSTALLER_DIR}/environments/${KUBERMATIC_ENV}/clusters/${KUBERMATIC_CLUSTER}/kubermatic/versions}"
 : "${CONFIG_DIR:=${INSTALLER_DIR}/environments/${KUBERMATIC_ENV}/kubermatic}"
+: "${CLUSTER_CONFIG_DIR:=${INSTALLER_DIR}/environments/${KUBERMATIC_ENV}/clusters/${KUBERMATIC_CLUSTER}}"
 : "${KUBERMATIC_EDITION:=ee}"
 if [[ -z "$SKIP_INSTALLER" ]]; then
 KUBERMATIC_ENV=${KUBERMATIC_ENV} KUBERMATIC_CLUSTER=${KUBERMATIC_CLUSTER} make -C ${INSTALLER_DIR}/kubermatic values.yaml
@@ -18,6 +18,9 @@ fi
 : "${DEBUG:="false"}"
 : "${TAG_WORKER:="true"}"
 SERVICE_ACCOUNT_SIGNING_KEY="$(KUBERMATIC_ENV=${KUBERMATIC_ENV} KUBERMATIC_CLUSTER=${KUBERMATIC_CLUSTER} ${INSTALLER_DIR}/bin/run-vault kv get -field=serviceAccountKey secret/metakube-${KUBERMATIC_ENV}/clusters/dbl1/kubermatic/auth)"
+
+# TODO generate versions and updates files from the environment's kubermaticconfiguration
+RESOURCES_DIR="${SRC_DIR}/hack/sys11-resources-dir"
 
 export KEYCLOAK_INTERNAL_URL="$(cat ${INSTALLER_DIR}/kubermatic/values.yaml | yq .keycloak.internal.url -r)"
 export KEYCLOAK_INTERNAL_ADMIN_USER="$(cat ${INSTALLER_DIR}/kubermatic/values.yaml | yq .keycloak.internal.adminUser -r)"
@@ -38,17 +41,7 @@ else
     make -C ${SRC_DIR} KUBERMATIC_EDITION=${KUBERMATIC_EDITION} kubermatic-api
 fi
 
-case $KUBERMATIC_ENV in
-stage)
-  oidcUrl="https://keystone-oidc.app.syseleven-dbl1-1.stage.metakube.de"
-  ;;
-prod)
-  oidcUrl="https://keystone-oidc.app.syseleven-dbl1-1.metakube.syseleven.de"
-  ;;
-*)
-  oidcUrl="https://keystone-oidc.app.syseleven-dbl1-1.dev.metakube.de"
-  ;;
-esac
+: "${OIDC_URL:=https://keystone-oidc.$(${INSTALLER_DIR}/bin/getvar kubermatic base.app_base_domain)}"
 
 # Please make sure to set -feature-gates=PrometheusEndpoint=true if you want to use that endpoint.
 
@@ -58,8 +51,11 @@ esac
 cd ${SRC_DIR}
 if [[ "${DEBUG}" == "true" ]]; then
     dlv --listen=:2345 --headless=true --api-version=2 --accept-multiclient exec ./_build/kubermatic-api -- \
-      -kubeconfig=${CONFIG_DIR}/kubeconfig \
+      -kubeconfig=${CLUSTER_CONFIG_DIR}/kubeconfig/useradmin.conf \
       -dynamic-datacenters=true \
+      -dynamic-presets=true \
+      -swagger=cmd/kubermatic-api/swagger.json \
+      -ca-bundle=charts/kubermatic-operator/static/ca-bundle.pem \
       -versions=${RESOURCES_DIR}/versions.yaml \
       -updates=${RESOURCES_DIR}/updates.yaml \
       -master-resources=${RESOURCES_DIR} \
@@ -67,7 +63,7 @@ if [[ "${DEBUG}" == "true" ]]; then
       -internal-address=127.0.0.1:18085 \
       -prometheus-url=http://localhost:9090 \
       -address=127.0.0.1:8080 \
-      -oidc-url=$oidcUrl \
+      -oidc-url=$OIDC_URL \
       -oidc-authenticator-client-id=metakube-dashboard \
       -oidc-skip-tls-verify=false \
       -service-account-signing-key="${SERVICE_ACCOUNT_SIGNING_KEY}" \
@@ -76,8 +72,11 @@ if [[ "${DEBUG}" == "true" ]]; then
       -v=8 $@
 else
     ./_build/kubermatic-api \
-      -kubeconfig=${CONFIG_DIR}/kubeconfig \
+      -kubeconfig=${CLUSTER_CONFIG_DIR}/kubeconfig/useradmin.conf \
       -dynamic-datacenters=true \
+      -dynamic-presets=true \
+      -swagger=cmd/kubermatic-api/swagger.json \
+      -ca-bundle=charts/kubermatic-operator/static/ca-bundle.pem \
       -versions=${RESOURCES_DIR}/versions.yaml \
       -updates=${RESOURCES_DIR}/updates.yaml \
       -master-resources=${RESOURCES_DIR} \
@@ -85,7 +84,7 @@ else
       -internal-address=127.0.0.1:18085 \
       -prometheus-url=http://localhost:9090 \
       -address=127.0.0.1:8080 \
-      -oidc-url=$oidcUrl \
+      -oidc-url=$OIDC_URL \
       -oidc-authenticator-client-id=metakube-dashboard \
       -oidc-skip-tls-verify=false \
       -service-account-signing-key="${SERVICE_ACCOUNT_SIGNING_KEY}" \

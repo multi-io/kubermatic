@@ -105,6 +105,8 @@ type Opts struct {
 	scenarioOptions              string
 	pushgatewayEndpoint          string
 
+	sys11NodeImage string
+
 	secrets secrets
 }
 
@@ -209,6 +211,7 @@ func main() {
 	flag.StringVar(&opts.workerName, "worker-name", "", "name of the worker, if set the 'worker-name' label will be set on all clusters")
 	flag.StringVar(&sversions, "versions", strings.Join(supportedVersions, ","), "a comma-separated list of versions to test")
 	flag.StringVar(&sdistributions, "distributions", "", "a comma-separated list of distributions to test (cannot be used in conjunction with -exclude-distributions)")
+	flag.StringVar(&opts.sys11NodeImage, "syseleven-node-image", "", "Introduced by SysEleven. Node image to be used in machine deployments creation.")
 	flag.StringVar(&sexcludeDistributions, "exclude-distributions", "", "a comma-separated list of distributions that will get excluded from the tests (cannot be used in conjunction with -distributions)")
 	flag.BoolVar(&opts.printGinkoLogs, "print-ginkgo-logs", false, "Whether to print ginkgo logs when ginkgo encountered failures")
 	flag.BoolVar(&opts.printContainerLogs, "print-container-logs", false, "Whether to print the logs of all controlplane containers after the test (even in case of success)")

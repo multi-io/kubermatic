@@ -35,11 +35,13 @@ func getOpenStackScenarios(versions []*semver.Semver) []testScenario {
 				Ubuntu: &apimodels.UbuntuSpec{},
 			},
 		})
-		// CentOS
+		// Flatcar
 		scenarios = append(scenarios, &openStackScenario{
 			version: v,
 			nodeOsSpec: apimodels.OperatingSystemSpec{
-				Centos: &apimodels.CentOSSpec{},
+				Flatcar: &apimodels.FlatcarSpec{
+					DisableAutoUpdate: true,
+				},
 			},
 		})
 	}
@@ -77,9 +79,9 @@ func (s *openStackScenario) Cluster(secrets secrets) *apimodels.CreateClusterSpe
 	}
 }
 
-func (s *openStackScenario) NodeDeployments(_ context.Context, num int, _ secrets) ([]apimodels.NodeDeployment, error) {
-	osName := getOSNameFromSpec(s.nodeOsSpec)
-	image := "kubermatic-e2e-" + osName
+func (s *openStackScenario) NodeDeployments(_ context.Context, num int, _ secrets, sys11NodeImage string) ([]apimodels.NodeDeployment, error) {
+	//osName := getOSNameFromSpec(s.nodeOsSpec)
+	//image := "kubermatic-e2e-" + osName
 	flavor := "m1.small"
 	replicas := int32(num)
 
@@ -91,7 +93,7 @@ func (s *openStackScenario) NodeDeployments(_ context.Context, num int, _ secret
 					Cloud: &apimodels.NodeCloudSpec{
 						Openstack: &apimodels.OpenstackNodeSpec{
 							Flavor:                    &flavor,
-							Image:                     &image,
+							Image:                     &sys11NodeImage,
 							InstanceReadyCheckPeriod:  "5s",
 							InstanceReadyCheckTimeout: "2m",
 						},

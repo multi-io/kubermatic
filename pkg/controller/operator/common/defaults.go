@@ -51,9 +51,9 @@ const (
 	DefaultMasterControllerMgrReplicas            = 1
 	DefaultAPIServerReplicas                      = 2
 	DefaultExposeStrategy                         = kubermaticv1.ExposeStrategyNodePort
-	DefaultVPARecommenderDockerRepository         = "gcr.io/google_containers/vpa-recommender"
-	DefaultVPAUpdaterDockerRepository             = "gcr.io/google_containers/vpa-updater"
-	DefaultVPAAdmissionControllerDockerRepository = "gcr.io/google_containers/vpa-admission-controller"
+	DefaultVPARecommenderDockerRepository         = "k8s.gcr.io/autoscaling/vpa-recommender"
+	DefaultVPAUpdaterDockerRepository             = "k8s.gcr.io/autoscaling/vpa-updater"
+	DefaultVPAAdmissionControllerDockerRepository = "k8s.gcr.io/autoscaling/vpa-admission-controller"
 	DefaultEnvoyDockerRepository                  = "docker.io/envoyproxy/envoy-alpine"
 	DefaultMaximumParallelReconciles              = 10
 	DefaultS3Endpoint                             = "s3.amazonaws.com"

@@ -49,7 +49,7 @@ func NewDefaultVersions() Versions {
 		KubermaticCommit:  gitHash,
 		Kubermatic:        kubermaticDockerTag,
 		UI:                uiDockerTag,
-		VPA:               "0.5.0",
+		VPA:               "0.9.2",
 		Envoy:             "v1.17.1",
 		KubermaticEdition: edition.KubermaticEdition,
 	}
@@ -60,7 +60,7 @@ func NewFakeVersions() Versions {
 		KubermaticCommit:  "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
 		Kubermatic:        "v0.0.0-test",
 		UI:                "v1.1.1-test",
-		VPA:               "0.5.0",
+		VPA:               "0.9.2",
 		Envoy:             "v1.16.0",
 		KubermaticEdition: edition.KubermaticEdition,
 	}

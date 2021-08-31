@@ -91,6 +91,18 @@ type SeedSpec struct {
 	ExposeStrategy ExposeStrategy `json:"expose_strategy,omitempty"`
 	// DefaultClusterComponentSettingsYAML is a YAML file with default cluster component settings
 	DefaultClusterComponentSettingsYAML string `json:"defaultClusterComponentSettingsYAML,omitempty"`
+	// BackupRestore contains the setup of the new backup and restore controllers.
+	BackupRestore SeedBackupRestoreConfiguration `json:"backupRestore,omitempty"`
+}
+
+// SeedBackupRestoreConfiguration are s3 settings used in backups and restores of user cluster etcds.
+type SeedBackupRestoreConfiguration struct {
+	// Enabled enables the new etcd backup and restore controllers.
+	Enabled bool `json:"enabled,omitempty"`
+	// S3Endpoint is the S3 API endpoint to use for backup and restore. Defaults to s3.amazonaws.com.
+	S3Endpoint string `json:"s3Endpoint,omitempty"`
+	// S3BucketName is the S3 bucket name to use for backup and restore.
+	S3BucketName string `json:"s3BucketName,omitempty"`
 }
 
 type NodeportProxyConfig struct {
