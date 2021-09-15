@@ -237,7 +237,7 @@ func (os *Provider) InitializeCloudProvider(cluster *kubermaticv1.Cluster, updat
 			// We're just searching for the floating ip pool here & don't create anything. Thus no need to create a finalizer
 		})
 		if err != nil {
-			return nil, fmt.Errorf("failed to update cluster floating IP pool: %v", err)
+			return nil, fmt.Errorf("failed to update cluster floating IP pool: %w", err)
 		}
 	}
 
@@ -264,7 +264,7 @@ func (os *Provider) InitializeCloudProvider(cluster *kubermaticv1.Cluster, updat
 			cluster.Spec.Cloud.Openstack.SecurityGroups = secGroupName
 		})
 		if err != nil {
-			return nil, fmt.Errorf("failed to add security group cleanup finalizer: %v", err)
+			return nil, fmt.Errorf("failed to add security group cleanup finalizer: %w", err)
 		}
 	}
 
@@ -277,7 +277,7 @@ func (os *Provider) InitializeCloudProvider(cluster *kubermaticv1.Cluster, updat
 			cluster.Spec.Cloud.Openstack.Network = network.Name
 		})
 		if err != nil {
-			return nil, fmt.Errorf("failed to add network cleanup finalizer: %v", err)
+			return nil, fmt.Errorf("failed to add network cleanup finalizer: %w", err)
 		}
 	}
 
@@ -297,7 +297,7 @@ func (os *Provider) InitializeCloudProvider(cluster *kubermaticv1.Cluster, updat
 			cluster.Spec.Cloud.Openstack.SubnetCIDR = subnet.CIDR
 		})
 		if err != nil {
-			return nil, fmt.Errorf("failed to add subnet cleanup finalizer: %v", err)
+			return nil, fmt.Errorf("failed to add subnet cleanup finalizer: %w", err)
 		}
 	}
 
@@ -312,7 +312,7 @@ func (os *Provider) InitializeCloudProvider(cluster *kubermaticv1.Cluster, updat
 				cluster.Spec.Cloud.Openstack.RouterID = router.ID
 			})
 			if err != nil {
-				return nil, fmt.Errorf("failed to add router cleanup finalizer: %v", err)
+				return nil, fmt.Errorf("failed to add router cleanup finalizer: %w", err)
 			}
 		} else {
 			// A router already exists -> Reuse it but don't clean it up
@@ -320,7 +320,7 @@ func (os *Provider) InitializeCloudProvider(cluster *kubermaticv1.Cluster, updat
 				cluster.Spec.Cloud.Openstack.RouterID = routerID
 			})
 			if err != nil {
-				return nil, fmt.Errorf("failed to add router ID to cluster: %v", err)
+				return nil, fmt.Errorf("failed to add router ID to cluster: %w", err)
 			}
 		}
 	}
@@ -338,9 +338,9 @@ func (os *Provider) InitializeCloudProvider(cluster *kubermaticv1.Cluster, updat
 			cluster.Spec.Cloud.Openstack.ServerGroupID = sg.ID
 		})
 		if err != nil {
-			err = fmt.Errorf("add server group ID to cluster: %v", err)
+			err = fmt.Errorf("add server group ID to cluster: %w", err)
 			if e := deleteServerGroup(netClient, sg.ID); e != nil {
-				err = fmt.Errorf("delete server group after failure: %v: %v", e, err)
+				err = fmt.Errorf("delete server group after failure: %v: %w", e, err)
 			}
 			return nil, err
 		}
