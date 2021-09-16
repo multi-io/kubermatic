@@ -565,14 +565,15 @@ func (r *Reconciler) sys11EnsureVerticalPodAutoscalers(ctx context.Context, c *k
 	if err != nil {
 		return err
 	}
-	machineControllerOwnerRef, err := getDeploymentOwnerReference(resources.MachineControllerDeploymentName)
-	if err != nil {
-		return err
-	}
-	machineControllerWebhookOwnerRef, err := getDeploymentOwnerReference(resources.MachineControllerWebhookDeploymentName)
-	if err != nil {
-		return err
-	}
+	// Disable for now https://github.com/kubermatic/machine-controller/issues/1058
+	//machineControllerOwnerRef, err := getDeploymentOwnerReference(resources.MachineControllerDeploymentName)
+	//if err != nil {
+	//	return err
+	//}
+	//machineControllerWebhookOwnerRef, err := getDeploymentOwnerReference(resources.MachineControllerWebhookDeploymentName)
+	//if err != nil {
+	//	return err
+	//}
 	userClusterControllerOwnerRef, err := getDeploymentOwnerReference(resources.UserClusterControllerDeploymentName)
 	if err != nil {
 		return err
@@ -599,8 +600,9 @@ func (r *Reconciler) sys11EnsureVerticalPodAutoscalers(ctx context.Context, c *k
 		controllermanager.VPACreator(controllerManagerOwnerRef, updateMode),
 		scheduler.VPACreator(schedulerOwnerRef, updateMode),
 		etcd.VPACreator(etcdOwnerRef, updateMode),
-		machinecontroller.VPACreator(machineControllerOwnerRef, updateMode),
-		machinecontroller.WebhookVPACreator(machineControllerWebhookOwnerRef, updateMode),
+		// Disable for now https://github.com/kubermatic/machine-controller/issues/1058
+		// machinecontroller.VPACreator(machineControllerOwnerRef, updateMode),
+		// machinecontroller.WebhookVPACreator(machineControllerWebhookOwnerRef, updateMode),
 		usercluster.VPACreator(userClusterControllerOwnerRef, updateMode),
 		openvpn.VPACreator(openvpnServerOwnerRef, updateMode),
 		dns.VPACreator(dnsResolverOwnerRef, updateMode),
