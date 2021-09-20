@@ -362,14 +362,17 @@ func (os *Provider) InitializeCloudProvider(cluster *kubermaticv1.Cluster, updat
 
 // CleanUpCloudProvider does the clean-up in particular:
 // removes security group and network configuration
+//nolint:golint,cyclomatic
 func (os *Provider) CleanUpCloudProvider(cluster *kubermaticv1.Cluster, update provider.ClusterUpdater) (*kubermaticv1.Cluster, error) {
 	netClient, err := os.getClientFunc(cluster.Spec.Cloud, os.dc, os.secretKeySelector, os.caBundle)
 	if err != nil {
 		return nil, err
 	}
 
-	if kubernetes.HasFinalizer(cluster, SecurityGroupCleanupFinalizer) {
-		for _, g := range strings.Split(cluster.Spec.Cloud.Openstack.SecurityGroups, ",") {
+	resources := cluster.Spec.Cloud.Openstack
+
+	if kubernetes.HasFinalizer(cluster, SecurityGroupCleanupFinalizer) && resources.SecurityGroups != "" {
+		for _, g := range strings.Split(resources.SecurityGroups, ",") {
 			if err := deleteSecurityGroup(netClient, strings.TrimSpace(g)); err != nil {
 				if !isNotFoundErr(err) {
 					return nil, fmt.Errorf("failed to delete security group %q: %v", g, err)
@@ -378,44 +381,44 @@ func (os *Provider) CleanUpCloudProvider(cluster *kubermaticv1.Cluster, update p
 		}
 	}
 
-	if kubernetes.HasFinalizer(cluster, RouterSubnetLinkCleanupFinalizer) || kubernetes.HasFinalizer(cluster, OldNetworkCleanupFinalizer) {
-		if _, err = detachSubnetFromRouter(netClient, cluster.Spec.Cloud.Openstack.SubnetID, cluster.Spec.Cloud.Openstack.RouterID); err != nil {
+	if resources.SubnetID != "" && resources.RouterID != "" && kubernetes.HasFinalizer(cluster, RouterSubnetLinkCleanupFinalizer) || kubernetes.HasFinalizer(cluster, OldNetworkCleanupFinalizer) {
+		if _, err = detachSubnetFromRouter(netClient, resources.SubnetID, resources.RouterID); err != nil {
 			if !isNotFoundErr(err) {
 				return nil, fmt.Errorf("failed to detach subnet from router: %v", err)
 			}
 		}
 	}
 
-	if kubernetes.HasFinalizer(cluster, SubnetCleanupFinalizer) || kubernetes.HasFinalizer(cluster, OldNetworkCleanupFinalizer) {
-		if err := deleteSubnet(netClient, cluster.Spec.Cloud.Openstack.SubnetID); err != nil {
+	if resources.SubnetID != "" && kubernetes.HasFinalizer(cluster, SubnetCleanupFinalizer) || kubernetes.HasFinalizer(cluster, OldNetworkCleanupFinalizer) {
+		if err := deleteSubnet(netClient, resources.SubnetID); err != nil {
 			if !isNotFoundErr(err) {
-				return nil, fmt.Errorf("failed to delete subnet '%s': %v", cluster.Spec.Cloud.Openstack.SubnetID, err)
+				return nil, fmt.Errorf("failed to delete subnet '%s': %v", resources.SubnetID, err)
 			}
 		}
 	}
 
-	if kubernetes.HasFinalizer(cluster, NetworkCleanupFinalizer) || kubernetes.HasFinalizer(cluster, OldNetworkCleanupFinalizer) {
-		if err = deleteNetworkByName(netClient, cluster.Spec.Cloud.Openstack.Network); err != nil {
+	if resources.Network != "" && kubernetes.HasFinalizer(cluster, NetworkCleanupFinalizer) || kubernetes.HasFinalizer(cluster, OldNetworkCleanupFinalizer) {
+		if err = deleteNetworkByName(netClient, resources.Network); err != nil {
 			if !isNotFoundErr(err) {
-				return nil, fmt.Errorf("failed to delete network '%s': %v", cluster.Spec.Cloud.Openstack.Network, err)
+				return nil, fmt.Errorf("failed to delete network '%s': %v", resources.Network, err)
 			}
 		}
 	}
 
-	if kubernetes.HasFinalizer(cluster, RouterCleanupFinalizer) || kubernetes.HasFinalizer(cluster, OldNetworkCleanupFinalizer) {
-		if err = deleteRouter(netClient, cluster.Spec.Cloud.Openstack.RouterID); err != nil {
+	if resources.RouterID != "" && kubernetes.HasFinalizer(cluster, RouterCleanupFinalizer) || kubernetes.HasFinalizer(cluster, OldNetworkCleanupFinalizer) {
+		if err = deleteRouter(netClient, resources.RouterID); err != nil {
 			if !isNotFoundErr(err) {
-				return nil, fmt.Errorf("failed to delete router '%s': %v", cluster.Spec.Cloud.Openstack.RouterID, err)
+				return nil, fmt.Errorf("failed to delete router '%s': %v", resources.RouterID, err)
 			}
 		}
 	}
 
-	if kubernetes.HasAnyFinalizer(cluster, ServerGroupCleanupFinalizer) {
+	if resources.ServerGroupID != "" && kubernetes.HasAnyFinalizer(cluster, ServerGroupCleanupFinalizer) {
 		computeClient, err := os.getClientFunc(cluster.Spec.Cloud, os.dc, os.secretKeySelector, nil)
 		if err != nil {
 			return nil, fmt.Errorf("get compute client: %v", err)
 		}
-		id := cluster.Spec.Cloud.Openstack.ServerGroupID
+		id := resources.ServerGroupID
 		if err := deleteServerGroup(computeClient, id); err != nil {
 			if !isNotFoundErr(err) {
 				return cluster, fmt.Errorf("delete server group for cluster '%s': %v", cluster.Name, err)
