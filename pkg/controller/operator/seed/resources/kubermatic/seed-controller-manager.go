@@ -45,6 +45,10 @@ func SeedControllerManagerDeploymentCreator(workerName string, versions kubermat
 	return func() (string, reconciling.DeploymentCreator) {
 		return common.SeedControllerManagerDeploymentName, func(d *appsv1.Deployment) (*appsv1.Deployment, error) {
 			d.Spec.Replicas = cfg.Spec.SeedController.Replicas
+			var leaderElectionArgs []string
+			if d.Spec.Replicas != nil && *d.Spec.Replicas == 1 {
+				leaderElectionArgs = []string{"-enable-leader-election=false"}
+			}
 			d.Spec.Selector = &metav1.LabelSelector{
 				MatchLabels: seedControllerManagerPodLabels(),
 			}
@@ -96,6 +100,7 @@ func SeedControllerManagerDeploymentCreator(workerName string, versions kubermat
 				fmt.Sprintf("-in-cluster-prometheus-disable-default-scraping-configs=%v", cfg.Spec.UserCluster.Monitoring.DisableDefaultScrapingConfigs),
 				fmt.Sprintf("-backup-container=/opt/backup/%s", storeContainerKey),
 			}
+			args = append(args, leaderElectionArgs...)
 
 			if !cfg.Spec.SeedController.BackupRestore.Enabled || cfg.Spec.SeedController.BackupCleanupContainer != "" {
 				args = append(args, fmt.Sprintf("-cleanup-container=/opt/backup/%s", cleanupContainerKey))

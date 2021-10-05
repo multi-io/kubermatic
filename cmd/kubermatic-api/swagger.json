@@ -1041,6 +1041,14 @@
                 "name": {
                   "type": "string",
                   "x-go-name": "Name"
+                },
+                "users": {
+                  "description": "human user email list for the service account in projectmanagers group",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "x-go-name": "Users"
                 }
               }
             }
@@ -7605,6 +7613,21 @@
           },
           {
             "type": "string",
+            "name": "ApplicationCredentialID",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "ApplicationCredentialSecret",
+            "in": "header"
+          },
+          {
+            "type": "boolean",
+            "name": "OIDCAuthentication",
+            "in": "header"
+          },
+          {
+            "type": "string",
             "name": "Credential",
             "in": "header"
           }
@@ -7696,6 +7719,21 @@
           {
             "type": "string",
             "name": "DatacenterName",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "ApplicationCredentialID",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "ApplicationCredentialSecret",
+            "in": "header"
+          },
+          {
+            "type": "boolean",
+            "name": "OIDCAuthentication",
             "in": "header"
           },
           {
@@ -7792,6 +7830,21 @@
           },
           {
             "type": "string",
+            "name": "ApplicationCredentialID",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "ApplicationCredentialSecret",
+            "in": "header"
+          },
+          {
+            "type": "boolean",
+            "name": "OIDCAuthentication",
+            "in": "header"
+          },
+          {
+            "type": "string",
             "name": "Credential",
             "in": "header"
           }
@@ -7854,6 +7907,21 @@
           {
             "type": "string",
             "name": "DatacenterName",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "ApplicationCredentialID",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "ApplicationCredentialSecret",
+            "in": "header"
+          },
+          {
+            "type": "boolean",
+            "name": "OIDCAuthentication",
             "in": "header"
           },
           {
@@ -7924,6 +7992,21 @@
           },
           {
             "type": "string",
+            "name": "ApplicationCredentialID",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "ApplicationCredentialSecret",
+            "in": "header"
+          },
+          {
+            "type": "boolean",
+            "name": "OIDCAuthentication",
+            "in": "header"
+          },
+          {
+            "type": "string",
             "name": "Credential",
             "in": "header"
           },
@@ -7982,6 +8065,21 @@
           {
             "type": "string",
             "name": "DatacenterName",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "ApplicationCredentialID",
+            "in": "header"
+          },
+          {
+            "type": "string",
+            "name": "ApplicationCredentialSecret",
+            "in": "header"
+          },
+          {
+            "type": "boolean",
+            "name": "OIDCAuthentication",
             "in": "header"
           },
           {
@@ -14928,6 +15026,9 @@
         "credentialsReference": {
           "$ref": "#/definitions/GlobalSecretKeySelector"
         },
+        "loadBalancerSKU": {
+          "$ref": "#/definitions/LBSKU"
+        },
         "openstackBillingTenant": {
           "type": "string",
           "x-go-name": "OpenstackBillingTenant"
@@ -17352,6 +17453,10 @@
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
     },
+    "LBSKU": {
+      "type": "string",
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+    },
     "LabelKeyList": {
       "type": "array",
       "items": {
@@ -18316,6 +18421,14 @@
       "type": "object",
       "title": "OpenstackCloudSpec specifies access data to an OpenStack cloud.",
       "properties": {
+        "applicationCredentialID": {
+          "type": "string",
+          "x-go-name": "ApplicationCredentialID"
+        },
+        "applicationCredentialSecret": {
+          "type": "string",
+          "x-go-name": "ApplicationCredentialSecret"
+        },
         "credentialsReference": {
           "$ref": "#/definitions/GlobalSecretKeySelector"
         },
@@ -18366,10 +18479,19 @@
           "type": "string",
           "x-go-name": "TenantID"
         },
+        "token": {
+          "description": "Used internally during cluster creation",
+          "type": "string",
+          "x-go-name": "Token"
+        },
         "useOctavia": {
           "description": "Whether or not to use Octavia for LoadBalancer type of Service\nimplementation instead of using Neutron-LBaaS.\nAttention:Openstack CCM use Octavia as default load balancer\nimplementation since v1.17.0\n\nTakes precedence over the 'use_octavia' flag provided at datacenter\nlevel if both are specified.\n+optional",
           "type": "boolean",
           "x-go-name": "UseOctavia"
+        },
+        "useToken": {
+          "type": "boolean",
+          "x-go-name": "UseToken"
         },
         "username": {
           "type": "string",
