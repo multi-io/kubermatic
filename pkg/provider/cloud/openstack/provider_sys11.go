@@ -3,6 +3,8 @@ package openstack
 import (
 	"crypto/x509"
 
+	"k8c.io/kubermatic/v2/pkg/resources"
+
 	oslimits "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/limits"
 	osimages "github.com/gophercloud/gophercloud/openstack/compute/v2/images"
 	osfloatingips "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/floatingips"
@@ -12,8 +14,8 @@ const (
 	openstackFloatingIPErrorStatusName = "ERROR"
 )
 
-func GetImages(username, password, domain, tenant, tenantID, authURL, region string, caBundle *x509.CertPool) ([]osimages.Image, error) {
-	serviceClient, err := getComputeClient(username, password, domain, tenant, tenantID, authURL, region, caBundle)
+func GetImages(authURL, region string, creds *resources.OpenstackCredentials, caBundle *x509.CertPool) ([]osimages.Image, error) {
+	serviceClient, err := getComputeClient(authURL, region, creds, caBundle)
 	if err != nil {
 		return nil, err
 	}
@@ -31,8 +33,8 @@ func GetImages(username, password, domain, tenant, tenantID, authURL, region str
 	return allImages, nil
 }
 
-func GetQuotaLimits(username, password, domain, tenant, tenantID, authURL, region string, caBundle *x509.CertPool) (*oslimits.Limits, error) {
-	serviceClient, err := getComputeClient(username, password, domain, tenant, tenantID, authURL, region, caBundle)
+func GetQuotaLimits(authURL, region string, creds *resources.OpenstackCredentials, caBundle *x509.CertPool) (*oslimits.Limits, error) {
+	serviceClient, err := getComputeClient(authURL, region, creds, caBundle)
 	if err != nil {
 		return nil, err
 	}
@@ -45,8 +47,8 @@ func GetQuotaLimits(username, password, domain, tenant, tenantID, authURL, regio
 	return limits, nil
 }
 
-func GetUsedFloatingIPCount(username, password, domain, tenant, tenantID, authURL, region string, caBundle *x509.CertPool) (int, error) {
-	netClient, err := getNetClient(username, password, domain, tenant, tenantID, authURL, region, caBundle)
+func GetUsedFloatingIPCount(authURL, region string, creds *resources.OpenstackCredentials, caBundle *x509.CertPool) (int, error) {
+	netClient, err := getNetClient(authURL, region, creds, caBundle)
 
 	if err != nil {
 		return 0, err
@@ -72,8 +74,8 @@ func GetUsedFloatingIPCount(username, password, domain, tenant, tenantID, authUR
 	return usedIPCount, nil
 }
 
-func GetFloatingIPQuota(username, password, domain, tenant, tenantID, authURL, region string, caBundle *x509.CertPool) (int, error) {
-	netClient, err := getNetClient(username, password, domain, tenant, tenantID, authURL, region, caBundle)
+func GetFloatingIPQuota(authURL, region string, creds *resources.OpenstackCredentials, caBundle *x509.CertPool) (int, error) {
+	netClient, err := getNetClient(authURL, region, creds, caBundle)
 	if err != nil {
 		return 0, err
 	}

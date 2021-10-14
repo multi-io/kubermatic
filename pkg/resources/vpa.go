@@ -124,3 +124,30 @@ func GetVerticalPodAutoscalersForAll(ctx context.Context, client ctrlruntimeclie
 
 	return append(deploymentVPACreators, statefulSetVPACreators...), nil
 }
+
+// GetVerticalPodAutoscalerWithPolicies will return a function to create the VPA resource given an owner reference and a set of container policies.
+// The owner reference must not be nil.
+// Parameter `policies` defines maxAllowed and minAllowed for selected containers.
+func GetVerticalPodAutoscalerWithPolicies(name string, ownerRef *metav1.OwnerReference, mode autoscalingv1beta2.UpdateMode, policies []autoscalingv1beta2.ContainerResourcePolicy) reconciling.NamedVerticalPodAutoscalerCreatorGetter {
+	return func() (string, reconciling.VerticalPodAutoscalerCreator) {
+		return name, func(vpa *autoscalingv1beta2.VerticalPodAutoscaler) (*autoscalingv1beta2.VerticalPodAutoscaler, error) {
+			// We're doing this as we don't want to use the Cluster object as owner.
+			// Instead we're using the actual target as owner - this way the VPA gets deleted when the Deployment/StatefulSet gets deleted as well
+			vpa.OwnerReferences = []metav1.OwnerReference{*ownerRef}
+			vpa.Spec = autoscalingv1beta2.VerticalPodAutoscalerSpec{
+				TargetRef: &autoscalingv1.CrossVersionObjectReference{
+					Name:       ownerRef.Name,
+					Kind:       ownerRef.Kind,
+					APIVersion: ownerRef.APIVersion,
+				},
+				UpdatePolicy: &autoscalingv1beta2.PodUpdatePolicy{
+					UpdateMode: &mode,
+				},
+				ResourcePolicy: &autoscalingv1beta2.PodResourcePolicy{
+					ContainerPolicies: policies,
+				},
+			}
+			return vpa, nil
+		}
+	}
+}

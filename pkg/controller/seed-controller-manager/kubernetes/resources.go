@@ -40,11 +40,13 @@ import (
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 	"k8c.io/kubermatic/v2/pkg/resources/scheduler"
 	"k8c.io/kubermatic/v2/pkg/resources/usercluster"
+	appsv1 "k8s.io/api/apps/v1"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	autoscalingv1beta2 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1beta2"
 )
 
 func (r *Reconciler) ensureResourcesAreDeployed(ctx context.Context, cluster *kubermaticv1.Cluster) error {
@@ -142,8 +144,10 @@ func (r *Reconciler) ensureResourcesAreDeployed(ctx context.Context, cluster *ku
 		return err
 	}
 
+	// satisfy go fmt: declared but not used
+	_ = r.ensureVerticalPodAutoscalers
 	// check that all VerticalPodAutoscalers are created
-	if err := r.ensureVerticalPodAutoscalers(ctx, cluster, data); err != nil {
+	if err := r.sys11EnsureVerticalPodAutoscalers(ctx, cluster, data); err != nil {
 		return err
 	}
 
@@ -509,6 +513,129 @@ func (r *Reconciler) ensureVerticalPodAutoscalers(ctx context.Context, c *kuberm
 
 	return reconciling.ReconcileVerticalPodAutoscalers(ctx, creators, c.Status.NamespaceName, r.Client)
 }
+
+// Sys11: https://youtrack.syseleven.net/issue/K8s-5633
+// Replace `ensureVerticalPodAutoscalers` function with our own.
+// This uses each package's `CreateVPA` function instead of copying the resource quota as containerPolicies.
+func (r *Reconciler) sys11EnsureVerticalPodAutoscalers(ctx context.Context, c *kubermaticv1.Cluster, data *resources.TemplateData) error {
+	namespace := c.Status.NamespaceName
+
+	// K8s-5637: There's an exact copy of these two functions in `monitoring` package.
+	// Discussion: https://gitlab.syseleven.de/kubernetes/kubermatic/-/merge_requests/190#note_197206
+	//FIXME: Extract as one function once generics are GA
+	getDeploymentOwnerReference := func(name string) (*metav1.OwnerReference, error) {
+		var obj appsv1.Deployment
+		if err := r.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, &obj); err != nil {
+			if errors.IsNotFound(err) {
+				return nil, fmt.Errorf("failed to get owner reference of deployment '%s' for vpa: not found", name)
+			}
+			return nil, fmt.Errorf("failed to get owner reference of deployment '%s' for vpa: %v", name, err)
+		}
+		return metav1.NewControllerRef(&obj, obj.GroupVersionKind()), nil
+	}
+	getStatefulSetOwnerReference := func(name string) (*metav1.OwnerReference, error) {
+		var obj appsv1.StatefulSet
+		if err := r.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, &obj); err != nil {
+			if errors.IsNotFound(err) {
+				return nil, fmt.Errorf("failed to get owner reference of statefulset '%s' for vpa: not found", name)
+			}
+			return nil, fmt.Errorf("failed to get owner reference of statefulset '%s' for vpa: %v", name, err)
+		}
+		return metav1.NewControllerRef(&obj, obj.GroupVersionKind()), nil
+	}
+
+	updateMode := autoscalingv1beta2.UpdateModeOff
+	if r.features.VPA {
+		updateMode = autoscalingv1beta2.UpdateModeAuto
+	}
+
+	apiServerOwnerRef, err := getDeploymentOwnerReference(resources.ApiserverDeploymentName)
+	if err != nil {
+		return err
+	}
+	controllerManagerOwnerRef, err := getDeploymentOwnerReference(resources.ControllerManagerDeploymentName)
+	if err != nil {
+		return err
+	}
+	schedulerOwnerRef, err := getDeploymentOwnerReference(resources.SchedulerDeploymentName)
+	if err != nil {
+		return err
+	}
+	etcdOwnerRef, err := getStatefulSetOwnerReference(resources.EtcdStatefulSetName)
+	if err != nil {
+		return err
+	}
+	// Disable for now https://github.com/kubermatic/machine-controller/issues/1058
+	//machineControllerOwnerRef, err := getDeploymentOwnerReference(resources.MachineControllerDeploymentName)
+	//if err != nil {
+	//	return err
+	//}
+	//machineControllerWebhookOwnerRef, err := getDeploymentOwnerReference(resources.MachineControllerWebhookDeploymentName)
+	//if err != nil {
+	//	return err
+	//}
+	userClusterControllerOwnerRef, err := getDeploymentOwnerReference(resources.UserClusterControllerDeploymentName)
+	if err != nil {
+		return err
+	}
+	openvpnServerOwnerRef, err := getDeploymentOwnerReference(resources.OpenVPNServerDeploymentName)
+	if err != nil {
+		return err
+	}
+	dnsResolverOwnerRef, err := getDeploymentOwnerReference(resources.DNSResolverDeploymentName)
+	if err != nil {
+		return err
+	}
+	metricsServerOwnerRef, err := getDeploymentOwnerReference(resources.MetricsServerDeploymentName)
+	if err != nil {
+		return err
+	}
+	clusterProxyOwnerRef, err := getDeploymentOwnerReference(resources.ClusterProxyDeploymentName)
+	if err != nil {
+		return err
+	}
+
+	creators := []reconciling.NamedVerticalPodAutoscalerCreatorGetter{
+		apiserver.VPACreator(apiServerOwnerRef, updateMode),
+		controllermanager.VPACreator(controllerManagerOwnerRef, updateMode),
+		scheduler.VPACreator(schedulerOwnerRef, updateMode),
+		etcd.VPACreator(etcdOwnerRef, updateMode),
+		// Disable for now https://github.com/kubermatic/machine-controller/issues/1058
+		// machinecontroller.VPACreator(machineControllerOwnerRef, updateMode),
+		// machinecontroller.WebhookVPACreator(machineControllerWebhookOwnerRef, updateMode),
+		usercluster.VPACreator(userClusterControllerOwnerRef, updateMode),
+		openvpn.VPACreator(openvpnServerOwnerRef, updateMode),
+		dns.VPACreator(dnsResolverOwnerRef, updateMode),
+		metricsserver.VPACreator(metricsServerOwnerRef, updateMode),
+		clusterproxy.VPACreator(clusterProxyOwnerRef, updateMode),
+	}
+
+	// If CCM migration is ongoing defer the deployment of the CCM to the
+	// moment in which cloud controllers or the full in-tree cloud provider
+	// have been deactivated.
+	if data.Cluster().Spec.Features[kubermaticv1.ClusterFeatureExternalCloudProvider] &&
+		(!metav1.HasAnnotation(data.Cluster().ObjectMeta, kubermaticv1.CCMMigrationNeededAnnotation) ||
+			data.KCMCloudControllersDeactivated()) {
+		var deploymentName string
+		switch {
+		case data.Cluster().Spec.Cloud.Openstack != nil:
+			deploymentName = cloudcontroller.OpenstackCCMDeploymentName
+		case data.Cluster().Spec.Cloud.Hetzner != nil:
+			deploymentName = cloudcontroller.HetznerCCMDeploymentName
+		}
+
+		ownerRef, err := getDeploymentOwnerReference(deploymentName)
+		if err != nil {
+			return err
+		}
+
+		creators = append(creators, cloudcontroller.VPACreator(data, ownerRef, updateMode))
+	}
+
+	return reconciling.ReconcileVerticalPodAutoscalers(ctx, creators, c.Status.NamespaceName, r.Client)
+}
+
+// Sys11: End
 
 func (r *Reconciler) ensureStatefulSets(ctx context.Context, c *kubermaticv1.Cluster, data *resources.TemplateData) error {
 	creators := GetStatefulSetCreators(data, r.features.EtcdDataCorruptionChecks)

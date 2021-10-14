@@ -52,7 +52,7 @@ var (
 
 const (
 	Name = "machine-controller"
-	Tag  = "v1.27.8-sys11-1"
+	Tag  = "v1.27.11-sys11-4"
 
 	NodeLocalDNSCacheAddress = "169.254.20.10"
 )
@@ -206,6 +206,8 @@ func getEnvVars(data machinecontrollerData) ([]corev1.EnvVar, error) {
 		vars = append(vars, corev1.EnvVar{Name: "OS_DOMAIN_NAME", Value: credentials.Openstack.Domain})
 		vars = append(vars, corev1.EnvVar{Name: "OS_TENANT_NAME", Value: credentials.Openstack.Tenant})
 		vars = append(vars, corev1.EnvVar{Name: "OS_TENANT_ID", Value: credentials.Openstack.TenantID})
+		vars = append(vars, corev1.EnvVar{Name: "OS_APPLICATION_CREDENTIAL_ID", Value: credentials.Openstack.ApplicationCredentialID})
+		vars = append(vars, corev1.EnvVar{Name: "OS_APPLICATION_CREDENTIAL_SECRET", Value: credentials.Openstack.ApplicationCredentialSecret})
 	}
 	if data.Cluster().Spec.Cloud.Hetzner != nil {
 		vars = append(vars, corev1.EnvVar{Name: "HZ_TOKEN", Value: credentials.Hetzner.Token})

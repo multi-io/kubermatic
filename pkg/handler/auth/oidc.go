@@ -93,7 +93,7 @@ type OpenIDClient struct {
 
 // NewOpenIDClient returns an authentication middleware which authenticates against an openID server.
 // If rootCertificates is nil, the host's root CAs will be used.
-func NewOpenIDClient(issuer, clientID, clientSecret, redirectURI string, extractor TokenExtractor, insecureSkipVerify bool, rootCertificates *x509.CertPool) (*OpenIDClient, error) {
+func NewOpenIDClient(issuer, clientID, clientSecret, redirectURI string, extractor TokenExtractor, insecureSkipVerify bool, skipClientIDCheck bool, rootCertificates *x509.CertPool) (*OpenIDClient, error) {
 	ctx := context.Background()
 	tr := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
@@ -124,7 +124,7 @@ func NewOpenIDClient(issuer, clientID, clientSecret, redirectURI string, extract
 		clientID:       clientID,
 		clientSecret:   clientSecret,
 		redirectURI:    redirectURI,
-		verifier:       p.Verifier(&oidc.Config{ClientID: clientID}),
+		verifier:       p.Verifier(&oidc.Config{ClientID: clientID, SkipClientIDCheck: skipClientIDCheck}),
 		provider:       p,
 		httpClient:     client,
 	}, nil

@@ -50,6 +50,8 @@ spec:
         - name: OS_TENANT_NAME
           value: openstack-tenant
         - name: OS_TENANT_ID
+        - name: OS_APPLICATION_CREDENTIAL_ID
+        - name: OS_APPLICATION_CREDENTIAL_SECRET
         - name: HTTP_PROXY
           value: http://my-corp
         - name: HTTPS_PROXY
@@ -64,7 +66,7 @@ spec:
           value: apiserver-external.cluster-de-test-01.svc.cluster.local.
         - name: KUBECONFIG
           value: /etc/kubernetes/kubeconfig/kubeconfig
-        image: docker.io/syseleven/machine-controller:v1.27.8-sys11-1
+        image: docker.io/syseleven/machine-controller:v1.27.11-sys11-4
         livenessProbe:
           failureThreshold: 8
           httpGet:

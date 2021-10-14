@@ -19,6 +19,7 @@ package cloudcontroller
 import (
 	"fmt"
 
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/resources"
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 	"k8c.io/kubermatic/v2/pkg/resources/vpnsidecar"
@@ -134,6 +135,9 @@ func getOSFlags(data *resources.TemplateData) []string {
 		"--cloud-config=/etc/kubernetes/cloud/config",
 		"--cloud-provider=openstack",
 		"--cluster-name=" + data.Cluster().Name,
+	}
+	if data.Cluster().Spec.Features[kubermaticv1.ClusterFeatureCCMClusterName] {
+		flags = append(flags, "--cluster-name", data.Cluster().Name)
 	}
 	return flags
 }

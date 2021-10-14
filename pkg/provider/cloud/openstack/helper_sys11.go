@@ -8,10 +8,11 @@ import (
 
 	"github.com/gophercloud/gophercloud"
 	goopenstack "github.com/gophercloud/gophercloud/openstack"
+	"k8c.io/kubermatic/v2/pkg/resources"
 )
 
-func getComputeClient(username, password, domain, tenant, tenantID, authURL, region string, caBundle *x509.CertPool) (*gophercloud.ServiceClient, error) {
-	authClient, err := getAuthClient(username, password, domain, tenant, tenantID, authURL, caBundle)
+func getComputeClient(authURL, region string, credentials *resources.OpenstackCredentials, caBundle *x509.CertPool) (*gophercloud.ServiceClient, error) {
+	authClient, err := getAuthClient(authURL, credentials, caBundle)
 	if err != nil {
 		return nil, err
 	}

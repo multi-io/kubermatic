@@ -30,8 +30,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/minio/minio-go"
-
+	minio "github.com/minio/minio-go"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/resources/certificates/triple"
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
@@ -529,11 +528,14 @@ const (
 
 	HetznerToken = "token"
 
-	OpenstackUsername = "username"
-	OpenstackPassword = "password"
-	OpenstackTenant   = "tenant"
-	OpenstackTenantID = "tenantID"
-	OpenstackDomain   = "domain"
+	OpenstackUsername                    = "username"
+	OpenstackPassword                    = "password"
+	OpenstackTenant                      = "tenant"
+	OpenstackTenantID                    = "tenantID"
+	OpenstackDomain                      = "domain"
+	OpenstackApplicationCredentialID     = "applicationCredentialID"
+	OpenstackApplicationCredentialSecret = "applicationCredentialSecret"
+	OpenstackToken                       = "token"
 
 	PacketAPIKey    = "apiKey"
 	PacketProjectID = "projectID"
@@ -615,15 +617,15 @@ const (
 const (
 	MLANamespace                   = "mla-system"
 	PromtailServiceAccountName     = "promtail"
-	PromtailClusterRoleName        = "promtail"
-	PromtailClusterRoleBindingName = "promtail"
+	PromtailClusterRoleName        = "system:kubermatic:mla:promtail"
+	PromtailClusterRoleBindingName = "system:kubermatic:mla:promtail"
 	PromtailSecretName             = "promtail"
 	PromtailDaemonSetName          = "promtail"
 
 	UserClusterPrometheusConfigMapName          = "prometheus"
 	UserClusterPrometheusServiceAccountName     = "prometheus"
-	UserClusterPrometheusClusterRoleName        = "prometheus"
-	UserClusterPrometheusClusterRoleBindingName = "prometheus"
+	UserClusterPrometheusClusterRoleName        = "system:kubermatic:mla:prometheus"
+	UserClusterPrometheusClusterRoleBindingName = "system:kubermatic:mla:prometheus"
 	UserClusterPrometheusDeploymentName         = "prometheus"
 )
 
