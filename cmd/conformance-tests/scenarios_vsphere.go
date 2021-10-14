@@ -107,7 +107,7 @@ func (s *vSphereScenario) Cluster(secrets secrets) *apimodels.CreateClusterSpec 
 	return spec
 }
 
-func (s *vSphereScenario) NodeDeployments(_ context.Context, num int, _ secrets, _ string) ([]apimodels.NodeDeployment, error) {
+func (s *vSphereScenario) NodeDeployments(_ context.Context, num int, _ secrets) ([]apimodels.NodeDeployment, error) {
 	osName := getOSNameFromSpec(s.nodeOsSpec)
 	replicas := int32(num)
 	return []apimodels.NodeDeployment{

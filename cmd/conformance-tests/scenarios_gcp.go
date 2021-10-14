@@ -76,7 +76,7 @@ func (s *gcpScenario) Cluster(secrets secrets) *apimodels.CreateClusterSpec {
 	}
 }
 
-func (s *gcpScenario) NodeDeployments(_ context.Context, num int, secrets secrets, _ string) ([]apimodels.NodeDeployment, error) {
+func (s *gcpScenario) NodeDeployments(_ context.Context, num int, secrets secrets) ([]apimodels.NodeDeployment, error) {
 	replicas := int32(num)
 
 	return []apimodels.NodeDeployment{
