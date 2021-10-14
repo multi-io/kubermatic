@@ -29,6 +29,7 @@ import (
 	jsonpatch "github.com/evanphx/json-patch"
 
 	clusterv1alpha1 "github.com/kubermatic/machine-controller/pkg/apis/cluster/v1alpha1"
+	providerconfig "github.com/kubermatic/machine-controller/pkg/providerconfig/types"
 	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/handler/middleware"
@@ -81,9 +82,12 @@ func CreateMachineDeployment(ctx context.Context, userInfoGetter provider.UserIn
 		return nil, k8cerrors.NewBadRequest("You cannot create a node deployment for KubeAdm provider")
 	}
 
-	keys, err := sshKeyProvider.List(project, &provider.SSHKeyListOptions{ClusterName: clusterID})
-	if err != nil {
-		return nil, common.KubernetesErrorToHTTPError(err)
+	var keys []*kubermaticv1.UserSSHKey
+	if v := cluster.Spec.EnableUserSSHKeyAgent; v == nil || !*v {
+		keys, err = sshKeyProvider.List(project, &provider.SSHKeyListOptions{ClusterName: clusterID})
+		if err != nil {
+			return nil, common.KubernetesErrorToHTTPError(err)
+		}
 	}
 
 	client, err := common.GetClusterClient(ctx, userInfoGetter, clusterProvider, cluster, project.Name)
@@ -126,6 +130,28 @@ func CreateMachineDeployment(ctx context.Context, userInfoGetter provider.UserIn
 	}
 
 	return outputMachineDeployment(md)
+}
+
+// removeUnnecessaryOrderingDiff returns old ordering of ssh keys if the new keys are the same as old keys which protects from unnecessary diff in machine template.
+// This ensures we do not recreate machines because ssh keys are in different order.
+func removeUnnecessaryOrderingDiff(md *clusterv1alpha1.MachineDeployment, keys []*kubermaticv1.UserSSHKey) ([]*kubermaticv1.UserSSHKey, error) {
+	cfg, err := providerconfig.GetConfig(md.Spec.Template.Spec.ProviderSpec)
+	if err != nil {
+		return nil, err
+	}
+	var preserved []*kubermaticv1.UserSSHKey
+	for _, before := range cfg.SSHPublicKeys {
+		for _, after := range keys {
+			if strings.TrimSpace(before) == strings.TrimSpace(after.Spec.PublicKey) {
+				preserved = append(preserved, after)
+				break
+			}
+		}
+	}
+	if len(preserved) == len(keys) {
+		return preserved, nil
+	}
+	return keys, nil
 }
 
 func outputMachineDeployment(md *clusterv1alpha1.MachineDeployment) (*apiv1.NodeDeployment, error) {
@@ -529,9 +555,19 @@ func PatchMachineDeployment(ctx context.Context, userInfoGetter provider.UserInf
 		return nil, fmt.Errorf("error getting dc: %v", err)
 	}
 
-	keys, err := sshKeyProvider.List(project, &provider.SSHKeyListOptions{ClusterName: clusterID})
-	if err != nil {
-		return nil, common.KubernetesErrorToHTTPError(err)
+	// If ssh key agent is disabled pass keys in machine spec. This will recreate nodes if ssh keys list has changed which is OK.
+	// Avoid settings ssh keys in machine spec when agent is enabled because it is not necessary and it might cause nodes recreation.
+	var keys []*kubermaticv1.UserSSHKey
+	if v := cluster.Spec.EnableUserSSHKeyAgent; v == nil || !*v {
+		keys, err = sshKeyProvider.List(project, &provider.SSHKeyListOptions{ClusterName: clusterID})
+		if err != nil {
+			return nil, common.KubernetesErrorToHTTPError(err)
+		}
+
+		keys, err = removeUnnecessaryOrderingDiff(machineDeployment, keys)
+		if err != nil {
+			return nil, common.KubernetesErrorToHTTPError(err)
+		}
 	}
 
 	assertedClusterProvider, ok := clusterProvider.(*kubernetesprovider.ClusterProvider)
