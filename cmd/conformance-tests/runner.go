@@ -826,7 +826,7 @@ func (r *testRunner) createNodeDeployments(ctx context.Context, log *zap.Sugared
 		ClusterID: clusterName,
 		DC:        r.seed.Name,
 	}
-	utils.SetupParams(nil, nodeDeploymentGetParams, 5*time.Second, 1*time.Minute)
+	utils.SetupParams(nil, nodeDeploymentGetParams, 10*time.Second, 5*time.Minute)
 
 	log.Info("Getting existing NodeDeployments")
 	resp, err := r.kubermaticClient.Project.ListNodeDeployments(nodeDeploymentGetParams, r.kubermaticAuthenticator)
@@ -871,7 +871,7 @@ func (r *testRunner) createNodeDeployments(ctx context.Context, log *zap.Sugared
 			DC:        r.seed.Name,
 			Body:      &nd,
 		}
-		utils.SetupParams(nil, params, 5*time.Second, 1*time.Minute, http.StatusConflict)
+		utils.SetupParams(nil, params, 5*time.Second, 5*time.Minute, http.StatusConflict)
 
 		if _, err := r.kubermaticClient.Project.CreateNodeDeployment(params, r.kubermaticAuthenticator); err != nil {
 			return fmt.Errorf("failed to create NodeDeployment %s: %v", nd.Name, err)
@@ -960,7 +960,7 @@ func (r *testRunner) createCluster(ctx context.Context, log *zap.SugaredLogger, 
 		DC:        r.seed.Name,
 		Body:      cluster,
 	}
-	utils.SetupParams(nil, params, 3*time.Second, 1*time.Minute, http.StatusConflict)
+	utils.SetupParams(nil, params, 3*time.Second, 5*time.Minute, http.StatusConflict)
 
 	response, err := r.kubermaticClient.Project.CreateCluster(params, r.kubermaticAuthenticator)
 	if err != nil {
