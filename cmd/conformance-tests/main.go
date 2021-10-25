@@ -436,6 +436,7 @@ func main() {
 	log.Infof("Whole suite took: %.2f seconds", time.Since(start).Seconds())
 }
 
+//nolint:golint,cyclomatic
 func getScenarios(opts Opts, log *zap.SugaredLogger) []testScenario {
 	scenarioOptions := strings.Split(opts.scenarioOptions, ",")
 
