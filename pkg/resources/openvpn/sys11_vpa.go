@@ -51,6 +51,10 @@ var (
 )
 
 // VPACreator returns a func to create/update the VPA
+//nolint // FIXME: remove with workaround below: https://youtrack.syseleven.net/issue/K8s-6012
 func VPACreator(ownerRef *metav1.OwnerReference, mode autoscalingv1beta2.UpdateMode) reconciling.NamedVerticalPodAutoscalerCreatorGetter {
+	// FIXME: OpenVPN server has insufficient resources https://youtrack.syseleven.net/issue/K8s-6012
+	mode = autoscalingv1beta2.UpdateModeOff
+	// FIXME: end
 	return resources.GetVerticalPodAutoscalerWithPolicies(name, ownerRef, mode, vpaContainerPolicies)
 }
