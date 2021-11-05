@@ -192,7 +192,7 @@ func DeploymentCreator(data *resources.TemplateData, enableOIDCAuthentication bo
 				openvpnSidecar.Name:        openvpnSidecar.Resources.DeepCopy(),
 				dnatControllerSidecar.Name: dnatControllerSidecar.Resources.DeepCopy(),
 			}
-			err = resources.SetResourceRequirements(dep.Spec.Template.Spec.Containers, defResourceRequirements, resources.GetOverrides(data.Cluster().Spec.ComponentsOverride), dep.Annotations)
+			err = resources.SetResourceRequirements(dep.Spec.Template.Spec.Containers, dep.Annotations, defResourceRequirements, resources.GetOverrides(data.Cluster().Spec.ComponentsOverride))
 			if err != nil {
 				return nil, fmt.Errorf("failed to set resource requirements: %v", err)
 			}

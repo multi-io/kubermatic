@@ -156,7 +156,7 @@ func DeploymentCreator(data metricsServerData) reconciling.NamedDeploymentCreato
 				openvpnSidecar.Name:        openvpnSidecar.Resources.DeepCopy(),
 				dnatControllerSidecar.Name: dnatControllerSidecar.Resources.DeepCopy(),
 			}
-			err = resources.SetResourceRequirements(dep.Spec.Template.Spec.Containers, defResourceRequirements, nil, dep.Annotations)
+			err = resources.SetResourceRequirements(dep.Spec.Template.Spec.Containers, dep.Annotations, defResourceRequirements, nil)
 			if err != nil {
 				return nil, fmt.Errorf("failed to set resource requirements: %v", err)
 			}

@@ -257,7 +257,7 @@ func StatefulSetCreator(data etcdStatefulSetCreatorData, enableDataCorruptionChe
 
 			set.Spec.Template.Spec.Tolerations = data.Cluster().Spec.ComponentsOverride.Etcd.Tolerations
 
-			err = resources.SetResourceRequirements(set.Spec.Template.Spec.Containers, defaultResourceRequirements, resources.GetOverrides(data.Cluster().Spec.ComponentsOverride), set.Annotations)
+			err = resources.SetResourceRequirements(set.Spec.Template.Spec.Containers, set.Annotations, defaultResourceRequirements, resources.GetOverrides(data.Cluster().Spec.ComponentsOverride))
 			if err != nil {
 				return nil, fmt.Errorf("failed to set resource requirements: %v", err)
 			}

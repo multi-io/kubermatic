@@ -37,7 +37,7 @@ type serverClientConfigsData interface {
 func ServerClientConfigsConfigMapCreator(data serverClientConfigsData) reconciling.NamedConfigMapCreatorGetter {
 	return func() (string, reconciling.ConfigMapCreator) {
 		return resources.OpenVPNClientConfigsConfigMapName, func(cm *corev1.ConfigMap) (*corev1.ConfigMap, error) {
-			cm.Labels = resources.BaseAppLabels(name, nil)
+			cm.Labels = resources.BaseAppLabels(containerServerName, nil)
 
 			var iroutes []string
 

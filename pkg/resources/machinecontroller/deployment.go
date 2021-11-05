@@ -172,7 +172,7 @@ func DeploymentCreatorWithoutInitWrapper(data machinecontrollerData) reconciling
 					},
 				},
 			}
-			err = resources.SetResourceRequirements(dep.Spec.Template.Spec.Containers, controllerResourceRequirements, nil, dep.Annotations)
+			err = resources.SetResourceRequirements(dep.Spec.Template.Spec.Containers, dep.Annotations, controllerResourceRequirements, nil)
 			if err != nil {
 				return nil, fmt.Errorf("failed to set resource requirements: %v", err)
 			}

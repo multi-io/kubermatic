@@ -111,7 +111,7 @@ func DeploymentCreator(kubernetesVersion *semver.Version) reconciling.NamedDeplo
 			// Sys11 end
 
 			dep.Spec.Template.Spec.Containers = getContainers(kubernetesVersion)
-			err := resources.SetResourceRequirements(dep.Spec.Template.Spec.Containers, defaultResourceRequirements, nil, dep.Annotations)
+			err := resources.SetResourceRequirements(dep.Spec.Template.Spec.Containers, dep.Annotations, defaultResourceRequirements, nil)
 			if err != nil {
 				return nil, fmt.Errorf("failed to set resource requirements: %v", err)
 			}
