@@ -524,22 +524,22 @@ func TestSetResourceRequirements(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			err := SetResourceRequirements(tc.containers, tc.defaultRequirements, tc.overrides, tc.annotations)
+			err := SetResourceRequirements(tc.containers, tc.annotations, tc.defaultRequirements, tc.overrides)
 			if err != nil {
 				t.Fatalf("error: %v", err)
 			}
 			for _, container := range tc.containers {
 				if tc.expectedRequirements[container.Name].Requests.Cpu() != nil && !container.Resources.Requests.Cpu().Equal(*tc.expectedRequirements[container.Name].Requests.Cpu()) {
-					t.Errorf("invalid resource requirements: expected requested cpu %v, but got %v", container.Resources.Requests.Cpu(), tc.expectedRequirements[container.Name].Requests.Cpu())
+					t.Errorf("invalid resource requirements: expected requested cpu %v, but got %v", tc.expectedRequirements[container.Name].Requests.Cpu(), container.Resources.Requests.Cpu())
 				}
 				if tc.expectedRequirements[container.Name].Requests.Memory() != nil && !container.Resources.Requests.Memory().Equal(*tc.expectedRequirements[container.Name].Requests.Memory()) {
-					t.Errorf("invalid resource requirements: expected requested memory %v, but got %v", container.Resources.Requests.Memory(), tc.expectedRequirements[container.Name].Requests.Memory())
+					t.Errorf("invalid resource requirements: expected requested memory %v, but got %v", tc.expectedRequirements[container.Name].Requests.Memory(), container.Resources.Requests.Memory())
 				}
 				if tc.expectedRequirements[container.Name].Limits.Cpu() != nil && !container.Resources.Limits.Cpu().Equal(*tc.expectedRequirements[container.Name].Limits.Cpu()) {
-					t.Errorf("invalid resource requirements: expected cpu limit %v, but got %v", container.Resources.Requests.Cpu(), tc.expectedRequirements[container.Name].Requests.Cpu())
+					t.Errorf("invalid resource requirements: expected cpu limit %v, but got %v", tc.expectedRequirements[container.Name].Requests.Cpu(), container.Resources.Requests.Cpu())
 				}
 				if tc.expectedRequirements[container.Name].Limits.Memory() != nil && !container.Resources.Limits.Memory().Equal(*tc.expectedRequirements[container.Name].Limits.Memory()) {
-					t.Errorf("invalid resource requirements: expected memory limit %v, but got %v", container.Resources.Limits.Memory(), tc.expectedRequirements[container.Name].Limits.Memory())
+					t.Errorf("invalid resource requirements: expected memory limit %v, but got %v", tc.expectedRequirements[container.Name].Limits.Memory(), container.Resources.Limits.Memory())
 				}
 			}
 		})
@@ -570,7 +570,7 @@ func TestSetResourceRequirementsDoesNotChangeDefaults(t *testing.T) {
 		},
 	}
 
-	err := SetResourceRequirements(nil, defaults, overrides, nil)
+	err := SetResourceRequirements(nil, nil, defaults, overrides)
 	if err != nil {
 		t.Fatalf("function should not have returned an error, but got: %v", err)
 	}

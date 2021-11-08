@@ -33,7 +33,7 @@ import (
 )
 
 var (
-	openvpnResourceRequirements = corev1.ResourceRequirements{
+	serverResourceRequirements = corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
 			corev1.ResourceMemory: resource.MustParse("5Mi"),
 			corev1.ResourceCPU:    resource.MustParse("100m"),
@@ -44,26 +44,28 @@ var (
 		},
 	}
 
-	defaultResourceRequirements = map[string]*corev1.ResourceRequirements{
-		name: openvpnResourceRequirements.DeepCopy(),
-		"ip-fixup": {
-			Requests: corev1.ResourceList{
-				corev1.ResourceMemory: resource.MustParse("16Mi"),
-				corev1.ResourceCPU:    resource.MustParse("5m"),
-			},
-			Limits: corev1.ResourceList{
-				corev1.ResourceMemory: resource.MustParse("32Mi"),
-				corev1.ResourceCPU:    resource.MustParse("50m"),
-			},
+	ipFixupResourceRequirements = corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("16Mi"),
+			corev1.ResourceCPU:    resource.MustParse("5m"),
 		},
-		"openvpn-exporter": openvpnResourceRequirements.DeepCopy(),
+		Limits: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("32Mi"),
+			corev1.ResourceCPU:    resource.MustParse("50m"),
+		},
 	}
+
+	exporterResourceRequirements              = *serverResourceRequirements.DeepCopy()
+	ipTablesInitContainerResourceRequirements = *serverResourceRequirements.DeepCopy()
 )
 
 const (
-	name         = "openvpn-server"
-	statusPath   = "/run/openvpn/openvpn-status"
-	exporterPort = 9176
+	containerIPTablesInitName = "iptables-init"
+	containerServerName       = "openvpn-server"
+	containerIPFixupName      = "ip-fixup"
+	containerExporterName     = "openvpn-exporter"
+	statusPath                = "/run/openvpn/openvpn-status"
+	exporterPort              = 9176
 )
 
 type openVPNDeploymentCreatorData interface {
@@ -78,12 +80,12 @@ func DeploymentCreator(data openVPNDeploymentCreatorData) reconciling.NamedDeplo
 	return func() (string, reconciling.DeploymentCreator) {
 		return resources.OpenVPNServerDeploymentName, func(dep *appsv1.Deployment) (*appsv1.Deployment, error) {
 			dep.Name = resources.OpenVPNServerDeploymentName
-			dep.Labels = resources.BaseAppLabels(name, nil)
+			dep.Labels = resources.BaseAppLabels(containerServerName, nil)
 
 			dep.Spec.Replicas = resources.Int32(1)
 			dep.Spec.Selector = &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					resources.AppLabelKey: name,
+					resources.AppLabelKey: containerServerName,
 				},
 			}
 			dep.Spec.Strategy.Type = appsv1.RollingUpdateDeploymentStrategyType
@@ -101,7 +103,7 @@ func DeploymentCreator(data openVPNDeploymentCreatorData) reconciling.NamedDeplo
 
 			procMountType := corev1.DefaultProcMount
 			volumes := getVolumes()
-			podLabels, err := data.GetPodTemplateLabels(name, volumes, nil)
+			podLabels, err := data.GetPodTemplateLabels(containerServerName, volumes, nil)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create pod labels: %v", err)
 			}
@@ -145,9 +147,17 @@ func DeploymentCreator(data openVPNDeploymentCreatorData) reconciling.NamedDeplo
 
 			dep.Spec.Template.Spec.Volumes = volumes
 
+			var iptablesContainerRequirements corev1.ResourceRequirements
+
+			if r := data.Cluster().Spec.ComponentsOverride.OpenVPN.IPTablesInitContainer.Resources; r != nil {
+				iptablesContainerRequirements = *r
+			} else {
+				iptablesContainerRequirements = ipTablesInitContainerResourceRequirements
+			}
+
 			dep.Spec.Template.Spec.InitContainers = []corev1.Container{
 				{
-					Name:    "iptables-init",
+					Name:    containerIPTablesInitName,
 					Image:   data.ImageRegistry(resources.RegistryQuay) + "/kubermatic/openvpn:v2.5.0-r1",
 					Command: []string{"/bin/bash"},
 					Args: []string{
@@ -173,7 +183,7 @@ iptables -A INPUT -i tun0 -j DROP
 						},
 						ProcMount: &procMountType,
 					},
-					Resources: openvpnResourceRequirements,
+					Resources: iptablesContainerRequirements,
 				},
 			}
 
@@ -204,7 +214,7 @@ iptables -A INPUT -i tun0 -j DROP
 
 			dep.Spec.Template.Spec.Containers = []corev1.Container{
 				{
-					Name:    name,
+					Name:    containerServerName,
 					Image:   data.ImageRegistry(resources.RegistryQuay) + "/kubermatic/openvpn:v2.5.0-r1",
 					Command: []string{"/usr/sbin/openvpn"},
 					Args:    vpnArgs,
@@ -257,7 +267,7 @@ iptables -A INPUT -i tun0 -j DROP
 					},
 				},
 				{
-					Name:    "ip-fixup",
+					Name:    containerIPFixupName,
 					Image:   data.ImageRegistry(resources.RegistryQuay) + "/kubermatic/openvpn:v2.5.0-r1",
 					Command: []string{"/bin/bash"},
 					Args: []string{
@@ -276,7 +286,7 @@ done`,
 					},
 				},
 				{
-					Name:    "openvpn-exporter",
+					Name:    containerExporterName,
 					Image:   data.ImageRegistry(resources.RegistryDocker) + "/kumina/openvpn-exporter:v0.2.2",
 					Command: []string{"/bin/openvpn_exporter"},
 					Args: []string{
@@ -297,11 +307,15 @@ done`,
 					},
 				},
 			}
-			err = resources.SetResourceRequirements(dep.Spec.Template.Spec.Containers, defaultResourceRequirements, nil, dep.Annotations)
-			if err != nil {
+			defaultResourceRequirements := map[string]*corev1.ResourceRequirements{
+				containerServerName:   &serverResourceRequirements,
+				containerIPFixupName:  &ipFixupResourceRequirements,
+				containerExporterName: &exporterResourceRequirements,
+			}
+			overrides := resources.GetOverrides(data.Cluster().Spec.ComponentsOverride)
+			if err = resources.SetResourceRequirements(dep.Spec.Template.Spec.Containers, dep.Annotations, defaultResourceRequirements, overrides); err != nil {
 				return nil, fmt.Errorf("failed to set resource requirements: %v", err)
 			}
-
 			return dep, nil
 		}
 	}

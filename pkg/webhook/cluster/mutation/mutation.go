@@ -99,6 +99,18 @@ func (h *AdmissionHandler) Handle(ctx context.Context, req webhook.AdmissionRequ
 		if settings.ControllerManager.RetryPeriodSeconds == nil {
 			settings.ControllerManager.RetryPeriodSeconds = h.defaultSettings.ControllerManager.RetryPeriodSeconds
 		}
+		if v := settings.OpenVPN.Server.Resources; v != nil {
+			settings.OpenVPN.Server.Resources = h.defaultSettings.OpenVPN.Server.Resources
+		}
+		if v := settings.OpenVPN.Exporter.Resources; v != nil {
+			settings.OpenVPN.Exporter.Resources = h.defaultSettings.OpenVPN.Exporter.Resources
+		}
+		if v := settings.OpenVPN.IPFixup.Resources; v != nil {
+			settings.OpenVPN.IPFixup.Resources = h.defaultSettings.OpenVPN.IPFixup.Resources
+		}
+		if v := settings.OpenVPN.IPTablesInitContainer.Resources; v != nil {
+			settings.OpenVPN.IPTablesInitContainer.Resources = h.defaultSettings.OpenVPN.IPTablesInitContainer.Resources
+		}
 		if settings.Scheduler.Replicas == nil {
 			settings.Scheduler.Replicas = h.defaultSettings.Scheduler.Replicas
 		}

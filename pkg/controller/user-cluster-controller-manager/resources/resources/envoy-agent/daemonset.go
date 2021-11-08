@@ -71,7 +71,7 @@ func DaemonSetCreator(agentIP net.IP, versions kubermatic.Versions) reconciling.
 			}
 
 			ds.Spec.Template.Spec = getAgentPodSpec(agentIP, versions)
-			if err := resources.SetResourceRequirements(ds.Spec.Template.Spec.Containers, defaultResourceRequirements, nil, ds.Annotations); err != nil {
+			if err := resources.SetResourceRequirements(ds.Spec.Template.Spec.Containers, ds.Annotations, defaultResourceRequirements, nil); err != nil {
 				return nil, fmt.Errorf("failed to set resource requirements: %v", err)
 			}
 

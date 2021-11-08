@@ -15,7 +15,7 @@ var (
 	// This is always equal or higher than VPA limit
 	vpaContainerPolicies = []autoscalingv1beta2.ContainerResourcePolicy{
 		{
-			ContainerName: name,
+			ContainerName: containerServerName,
 			MinAllowed: corev1.ResourceList{
 				corev1.ResourceMemory: resource.MustParse("10Mi"),
 				corev1.ResourceCPU:    resource.MustParse("5m"),
@@ -56,5 +56,5 @@ func VPACreator(ownerRef *metav1.OwnerReference, mode autoscalingv1beta2.UpdateM
 	// FIXME: OpenVPN server has insufficient resources https://youtrack.syseleven.net/issue/K8s-6012
 	mode = autoscalingv1beta2.UpdateModeOff
 	// FIXME: end
-	return resources.GetVerticalPodAutoscalerWithPolicies(name, ownerRef, mode, vpaContainerPolicies)
+	return resources.GetVerticalPodAutoscalerWithPolicies(containerServerName, ownerRef, mode, vpaContainerPolicies)
 }
