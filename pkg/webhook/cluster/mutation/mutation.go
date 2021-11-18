@@ -23,8 +23,6 @@ import (
 	"net/http"
 
 	"github.com/go-logr/logr"
-	"gomodules.xyz/jsonpatch/v2"
-
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 
 	admissionv1 "k8s.io/api/admission/v1"
@@ -67,7 +65,8 @@ func (h *AdmissionHandler) Handle(ctx context.Context, req webhook.AdmissionRequ
 		if err := h.decoder.Decode(req, cluster); err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
 		}
-		settings := cluster.Spec.ComponentsOverride
+		h.applyDefaults(cluster)
+		settings := &cluster.Spec.ComponentsOverride
 
 		if settings.Apiserver.Replicas == nil {
 			settings.Apiserver.Replicas = h.defaultSettings.Apiserver.Replicas
@@ -150,19 +149,6 @@ func (h *AdmissionHandler) Handle(ctx context.Context, req webhook.AdmissionRequ
 		if !settings.Openstack.EnableIngressHostname {
 			settings.Openstack.EnableIngressHostname = h.defaultSettings.Openstack.EnableIngressHostname
 		}
-
-		response := webhook.Patched("default componentsOverride",
-			jsonpatch.Operation{
-				Operation: "remove",
-				Path:      "/spec/componentsOverride",
-			},
-			jsonpatch.Operation{
-				Operation: "add",
-				Path:      "/spec/componentsOverride",
-				Value:     settings,
-			})
-		response.UID = req.UID
-		return response
 	case admissionv1.Update:
 		if err := h.decoder.Decode(req, cluster); err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
@@ -183,11 +169,27 @@ func (h *AdmissionHandler) Handle(ctx context.Context, req webhook.AdmissionRequ
 
 		return admission.PatchResponseFromRaw(req.Object.Raw, mutatedCluster)
 	case admissionv1.Delete:
-		// NOP
+		return webhook.Allowed(fmt.Sprintf("no mutation done for request %s", req.UID))
 	default:
 		return admission.Errored(http.StatusBadRequest, fmt.Errorf("%s not supported on cluster resources", req.Operation))
 	}
-	return webhook.Allowed(fmt.Sprintf("no mutation done for request %s", req.UID))
+
+	mutatedCluster, err := json.Marshal(cluster)
+	if err != nil {
+		return webhook.Errored(http.StatusInternalServerError, fmt.Errorf("marshaling cluster object failed: %v", err))
+	}
+
+	return admission.PatchResponseFromRaw(req.Object.Raw, mutatedCluster)
+}
+
+func (h *AdmissionHandler) applyDefaults(c *kubermaticv1.Cluster) {
+	// Network policies for Apiserver are deployed by default
+	if _, ok := c.Spec.Features[kubermaticv1.ApiserverNetworkPolicy]; !ok {
+		if c.Spec.Features == nil {
+			c.Spec.Features = map[string]bool{}
+		}
+		c.Spec.Features[kubermaticv1.ApiserverNetworkPolicy] = true
+	}
 }
 
 func (h *AdmissionHandler) mutateUpdate(ctx context.Context, oldCluster, newCluster *kubermaticv1.Cluster) error {
