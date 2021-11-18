@@ -157,10 +157,6 @@ func getContainers(clusterVersion *semver.Version) []corev1.Container {
 					Name:      extraConfigVolume,
 					MountPath: extraConfigsMountPath,
 				},
-				{
-					Name:      "tmp",
-					MountPath: "/tmp",
-				},
 			},
 			Ports: []corev1.ContainerPort{
 				{
@@ -226,12 +222,6 @@ func getContainers(clusterVersion *semver.Version) []corev1.Container {
 
 func getVolumes() []corev1.Volume {
 	return []corev1.Volume{
-		{
-			Name: "tmp",
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{},
-			},
-		},
 		{
 			Name: "config-volume",
 			VolumeSource: corev1.VolumeSource{
