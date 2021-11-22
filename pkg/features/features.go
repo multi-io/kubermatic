@@ -58,6 +58,10 @@ const (
 	// control plane to cluster communication, instead of relying on the legacy
 	// solution based on OpenVPN.
 	KonnectivityService = "KonnectivityService"
+
+	// PriorityClasses if enabled will apply priority classes to all managed seed infrastructure
+	// with levels depending on criticality
+	PriorityClasses = "PriorityClasses"
 )
 
 // FeatureGate is map of key=value pairs that enables/disables various features.
