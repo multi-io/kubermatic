@@ -64,3 +64,10 @@ func DecodeGetAdminKubeconfig(c context.Context, r *http.Request) (interface{}, 
 func DecodeCreateOIDCKubeconfig(c context.Context, r *http.Request) (interface{}, error) {
 	return handlercommon.DecodeCreateOIDCKubeconfig(c, r)
 }
+
+func GetClusterOidcEndpoint(projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, userInfoGetter provider.UserInfoGetter) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (interface{}, error) {
+		req := request.(GetClusterReq)
+		return handlercommon.GetClusterOidcEndpoint(ctx, userInfoGetter, req.ProjectID, req.ClusterID, projectProvider, privilegedProjectProvider)
+	}
+}

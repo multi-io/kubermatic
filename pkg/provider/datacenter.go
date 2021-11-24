@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
-	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
 	"k8c.io/kubermatic/v2/pkg/util/restmapper"
 
 	corev1 "k8s.io/api/core/v1"
@@ -58,7 +57,7 @@ type SeedClientGetter = func(seed *kubermaticv1.Seed) (ctrlruntimeclient.Client,
 // ClusterProviderGetter is used to get a clusterProvider
 type ClusterProviderGetter = func(seed *kubermaticv1.Seed) (ClusterProvider, error)
 
-// AddonProviderGetterr is used to get an AddonProvider
+// AddonProviderGetter is used to get an AddonProvider
 type AddonProviderGetter = func(seed *kubermaticv1.Seed) (AddonProvider, error)
 
 // MachineDeploymentRequestProviderGetter is used to get an MachineDeploymentRequestProvider
@@ -67,8 +66,35 @@ type MachineDeploymentRequestProviderGetter = func(seed *kubermaticv1.Seed) (Mac
 // ConstraintProviderGetter is used to get a ConstraintProvider
 type ConstraintProviderGetter = func(seed *kubermaticv1.Seed) (ConstraintProvider, error)
 
+// AlertmanagerProviderGetter is used to get an AlertmanagerProvider
+type AlertmanagerProviderGetter = func(seed *kubermaticv1.Seed) (AlertmanagerProvider, error)
+
+// RuleGroupProviderGetter is used to get an RuleGroupProvider
+type RuleGroupProviderGetter = func(seed *kubermaticv1.Seed) (RuleGroupProvider, error)
+
+// PrivilegedMLAAdminSettingProviderGetter is used to get a PrivilegedMLAAdminSettingProvider
+type PrivilegedMLAAdminSettingProviderGetter = func(seed *kubermaticv1.Seed) (PrivilegedMLAAdminSettingProvider, error)
+
+// ClusterTemplateInstanceProviderGetter is used to get a ClusterTemplateInstanceProvider
+type ClusterTemplateInstanceProviderGetter = func(seed *kubermaticv1.Seed) (ClusterTemplateInstanceProvider, error)
+
+// EtcdBackupConfigProviderGetter is used to get a EtcdBackupConfigProvider
+type EtcdBackupConfigProviderGetter = func(seed *kubermaticv1.Seed) (EtcdBackupConfigProvider, error)
+
+// EtcdBackupConfigProjectProviderGetter is used to get a EtcdBackupConfigProjectProvider
+type EtcdBackupConfigProjectProviderGetter = func(seeds map[string]*kubermaticv1.Seed) (EtcdBackupConfigProjectProvider, error)
+
+// EtcdRestoreProviderGetter is used to get a EtcdRestoreProvider
+type EtcdRestoreProviderGetter = func(seed *kubermaticv1.Seed) (EtcdRestoreProvider, error)
+
+// EtcdRestoreProjectProviderGetter is used to get a EtcdRestoreProjectProvider
+type EtcdRestoreProjectProviderGetter = func(seeds map[string]*kubermaticv1.Seed) (EtcdRestoreProjectProvider, error)
+
+// BackupCredentialsProviderGetter is used to get a BackupCredentialsProvider
+type BackupCredentialsProviderGetter = func(seed *kubermaticv1.Seed) (BackupCredentialsProvider, error)
+
 // SeedGetterFactory returns a SeedGetter. It has validation of all its arguments
-func SeedGetterFactory(ctx context.Context, client ctrlruntimeclient.Client, seedName string, namespace string) (SeedGetter, error) {
+func SeedGetterFactory(ctx context.Context, client ctrlruntimeclient.Reader, seedName string, namespace string) (SeedGetter, error) {
 	return func() (*kubermaticv1.Seed, error) {
 		seed := &kubermaticv1.Seed{}
 		if err := client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: seedName}, seed); err != nil {
@@ -133,7 +159,6 @@ func SeedKubeconfigGetterFactory(ctx context.Context, client ctrlruntimeclient.C
 		if err != nil {
 			return nil, fmt.Errorf("failed to load kubeconfig: %v", err)
 		}
-		kubermaticlog.Logger.With("seed", seed.Name).Debug("Successfully got kubeconfig")
 		return cfg, nil
 	}, nil
 }

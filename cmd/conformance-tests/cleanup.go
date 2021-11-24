@@ -21,6 +21,9 @@ import (
 
 	"go.uber.org/zap"
 
+	"k8c.io/kubermatic/v2/pkg/resources"
+
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -33,44 +36,75 @@ var (
 		metav1.NamespaceDefault,
 		metav1.NamespaceSystem,
 		metav1.NamespacePublic,
-		corev1.NamespaceNodeLease)
-	// Sys11 disable kubernetesdashboard.Namespace)
+		corev1.NamespaceNodeLease,
+	// Sys11 disable kubernetesdashboard.Namespace,
+		resources.CloudInitSettingsNamespace,
+	)
 )
 
-func (r *testRunner) deleteAllNonDefaultNamespaces(ctx context.Context, log *zap.SugaredLogger, client ctrlruntimeclient.Client) error {
-	log.Info("Removing non-default namespaces...")
+func (r *testRunner) cleanupBeforeGinkgo(ctx context.Context, log *zap.SugaredLogger, client ctrlruntimeclient.Client) error {
+	log.Info("Removing webhooks...")
 
-	return wait.Poll(r.userClusterPollInterval, r.customTestTimeout, func() (done bool, err error) {
-		namespaceList := &corev1.NamespaceList{}
-		if err := client.List(ctx, namespaceList); err != nil {
-			log.Errorw("Failed to list namespaces", zap.Error(err))
+	if err := wait.PollImmediate(r.userClusterPollInterval, r.customTestTimeout, func() (done bool, err error) {
+		webhookList := &admissionregistrationv1.ValidatingWebhookConfigurationList{}
+		if err := client.List(ctx, webhookList); err != nil {
+			log.Errorw("Failed to list webhooks", zap.Error(err))
 			return false, nil
 		}
 
-		// This check assumes no one deleted one of the protected namespaces
-		if len(namespaceList.Items) <= protectedNamespaces.Len() {
+		if len(webhookList.Items) == 0 {
 			return true, nil
 		}
 
-		for _, namespace := range namespaceList.Items {
-			if protectedNamespaces.Has(namespace.Name) {
-				continue
-			}
+		for _, webhook := range webhookList.Items {
+			if webhook.DeletionTimestamp == nil {
+				wlog := log.With("webhook", webhook.Name)
 
-			// If it's not gone & the DeletionTimestamp is nil, delete it
-			if namespace.DeletionTimestamp == nil {
-				// make sure to create a new variable, or else subsequent With() calls will
-				// *add* new attributes instead of overriding the existing namespace value
-				log := log.With("namespace", namespace.Name)
-
-				if err := client.Delete(ctx, &namespace); err != nil {
-					log.Errorw("Failed to delete namespace", zap.Error(err))
+				if err := client.Delete(ctx, &webhook); err != nil {
+					wlog.Errorw("Failed to delete webhook", zap.Error(err))
 				} else {
-					log.Debug("Deleted namespace.")
+					wlog.Debug("Deleted webhook.")
 				}
 			}
 		}
 
 		return false, nil
-	})
+	}); err != nil {
+		return err
+	}
+
+	log.Info("Removing non-default namespaces...")
+
+	// For these we do not wait for thhe deletion to be done, as it's enough to trigger
+	// the deletion and have the resources disappear over time.
+
+	namespaceList := &corev1.NamespaceList{}
+	if err := client.List(ctx, namespaceList); err != nil {
+		log.Errorw("Failed to delete namespaces", zap.Error(err))
+		return nil
+	}
+
+	// This check assumes no one deleted one of the protected namespaces
+	if len(namespaceList.Items) <= protectedNamespaces.Len() {
+		return nil
+	}
+
+	for _, namespace := range namespaceList.Items {
+		if protectedNamespaces.Has(namespace.Name) {
+			continue
+		}
+
+		// If it's not gone & the DeletionTimestamp is nil, delete it
+		if namespace.DeletionTimestamp == nil {
+			nslog := log.With("namespace", namespace.Name)
+
+			if err := client.Delete(ctx, &namespace); err != nil {
+				nslog.Errorw("Failed to delete namespace", zap.Error(err))
+			} else {
+				nslog.Debug("Deleted namespace.")
+			}
+		}
+	}
+
+	return nil
 }

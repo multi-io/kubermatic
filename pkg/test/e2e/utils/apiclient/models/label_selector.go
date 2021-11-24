@@ -6,6 +6,7 @@ package models
 // Editing this file might prove futile when you re-run the swagger generate command
 
 import (
+	"context"
 	"strconv"
 
 	"github.com/go-openapi/errors"
@@ -16,6 +17,7 @@ import (
 // LabelSelector A label selector is a label query over a set of resources. The result of matchLabels and
 // matchExpressions are ANDed. An empty label selector matches all objects. A null
 // label selector matches no objects.
+// +structType=atomic
 //
 // swagger:model LabelSelector
 type LabelSelector struct {
@@ -46,7 +48,6 @@ func (m *LabelSelector) Validate(formats strfmt.Registry) error {
 }
 
 func (m *LabelSelector) validateMatchExpressions(formats strfmt.Registry) error {
-
 	if swag.IsZero(m.MatchExpressions) { // not required
 		return nil
 	}
@@ -58,6 +59,38 @@ func (m *LabelSelector) validateMatchExpressions(formats strfmt.Registry) error 
 
 		if m.MatchExpressions[i] != nil {
 			if err := m.MatchExpressions[i].Validate(formats); err != nil {
+				if ve, ok := err.(*errors.Validation); ok {
+					return ve.ValidateName("matchExpressions" + "." + strconv.Itoa(i))
+				}
+				return err
+			}
+		}
+
+	}
+
+	return nil
+}
+
+// ContextValidate validate this label selector based on the context it is used
+func (m *LabelSelector) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
+	var res []error
+
+	if err := m.contextValidateMatchExpressions(ctx, formats); err != nil {
+		res = append(res, err)
+	}
+
+	if len(res) > 0 {
+		return errors.CompositeValidationError(res...)
+	}
+	return nil
+}
+
+func (m *LabelSelector) contextValidateMatchExpressions(ctx context.Context, formats strfmt.Registry) error {
+
+	for i := 0; i < len(m.MatchExpressions); i++ {
+
+		if m.MatchExpressions[i] != nil {
+			if err := m.MatchExpressions[i].ContextValidate(ctx, formats); err != nil {
 				if ve, ok := err.(*errors.Validation); ok {
 					return ve.ValidateName("matchExpressions" + "." + strconv.Itoa(i))
 				}

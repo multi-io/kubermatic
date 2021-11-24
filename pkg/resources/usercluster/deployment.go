@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1/helper"
 	"k8c.io/kubermatic/v2/pkg/resources"
 	"k8c.io/kubermatic/v2/pkg/resources/apiserver"
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
@@ -60,10 +61,14 @@ type userclusterControllerData interface {
 	GetPodTemplateLabels(string, []corev1.Volume, map[string]string) (map[string]string, error)
 	ImageRegistry(string) string
 	Cluster() *kubermaticv1.Cluster
+	NodeLocalDNSCacheEnabled() bool
 	GetOpenVPNServerPort() (int32, error)
+	GetMLAGatewayPort() (int32, error)
 	KubermaticAPIImage() string
 	KubermaticDockerTag() string
-	GetKubernetesCloudProviderName() string
+	GetCloudProviderName() (string, error)
+	UserClusterMLAEnabled() bool
+	IsKonnectivityEnabled() bool
 }
 
 // DeploymentCreator returns the function to create and update the user cluster controller deployment
@@ -130,21 +135,24 @@ func DeploymentCreator(data userclusterControllerData) reconciling.NamedDeployme
 				"-health-listen-address", "0.0.0.0:8086",
 				"-namespace", "$(NAMESPACE)",
 				"-cluster-url", data.Cluster().Address.URL,
+				"-cluster-name", data.Cluster().Name,
 				"-dns-cluster-ip", dnsClusterIP,
 				"-openvpn-server-port", fmt.Sprint(openvpnServerPort),
 				"-overwrite-registry", data.ImageRegistry(""),
 				"-version", data.Cluster().Spec.Version.String(),
-				"-cloud-provider-name", data.GetKubernetesCloudProviderName(),
 				"-owner-email", data.Cluster().Status.UserEmail,
 				fmt.Sprintf("-enable-ssh-key-agent=%t", *enableUserSSHKeyAgent),
 				fmt.Sprintf("-opa-integration=%t", data.Cluster().Spec.OPAIntegration != nil && data.Cluster().Spec.OPAIntegration.Enabled),
-				fmt.Sprintf("-user-cluster-monitoring=%t", data.Cluster().Spec.MLA != nil && data.Cluster().Spec.MLA.MonitoringEnabled),
-				fmt.Sprintf("-user-cluster-logging=%t", data.Cluster().Spec.MLA != nil && data.Cluster().Spec.MLA.LoggingEnabled),
 				fmt.Sprintf("-ca-bundle=/opt/ca-bundle/%s", resources.CABundleConfigMapKey),
+				fmt.Sprintf("-node-local-dns-cache=%t", data.NodeLocalDNSCacheEnabled()),
 			}, getNetworkArgs(data)...)
 
 			if data.Cluster().Spec.ClusterNetwork.DNSDomain != "" {
 				args = append(args, "-cluster-dns-domain", data.Cluster().Spec.ClusterNetwork.DNSDomain)
+			}
+
+			if data.IsKonnectivityEnabled() {
+				args = append(args, "-konnectivity-enabled=true")
 			}
 
 			if data.Cluster().Spec.ExposeStrategy == kubermaticv1.ExposeStrategyTunneling {
@@ -152,12 +160,47 @@ func DeploymentCreator(data userclusterControllerData) reconciling.NamedDeployme
 				args = append(args, "-kas-secure-port", fmt.Sprint(data.Cluster().Address.Port))
 			}
 
+			providerName, err := data.GetCloudProviderName()
+			if err != nil {
+				return nil, fmt.Errorf("failed to get cloud provider name: %v", err)
+			}
+			args = append(args, "-cloud-provider-name", providerName)
+
 			if data.Cluster().Spec.UpdateWindow != nil && data.Cluster().Spec.UpdateWindow.Length != "" && data.Cluster().Spec.UpdateWindow.Start != "" {
 				args = append(args, "-update-window-start", data.Cluster().Spec.UpdateWindow.Start, "-update-window-length", data.Cluster().Spec.UpdateWindow.Length)
 			}
 
 			if data.Cluster().Spec.OPAIntegration != nil && data.Cluster().Spec.OPAIntegration.WebhookTimeoutSeconds != nil {
 				args = append(args, "-opa-webhook-timeout", fmt.Sprint(*data.Cluster().Spec.OPAIntegration.WebhookTimeoutSeconds))
+			}
+
+			if data.Cluster().Spec.OPAIntegration != nil && data.Cluster().Spec.OPAIntegration.Enabled {
+				args = append(args, fmt.Sprintf("-enable-mutation=%t", data.Cluster().Spec.OPAIntegration.ExperimentalEnableMutation))
+			}
+
+			if data.UserClusterMLAEnabled() && data.Cluster().Spec.MLA != nil {
+				args = append(args, fmt.Sprintf("-user-cluster-monitoring=%t", data.Cluster().Spec.MLA.MonitoringEnabled))
+				args = append(args, fmt.Sprintf("-user-cluster-logging=%t", data.Cluster().Spec.MLA.LoggingEnabled))
+
+				if data.Cluster().Spec.MLA.MonitoringEnabled || data.Cluster().Spec.MLA.LoggingEnabled {
+					mlaGatewayPort, err := data.GetMLAGatewayPort()
+					if err != nil {
+						return nil, err
+					}
+					mlaEndpoint := fmt.Sprintf("%s:%d", data.Cluster().Address.ExternalName, mlaGatewayPort)
+					if data.Cluster().Spec.ExposeStrategy == kubermaticv1.ExposeStrategyTunneling {
+						mlaEndpoint = resources.MLAGatewaySNIPrefix + mlaEndpoint
+					}
+					args = append(args, "-mla-gateway-url", "https://"+mlaEndpoint)
+				}
+			}
+
+			if helper.NeedCCMMigration(data.Cluster()) {
+				args = append(args, "-ccm-migration")
+			}
+
+			if helper.CCMMigrationCompleted(data.Cluster()) {
+				args = append(args, "-ccm-migration-completed")
 			}
 
 			labelArgsValue, err := getLabelsArgValue(data.Cluster())

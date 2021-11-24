@@ -17,12 +17,13 @@ limitations under the License.
 package metrics
 
 import (
+	"context"
 	"net/url"
 	"time"
 
-	"k8s.io/client-go/tools/metrics"
-
 	"github.com/prometheus/client_golang/prometheus"
+
+	"k8s.io/client-go/tools/metrics"
 )
 
 // Copied from https://github.com/kubernetes/kubernetes/blob/master/pkg/client/metrics/prometheus/prometheus.go
@@ -60,7 +61,7 @@ type latencyAdapter struct {
 	m *prometheus.HistogramVec
 }
 
-func (l *latencyAdapter) Observe(verb string, u url.URL, latency time.Duration) {
+func (l *latencyAdapter) Observe(ctx context.Context, verb string, u url.URL, latency time.Duration) {
 	l.m.WithLabelValues(verb, u.String()).Observe(latency.Seconds())
 }
 
@@ -68,6 +69,6 @@ type resultAdapter struct {
 	m *prometheus.CounterVec
 }
 
-func (r *resultAdapter) Increment(code, method, host string) {
+func (r *resultAdapter) Increment(ctx context.Context, code, method, host string) {
 	r.m.WithLabelValues(code, method, host).Inc()
 }

@@ -36,6 +36,7 @@ import (
 	"k8c.io/kubermatic/v2/pkg/watcher"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // Routing represents an object which binds endpoints to http handlers.
@@ -44,6 +45,7 @@ type Routing struct {
 	logger                                log.Logger
 	versions                              kubermatic.Versions
 	presetsProvider                       provider.PresetProvider
+	masterClient                          client.Client
 	seedsGetter                           provider.SeedsGetter
 	seedsClientGetter                     provider.SeedClientGetter
 	sshKeyProvider                        provider.SSHKeyProvider
@@ -63,6 +65,7 @@ type Routing struct {
 	addonProviderGetter                   provider.AddonProviderGetter
 	addonConfigProvider                   provider.AddonConfigProvider
 	updateManager                         common.UpdateManager
+	supportManager                        common.SupportManager
 	prometheusClient                      prometheusapi.Client
 	projectMemberProvider                 provider.ProjectMemberProvider
 	privilegedProjectMemberProvider       provider.PrivilegedProjectMemberProvider
@@ -83,11 +86,12 @@ type Routing struct {
 }
 
 // NewRouting creates a new Routing.
-func NewRouting(routingParams RoutingParams) Routing {
+func NewRouting(routingParams RoutingParams, masterClient client.Client) Routing {
 	return Routing{
 		log:                                   routingParams.Log,
 		logger:                                log.NewLogfmtLogger(os.Stderr),
 		presetsProvider:                       routingParams.PresetsProvider,
+		masterClient:                          masterClient,
 		seedsGetter:                           routingParams.SeedsGetter,
 		seedsClientGetter:                     routingParams.SeedsClientGetter,
 		clusterProviderGetter:                 routingParams.ClusterProviderGetter,
@@ -107,6 +111,7 @@ func NewRouting(routingParams RoutingParams) Routing {
 		tokenVerifiers:                        routingParams.TokenVerifiers,
 		tokenExtractors:                       routingParams.TokenExtractors,
 		updateManager:                         routingParams.UpdateManager,
+		supportManager:                        routingParams.UpdateManager.(common.SupportManager),
 		prometheusClient:                      routingParams.PrometheusClient,
 		projectMemberProvider:                 routingParams.ProjectMemberProvider,
 		privilegedProjectMemberProvider:       routingParams.PrivilegedProjectMemberProvider,
@@ -137,47 +142,59 @@ func (r Routing) defaultServerOptions() []httptransport.ServerOption {
 }
 
 type RoutingParams struct {
-	Log                                   *zap.SugaredLogger
-	PresetsProvider                       provider.PresetProvider
-	SeedsGetter                           provider.SeedsGetter
-	SeedsClientGetter                     provider.SeedClientGetter
-	SSHKeyProvider                        provider.SSHKeyProvider
-	PrivilegedSSHKeyProvider              provider.PrivilegedSSHKeyProvider
-	UserProvider                          provider.UserProvider
-	ServiceAccountProvider                provider.ServiceAccountProvider
-	PrivilegedServiceAccountProvider      provider.PrivilegedServiceAccountProvider
-	ServiceAccountTokenProvider           provider.ServiceAccountTokenProvider
-	PrivilegedServiceAccountTokenProvider provider.PrivilegedServiceAccountTokenProvider
-	ProjectProvider                       provider.ProjectProvider
-	MdRequestProviderGetter               provider.MachineDeploymentRequestProviderGetter
-	PrivilegedProjectProvider             provider.PrivilegedProjectProvider
-	OIDCIssuerVerifier                    auth.OIDCIssuerVerifier
-	TokenVerifiers                        auth.TokenVerifier
-	TokenExtractors                       auth.TokenExtractor
-	ClusterProviderGetter                 provider.ClusterProviderGetter
-	AddonProviderGetter                   provider.AddonProviderGetter
-	AddonConfigProvider                   provider.AddonConfigProvider
-	UpdateManager                         common.UpdateManager
-	PrometheusClient                      prometheusapi.Client
-	ProjectMemberProvider                 provider.ProjectMemberProvider
-	PrivilegedProjectMemberProvider       provider.PrivilegedProjectMemberProvider
-	UserProjectMapper                     provider.ProjectMemberMapper
-	SATokenAuthenticator                  serviceaccount.TokenAuthenticator
-	SATokenGenerator                      serviceaccount.TokenGenerator
-	EventRecorderProvider                 provider.EventRecorderProvider
-	KeycloakFacade                        keycloak.Facade
-	ExposeStrategy                        kubermaticv1.ExposeStrategy
-	AccessibleAddons                      sets.String
-	UserInfoGetter                        provider.UserInfoGetter
-	SettingsProvider                      provider.SettingsProvider
-	AdminProvider                         provider.AdminProvider
-	AdmissionPluginProvider               provider.AdmissionPluginsProvider
-	SettingsWatcher                       watcher.SettingsWatcher
-	UserWatcher                           watcher.UserWatcher
-	ExternalClusterProvider               provider.ExternalClusterProvider
-	PrivilegedExternalClusterProvider     provider.PrivilegedExternalClusterProvider
-	ConstraintTemplateProvider            provider.ConstraintTemplateProvider
-	ConstraintProviderGetter              provider.ConstraintProviderGetter
-	Versions                              kubermatic.Versions
-	CABundle                              *x509.CertPool
+	MdRequestProviderGetter                 provider.MachineDeploymentRequestProviderGetter
+	KeycloakFacade                          keycloak.Facade
+	Log                                     *zap.SugaredLogger
+	PresetsProvider                         provider.PresetProvider
+	SeedsGetter                             provider.SeedsGetter
+	SeedsClientGetter                       provider.SeedClientGetter
+	SSHKeyProvider                          provider.SSHKeyProvider
+	PrivilegedSSHKeyProvider                provider.PrivilegedSSHKeyProvider
+	UserProvider                            provider.UserProvider
+	ServiceAccountProvider                  provider.ServiceAccountProvider
+	PrivilegedServiceAccountProvider        provider.PrivilegedServiceAccountProvider
+	ServiceAccountTokenProvider             provider.ServiceAccountTokenProvider
+	PrivilegedServiceAccountTokenProvider   provider.PrivilegedServiceAccountTokenProvider
+	ProjectProvider                         provider.ProjectProvider
+	PrivilegedProjectProvider               provider.PrivilegedProjectProvider
+	OIDCIssuerVerifier                      auth.OIDCIssuerVerifier
+	TokenVerifiers                          auth.TokenVerifier
+	TokenExtractors                         auth.TokenExtractor
+	ClusterProviderGetter                   provider.ClusterProviderGetter
+	AddonProviderGetter                     provider.AddonProviderGetter
+	AddonConfigProvider                     provider.AddonConfigProvider
+	UpdateManager                           common.UpdateManager
+	PrometheusClient                        prometheusapi.Client
+	ProjectMemberProvider                   provider.ProjectMemberProvider
+	PrivilegedProjectMemberProvider         provider.PrivilegedProjectMemberProvider
+	UserProjectMapper                       provider.ProjectMemberMapper
+	SATokenAuthenticator                    serviceaccount.TokenAuthenticator
+	SATokenGenerator                        serviceaccount.TokenGenerator
+	EventRecorderProvider                   provider.EventRecorderProvider
+	ExposeStrategy                          kubermaticv1.ExposeStrategy
+	AccessibleAddons                        sets.String
+	UserInfoGetter                          provider.UserInfoGetter
+	SettingsProvider                        provider.SettingsProvider
+	AdminProvider                           provider.AdminProvider
+	AdmissionPluginProvider                 provider.AdmissionPluginsProvider
+	SettingsWatcher                         watcher.SettingsWatcher
+	UserWatcher                             watcher.UserWatcher
+	ExternalClusterProvider                 provider.ExternalClusterProvider
+	PrivilegedExternalClusterProvider       provider.PrivilegedExternalClusterProvider
+	DefaultConstraintProvider               provider.DefaultConstraintProvider
+	ConstraintTemplateProvider              provider.ConstraintTemplateProvider
+	ConstraintProviderGetter                provider.ConstraintProviderGetter
+	AlertmanagerProviderGetter              provider.AlertmanagerProviderGetter
+	ClusterTemplateProvider                 provider.ClusterTemplateProvider
+	ClusterTemplateInstanceProviderGetter   provider.ClusterTemplateInstanceProviderGetter
+	RuleGroupProviderGetter                 provider.RuleGroupProviderGetter
+	PrivilegedAllowedRegistryProvider       provider.PrivilegedAllowedRegistryProvider
+	EtcdBackupConfigProviderGetter          provider.EtcdBackupConfigProviderGetter
+	EtcdRestoreProviderGetter               provider.EtcdRestoreProviderGetter
+	EtcdBackupConfigProjectProviderGetter   provider.EtcdBackupConfigProjectProviderGetter
+	EtcdRestoreProjectProviderGetter        provider.EtcdRestoreProjectProviderGetter
+	BackupCredentialsProviderGetter         provider.BackupCredentialsProviderGetter
+	PrivilegedMLAAdminSettingProviderGetter provider.PrivilegedMLAAdminSettingProviderGetter
+	Versions                                kubermatic.Versions
+	CABundle                                *x509.CertPool
 }

@@ -26,6 +26,7 @@ import (
 	"k8c.io/kubermatic/v2/pkg/controller/operator/common"
 	"k8c.io/kubermatic/v2/pkg/controller/operator/common/vpa"
 	kubermaticseed "k8c.io/kubermatic/v2/pkg/controller/operator/seed/resources/kubermatic"
+	"k8c.io/kubermatic/v2/pkg/controller/operator/seed/resources/metering"
 	"k8c.io/kubermatic/v2/pkg/controller/operator/seed/resources/nodeportproxy"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	operatorv1alpha1 "k8c.io/kubermatic/v2/pkg/crd/operator/v1alpha1"
@@ -110,29 +111,13 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, seed
 	seedRecorder := r.seedRecorders[seedName]
 
 	// find the owning KubermaticConfiguration
-	configList := &operatorv1alpha1.KubermaticConfigurationList{}
-	listOpts := &ctrlruntimeclient.ListOptions{
-		Namespace: r.namespace,
+	config, err := getKubermaticConfigurationForNamespace(ctx, r.masterClient, r.namespace, log)
+	if err != nil || config == nil {
+		return err
 	}
-
-	if err := r.masterClient.List(ctx, configList, listOpts); err != nil {
-		return fmt.Errorf("failed to find KubermaticConfigurations: %v", err)
-	}
-
-	if len(configList.Items) == 0 {
-		log.Debug("ignoring request for namespace without KubermaticConfiguration")
-		return nil
-	}
-
-	if len(configList.Items) > 1 {
-		log.Infow("there are multiple KubermaticConfiguration objects, cannot reconcile", "namespace", r.namespace)
-		return nil
-	}
-
-	config := configList.Items[0]
 
 	// create a copy of the configuration with default values applied
-	defaulted, err := common.DefaultConfiguration(&config, log)
+	defaulted, err := common.DefaultConfiguration(config, log)
 	if err != nil {
 		return fmt.Errorf("failed to apply defaults to KubermaticConfiguration: %v", err)
 	}
@@ -150,7 +135,7 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, seed
 		if kerrors.IsNotFound(err) {
 			err = errors.New("seed cluster has not yet been provisioned and contains no Seed CR yet")
 
-			r.masterRecorder.Event(&config, corev1.EventTypeWarning, "SeedReconcilingSkipped", fmt.Sprintf("%s: %v", seedName, err))
+			r.masterRecorder.Event(config, corev1.EventTypeWarning, "SeedReconcilingSkipped", fmt.Sprintf("%s: %v", seedName, err))
 			r.masterRecorder.Event(seed, corev1.EventTypeWarning, "ReconcilingSkipped", err.Error())
 			seedRecorder.Event(seedCopy, corev1.EventTypeWarning, "ReconcilingSkipped", err.Error())
 			return err
@@ -166,7 +151,7 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, seed
 
 	// make sure to use the seedCopy so the owner ref has the correct UID
 	if err := r.reconcileResources(ctx, defaulted, seedCopy, seedClient, log); err != nil {
-		r.masterRecorder.Event(&config, corev1.EventTypeWarning, "SeedReconcilingError", fmt.Sprintf("%s: %v", seedName, err))
+		r.masterRecorder.Event(config, corev1.EventTypeWarning, "SeedReconcilingError", fmt.Sprintf("%s: %v", seedName, err))
 		r.masterRecorder.Event(seed, corev1.EventTypeWarning, "ReconcilingError", err.Error())
 		seedRecorder.Event(seedCopy, corev1.EventTypeWarning, "ReconcilingError", err.Error())
 		return err
@@ -275,6 +260,12 @@ func (r *Reconciler) reconcileResources(ctx context.Context, cfg *operatorv1alph
 
 	if err := r.reconcileAdmissionWebhooks(ctx, cfg, seed, client, log); err != nil {
 		return err
+	}
+
+	if seed.Spec.Metering != nil && seed.Spec.Metering.Enabled {
+		if err := metering.ReconcileMeteringResources(ctx, client, seed); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -407,8 +398,7 @@ func (r *Reconciler) reconcileConfigMaps(ctx context.Context, cfg *operatorv1alp
 	log.Debug("reconciling ConfigMaps")
 
 	creators := []reconciling.NamedConfigMapCreatorGetter{
-		kubermaticseed.BackupContainersConfigMapCreator(cfg),
-		kubermaticseed.DefaultClusterComponentSettingsYAML(seed),
+		kubermaticseed.BackupContainersConfigMapCreator(cfg, seed, log),
 		kubermaticseed.CABundleConfigMapCreator(caBundle),
 	}
 
@@ -431,14 +421,13 @@ func (r *Reconciler) reconcileConfigMaps(ctx context.Context, cfg *operatorv1alp
 	var kubeSystemCreators []reconciling.NamedConfigMapCreatorGetter
 
 	// For backward compatibility check both sources for backup and restore configuration.
-	var backupRestore kubermaticv1.SeedBackupRestoreConfiguration
+	backupRestore := &kubermaticv1.SeedBackupRestoreConfiguration{}
 	if cfg.Spec.SeedController.BackupRestore.Enabled {
-		backupRestore.Enabled = true
 		backupRestore.S3Endpoint = cfg.Spec.SeedController.BackupRestore.S3Endpoint
 		backupRestore.S3BucketName = cfg.Spec.SeedController.BackupRestore.S3BucketName
 	}
 	// Seed backup and restore configuration takes precedence.
-	if seed.Spec.BackupRestore.Enabled {
+	if seed.Spec.BackupRestore != nil {
 		backupRestore = seed.Spec.BackupRestore
 	}
 	if creator := kubermaticseed.RestoreS3SettingsConfigMapCreator(backupRestore); creator != nil {

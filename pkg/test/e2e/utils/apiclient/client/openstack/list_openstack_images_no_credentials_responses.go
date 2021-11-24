@@ -46,7 +46,7 @@ func NewListOpenstackImagesNoCredentialsOK() *ListOpenstackImagesNoCredentialsOK
 	return &ListOpenstackImagesNoCredentialsOK{}
 }
 
-/*ListOpenstackImagesNoCredentialsOK handles this case with default header values.
+/* ListOpenstackImagesNoCredentialsOK describes a response with status code 200, with default header values.
 
 Image
 */
@@ -57,7 +57,6 @@ type ListOpenstackImagesNoCredentialsOK struct {
 func (o *ListOpenstackImagesNoCredentialsOK) Error() string {
 	return fmt.Sprintf("[GET /api/v1/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/providers/openstack/images][%d] listOpenstackImagesNoCredentialsOK  %+v", 200, o.Payload)
 }
-
 func (o *ListOpenstackImagesNoCredentialsOK) GetPayload() []*models.Image {
 	return o.Payload
 }
@@ -79,7 +78,7 @@ func NewListOpenstackImagesNoCredentialsDefault(code int) *ListOpenstackImagesNo
 	}
 }
 
-/*ListOpenstackImagesNoCredentialsDefault handles this case with default header values.
+/* ListOpenstackImagesNoCredentialsDefault describes a response with status code -1, with default header values.
 
 errorResponse
 */
@@ -97,7 +96,6 @@ func (o *ListOpenstackImagesNoCredentialsDefault) Code() int {
 func (o *ListOpenstackImagesNoCredentialsDefault) Error() string {
 	return fmt.Sprintf("[GET /api/v1/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/providers/openstack/images][%d] listOpenstackImagesNoCredentials default  %+v", o._statusCode, o.Payload)
 }
-
 func (o *ListOpenstackImagesNoCredentialsDefault) GetPayload() *models.ErrorResponse {
 	return o.Payload
 }

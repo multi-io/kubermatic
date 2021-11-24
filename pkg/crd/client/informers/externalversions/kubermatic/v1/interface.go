@@ -12,8 +12,16 @@ type Interface interface {
 	Addons() AddonInformer
 	// AddonConfigs returns a AddonConfigInformer.
 	AddonConfigs() AddonConfigInformer
+	// Alertmanagers returns a AlertmanagerInformer.
+	Alertmanagers() AlertmanagerInformer
+	// AllowedRegistries returns a AllowedRegistryInformer.
+	AllowedRegistries() AllowedRegistryInformer
 	// Clusters returns a ClusterInformer.
 	Clusters() ClusterInformer
+	// ClusterTemplates returns a ClusterTemplateInformer.
+	ClusterTemplates() ClusterTemplateInformer
+	// ClusterTemplateInstances returns a ClusterTemplateInstanceInformer.
+	ClusterTemplateInstances() ClusterTemplateInstanceInformer
 	// Constraints returns a ConstraintInformer.
 	Constraints() ConstraintInformer
 	// ConstraintTemplates returns a ConstraintTemplateInformer.
@@ -26,10 +34,14 @@ type Interface interface {
 	ExternalClusters() ExternalClusterInformer
 	// KubermaticSettings returns a KubermaticSettingInformer.
 	KubermaticSettings() KubermaticSettingInformer
+	// MLAAdminSettings returns a MLAAdminSettingInformer.
+	MLAAdminSettings() MLAAdminSettingInformer
 	// MachineDeploymentRequests returns a MachineDeploymentRequestInformer.
 	MachineDeploymentRequests() MachineDeploymentRequestInformer
 	// Projects returns a ProjectInformer.
 	Projects() ProjectInformer
+	// RuleGroups returns a RuleGroupInformer.
+	RuleGroups() RuleGroupInformer
 	// Users returns a UserInformer.
 	Users() UserInformer
 	// UserProjectBindings returns a UserProjectBindingInformer.
@@ -59,9 +71,29 @@ func (v *version) AddonConfigs() AddonConfigInformer {
 	return &addonConfigInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
+// Alertmanagers returns a AlertmanagerInformer.
+func (v *version) Alertmanagers() AlertmanagerInformer {
+	return &alertmanagerInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// AllowedRegistries returns a AllowedRegistryInformer.
+func (v *version) AllowedRegistries() AllowedRegistryInformer {
+	return &allowedRegistryInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
 // Clusters returns a ClusterInformer.
 func (v *version) Clusters() ClusterInformer {
 	return &clusterInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// ClusterTemplates returns a ClusterTemplateInformer.
+func (v *version) ClusterTemplates() ClusterTemplateInformer {
+	return &clusterTemplateInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// ClusterTemplateInstances returns a ClusterTemplateInstanceInformer.
+func (v *version) ClusterTemplateInstances() ClusterTemplateInstanceInformer {
+	return &clusterTemplateInstanceInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // Constraints returns a ConstraintInformer.
@@ -94,6 +126,11 @@ func (v *version) KubermaticSettings() KubermaticSettingInformer {
 	return &kubermaticSettingInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
+// MLAAdminSettings returns a MLAAdminSettingInformer.
+func (v *version) MLAAdminSettings() MLAAdminSettingInformer {
+	return &mLAAdminSettingInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
 // MachineDeploymentRequests returns a MachineDeploymentRequestInformer.
 func (v *version) MachineDeploymentRequests() MachineDeploymentRequestInformer {
 	return &machineDeploymentRequestInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
@@ -102,6 +139,11 @@ func (v *version) MachineDeploymentRequests() MachineDeploymentRequestInformer {
 // Projects returns a ProjectInformer.
 func (v *version) Projects() ProjectInformer {
 	return &projectInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// RuleGroups returns a RuleGroupInformer.
+func (v *version) RuleGroups() RuleGroupInformer {
+	return &ruleGroupInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // Users returns a UserInformer.

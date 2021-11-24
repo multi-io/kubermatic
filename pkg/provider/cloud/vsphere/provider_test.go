@@ -20,12 +20,16 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/vmware/govmomi/simulator"
+
 	providerconfig "github.com/kubermatic/machine-controller/pkg/providerconfig/types"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/provider"
 	"k8c.io/kubermatic/v2/pkg/resources"
+)
 
-	"github.com/vmware/govmomi/simulator"
+const (
+	fakeStoragePolicy = "fake_storage_policy"
 )
 
 func TestGetCredentialsForCluster(t *testing.T) {
@@ -183,16 +187,17 @@ func TestProviderValidateCloudSpec(t *testing.T) {
 		},
 		{
 			name: "No datastore at Datacenter level but datastore at cluster level",
-			dc:   &kubermaticv1.DatacenterSpecVSphere{},
+			dc:   &kubermaticv1.DatacenterSpecVSphere{DefaultStoragePolicy: fakeStoragePolicy},
 			spec: kubermaticv1.CloudSpec{
 				VSphere: &kubermaticv1.VSphereCloudSpec{
-					Datastore: "LocalDS_0",
+					Datastore:     "LocalDS_0",
+					StoragePolicy: fakeStoragePolicy,
 				},
 			},
 		},
 		{
 			name: "No datastore at Datacenter level but datastore cluster at cluster level",
-			dc:   &kubermaticv1.DatacenterSpecVSphere{},
+			dc:   &kubermaticv1.DatacenterSpecVSphere{DefaultStoragePolicy: fakeStoragePolicy},
 			spec: kubermaticv1.CloudSpec{
 				VSphere: &kubermaticv1.VSphereCloudSpec{
 					DatastoreCluster: "DC0_POD0",
@@ -213,7 +218,8 @@ func TestProviderValidateCloudSpec(t *testing.T) {
 		{
 			name: "Default datastore at datacenter level",
 			dc: &kubermaticv1.DatacenterSpecVSphere{
-				DefaultDatastore: "LocalDS_0",
+				DefaultDatastore:     "LocalDS_0",
+				DefaultStoragePolicy: fakeStoragePolicy,
 			},
 			spec: kubermaticv1.CloudSpec{
 				VSphere: &kubermaticv1.VSphereCloudSpec{},
@@ -232,7 +238,8 @@ func TestProviderValidateCloudSpec(t *testing.T) {
 		{
 			name: "Default datastore at datacenter overridden at cluster level",
 			dc: &kubermaticv1.DatacenterSpecVSphere{
-				DefaultDatastore: "LocalDS_0",
+				DefaultDatastore:     "LocalDS_0",
+				DefaultStoragePolicy: fakeStoragePolicy,
 			},
 			spec: kubermaticv1.CloudSpec{
 				VSphere: &kubermaticv1.VSphereCloudSpec{
@@ -255,7 +262,8 @@ func TestProviderValidateCloudSpec(t *testing.T) {
 		{
 			name: "Default datastore at datacenter and datastore cluster at cluster level",
 			dc: &kubermaticv1.DatacenterSpecVSphere{
-				DefaultDatastore: "LocalDS_0",
+				DefaultDatastore:     "LocalDS_0",
+				DefaultStoragePolicy: fakeStoragePolicy,
 			},
 			spec: kubermaticv1.CloudSpec{
 				VSphere: &kubermaticv1.VSphereCloudSpec{

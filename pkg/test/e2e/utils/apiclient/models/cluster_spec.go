@@ -6,6 +6,7 @@ package models
 // Editing this file might prove futile when you re-run the swagger generate command
 
 import (
+	"context"
 	"strconv"
 
 	"github.com/go-openapi/errors"
@@ -20,6 +21,9 @@ type ClusterSpec struct {
 
 	// Additional Admission Controller plugins
 	AdmissionPlugins []string `json:"admissionPlugins"`
+
+	// ContainerRuntime to use, i.e. Docker or containerd. By default containerd will be used.
+	ContainerRuntime string `json:"containerRuntime,omitempty"`
 
 	// EnableUserSSHKeyAgent control whether the UserSSHKeyAgent will be deployed in the user cluster or not.
 	// If it was enabled, the agent will be deployed and used to sync the user ssh keys, that the user attach
@@ -129,7 +133,6 @@ func (m *ClusterSpec) Validate(formats strfmt.Registry) error {
 }
 
 func (m *ClusterSpec) validateMachineNetworks(formats strfmt.Registry) error {
-
 	if swag.IsZero(m.MachineNetworks) { // not required
 		return nil
 	}
@@ -154,7 +157,6 @@ func (m *ClusterSpec) validateMachineNetworks(formats strfmt.Registry) error {
 }
 
 func (m *ClusterSpec) validateAuditLogging(formats strfmt.Registry) error {
-
 	if swag.IsZero(m.AuditLogging) { // not required
 		return nil
 	}
@@ -172,7 +174,6 @@ func (m *ClusterSpec) validateAuditLogging(formats strfmt.Registry) error {
 }
 
 func (m *ClusterSpec) validateCloud(formats strfmt.Registry) error {
-
 	if swag.IsZero(m.Cloud) { // not required
 		return nil
 	}
@@ -190,7 +191,6 @@ func (m *ClusterSpec) validateCloud(formats strfmt.Registry) error {
 }
 
 func (m *ClusterSpec) validateClusterNetwork(formats strfmt.Registry) error {
-
 	if swag.IsZero(m.ClusterNetwork) { // not required
 		return nil
 	}
@@ -208,7 +208,6 @@ func (m *ClusterSpec) validateClusterNetwork(formats strfmt.Registry) error {
 }
 
 func (m *ClusterSpec) validateMla(formats strfmt.Registry) error {
-
 	if swag.IsZero(m.Mla) { // not required
 		return nil
 	}
@@ -226,7 +225,6 @@ func (m *ClusterSpec) validateMla(formats strfmt.Registry) error {
 }
 
 func (m *ClusterSpec) validateOidc(formats strfmt.Registry) error {
-
 	if swag.IsZero(m.Oidc) { // not required
 		return nil
 	}
@@ -244,7 +242,6 @@ func (m *ClusterSpec) validateOidc(formats strfmt.Registry) error {
 }
 
 func (m *ClusterSpec) validateOpaIntegration(formats strfmt.Registry) error {
-
 	if swag.IsZero(m.OpaIntegration) { // not required
 		return nil
 	}
@@ -262,7 +259,6 @@ func (m *ClusterSpec) validateOpaIntegration(formats strfmt.Registry) error {
 }
 
 func (m *ClusterSpec) validateServiceAccount(formats strfmt.Registry) error {
-
 	if swag.IsZero(m.ServiceAccount) { // not required
 		return nil
 	}
@@ -280,7 +276,6 @@ func (m *ClusterSpec) validateServiceAccount(formats strfmt.Registry) error {
 }
 
 func (m *ClusterSpec) validateSys11auth(formats strfmt.Registry) error {
-
 	if swag.IsZero(m.Sys11auth) { // not required
 		return nil
 	}
@@ -298,13 +293,206 @@ func (m *ClusterSpec) validateSys11auth(formats strfmt.Registry) error {
 }
 
 func (m *ClusterSpec) validateUpdateWindow(formats strfmt.Registry) error {
-
 	if swag.IsZero(m.UpdateWindow) { // not required
 		return nil
 	}
 
 	if m.UpdateWindow != nil {
 		if err := m.UpdateWindow.Validate(formats); err != nil {
+			if ve, ok := err.(*errors.Validation); ok {
+				return ve.ValidateName("updateWindow")
+			}
+			return err
+		}
+	}
+
+	return nil
+}
+
+// ContextValidate validate this cluster spec based on the context it is used
+func (m *ClusterSpec) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
+	var res []error
+
+	if err := m.contextValidateMachineNetworks(ctx, formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.contextValidateAuditLogging(ctx, formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.contextValidateCloud(ctx, formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.contextValidateClusterNetwork(ctx, formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.contextValidateMla(ctx, formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.contextValidateOidc(ctx, formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.contextValidateOpaIntegration(ctx, formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.contextValidateServiceAccount(ctx, formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.contextValidateSys11auth(ctx, formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.contextValidateUpdateWindow(ctx, formats); err != nil {
+		res = append(res, err)
+	}
+
+	if len(res) > 0 {
+		return errors.CompositeValidationError(res...)
+	}
+	return nil
+}
+
+func (m *ClusterSpec) contextValidateMachineNetworks(ctx context.Context, formats strfmt.Registry) error {
+
+	for i := 0; i < len(m.MachineNetworks); i++ {
+
+		if m.MachineNetworks[i] != nil {
+			if err := m.MachineNetworks[i].ContextValidate(ctx, formats); err != nil {
+				if ve, ok := err.(*errors.Validation); ok {
+					return ve.ValidateName("machineNetworks" + "." + strconv.Itoa(i))
+				}
+				return err
+			}
+		}
+
+	}
+
+	return nil
+}
+
+func (m *ClusterSpec) contextValidateAuditLogging(ctx context.Context, formats strfmt.Registry) error {
+
+	if m.AuditLogging != nil {
+		if err := m.AuditLogging.ContextValidate(ctx, formats); err != nil {
+			if ve, ok := err.(*errors.Validation); ok {
+				return ve.ValidateName("auditLogging")
+			}
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (m *ClusterSpec) contextValidateCloud(ctx context.Context, formats strfmt.Registry) error {
+
+	if m.Cloud != nil {
+		if err := m.Cloud.ContextValidate(ctx, formats); err != nil {
+			if ve, ok := err.(*errors.Validation); ok {
+				return ve.ValidateName("cloud")
+			}
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (m *ClusterSpec) contextValidateClusterNetwork(ctx context.Context, formats strfmt.Registry) error {
+
+	if m.ClusterNetwork != nil {
+		if err := m.ClusterNetwork.ContextValidate(ctx, formats); err != nil {
+			if ve, ok := err.(*errors.Validation); ok {
+				return ve.ValidateName("clusterNetwork")
+			}
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (m *ClusterSpec) contextValidateMla(ctx context.Context, formats strfmt.Registry) error {
+
+	if m.Mla != nil {
+		if err := m.Mla.ContextValidate(ctx, formats); err != nil {
+			if ve, ok := err.(*errors.Validation); ok {
+				return ve.ValidateName("mla")
+			}
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (m *ClusterSpec) contextValidateOidc(ctx context.Context, formats strfmt.Registry) error {
+
+	if m.Oidc != nil {
+		if err := m.Oidc.ContextValidate(ctx, formats); err != nil {
+			if ve, ok := err.(*errors.Validation); ok {
+				return ve.ValidateName("oidc")
+			}
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (m *ClusterSpec) contextValidateOpaIntegration(ctx context.Context, formats strfmt.Registry) error {
+
+	if m.OpaIntegration != nil {
+		if err := m.OpaIntegration.ContextValidate(ctx, formats); err != nil {
+			if ve, ok := err.(*errors.Validation); ok {
+				return ve.ValidateName("opaIntegration")
+			}
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (m *ClusterSpec) contextValidateServiceAccount(ctx context.Context, formats strfmt.Registry) error {
+
+	if m.ServiceAccount != nil {
+		if err := m.ServiceAccount.ContextValidate(ctx, formats); err != nil {
+			if ve, ok := err.(*errors.Validation); ok {
+				return ve.ValidateName("serviceAccount")
+			}
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (m *ClusterSpec) contextValidateSys11auth(ctx context.Context, formats strfmt.Registry) error {
+
+	if m.Sys11auth != nil {
+		if err := m.Sys11auth.ContextValidate(ctx, formats); err != nil {
+			if ve, ok := err.(*errors.Validation); ok {
+				return ve.ValidateName("sys11auth")
+			}
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (m *ClusterSpec) contextValidateUpdateWindow(ctx context.Context, formats strfmt.Registry) error {
+
+	if m.UpdateWindow != nil {
+		if err := m.UpdateWindow.ContextValidate(ctx, formats); err != nil {
 			if ve, ok := err.(*errors.Validation); ok {
 				return ve.ValidateName("updateWindow")
 			}

@@ -46,7 +46,7 @@ func NewListOpenstackQuotaLimitsOK() *ListOpenstackQuotaLimitsOK {
 	return &ListOpenstackQuotaLimitsOK{}
 }
 
-/*ListOpenstackQuotaLimitsOK handles this case with default header values.
+/* ListOpenstackQuotaLimitsOK describes a response with status code 200, with default header values.
 
 Quotas
 */
@@ -57,7 +57,6 @@ type ListOpenstackQuotaLimitsOK struct {
 func (o *ListOpenstackQuotaLimitsOK) Error() string {
 	return fmt.Sprintf("[GET /api/v1/providers/openstack/quotalimits][%d] listOpenstackQuotaLimitsOK  %+v", 200, o.Payload)
 }
-
 func (o *ListOpenstackQuotaLimitsOK) GetPayload() *models.Quotas {
 	return o.Payload
 }
@@ -81,7 +80,7 @@ func NewListOpenstackQuotaLimitsDefault(code int) *ListOpenstackQuotaLimitsDefau
 	}
 }
 
-/*ListOpenstackQuotaLimitsDefault handles this case with default header values.
+/* ListOpenstackQuotaLimitsDefault describes a response with status code -1, with default header values.
 
 errorResponse
 */
@@ -99,7 +98,6 @@ func (o *ListOpenstackQuotaLimitsDefault) Code() int {
 func (o *ListOpenstackQuotaLimitsDefault) Error() string {
 	return fmt.Sprintf("[GET /api/v1/providers/openstack/quotalimits][%d] listOpenstackQuotaLimits default  %+v", o._statusCode, o.Payload)
 }
-
 func (o *ListOpenstackQuotaLimitsDefault) GetPayload() *models.ErrorResponse {
 	return o.Payload
 }

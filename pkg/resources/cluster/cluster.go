@@ -44,7 +44,6 @@ func Spec(apiCluster apiv1.Cluster, dc *kubermaticv1.Datacenter, secretKeyGetter
 		HumanReadableName:                    apiCluster.Name,
 		Cloud:                                apiCluster.Spec.Cloud,
 		MachineNetworks:                      apiCluster.Spec.MachineNetworks,
-		ClusterNetwork:                       apiCluster.Spec.ClusterNetwork,
 		OIDC:                                 apiCluster.Spec.OIDC,
 		Sys11Auth:                            apiCluster.Spec.Sys11Auth,
 		UpdateWindow:                         apiCluster.Spec.UpdateWindow,
@@ -58,6 +57,11 @@ func Spec(apiCluster apiv1.Cluster, dc *kubermaticv1.Datacenter, secretKeyGetter
 		PodNodeSelectorAdmissionPluginConfig: apiCluster.Spec.PodNodeSelectorAdmissionPluginConfig,
 		ServiceAccount:                       apiCluster.Spec.ServiceAccount,
 		MLA:                                  apiCluster.Spec.MLA,
+		ContainerRuntime:                     apiCluster.Spec.ContainerRuntime,
+	}
+
+	if apiCluster.Spec.ClusterNetwork != nil {
+		spec.ClusterNetwork = *apiCluster.Spec.ClusterNetwork
 	}
 
 	providerName, err := provider.ClusterCloudProviderName(spec.Cloud)

@@ -31,7 +31,7 @@ function generate_secret {
 # We replace the domain with a dns name relying on nip.io poining to the
 # nodeport-proxy service. This makes the testing of expose strategies relying
 # on nodeport-proxy very easy from within the kind cluster.
-# TODO(irozzo) Find another solution in case nip.io does not result to be
+# TODO Find another solution in case nip.io does not result to be
 # available enough for our own CI usage.
 function patch_kubermatic_domain {
   local ip="$(kubectl get service nodeport-proxy -n kubermatic -otemplate --template='{{ .spec.clusterIP }}')"
@@ -44,13 +44,13 @@ DOCKER_REPO="${DOCKER_REPO:-quay.io/kubermatic}"
 GOOS="${GOOS:-linux}"
 TAG="$(git rev-parse HEAD)"
 KIND_CLUSTER_NAME="${KIND_CLUSTER_NAME:-kubermatic}"
-KIND_NODE_VERSION="${KIND_NODE_VERSION:-v1.20.2}"
+KIND_NODE_VERSION="${KIND_NODE_VERSION:-v1.21.1}"
 USER_CLUSTER_KUBERNETES_VERSION="${USER_CLUSTER_KUBERNETES_VERSION:-v1.20.2}"
 KUBECONFIG="${KUBECONFIG:-"${HOME}/.kube/config"}"
 HELM_BINARY="${HELM_BINARY:-helm}" # This works when helm 3 is in path
 
 REPOSUFFIX=""
-if [ "${KUBERMATIC_EDITION}" == "ee" ]; then
+if [ "${KUBERMATIC_EDITION:-}" == "ee" ]; then
   REPOSUFFIX="-${KUBERMATIC_EDITION}"
 fi
 
@@ -163,7 +163,7 @@ kubermaticOperator:
 EOF
 
 # install dependencies and Kubermatic Operator into cluster
-./_build/kubermatic-installer deploy \
+./_build/kubermatic-installer deploy --disable-telemetry \
   --storageclass copy-default \
   --config "${KUBERMATIC_CONFIG}" \
   --kubeconfig "${KUBECONFIG}" \

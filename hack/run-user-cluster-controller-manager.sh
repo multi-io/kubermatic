@@ -65,6 +65,8 @@ OPENVPN_SERVER_NODEPORT="$(echo ${OPENVPN_SERVER_SERVICE_RAW} | jq -r .spec.port
 ARGS=""
 if echo $CLUSTER_RAW | grep -i aws -q; then
   ARGS="$ARGS -cloud-provider-name=aws"
+elif echo $CLUSTER_RAW | grep -i vsphere -q; then
+  ARGS="$ARGS -cloud-provider-name=vsphere"
 fi
 
 echodate "Starting user-cluster-controller-manager..."
@@ -77,13 +79,16 @@ set -x
   -pprof-listen-address=":${PPROF_PORT}" \
   -namespace=${NAMESPACE} \
   -openvpn-server-port=${OPENVPN_SERVER_NODEPORT} \
+  -cluster-name=${CLUSTER_NAME} \
   -cluster-url=${CLUSTER_URL} \
   -version=${CLUSTER_VERSION} \
   -log-debug=$KUBERMATIC_DEBUG \
   -log-format=Console \
   -logtostderr \
+  -tunneling-agent-ip=192.168.30.10 \
   -v=4 \
   -seed-kubeconfig=${SEED_KUBECONFIG} \
   -owner-email=${OWNER_EMAIL} \
   -dns-cluster-ip=10.240.16.10 \
+  -konnectivity-enabled=true \
   ${ARGS}

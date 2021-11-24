@@ -24,11 +24,12 @@ import (
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 	"k8c.io/kubermatic/v2/pkg/resources/vpnsidecar"
 	"k8c.io/kubermatic/v2/pkg/semver"
-	"k8s.io/apimachinery/pkg/api/resource"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 )
 
 const (
@@ -75,8 +76,7 @@ func openStackDeploymentCreator(data *resources.TemplateData) reconciling.NamedD
 				return nil, err
 			}
 
-			f := false
-			dep.Spec.Template.Spec.AutomountServiceAccountToken = &f
+			dep.Spec.Template.Spec.AutomountServiceAccountToken = pointer.BoolPtr(false)
 
 			openvpnSidecar, err := vpnsidecar.OpenVPNSidecarContainer(data, openvpnClientContainerName)
 			if err != nil {
@@ -139,28 +139,26 @@ func getOSFlags(data *resources.TemplateData) []string {
 	if data.Cluster().Spec.Features[kubermaticv1.ClusterFeatureCCMClusterName] {
 		flags = append(flags, "--cluster-name", data.Cluster().Name)
 	}
+	if data.Cluster().Spec.Features[kubermaticv1.ClusterFeatureCCMClusterName] {
+		flags = append(flags, "--cluster-name", data.Cluster().Name)
+	}
 	return flags
 }
 
-const latestCCMVersion = "1.21.0"
+const latestCCMVersion = "1.22.0"
 
 func getOSVersion(version semver.Semver) (string, error) {
-	if version.Minor() < 17 {
-		return "", fmt.Errorf("Kubernetes version %s is not supported", version.String())
-	}
-
 	switch version.Minor() {
-	case 17:
-		return "1.17.0", nil
 	// Use newest cloud controller for all kubermatic version >v1.17
 	// New features and bugfixes don't get backported to older versions
-	// case 18:
-	// case 19:
-	//	return "1.19.2", nil
+	case 18:
+		fallthrough
+	case 19:
+		fallthrough
 	case 20:
-		return latestCCMVersion, nil
+		fallthrough
 	case 21:
-		return latestCCMVersion, nil
+		return "1.21.0", nil
 	default:
 		return latestCCMVersion, nil
 	}
@@ -168,8 +166,6 @@ func getOSVersion(version semver.Semver) (string, error) {
 
 // OpenStackCloudControllerSupported checks if this version of Kubernetes is supported
 // by our implementation of the external cloud controller.
-// This is not called for now, but it's here so we can use it later to automagically
-// enable external cloud controller support for supported versions.
 func OpenStackCloudControllerSupported(version semver.Semver) bool {
 	if _, err := getOSVersion(version); err != nil {
 		return false

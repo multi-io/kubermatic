@@ -194,6 +194,7 @@ func outputMachineDeployment(md *clusterv1alpha1.MachineDeployment) (*apiv1.Node
 		ObjectMeta: apiv1.ObjectMeta{
 			ID:                md.Name,
 			Name:              md.Name,
+			Annotations:       md.Annotations,
 			DeletionTimestamp: deletionTimestamp,
 			CreationTimestamp: apiv1.NewTime(md.CreationTimestamp.Time),
 		},
@@ -598,6 +599,35 @@ func PatchMachineDeployment(ctx context.Context, userInfoGetter provider.UserInf
 	return outputMachineDeployment(machineDeployment)
 }
 
+func RestartMachineDeployment(ctx context.Context, userInfoGetter provider.UserInfoGetter, projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, projectID, clusterID, machineDeploymentID string) (interface{}, error) {
+	clusterProvider := ctx.Value(middleware.ClusterProviderContextKey).(provider.ClusterProvider)
+	cluster, err := GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, projectID, clusterID, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := common.GetClusterClient(ctx, userInfoGetter, clusterProvider, cluster, projectID)
+	if err != nil {
+		return nil, common.KubernetesErrorToHTTPError(err)
+	}
+
+	machineDeployment := &clusterv1alpha1.MachineDeployment{}
+	if err := client.Get(ctx, types.NamespacedName{Namespace: metav1.NamespaceSystem, Name: machineDeploymentID}, machineDeployment); err != nil {
+		return nil, common.KubernetesErrorToHTTPError(err)
+	}
+
+	if machineDeployment.Spec.Template.Annotations == nil {
+		machineDeployment.Spec.Template.Annotations = map[string]string{}
+	}
+	machineDeployment.Spec.Template.Annotations[kubermaticv1.ForceRestartAnnotation] = strconv.FormatInt(time.Now().UnixNano(), 10)
+
+	if err := client.Update(ctx, machineDeployment); err != nil {
+		return nil, fmt.Errorf("failed to update machine deployment: %v", err)
+	}
+
+	return outputMachineDeployment(machineDeployment)
+}
+
 func ListMachineDeploymentNodesEvents(ctx context.Context, userInfoGetter provider.UserInfoGetter, projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, projectID, clusterID, machineDeploymentID, eventType string) (interface{}, error) {
 	clusterProvider := ctx.Value(middleware.ClusterProviderContextKey).(provider.ClusterProvider)
 
@@ -877,7 +907,7 @@ func findMachineAndNode(ctx context.Context, name string, client ctrlruntimeclie
 		}
 	}
 
-	//Check if we can get a owner ref from a machine
+	// Check if we can get a owner ref from a machine
 	if node != nil && machine == nil {
 		machine = getMachineForNode(node, machineList.Items)
 	}

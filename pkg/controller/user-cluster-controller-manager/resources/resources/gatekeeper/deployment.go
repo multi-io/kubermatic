@@ -34,7 +34,7 @@ const (
 	controllerName = resources.GatekeeperControllerDeploymentName
 	auditName      = resources.GatekeeperAuditDeploymentName
 	imageName      = "openpolicyagent/gatekeeper"
-	tag            = "v3.1.3"
+	tag            = "v3.5.2"
 	// Namespace used by Dashboard to find required resources.
 	webhookServerPort  = 8443
 	metricsPort        = 8888
@@ -51,7 +51,7 @@ var (
 			},
 			Limits: corev1.ResourceList{
 				corev1.ResourceMemory: resource.MustParse("512Mi"),
-				corev1.ResourceCPU:    resource.MustParse("1000m"),
+				corev1.ResourceCPU:    resource.MustParse("1"),
 			},
 		},
 		auditName: {
@@ -61,7 +61,7 @@ var (
 			},
 			Limits: corev1.ResourceList{
 				corev1.ResourceMemory: resource.MustParse("512Mi"),
-				corev1.ResourceCPU:    resource.MustParse("1000m"),
+				corev1.ResourceCPU:    resource.MustParse("1"),
 			},
 		},
 	}
@@ -80,7 +80,7 @@ var (
 )
 
 // ControllerDeploymentCreator returns the function to create and update the Gatekeeper controller deployment
-func ControllerDeploymentCreator() reconciling.NamedDeploymentCreatorGetter {
+func ControllerDeploymentCreator(enableMutation bool) reconciling.NamedDeploymentCreatorGetter {
 	return func() (string, reconciling.DeploymentCreator) {
 		return controllerName, func(dep *appsv1.Deployment) (*appsv1.Deployment, error) {
 			dep.Name = controllerName
@@ -103,9 +103,8 @@ func ControllerDeploymentCreator() reconciling.NamedDeploymentCreatorGetter {
 			dep.Spec.Template.Spec.TerminationGracePeriodSeconds = pointer.Int64Ptr(60)
 			dep.Spec.Template.Spec.NodeSelector = map[string]string{"kubernetes.io/os": "linux"}
 			dep.Spec.Template.Spec.ServiceAccountName = serviceAccountName
-
-			dep.Spec.Template.Spec.InitContainers = []corev1.Container{}
-			dep.Spec.Template.Spec.Containers = getControllerContainers()
+			dep.Spec.Template.Spec.PriorityClassName = "system-cluster-critical"
+			dep.Spec.Template.Spec.Containers = getControllerContainers(enableMutation)
 			err := resources.SetResourceRequirements(dep.Spec.Template.Spec.Containers, dep.Annotations, defaultResourceRequirements, nil)
 			if err != nil {
 				return nil, fmt.Errorf("failed to set resource requirements: %v", err)
@@ -151,8 +150,9 @@ func AuditDeploymentCreator() reconciling.NamedDeploymentCreatorGetter {
 			dep.Spec.Template.Spec.TerminationGracePeriodSeconds = pointer.Int64Ptr(60)
 			dep.Spec.Template.Spec.NodeSelector = map[string]string{"kubernetes.io/os": "linux"}
 			dep.Spec.Template.Spec.ServiceAccountName = serviceAccountName
+			dep.Spec.Template.Spec.AutomountServiceAccountToken = pointer.BoolPtr(true)
+			dep.Spec.Template.Spec.PriorityClassName = "system-cluster-critical"
 
-			dep.Spec.Template.Spec.InitContainers = []corev1.Container{}
 			dep.Spec.Template.Spec.Containers = getAuditContainers()
 			err := resources.SetResourceRequirements(dep.Spec.Template.Spec.Containers, dep.Annotations, defaultResourceRequirements, nil)
 			if err != nil {
@@ -164,7 +164,7 @@ func AuditDeploymentCreator() reconciling.NamedDeploymentCreatorGetter {
 	}
 }
 
-func getControllerContainers() []corev1.Container {
+func getControllerContainers(enableMutation bool) []corev1.Container {
 
 	return []corev1.Container{{
 		Name:            controllerName,
@@ -175,7 +175,9 @@ func getControllerContainers() []corev1.Container {
 			"--port=8443",
 			"--logtostderr",
 			fmt.Sprintf("--exempt-namespace=%s", resources.GatekeeperNamespace),
+			fmt.Sprintf("--exempt-namespace=%s", metav1.NamespaceSystem),
 			"--operation=webhook",
+			fmt.Sprintf("--enable-mutation=%t", enableMutation),
 		},
 		Ports: []corev1.ContainerPort{
 			{
@@ -242,9 +244,10 @@ func getControllerContainers() []corev1.Container {
 					"all",
 				},
 			},
-			RunAsGroup:   pointer.Int64Ptr(999),
-			RunAsNonRoot: pointer.BoolPtr(true),
-			RunAsUser:    pointer.Int64Ptr(1000),
+			ReadOnlyRootFilesystem: pointer.BoolPtr(true),
+			RunAsGroup:             pointer.Int64Ptr(999),
+			RunAsNonRoot:           pointer.BoolPtr(true),
+			RunAsUser:              pointer.Int64Ptr(1000),
 		},
 	}}
 }
@@ -259,6 +262,8 @@ func getAuditContainers() []corev1.Container {
 		Args: []string{
 			"--logtostderr",
 			"--operation=audit",
+			fmt.Sprintf("--constraint-violations-limit=%d", resources.ConstraintViolationsLimit),
+			fmt.Sprintf("--audit-match-kind-only=%t", resources.AuditMatchKindOnly),
 		},
 		Ports: []corev1.ContainerPort{
 			{
@@ -315,9 +320,10 @@ func getAuditContainers() []corev1.Container {
 					"all",
 				},
 			},
-			RunAsGroup:   pointer.Int64Ptr(999),
-			RunAsNonRoot: pointer.BoolPtr(true),
-			RunAsUser:    pointer.Int64Ptr(1000),
+			ReadOnlyRootFilesystem: pointer.BoolPtr(true),
+			RunAsGroup:             pointer.Int64Ptr(999),
+			RunAsNonRoot:           pointer.BoolPtr(true),
+			RunAsUser:              pointer.Int64Ptr(1000),
 		},
 	}}
 }

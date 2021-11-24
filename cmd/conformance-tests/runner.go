@@ -1150,19 +1150,18 @@ func (r *testRunner) getGinkgoRuns(
 
 	nodeNumberTotal := int32(r.nodeCount)
 
-	ginkgoSkipParallel := `\[Serial\]`
-	if minor := cluster.Spec.Version.Minor(); minor >= 16 && minor <= 21 {
-		// These require the nodes NodePort to be available from the tester, which is not the case for us.
-		// TODO: Maybe add an option to allow the NodePorts in the SecurityGroup?
-		ginkgoSkipParallel = strings.Join([]string{
-			ginkgoSkipParallel,
-			"Services should be able to change the type from ExternalName to NodePort",
-			"Services should be able to create a functioning NodePort service",
-			"Services should be able to switch session affinity for NodePort service",
-			"Services should have session affinity timeout work for NodePort service",
-			"Services should have session affinity work for NodePort service",
-		}, "|")
-	}
+	// These require the nodes NodePort to be available from the tester, which is not the case for us.
+	// TODO: Maybe add an option to allow the NodePorts in the SecurityGroup?
+	ginkgoSkipParallel := strings.Join([]string{
+		`\[Serial\]`,
+		"Services should be able to change the type from ExternalName to NodePort",
+		"Services should be able to change the type from NodePort to ExternalName",
+		"Services should be able to change the type from ClusterIP to ExternalName",
+		"Services should be able to create a functioning NodePort service",
+		"Services should be able to switch session affinity for NodePort service",
+		"Services should have session affinity timeout work for NodePort service",
+		"Services should have session affinity work for NodePort service",
+	}, "|")
 
 	runs := []struct {
 		name          string
@@ -1252,8 +1251,8 @@ func (r *testRunner) getGinkgoRuns(
 func (r *testRunner) executeGinkgoRun(ctx context.Context, parentLog *zap.SugaredLogger, run *ginkgoRun, client ctrlruntimeclient.Client) (*ginkgoResult, error) {
 	log := parentLog.With("reports-dir", run.reportsDir)
 
-	if err := r.deleteAllNonDefaultNamespaces(ctx, log, client); err != nil {
-		return nil, fmt.Errorf("failed to cleanup namespaces before the Ginkgo run: %v", err)
+	if err := r.cleanupBeforeGinkgo(ctx, log, client); err != nil {
+		return nil, fmt.Errorf("failed to cleanup before the Ginkgo run: %v", err)
 	}
 
 	timedCtx, cancel := context.WithTimeout(ctx, run.timeout)
@@ -1357,7 +1356,7 @@ func supportsLBs(cluster *kubermaticv1.Cluster) bool {
 	return cluster.Spec.Cloud.Azure != nil ||
 		cluster.Spec.Cloud.AWS != nil ||
 		cluster.Spec.Cloud.GCP != nil ||
-		(cluster.Spec.Cloud.Hetzner != nil && cluster.Spec.Version.Minor() >= 18)
+		cluster.Spec.Cloud.Hetzner != nil
 }
 
 func (r *testRunner) printAllControlPlaneLogs(ctx context.Context, log *zap.SugaredLogger, clusterName string) {

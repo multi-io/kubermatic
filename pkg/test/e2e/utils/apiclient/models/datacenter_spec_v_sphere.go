@@ -6,6 +6,8 @@ package models
 // Editing this file might prove futile when you re-run the swagger generate command
 
 import (
+	"context"
+
 	"github.com/go-openapi/errors"
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/swag"
@@ -33,6 +35,9 @@ type DatacenterSpecVSphere struct {
 	// classes/dynamic provisioning and for storing virtual machine files in
 	// case no `Datastore` or `DatastoreCluster` is provided at Cluster level.
 	DefaultDatastore string `json:"datastore,omitempty"`
+
+	// The name of the storage policy to use for the storage class created in the user cluster.
+	DefaultStoragePolicy string `json:"storage_policy,omitempty"`
 
 	// Endpoint URL to use, including protocol, for example "https://vcenter.example.com".
 	Endpoint string `json:"endpoint,omitempty"`
@@ -69,7 +74,6 @@ func (m *DatacenterSpecVSphere) Validate(formats strfmt.Registry) error {
 }
 
 func (m *DatacenterSpecVSphere) validateInfraManagementUser(formats strfmt.Registry) error {
-
 	if swag.IsZero(m.InfraManagementUser) { // not required
 		return nil
 	}
@@ -87,12 +91,57 @@ func (m *DatacenterSpecVSphere) validateInfraManagementUser(formats strfmt.Regis
 }
 
 func (m *DatacenterSpecVSphere) validateTemplates(formats strfmt.Registry) error {
-
 	if swag.IsZero(m.Templates) { // not required
 		return nil
 	}
 
-	if err := m.Templates.Validate(formats); err != nil {
+	if m.Templates != nil {
+		if err := m.Templates.Validate(formats); err != nil {
+			if ve, ok := err.(*errors.Validation); ok {
+				return ve.ValidateName("templates")
+			}
+			return err
+		}
+	}
+
+	return nil
+}
+
+// ContextValidate validate this datacenter spec v sphere based on the context it is used
+func (m *DatacenterSpecVSphere) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
+	var res []error
+
+	if err := m.contextValidateInfraManagementUser(ctx, formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.contextValidateTemplates(ctx, formats); err != nil {
+		res = append(res, err)
+	}
+
+	if len(res) > 0 {
+		return errors.CompositeValidationError(res...)
+	}
+	return nil
+}
+
+func (m *DatacenterSpecVSphere) contextValidateInfraManagementUser(ctx context.Context, formats strfmt.Registry) error {
+
+	if m.InfraManagementUser != nil {
+		if err := m.InfraManagementUser.ContextValidate(ctx, formats); err != nil {
+			if ve, ok := err.(*errors.Validation); ok {
+				return ve.ValidateName("infra_management_user")
+			}
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (m *DatacenterSpecVSphere) contextValidateTemplates(ctx context.Context, formats strfmt.Registry) error {
+
+	if err := m.Templates.ContextValidate(ctx, formats); err != nil {
 		if ve, ok := err.(*errors.Validation); ok {
 			return ve.ValidateName("templates")
 		}

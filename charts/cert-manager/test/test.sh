@@ -31,6 +31,7 @@ helm3 upgrade \
   --namespace cert-manager \
   --create-namespace \
   --atomic \
+  --values charts/cert-manager/test/test-values.yaml \
   cert-manager charts/cert-manager/
 
 # make sure the webhook works, but before that, give the cainjector some
@@ -38,7 +39,7 @@ helm3 upgrade \
 sleep 5
 
 echodate "Creating test certificate..."
-kubectl apply -f charts/cert-manager/test/certificate.yaml
+retry 5 kubectl apply -f charts/cert-manager/test/certificate.yaml
 
 echodate "Deleting kind cluster..."
 kind delete cluster --name "$KIND_CLUSTER_NAME"

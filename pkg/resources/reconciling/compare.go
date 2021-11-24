@@ -23,9 +23,9 @@ import (
 	"github.com/go-test/deep"
 	"go.uber.org/zap"
 
+	k8cequality "k8c.io/kubermatic/v2/pkg/crd/equality"
 	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
 
-	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -38,7 +38,7 @@ func init() {
 
 // DeepEqual compares both objects for equality
 func DeepEqual(a, b metav1.Object) bool {
-	if equality.Semantic.DeepEqual(a, b) {
+	if k8cequality.Semantic.DeepEqual(a, b) {
 		return true
 	}
 

@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
 
@@ -41,6 +42,9 @@ type ObjectMeta struct {
 
 	// Name represents human readable name for the resource
 	Name string `json:"name"`
+
+	// Annotations that can be added to the resource
+	Annotations map[string]string `json:"annotations,omitempty"`
 
 	// DeletionTimestamp is a timestamp representing the server time when this object was deleted.
 	// swagger:strfmt date-time
@@ -118,12 +122,13 @@ type DatacenterMeta struct {
 // AWSSize represents a object of AWS size.
 // swagger:model AWSSize
 type AWSSize struct {
-	Name       string  `json:"name"`
-	PrettyName string  `json:"pretty_name"`
-	Memory     float32 `json:"memory"`
-	VCPUs      int     `json:"vcpus"`
-	GPUs       int     `json:"gpus"`
-	Price      float64 `json:"price"`
+	Name         string  `json:"name"`
+	PrettyName   string  `json:"pretty_name"`
+	Memory       float32 `json:"memory"`
+	VCPUs        int     `json:"vcpus"`
+	GPUs         int     `json:"gpus"`
+	Price        float64 `json:"price"`
+	Architecture string  `json:"architecture"`
 }
 
 // AWSSizeList represents an array of AWS sizes.
@@ -699,6 +704,10 @@ type AnexiaTemplate struct {
 	ID string `json:"id"`
 }
 
+// VersionList represents a list of versions
+// swagger:model VersionList
+type VersionList []MasterVersion
+
 // MasterVersion describes a version of the master components
 // swagger:model MasterVersion
 type MasterVersion struct {
@@ -747,7 +756,6 @@ type ClusterSpec struct {
 	// Cloud specifies the cloud providers configuration
 	Cloud kubermaticv1.CloudSpec `json:"cloud"`
 
-	ClusterNetwork kubermaticv1.ClusterNetworkingConfig `json:"clusterNetwork,omitempty"`
 	// MachineNetworks optionally specifies the parameters for IPAM.
 	MachineNetworks []kubermaticv1.MachineNetworkingConfig `json:"machineNetworks,omitempty"`
 
@@ -799,8 +807,14 @@ type ClusterSpec struct {
 	// By default it is disabled.
 	OPAIntegration *kubermaticv1.OPAIntegrationSettings `json:"opaIntegration,omitempty"`
 
-	//MLA contains monitoring, logging and alerting related settings for the user cluster.
+	// MLA contains monitoring, logging and alerting related settings for the user cluster.
 	MLA *kubermaticv1.MLASettings `json:"mla,omitempty"`
+
+	// ClusterNetwork contains network settings.
+	ClusterNetwork *kubermaticv1.ClusterNetworkingConfig `json:"clusterNetwork,omitempty"`
+
+	// ContainerRuntime to use, i.e. Docker or containerd. By default containerd will be used.
+	ContainerRuntime string `json:"containerRuntime,omitempty"`
 }
 
 // MarshalJSON marshals ClusterSpec object into JSON. It is overwritten to control data
@@ -808,7 +822,6 @@ type ClusterSpec struct {
 func (cs *ClusterSpec) MarshalJSON() ([]byte, error) {
 	ret, err := json.Marshal(struct {
 		Cloud                                PublicCloudSpec                        `json:"cloud"`
-		ClusterNetwork                       kubermaticv1.ClusterNetworkingConfig   `json:"clusterNetwork,omitempty"`
 		MachineNetworks                      []kubermaticv1.MachineNetworkingConfig `json:"machineNetworks,omitempty"`
 		Version                              ksemver.Semver                         `json:"version"`
 		OIDC                                 kubermaticv1.OIDCSettings              `json:"oidc"`
@@ -823,6 +836,8 @@ func (cs *ClusterSpec) MarshalJSON() ([]byte, error) {
 		ServiceAccount                       *kubermaticv1.ServiceAccountSettings   `json:"serviceAccount,omitempty"`
 		OPAIntegration                       *kubermaticv1.OPAIntegrationSettings   `json:"opaIntegration,omitempty"`
 		MLA                                  *kubermaticv1.MLASettings              `json:"mla,omitempty"`
+		ContainerRuntime                     string                                 `json:"containerRuntime,omitempty"`
+		ClusterNetwork                       *kubermaticv1.ClusterNetworkingConfig  `json:"clusterNetwork,omitempty"`
 	}{
 		Cloud: PublicCloudSpec{
 			DatacenterName: cs.Cloud.DatacenterName,
@@ -841,7 +856,6 @@ func (cs *ClusterSpec) MarshalJSON() ([]byte, error) {
 			Anexia:         newPublicAnexiaCloudSpec(cs.Cloud.Anexia),
 		},
 		Version:                              cs.Version,
-		ClusterNetwork:                       cs.ClusterNetwork,
 		MachineNetworks:                      cs.MachineNetworks,
 		OIDC:                                 cs.OIDC,
 		Sys11Auth:                            cs.Sys11Auth,
@@ -855,6 +869,8 @@ func (cs *ClusterSpec) MarshalJSON() ([]byte, error) {
 		ServiceAccount:                       cs.ServiceAccount,
 		OPAIntegration:                       cs.OPAIntegration,
 		MLA:                                  cs.MLA,
+		ContainerRuntime:                     cs.ContainerRuntime,
+		ClusterNetwork:                       cs.ClusterNetwork,
 	})
 
 	return ret, err
@@ -913,14 +929,18 @@ func newPublicHetznerCloudSpec(internal *kubermaticv1.HetznerCloudSpec) (public 
 }
 
 // PublicAzureCloudSpec is a public counterpart of apiv1.AzureCloudSpec.
-type PublicAzureCloudSpec struct{}
+type PublicAzureCloudSpec struct {
+	AssignAvailabilitySet *bool `json:"assignAvailabilitySet"`
+}
 
 func newPublicAzureCloudSpec(internal *kubermaticv1.AzureCloudSpec) (public *PublicAzureCloudSpec) {
 	if internal == nil {
 		return nil
 	}
 
-	return &PublicAzureCloudSpec{}
+	return &PublicAzureCloudSpec{
+		AssignAvailabilitySet: internal.AssignAvailabilitySet,
+	}
 }
 
 // PublicVSphereCloudSpec is a public counterpart of apiv1.VSphereCloudSpec.
@@ -1046,10 +1066,24 @@ func newPublicAnexiaCloudSpec(internal *kubermaticv1.AnexiaCloudSpec) (public *P
 type ClusterStatus struct {
 	// Version actual version of the kubernetes master components
 	Version ksemver.Semver `json:"version"`
-
 	// URL specifies the address at which the cluster is available
 	URL string `json:"url"`
+	// ExternalCCMMigration represents the migration status to the external CCM
+	ExternalCCMMigration ExternalCCMMigrationStatus `json:"externalCCMMigration"`
 }
+
+type ExternalCCMMigrationStatus string
+
+var (
+	// ExternalCCMMigrationNotNeeded indicates that the external CCM is already in use
+	ExternalCCMMigrationNotNeeded ExternalCCMMigrationStatus = "NotNeeded"
+	// ExternalCCMMigrationSupported indicates that the external CCM is not used but supported
+	ExternalCCMMigrationSupported ExternalCCMMigrationStatus = "Supported"
+	// ExternalCCMMigrationUnsupported indicates that the external CCM is not used and not supported
+	ExternalCCMMigrationUnsupported ExternalCCMMigrationStatus = "Unsupported"
+	// ExternalCCMMigrationInProgress indicates that the migration procedure to the external CCM is in progress
+	ExternalCCMMigrationInProgress ExternalCCMMigrationStatus = "InProgress"
+)
 
 // ClusterHealth stores health information about the cluster's components.
 // swagger:model ClusterHealth
@@ -1309,6 +1343,8 @@ type AzureNodeSpec struct {
 	// ImageID represents the ID of the image that should be used to run the node
 	// required: false
 	ImageID string `json:"imageID"`
+	// AssignAvailabilitySet is used to check if an availability set should be created and assigned to the cluster.
+	AssignAvailabilitySet bool `json:"assignAvailabilitySet"`
 }
 
 func (spec *AzureNodeSpec) MarshalJSON() ([]byte, error) {
@@ -1323,21 +1359,23 @@ func (spec *AzureNodeSpec) MarshalJSON() ([]byte, error) {
 	}
 
 	res := struct {
-		Size           string            `json:"size"`
-		AssignPublicIP bool              `json:"assignPublicIP"`
-		Tags           map[string]string `json:"tags,omitempty"`
-		OSDiskSize     int32             `json:"osDiskSize"`
-		DataDiskSize   int32             `json:"dataDiskSize"`
-		Zones          []string          `json:"zones"`
-		ImageID        string            `json:"imageID"`
+		Size                  string            `json:"size"`
+		AssignPublicIP        bool              `json:"assignPublicIP"`
+		Tags                  map[string]string `json:"tags,omitempty"`
+		OSDiskSize            int32             `json:"osDiskSize"`
+		DataDiskSize          int32             `json:"dataDiskSize"`
+		Zones                 []string          `json:"zones"`
+		ImageID               string            `json:"imageID"`
+		AssignAvailabilitySet bool              `json:"assignAvailabilitySet"`
 	}{
-		Size:           spec.Size,
-		AssignPublicIP: spec.AssignPublicIP,
-		Tags:           spec.Tags,
-		OSDiskSize:     spec.OSDiskSize,
-		DataDiskSize:   spec.DataDiskSize,
-		Zones:          spec.Zones,
-		ImageID:        spec.ImageID,
+		Size:                  spec.Size,
+		AssignPublicIP:        spec.AssignPublicIP,
+		Tags:                  spec.Tags,
+		OSDiskSize:            spec.OSDiskSize,
+		DataDiskSize:          spec.DataDiskSize,
+		Zones:                 spec.Zones,
+		ImageID:               spec.ImageID,
+		AssignAvailabilitySet: spec.AssignAvailabilitySet,
 	}
 
 	return json.Marshal(&res)
@@ -1404,9 +1442,11 @@ type OpenstackNodeSpec struct {
 	Tags map[string]string `json:"tags,omitempty"`
 	// Defines whether floating ip should be used
 	// required: false
-	UseFloatingIP bool `json:"useFloatingIP,omitempty"`
+	// +x-omitempty: false
+	UseFloatingIP bool `json:"useFloatingIP"`
 	// if set, the rootDisk will be a volume. If not, the rootDisk will be on ephemeral storage and its size will be derived from the flavor
 	// required: false
+	// +x-omitempty: falsepkg/webhook/cluster/mutation
 	RootDiskSizeGB *int `json:"diskSize"`
 	// if not set, the default AZ from the Datacenter spec will be used
 	// required: false
@@ -1483,6 +1523,15 @@ type AWSNodeSpec struct {
 	AssignPublicIP *bool `json:"assignPublicIP"`
 	// IsSpotInstance indicates whether the created machine is an aws ec2 spot instance or on-demand ec2 instance.
 	IsSpotInstance *bool `json:"isSpotInstance"`
+	// SpotInstanceMaxPrice is the maximum price you are willing to pay per instance hour. Your instance runs when
+	// your maximum price is greater than the Spot Price.
+	SpotInstanceMaxPrice *string `json:"spotInstanceMaxPrice"`
+	// SpotInstancePersistentRequest ensures that your request will be submitted every time your Spot Instance is terminated.
+	SpotInstancePersistentRequest *bool `json:"spotInstancePersistentRequest"`
+	// SpotInstanceInterruptionBehavior sets the interruption behavior for the spot instance when capacity is no longer
+	// available at the price you specified, if there is no capacity, or if a constraint cannot be met. Charges for EBS
+	// volume storage apply when an instance is stopped.
+	SpotInstanceInterruptionBehavior *string `json:"spotInstanceInterruptionBehavior"`
 }
 
 func (spec *AWSNodeSpec) MarshalJSON() ([]byte, error) {
@@ -1505,25 +1554,31 @@ func (spec *AWSNodeSpec) MarshalJSON() ([]byte, error) {
 	}
 
 	res := struct {
-		InstanceType     string            `json:"instanceType"`
-		VolumeSize       int64             `json:"diskSize"`
-		VolumeType       string            `json:"volumeType"`
-		AMI              string            `json:"ami"`
-		Tags             map[string]string `json:"tags"`
-		AvailabilityZone string            `json:"availabilityZone"`
-		SubnetID         string            `json:"subnetID"`
-		AssignPublicIP   *bool             `json:"assignPublicIP"`
-		IsSpotInstance   *bool             `json:"isSpotInstance"`
+		InstanceType                     string            `json:"instanceType"`
+		VolumeSize                       int64             `json:"diskSize"`
+		VolumeType                       string            `json:"volumeType"`
+		AMI                              string            `json:"ami"`
+		Tags                             map[string]string `json:"tags"`
+		AvailabilityZone                 string            `json:"availabilityZone"`
+		SubnetID                         string            `json:"subnetID"`
+		AssignPublicIP                   *bool             `json:"assignPublicIP"`
+		IsSpotInstance                   *bool             `json:"isSpotInstance"`
+		SpotInstanceMaxPrice             *string           `json:"spotInstanceMaxPrice,omitempty"`
+		SpotInstancePersistentRequest    *bool             `json:"spotInstancePersistentRequest,omitempty"`
+		SpotInstanceInterruptionBehavior *string           `json:"spotInstanceInterruptionBehavior,omitempty"`
 	}{
-		InstanceType:     spec.InstanceType,
-		VolumeSize:       spec.VolumeSize,
-		VolumeType:       spec.VolumeType,
-		AMI:              spec.AMI,
-		Tags:             spec.Tags,
-		AvailabilityZone: spec.AvailabilityZone,
-		SubnetID:         spec.SubnetID,
-		AssignPublicIP:   spec.AssignPublicIP,
-		IsSpotInstance:   spec.IsSpotInstance,
+		InstanceType:                     spec.InstanceType,
+		VolumeSize:                       spec.VolumeSize,
+		VolumeType:                       spec.VolumeType,
+		AMI:                              spec.AMI,
+		Tags:                             spec.Tags,
+		AvailabilityZone:                 spec.AvailabilityZone,
+		SubnetID:                         spec.SubnetID,
+		AssignPublicIP:                   spec.AssignPublicIP,
+		IsSpotInstance:                   spec.IsSpotInstance,
+		SpotInstanceMaxPrice:             spec.SpotInstanceMaxPrice,
+		SpotInstancePersistentRequest:    spec.SpotInstancePersistentRequest,
+		SpotInstanceInterruptionBehavior: spec.SpotInstanceInterruptionBehavior,
 	}
 
 	return json.Marshal(&res)
@@ -2138,6 +2193,10 @@ type SeedSpec struct {
 	ProxySettings *kubermaticv1.ProxySettings `json:"proxy_settings,omitempty"`
 	// Optional: ExposeStrategy explicitly sets the expose strategy for this seed cluster, if not set, the default provided by the master is used.
 	ExposeStrategy kubermaticv1.ExposeStrategy `json:"expose_strategy,omitempty"`
+	// Optional: MLA allows configuring seed level MLA (Monitoring, Logging & Alerting) stack settings.
+	MLA *kubermaticv1.SeedMLASettings `json:"mla,omitempty"`
+	// Optional: BackupRestore when set, enables backup and restore controllers with given configuration.
+	BackupRestore *kubermaticv1.SeedBackupRestoreConfiguration `json:"backupRestore,omitempty"`
 }
 
 // swagger:model SeedNamesList
@@ -2148,6 +2207,18 @@ type SeedCluster struct {
 	SeedName  string
 	ClusterID string
 }
+
+// MeteringReport holds objects names and metadata for available reports
+// swagger:model MeteringReport
+type MeteringReport struct {
+	Name         string    `json:"name"`
+	LastModified time.Time `json:"lastModified"`
+	Size         int64     `json:"size"`
+}
+
+// ReportURL represent an S3 pre signed URL to download a report
+// swagger:model MeteringReportURL
+type ReportURL string
 
 const (
 	// NodeDeletionFinalizer indicates that the nodes still need cleanup
@@ -2168,16 +2239,28 @@ const (
 	GatekeeperConstraintTemplateCleanupFinalizer = "kubermatic.io/cleanup-gatekeeper-constraint-templates"
 	// GatekeeperSeedConstraintTemplateCleanupFinalizer indicates that synced gatekeeper Constraint Templates on seed clusters need cleanup
 	GatekeeperSeedConstraintTemplateCleanupFinalizer = "kubermatic.io/cleanup-gatekeeper-master-constraint-templates"
+	// GatekeeperSeedConstraintCleanupFinalizer indicates that synced gatekeeper Constraint on seed clusters need cleanup
+	GatekeeperSeedConstraintCleanupFinalizer = "kubermatic.io/cleanup-gatekeeper-seed-constraint"
 	// GatekeeperConstraintCleanupFinalizer indicates that gatkeeper constraints on the user cluster need cleanup
 	GatekeeperConstraintCleanupFinalizer = "kubermatic.io/cleanup-gatekeeper-constraints"
+	// KubermaticUserClusterNsDefaultConstraintCleanupFinalizer indicates that kubermatic constraints on the user cluster namespace need cleanup
+	KubermaticUserClusterNsDefaultConstraintCleanupFinalizer = "kubermatic.io/cleanup-kubermatic-usercluster-ns-default-constraints"
 	// KubermaticConstraintCleanupFinalizer indicates that Kubermatic constraints for the cluster need cleanup
 	KubermaticConstraintCleanupFinalizer = "kubermatic.io/cleanup-kubermatic-constraints"
 	// SeedProjectCleanupFinalizer indicates that Kubermatic Projects on the seed clusters need cleanup
 	SeedProjectCleanupFinalizer = "kubermatic.io/cleanup-seed-projects"
 	// SeedUserProjectBindingCleanupFinalizer indicates that Kubermatic UserProjectBindings on the seed clusters need cleanup
 	SeedUserProjectBindingCleanupFinalizer = "kubermatic.io/cleanup-seed-user-project-bindings"
+	// SeedUserCleanupFinalizer indicates that Kubermatic Users on the seed clusters need cleanup
+	SeedUserCleanupFinalizer = "kubermatic.io/cleanup-seed-users"
 	// ClusterRoleBindingsCleanupFinalizer indicates that the cluster ClusterRoleBindings on the seed cluster need cleanup
 	ClusterRoleBindingsCleanupFinalizer = "kubermatic.io/cleanup-cluster-role-bindings"
+	// ClusterTemplateSeedCleanupFinalizer indicates that synced cluster template on seed clusters need cleanup
+	ClusterTemplateSeedCleanupFinalizer = "kubermatic.io/cleanup-seed-cluster-template"
+	// AllowedRegistryCleanupFinalizer indicates that allowed registry Constraints need to be cleaned up
+	AllowedRegistryCleanupFinalizer = "kubermatic.io/cleanup-allowed-registry"
+	// ClusterTemplateSeedCleanupFinalizer indicates that cluster template instance on seed clusters need cleanup
+	SeedClusterTemplateInstanceFinalizer = "kubermatic.io/cleanup-seed-cluster-template-instance"
 )
 
 func ToInternalClusterType(externalClusterType string) kubermaticv1.ClusterType {

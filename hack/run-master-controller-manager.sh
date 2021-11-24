@@ -21,7 +21,7 @@ source hack/lib.sh
 
 KUBERMATIC_EDITION="${KUBERMATIC_EDITION:-ce}"
 KUBERMATIC_DEBUG=${KUBERMATIC_DEBUG:-true}
-PPROF_PORT=${PPROF_PORT:-6600}
+PPROF_PORT=${PPROF_PORT:-6601}
 
 echodate "Compiling master-controller-manager..."
 make master-controller-manager
@@ -32,7 +32,7 @@ if [ "$KUBERMATIC_EDITION" == "ee" ]; then
 fi
 
 if [ -z "${VAULT_ADDR:-}" ]; then
-  export VAULT_ADDR=https://vault.loodse.com/
+  export VAULT_ADDR=https://vault.kubermatic.com/
 fi
 
 if [ -z "${KUBECONFIG:-}" ]; then

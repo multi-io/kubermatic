@@ -24,6 +24,7 @@ import (
 
 	"github.com/go-logr/logr"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/resources"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/utils/pointer"
@@ -37,12 +38,14 @@ type AdmissionHandler struct {
 	log     logr.Logger
 	decoder *admission.Decoder
 
-	defaultSettings kubermaticv1.ComponentSettings
+	defaultComponentSettings kubermaticv1.ComponentSettings
 }
 
 // NewAdmissionHandler returns a new cluster mutation AdmissionHandler.
-func NewAdmissionHandler(s kubermaticv1.ComponentSettings) *AdmissionHandler {
-	return &AdmissionHandler{defaultSettings: s}
+func NewAdmissionHandler(defaults kubermaticv1.ComponentSettings) *AdmissionHandler {
+	return &AdmissionHandler{
+		defaultComponentSettings: defaults,
+	}
 }
 
 func (h *AdmissionHandler) InjectLogger(l logr.Logger) error {
@@ -66,89 +69,6 @@ func (h *AdmissionHandler) Handle(ctx context.Context, req webhook.AdmissionRequ
 			return admission.Errored(http.StatusBadRequest, err)
 		}
 		h.applyDefaults(cluster)
-		settings := &cluster.Spec.ComponentsOverride
-
-		if settings.Apiserver.Replicas == nil {
-			settings.Apiserver.Replicas = h.defaultSettings.Apiserver.Replicas
-		}
-		if settings.Apiserver.Resources == nil {
-			settings.Apiserver.Resources = h.defaultSettings.Apiserver.Resources
-		}
-		if settings.Apiserver.EndpointReconcilingDisabled == nil {
-			settings.Apiserver.EndpointReconcilingDisabled = h.defaultSettings.Apiserver.EndpointReconcilingDisabled
-		}
-		if settings.Apiserver.NodePortRange == "" {
-			settings.Apiserver.NodePortRange = h.defaultSettings.Apiserver.NodePortRange
-		}
-		if settings.ControllerManager.Replicas == nil {
-			settings.ControllerManager.Replicas = h.defaultSettings.ControllerManager.Replicas
-		}
-		if settings.ControllerManager.Resources == nil {
-			settings.ControllerManager.Resources = h.defaultSettings.ControllerManager.Resources
-		}
-		if settings.ControllerManager.Tolerations == nil {
-			settings.ControllerManager.Tolerations = h.defaultSettings.ControllerManager.Tolerations
-		}
-		if settings.ControllerManager.LeaseDurationSeconds == nil {
-			settings.ControllerManager.LeaseDurationSeconds = h.defaultSettings.ControllerManager.LeaseDurationSeconds
-		}
-		if settings.ControllerManager.RenewDeadlineSeconds == nil {
-			settings.ControllerManager.RenewDeadlineSeconds = h.defaultSettings.ControllerManager.RenewDeadlineSeconds
-		}
-		if settings.ControllerManager.RetryPeriodSeconds == nil {
-			settings.ControllerManager.RetryPeriodSeconds = h.defaultSettings.ControllerManager.RetryPeriodSeconds
-		}
-		if v := settings.OpenVPN.Server.Resources; v != nil {
-			settings.OpenVPN.Server.Resources = h.defaultSettings.OpenVPN.Server.Resources
-		}
-		if v := settings.OpenVPN.Exporter.Resources; v != nil {
-			settings.OpenVPN.Exporter.Resources = h.defaultSettings.OpenVPN.Exporter.Resources
-		}
-		if v := settings.OpenVPN.IPFixup.Resources; v != nil {
-			settings.OpenVPN.IPFixup.Resources = h.defaultSettings.OpenVPN.IPFixup.Resources
-		}
-		if v := settings.OpenVPN.IPTablesInitContainer.Resources; v != nil {
-			settings.OpenVPN.IPTablesInitContainer.Resources = h.defaultSettings.OpenVPN.IPTablesInitContainer.Resources
-		}
-		if settings.Scheduler.Replicas == nil {
-			settings.Scheduler.Replicas = h.defaultSettings.Scheduler.Replicas
-		}
-		if settings.Scheduler.Resources == nil {
-			settings.Scheduler.Resources = h.defaultSettings.Scheduler.Resources
-		}
-		if settings.Scheduler.Tolerations == nil {
-			settings.Scheduler.Tolerations = h.defaultSettings.Scheduler.Tolerations
-		}
-		if settings.Scheduler.LeaseDurationSeconds == nil {
-			settings.Scheduler.LeaseDurationSeconds = h.defaultSettings.Scheduler.LeaseDurationSeconds
-		}
-		if settings.Scheduler.RenewDeadlineSeconds == nil {
-			settings.Scheduler.RenewDeadlineSeconds = h.defaultSettings.Scheduler.RenewDeadlineSeconds
-		}
-		if settings.Scheduler.RetryPeriodSeconds == nil {
-			settings.Scheduler.RetryPeriodSeconds = h.defaultSettings.Scheduler.RetryPeriodSeconds
-		}
-		if settings.Etcd.Replicas == nil {
-			settings.Etcd.Replicas = h.defaultSettings.Etcd.Replicas
-		}
-		if settings.Etcd.Resources == nil {
-			settings.Etcd.Resources = h.defaultSettings.Etcd.Resources
-		}
-		if settings.Etcd.Tolerations == nil {
-			settings.Etcd.Tolerations = h.defaultSettings.Etcd.Tolerations
-		}
-		if settings.Etcd.DiskSize == nil {
-			settings.Etcd.DiskSize = h.defaultSettings.Etcd.DiskSize
-		}
-		if settings.Etcd.StorageClass == "" {
-			settings.Etcd.StorageClass = h.defaultSettings.Etcd.StorageClass
-		}
-		if settings.Prometheus.Resources == nil {
-			settings.Prometheus.Resources = h.defaultSettings.Prometheus.Resources
-		}
-		if !settings.Openstack.EnableIngressHostname {
-			settings.Openstack.EnableIngressHostname = h.defaultSettings.Openstack.EnableIngressHostname
-		}
 	case admissionv1.Update:
 		if err := h.decoder.Decode(req, cluster); err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
@@ -161,13 +81,6 @@ func (h *AdmissionHandler) Handle(ctx context.Context, req webhook.AdmissionRequ
 			h.log.Info("cluster mutation failed", "error", err)
 			return webhook.Errored(http.StatusInternalServerError, fmt.Errorf("cluster mutation request %s failed: %v", req.UID, err))
 		}
-
-		mutatedCluster, err := json.Marshal(cluster)
-		if err != nil {
-			return webhook.Errored(http.StatusInternalServerError, fmt.Errorf("marshaling cluster object failed: %v", err))
-		}
-
-		return admission.PatchResponseFromRaw(req.Object.Raw, mutatedCluster)
 	case admissionv1.Delete:
 		return webhook.Allowed(fmt.Sprintf("no mutation done for request %s", req.UID))
 	default:
@@ -183,12 +96,157 @@ func (h *AdmissionHandler) Handle(ctx context.Context, req webhook.AdmissionRequ
 }
 
 func (h *AdmissionHandler) applyDefaults(c *kubermaticv1.Cluster) {
+	// Add default CNI plugin settings if not present.
+	if c.Spec.CNIPlugin == nil {
+		c.Spec.CNIPlugin = &kubermaticv1.CNIPluginSettings{
+			Type:    kubermaticv1.CNIPluginTypeCanal,
+			Version: "v3.19",
+		}
+	}
+
+	if len(c.Spec.ClusterNetwork.Services.CIDRBlocks) == 0 {
+		if c.Spec.Cloud.Kubevirt != nil {
+			// KubeVirt cluster can be provisioned on top of k8s cluster created by KKP
+			// thus we have to avoid network collision
+			c.Spec.ClusterNetwork.Services.CIDRBlocks = []string{"10.241.0.0/20"}
+		} else {
+			c.Spec.ClusterNetwork.Services.CIDRBlocks = []string{"10.240.16.0/20"}
+		}
+	}
+
+	if len(c.Spec.ClusterNetwork.Pods.CIDRBlocks) == 0 {
+		if c.Spec.Cloud.Kubevirt != nil {
+			c.Spec.ClusterNetwork.Pods.CIDRBlocks = []string{"172.26.0.0/16"}
+		} else {
+			c.Spec.ClusterNetwork.Pods.CIDRBlocks = []string{"172.25.0.0/16"}
+		}
+	}
+
+	if c.Spec.ClusterNetwork.DNSDomain == "" {
+		c.Spec.ClusterNetwork.DNSDomain = "cluster.local"
+	}
+
+	if c.Spec.ClusterNetwork.ProxyMode == "" {
+		// IPVS causes issues with Hetzner's LoadBalancers, which should
+		// be addressed via https://github.com/kubernetes/enhancements/pull/1392
+		if c.Spec.Cloud.Hetzner != nil {
+			c.Spec.ClusterNetwork.ProxyMode = resources.IPTablesProxyMode
+		} else {
+			c.Spec.ClusterNetwork.ProxyMode = resources.IPVSProxyMode
+		}
+	}
+
+	if c.Spec.ClusterNetwork.IPVS != nil {
+		if c.Spec.ClusterNetwork.IPVS.StrictArp == nil {
+			c.Spec.ClusterNetwork.IPVS.StrictArp = pointer.BoolPtr(resources.IPVSStrictArp)
+		}
+	}
+
 	// Network policies for Apiserver are deployed by default
 	if _, ok := c.Spec.Features[kubermaticv1.ApiserverNetworkPolicy]; !ok {
 		if c.Spec.Features == nil {
 			c.Spec.Features = map[string]bool{}
 		}
 		c.Spec.Features[kubermaticv1.ApiserverNetworkPolicy] = true
+	}
+
+	if c.Spec.ClusterNetwork.NodeLocalDNSCacheEnabled == nil {
+		c.Spec.ClusterNetwork.NodeLocalDNSCacheEnabled = pointer.BoolPtr(true)
+	}
+
+	// Default component settings
+	h.defaultClusterComponentSettings(c)
+}
+
+func (h *AdmissionHandler) defaultClusterComponentSettings(c *kubermaticv1.Cluster) {
+
+	settings := &c.Spec.ComponentsOverride
+
+	if settings.Apiserver.Replicas == nil {
+		settings.Apiserver.Replicas = h.defaultComponentSettings.Apiserver.Replicas
+	}
+	if settings.Apiserver.Resources == nil {
+		settings.Apiserver.Resources = h.defaultComponentSettings.Apiserver.Resources
+	}
+	if settings.Apiserver.EndpointReconcilingDisabled == nil {
+		settings.Apiserver.EndpointReconcilingDisabled = h.defaultComponentSettings.Apiserver.EndpointReconcilingDisabled
+	}
+	if settings.Apiserver.NodePortRange == "" {
+		settings.Apiserver.NodePortRange = h.defaultComponentSettings.Apiserver.NodePortRange
+	}
+	if settings.ControllerManager.Replicas == nil {
+		settings.ControllerManager.Replicas = h.defaultComponentSettings.ControllerManager.Replicas
+	}
+	if settings.ControllerManager.Resources == nil {
+		settings.ControllerManager.Resources = h.defaultComponentSettings.ControllerManager.Resources
+	}
+	if settings.ControllerManager.Tolerations == nil {
+		settings.ControllerManager.Tolerations = h.defaultComponentSettings.ControllerManager.Tolerations
+	}
+	if settings.ControllerManager.LeaseDurationSeconds == nil {
+		settings.ControllerManager.LeaseDurationSeconds = h.defaultComponentSettings.ControllerManager.LeaseDurationSeconds
+	}
+	if settings.ControllerManager.RenewDeadlineSeconds == nil {
+		settings.ControllerManager.RenewDeadlineSeconds = h.defaultComponentSettings.ControllerManager.RenewDeadlineSeconds
+	}
+	if settings.ControllerManager.RetryPeriodSeconds == nil {
+		settings.ControllerManager.RetryPeriodSeconds = h.defaultComponentSettings.ControllerManager.RetryPeriodSeconds
+	}
+	if v := settings.OpenVPN.Server.Resources; v != nil {
+		settings.OpenVPN.Server.Resources = h.defaultComponentSettings.OpenVPN.Server.Resources
+	}
+	if v := settings.OpenVPN.Exporter.Resources; v != nil {
+		settings.OpenVPN.Exporter.Resources = h.defaultComponentSettings.OpenVPN.Exporter.Resources
+	}
+	if v := settings.OpenVPN.IPFixup.Resources; v != nil {
+		settings.OpenVPN.IPFixup.Resources = h.defaultComponentSettings.OpenVPN.IPFixup.Resources
+	}
+	if v := settings.OpenVPN.IPTablesInitContainer.Resources; v != nil {
+		settings.OpenVPN.IPTablesInitContainer.Resources = h.defaultComponentSettings.OpenVPN.IPTablesInitContainer.Resources
+	}
+	if settings.Scheduler.Replicas == nil {
+		settings.Scheduler.Replicas = h.defaultComponentSettings.Scheduler.Replicas
+	}
+	if settings.Scheduler.Resources == nil {
+		settings.Scheduler.Resources = h.defaultComponentSettings.Scheduler.Resources
+	}
+	if settings.Scheduler.Tolerations == nil {
+		settings.Scheduler.Tolerations = h.defaultComponentSettings.Scheduler.Tolerations
+	}
+	if settings.Scheduler.LeaseDurationSeconds == nil {
+		settings.Scheduler.LeaseDurationSeconds = h.defaultComponentSettings.Scheduler.LeaseDurationSeconds
+	}
+	if settings.Scheduler.RenewDeadlineSeconds == nil {
+		settings.Scheduler.RenewDeadlineSeconds = h.defaultComponentSettings.Scheduler.RenewDeadlineSeconds
+	}
+	if settings.Scheduler.RetryPeriodSeconds == nil {
+		settings.Scheduler.RetryPeriodSeconds = h.defaultComponentSettings.Scheduler.RetryPeriodSeconds
+	}
+	if settings.Etcd.Replicas == nil {
+		settings.Etcd.Replicas = h.defaultComponentSettings.Etcd.Replicas
+	}
+	if settings.Etcd.Resources == nil {
+		settings.Etcd.Resources = h.defaultComponentSettings.Etcd.Resources
+	}
+	if settings.Etcd.Tolerations == nil {
+		settings.Etcd.Tolerations = h.defaultComponentSettings.Etcd.Tolerations
+	}
+	if settings.Etcd.DiskSize == nil {
+		settings.Etcd.DiskSize = h.defaultComponentSettings.Etcd.DiskSize
+	}
+	if settings.Etcd.StorageClass == "" {
+		settings.Etcd.StorageClass = h.defaultComponentSettings.Etcd.StorageClass
+	}
+	if settings.Prometheus.Resources == nil {
+		settings.Prometheus.Resources = h.defaultComponentSettings.Prometheus.Resources
+	}
+	if !settings.Openstack.EnableIngressHostname {
+		settings.Openstack.EnableIngressHostname = h.defaultComponentSettings.Openstack.EnableIngressHostname
+	}
+	
+	// Always enable external CCM
+	if c.Spec.Cloud.Anexia != nil || c.Spec.Cloud.Kubevirt != nil {
+		c.Spec.Features[kubermaticv1.ClusterFeatureExternalCloudProvider] = true
 	}
 }
 
@@ -197,17 +255,14 @@ func (h *AdmissionHandler) mutateUpdate(ctx context.Context, oldCluster, newClus
 	// only for OpenStack clusters, in the following way:
 	//   * Add the CCM/CSI migration annotations
 	//   * Enable the UseOctaiva flag
-	switch {
-	case newCluster.Spec.Cloud.Openstack != nil:
-		if v, oldV := newCluster.Spec.Features[kubermaticv1.ClusterFeatureExternalCloudProvider],
-			oldCluster.Spec.Features[kubermaticv1.ClusterFeatureExternalCloudProvider]; v && !oldV {
-			if newCluster.ObjectMeta.Annotations == nil {
-				newCluster.ObjectMeta.Annotations = map[string]string{}
-			}
-
-			newCluster.ObjectMeta.Annotations[kubermaticv1.CCMMigrationNeededAnnotation] = ""
-			newCluster.ObjectMeta.Annotations[kubermaticv1.CSIMigrationNeededAnnotation] = ""
+	if v, oldV := newCluster.Spec.Features[kubermaticv1.ClusterFeatureExternalCloudProvider],
+		oldCluster.Spec.Features[kubermaticv1.ClusterFeatureExternalCloudProvider]; v && !oldV {
+		switch {
+		case newCluster.Spec.Cloud.Openstack != nil:
+			addCCMCSIMigrationAnnotations(newCluster)
 			newCluster.Spec.Cloud.Openstack.UseOctavia = pointer.BoolPtr(true)
+		case newCluster.Spec.Cloud.VSphere != nil:
+			addCCMCSIMigrationAnnotations(newCluster)
 		}
 	}
 
@@ -216,4 +271,13 @@ func (h *AdmissionHandler) mutateUpdate(ctx context.Context, oldCluster, newClus
 
 func (h *AdmissionHandler) SetupWebhookWithManager(mgr ctrlruntime.Manager) {
 	mgr.GetWebhookServer().Register("/mutate-kubermatic-k8s-io-cluster", &webhook.Admission{Handler: h})
+}
+
+func addCCMCSIMigrationAnnotations(cluster *kubermaticv1.Cluster) {
+	if cluster.ObjectMeta.Annotations == nil {
+		cluster.ObjectMeta.Annotations = map[string]string{}
+	}
+
+	cluster.ObjectMeta.Annotations[kubermaticv1.CCMMigrationNeededAnnotation] = ""
+	cluster.ObjectMeta.Annotations[kubermaticv1.CSIMigrationNeededAnnotation] = ""
 }

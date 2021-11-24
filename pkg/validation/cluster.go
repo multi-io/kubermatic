@@ -23,6 +23,9 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/Masterminds/semver/v3"
+	"github.com/coreos/locksmith/pkg/timeutil"
+
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/keycloak"
 	kuberneteshelper "k8c.io/kubermatic/v2/pkg/kubernetes"
@@ -31,7 +34,6 @@ import (
 	kubernetesprovider "k8c.io/kubermatic/v2/pkg/provider/kubernetes"
 	"k8c.io/kubermatic/v2/pkg/resources"
 
-	"github.com/coreos/locksmith/pkg/timeutil"
 	"k8s.io/apimachinery/pkg/api/equality"
 	utilerror "k8s.io/apimachinery/pkg/util/errors"
 	kubenetutil "k8s.io/apimachinery/pkg/util/net"
@@ -47,6 +49,7 @@ var (
 
 // ValidateCreateClusterSpec validates the given cluster spec
 func ValidateCreateClusterSpec(spec *kubermaticv1.ClusterSpec, dc *kubermaticv1.Datacenter, cloudProvider provider.CloudProvider) error {
+
 	if spec.HumanReadableName == "" {
 		return errors.New("no name specified")
 	}
@@ -72,12 +75,59 @@ func ValidateCreateClusterSpec(spec *kubermaticv1.ClusterSpec, dc *kubermaticv1.
 	}
 
 	specFieldPath := field.NewPath("spec")
+
+	if errs := ValidateClusterNetworkConfig(&spec.ClusterNetwork, specFieldPath.Child("networkConfig"), true); len(errs) > 0 {
+		return fmt.Errorf("cluster network config validation failed: %v", errs)
+	}
+
 	portRangeFld := specFieldPath.Child("componentsOverride", "apiserver", "nodePortRange")
-	if errs := ValidateNodePortRange(spec.ComponentsOverride.Apiserver.NodePortRange, portRangeFld); len(errs) > 0 {
+	if errs := ValidateNodePortRange(spec.ComponentsOverride.Apiserver.NodePortRange, portRangeFld, false); len(errs) > 0 {
 		return fmt.Errorf("apiserver NodePortRange validation failed: %v", errs)
 	}
 
 	return nil
+}
+
+func ValidateClusterNetworkConfig(n *kubermaticv1.ClusterNetworkingConfig, fldPath *field.Path, allowEmpty bool) field.ErrorList {
+	allErrs := field.ErrorList{}
+	// We only consider first element (not sure why we use lists).
+	if len(n.Pods.CIDRBlocks) > 1 {
+		allErrs = append(allErrs, field.TooMany(fldPath.Child("pods", "cidrBlocks"), len(n.Pods.CIDRBlocks), 1))
+	}
+	if len(n.Services.CIDRBlocks) > 1 {
+		allErrs = append(allErrs, field.TooMany(fldPath.Child("services", "cidrBlocks"), len(n.Services.CIDRBlocks), 1))
+	}
+	if len(n.Pods.CIDRBlocks) == 0 && !allowEmpty {
+		allErrs = append(allErrs, field.Required(fldPath.Child("pods", "cidrBlocks"), "pod CIDR must be provided"))
+	}
+	if len(n.Services.CIDRBlocks) == 0 && !allowEmpty {
+		allErrs = append(allErrs, field.Required(fldPath.Child("services", "cidrBlocks"), "service CIDR must be provided"))
+	}
+
+	// Verify that provided CIDR are well formed
+	if podsCIDR := n.Pods.CIDRBlocks; len(podsCIDR) == 1 {
+		if _, _, err := net.ParseCIDR(podsCIDR[0]); err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("pods", "cidrBlocks").Index(0), podsCIDR,
+				fmt.Sprintf("couldn't parse pod CIDR `%s`: %v", podsCIDR, err)))
+		}
+	}
+	if servicesCIDR := n.Services.CIDRBlocks; len(servicesCIDR) == 1 {
+		if _, _, err := net.ParseCIDR(servicesCIDR[0]); err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("services", "cidrBlocks").Index(0), servicesCIDR,
+				fmt.Sprintf("couldn't parse service CIDR: %v", err)))
+		}
+	}
+	// TODO Remove all hardcodes before allowing arbitrary domain names.
+	if (!allowEmpty || n.DNSDomain != "") && n.DNSDomain != "cluster.local" {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("dnsDomain"), n.DNSDomain,
+			"dnsDomain must be 'cluster.local'"))
+	}
+	if (!allowEmpty || n.ProxyMode != "") && (n.ProxyMode != resources.IPVSProxyMode && n.ProxyMode != resources.IPTablesProxyMode) {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("proxyMode"), n.ProxyMode,
+			[]string{resources.IPVSProxyMode, resources.IPTablesProxyMode}))
+	}
+
+	return allErrs
 }
 
 func validateMachineNetworksFromClusterSpec(spec *kubermaticv1.ClusterSpec) error {
@@ -535,34 +585,55 @@ func ValidateUpdateWindow(updateWindow *kubermaticv1.UpdateWindow) error {
 	return nil
 }
 
-func ValidateLeaderElectionSettings(l kubermaticv1.LeaderElectionSettings) error {
-	if l.LeaseDurationSeconds != nil && *l.LeaseDurationSeconds < 0 {
-		return fmt.Errorf("lease duration seconds cannot be negative: %d", *l.LeaseDurationSeconds)
+func ValidateContainerRuntime(spec *kubermaticv1.ClusterSpec) error {
+	supportedContainerRuntimes := map[string]struct{}{
+		"docker":     {},
+		"containerd": {},
 	}
-	if l.RenewDeadlineSeconds != nil && *l.RenewDeadlineSeconds < 0 {
-		return fmt.Errorf("renew deadline seconds cannot be negative: %d", *l.RenewDeadlineSeconds)
+	if _, isSupported := supportedContainerRuntimes[spec.ContainerRuntime]; !isSupported {
+		return fmt.Errorf("container runtime not supported: %s", spec.ContainerRuntime)
 	}
-	if l.RetryPeriodSeconds != nil && *l.RetryPeriodSeconds < 0 {
-		return fmt.Errorf("retry period seconds cannot be negative: %d", *l.RetryPeriodSeconds)
+
+	dockerSupportLimit := semver.MustParse("1.22.1")
+	if spec.ContainerRuntime == "docker" && !spec.Version.LessThan(dockerSupportLimit) {
+		return fmt.Errorf("docker not supported from version 1.22: %s", spec.ContainerRuntime)
 	}
-	if lds, rds := l.LeaseDurationSeconds, l.RenewDeadlineSeconds; (lds == nil) != (rds == nil) {
-		return errors.New("leader election lease duration and renew deadline should be either both specified or unspecified")
-	}
-	if lds, rds := l.LeaseDurationSeconds, l.RenewDeadlineSeconds; lds != nil && *lds < *rds {
-		return errors.New("control plane leader election renew deadline cannot be smaller than lease duration")
-	}
+
 	return nil
 }
 
-func ValidateNodePortRange(nodePortRange string, fldPath *field.Path) field.ErrorList {
+func ValidateLeaderElectionSettings(l *kubermaticv1.LeaderElectionSettings, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if nodePortRange == "" {
+	if l.LeaseDurationSeconds != nil && *l.LeaseDurationSeconds < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("leaseDurationSeconds"), l.LeaseDurationSeconds, "lease duration seconds cannot be negative"))
+	}
+	if l.RenewDeadlineSeconds != nil && *l.RenewDeadlineSeconds < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("renewDeadlineSeconds"), l.RenewDeadlineSeconds, "renew deadline seconds cannot be negative"))
+	}
+	if l.RetryPeriodSeconds != nil && *l.RetryPeriodSeconds < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("retryPeriodSeconds"), l.RetryPeriodSeconds, "retry period seconds cannot be negative"))
+	}
+	if lds, rds := l.LeaseDurationSeconds, l.RenewDeadlineSeconds; (lds == nil) != (rds == nil) {
+		allErrs = append(allErrs, field.Forbidden(fldPath, "leader election lease duration and renew deadline should be either both specified or unspecified"))
+	}
+	if lds, rds := l.LeaseDurationSeconds, l.RenewDeadlineSeconds; lds != nil && rds != nil && *lds < *rds {
+		allErrs = append(allErrs, field.Forbidden(fldPath, "control plane leader election renew deadline cannot be smaller than lease duration"))
+	}
+	return allErrs
+}
+
+func ValidateNodePortRange(nodePortRange string, fldPath *field.Path, required bool) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if !required && nodePortRange == "" {
 		return allErrs
 	}
 
-	if _, err := kubenetutil.ParsePortRange(nodePortRange); err != nil {
+	if pr, err := kubenetutil.ParsePortRange(nodePortRange); err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, nodePortRange, err.Error()))
+	} else if pr.Base == 0 || pr.Size == 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath, nodePortRange, "invalid nodeport range"))
 	}
 
 	return allErrs

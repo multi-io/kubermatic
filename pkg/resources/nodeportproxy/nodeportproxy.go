@@ -40,7 +40,7 @@ const (
 	imageName          = "kubermatic/nodeport-proxy"
 	envoyAppLabelValue = name + "-envoy"
 
-	// NodePortPRoxyExposeNamespacedAnnotationKey is the annotation key used to indicate that
+	// NodePortProxyExposeNamespacedAnnotationKey is the annotation key used to indicate that
 	// a service should be exposed by the namespaced NodeportProxy instance.
 	// We use it when clusters get exposed via a LoadBalancer, to allow re-using that LoadBalancer
 	// for both the kube-apiserver and the openVPN server
@@ -64,7 +64,7 @@ const (
 	SNIType
 	// TunnelingType configures Envoy to terminate the tunnel and stream the
 	// data to the destination.
-	// The only supported tunneling tecnique at the moment in HTTP/2 Connect.
+	// The only supported tunneling technique at the moment in HTTP/2 Connect.
 	TunnelingType
 )
 

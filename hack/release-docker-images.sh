@@ -48,6 +48,7 @@ source hack/lib.sh
 export DOCKER_REPO="${DOCKER_REPO:-quay.io/kubermatic}"
 export GOOS="${GOOS:-linux}"
 export KUBERMATIC_EDITION="${KUBERMATIC_EDITION:-ee}"
+export ARCHITECTURES=${ARCHITECTURES:-amd64 arm64}
 
 REPOSUFFIX=""
 if [ "$KUBERMATIC_EDITION" != "ce" ]; then
@@ -59,9 +60,29 @@ PRIMARY_TAG="${1}"
 make docker-build TAGS="${PRIMARY_TAG}"
 make -C cmd/nodeport-proxy docker TAG="${PRIMARY_TAG}"
 make -C cmd/kubeletdnat-controller docker TAG="${PRIMARY_TAG}"
-make -C cmd/user-ssh-keys-agent docker TAG="${PRIMARY_TAG}"
 docker build -t "${DOCKER_REPO}/addons:${PRIMARY_TAG}" addons
 docker build -t "${DOCKER_REPO}/etcd-launcher:${PRIMARY_TAG}" -f cmd/etcd-launcher/Dockerfile .
+
+# build multi-arch images
+buildah manifest create "${DOCKER_REPO}/user-ssh-keys-agent:${PRIMARY_TAG}"
+for ARCH in ${ARCHITECTURES}; do
+  echodate "Building user-ssh-keys-agent image for $ARCH..."
+
+  # Building via buildah does not use the gocache, but that's okay, because we
+  # wouldn't want to cache arm64 stuff anyway, as it would just blow up the
+  # cache size and force every e2e test to download gigabytes worth of unneeded
+  # arm64 stuff. We might need to change this once we run e2e tests on arm64.
+  buildah bud \
+    --tag "${DOCKER_REPO}/user-ssh-keys-agent-${ARCH}:${PRIMARY_TAG}" \
+    --build-arg "GOPROXY=${GOPROXY:-}" \
+    --build-arg "KUBERMATIC_EDITION=${KUBERMATIC_EDITION}" \
+    --arch "$ARCH" \
+    --override-arch "$ARCH" \
+    --format=docker \
+    --file cmd/user-ssh-keys-agent/Dockerfile.multiarch \
+    .
+  buildah manifest add "${DOCKER_REPO}/user-ssh-keys-agent:${PRIMARY_TAG}" "${DOCKER_REPO}/user-ssh-keys-agent-${ARCH}:${PRIMARY_TAG}"
+done
 
 # keep a mirror of the EE version in the old repo
 if [ "$KUBERMATIC_EDITION" == "ee" ]; then
@@ -79,16 +100,16 @@ for TAG in "$@"; do
   docker tag "${DOCKER_REPO}/nodeport-proxy:${PRIMARY_TAG}" "${DOCKER_REPO}/nodeport-proxy:${TAG}"
   docker tag "${DOCKER_REPO}/kubeletdnat-controller:${PRIMARY_TAG}" "${DOCKER_REPO}/kubeletdnat-controller:${TAG}"
   docker tag "${DOCKER_REPO}/addons:${PRIMARY_TAG}" "${DOCKER_REPO}/addons:${TAG}"
-  docker tag "${DOCKER_REPO}/user-ssh-keys-agent:${PRIMARY_TAG}" "${DOCKER_REPO}/user-ssh-keys-agent:${TAG}"
   docker tag "${DOCKER_REPO}/etcd-launcher:${PRIMARY_TAG}" "${DOCKER_REPO}/etcd-launcher:${TAG}"
+  buildah tag "${DOCKER_REPO}/user-ssh-keys-agent:${PRIMARY_TAG}" "${DOCKER_REPO}/user-ssh-keys-agent:${TAG}"
 
   echodate "Pushing images"
   docker push "${DOCKER_REPO}/kubermatic${REPOSUFFIX}:${TAG}"
   docker push "${DOCKER_REPO}/nodeport-proxy:${TAG}"
   docker push "${DOCKER_REPO}/kubeletdnat-controller:${TAG}"
   docker push "${DOCKER_REPO}/addons:${TAG}"
-  docker push "${DOCKER_REPO}/user-ssh-keys-agent:${TAG}"
   docker push "${DOCKER_REPO}/etcd-launcher:${TAG}"
+  buildah manifest push --all "${DOCKER_REPO}/user-ssh-keys-agent:${TAG}" "docker://${DOCKER_REPO}/user-ssh-keys-agent:${TAG}"
 
   if [ "$KUBERMATIC_EDITION" == "ee" ]; then
     docker tag "${DOCKER_REPO}/api:${PRIMARY_TAG}" "${DOCKER_REPO}/api:${TAG}"

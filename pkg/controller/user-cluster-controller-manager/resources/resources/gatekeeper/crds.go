@@ -20,7 +20,7 @@ import (
 	"k8c.io/kubermatic/v2/pkg/resources"
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 )
 
 const (
@@ -31,19 +31,35 @@ const (
 	statusAPIGroup                        = "status.gatekeeper.sh"
 	constraintPodStatusAPIVersion         = "v1beta1"
 	constraintTemplatePodStatusAPIVersion = "v1beta1"
+	mutatorPodStatusAPIVersion            = "v1beta1"
+	mutatorPodStatusAPIGroup              = "status.gatekeeper.sh"
+	assignAPIGroup                        = "mutations.gatekeeper.sh"
+	assignAPIVersion                      = "v1alpha1"
+	assignMetadataAPIGroup                = "mutations.gatekeeper.sh"
+	assignMetadataAPIVersion              = "v1alpha1"
 )
 
 // ConfigCRDCreator returns the gatekeeper config CRD definition
 func ConfigCRDCreator() reconciling.NamedCustomResourceDefinitionCreatorGetter {
 	return func() (string, reconciling.CustomResourceDefinitionCreator) {
-		return resources.GatekeeperConfigCRDName, func(crd *apiextensionsv1beta1.CustomResourceDefinition) (*apiextensionsv1beta1.CustomResourceDefinition, error) {
-			crd.Annotations = map[string]string{"controller-gen.kubebuilder.io/version": "v0.2.4"}
+		return resources.GatekeeperConfigCRDName, func(crd *apiextensionsv1.CustomResourceDefinition) (*apiextensionsv1.CustomResourceDefinition, error) {
+			crd.Annotations = map[string]string{"controller-gen.kubebuilder.io/version": "v0.5.2"}
 			crd.Labels = map[string]string{"gatekeeper.sh/system": "yes"}
 			crd.Spec.Group = configAPIGroup
-			crd.Spec.Versions = []apiextensionsv1beta1.CustomResourceDefinitionVersion{
-				{Name: configAPIVersion, Served: true, Storage: true},
+			crd.Spec.Versions = []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name:    configAPIVersion,
+					Served:  true,
+					Storage: true,
+					Schema: &apiextensionsv1.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+							XPreserveUnknownFields: resources.Bool(true),
+							Type:                   "object",
+						},
+					},
+				},
 			}
-			crd.Spec.Scope = apiextensionsv1beta1.NamespaceScoped
+			crd.Spec.Scope = apiextensionsv1.NamespaceScoped
 			crd.Spec.Names.Kind = "Config"
 			crd.Spec.Names.ListKind = "ConfigList"
 			crd.Spec.Names.Plural = "configs"
@@ -57,56 +73,198 @@ func ConfigCRDCreator() reconciling.NamedCustomResourceDefinitionCreatorGetter {
 // ConstraintTemplateCRDCreator returns the gatekeeper constraintTemplate CRD definition
 func ConstraintTemplateCRDCreator() reconciling.NamedCustomResourceDefinitionCreatorGetter {
 	return func() (string, reconciling.CustomResourceDefinitionCreator) {
-		return resources.GatekeeperConstraintTemplateCRDName, func(crd *apiextensionsv1beta1.CustomResourceDefinition) (*apiextensionsv1beta1.CustomResourceDefinition, error) {
-			crd.Annotations = map[string]string{"controller-gen.kubebuilder.io/version": "v0.2.4"}
+		return resources.GatekeeperConstraintTemplateCRDName, func(crd *apiextensionsv1.CustomResourceDefinition) (*apiextensionsv1.CustomResourceDefinition, error) {
+			crd.Annotations = map[string]string{"controller-gen.kubebuilder.io/version": "v0.5.2"}
 			crd.Labels = map[string]string{"gatekeeper.sh/system": "yes", "controller-tools.k8s.io": "1.0"}
 			crd.Spec.Group = constraintTemplateAPIGroup
-			crd.Spec.Versions = []apiextensionsv1beta1.CustomResourceDefinitionVersion{
-				{Name: constraintTemplateAPIVersion, Served: true, Storage: true},
-				{Name: "v1alpha1", Served: true, Storage: false},
+			crd.Spec.Versions = []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name:    constraintTemplateAPIVersion,
+					Served:  true,
+					Storage: true,
+					Schema: &apiextensionsv1.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+							XPreserveUnknownFields: resources.Bool(true),
+							Type:                   "object",
+						},
+					},
+					Subresources: &apiextensionsv1.CustomResourceSubresources{
+						Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+					},
+				},
+				{
+					Name:    "v1alpha1",
+					Served:  true,
+					Storage: false,
+					Schema: &apiextensionsv1.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+							XPreserveUnknownFields: resources.Bool(true),
+							Type:                   "object",
+						},
+					},
+					Subresources: &apiextensionsv1.CustomResourceSubresources{
+						Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+					},
+				},
 			}
-			crd.Spec.Scope = apiextensionsv1beta1.ClusterScoped
+			crd.Spec.Scope = apiextensionsv1.ClusterScoped
 			crd.Spec.Names.Kind = "ConstraintTemplate"
 			crd.Spec.Names.Plural = "constrainttemplates"
-			crd.Spec.Subresources = &apiextensionsv1beta1.CustomResourceSubresources{Status: &apiextensionsv1beta1.CustomResourceSubresourceStatus{}}
 
 			return crd, nil
 		}
 	}
 }
 
-// ConstraintPodStatusRDCreator returns the gatekeeper ConstraintPodStatus CRD definition
-func ConstraintPodStatusRDCreator() reconciling.NamedCustomResourceDefinitionCreatorGetter {
+// ConstraintPodStatusCRDCreator returns the gatekeeper ConstraintPodStatus CRD definition
+func ConstraintPodStatusCRDCreator() reconciling.NamedCustomResourceDefinitionCreatorGetter {
 	return func() (string, reconciling.CustomResourceDefinitionCreator) {
-		return resources.GatekeeperConstraintPodStatusCRDName, func(crd *apiextensionsv1beta1.CustomResourceDefinition) (*apiextensionsv1beta1.CustomResourceDefinition, error) {
+		return resources.GatekeeperConstraintPodStatusCRDName, func(crd *apiextensionsv1.CustomResourceDefinition) (*apiextensionsv1.CustomResourceDefinition, error) {
 			crd.Labels = map[string]string{"gatekeeper.sh/system": "yes"}
 			crd.Spec.Group = statusAPIGroup
-			crd.Spec.Versions = []apiextensionsv1beta1.CustomResourceDefinitionVersion{
-				{Name: constraintPodStatusAPIVersion, Served: true, Storage: true},
+			crd.Spec.Versions = []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name:    constraintPodStatusAPIVersion,
+					Served:  true,
+					Storage: true,
+					Schema: &apiextensionsv1.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+							XPreserveUnknownFields: resources.Bool(true),
+							Type:                   "object",
+						},
+					},
+					Subresources: &apiextensionsv1.CustomResourceSubresources{
+						Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+					},
+				},
 			}
-			crd.Spec.Scope = apiextensionsv1beta1.NamespaceScoped
+			crd.Spec.Scope = apiextensionsv1.NamespaceScoped
 			crd.Spec.Names.Kind = "ConstraintPodStatus"
 			crd.Spec.Names.Plural = "constraintpodstatuses"
-			crd.Spec.Subresources = &apiextensionsv1beta1.CustomResourceSubresources{Status: &apiextensionsv1beta1.CustomResourceSubresourceStatus{}}
 
 			return crd, nil
 		}
 	}
 }
 
-// ConstraintTemplatePodStatusRDCreator returns the gatekeeper ConstraintTemplatePodStatus CRD definition
-func ConstraintTemplatePodStatusRDCreator() reconciling.NamedCustomResourceDefinitionCreatorGetter {
+// ConstraintTemplatePodStatusCRDCreator returns the gatekeeper ConstraintTemplatePodStatus CRD definition
+func ConstraintTemplatePodStatusCRDCreator() reconciling.NamedCustomResourceDefinitionCreatorGetter {
 	return func() (string, reconciling.CustomResourceDefinitionCreator) {
-		return resources.GatekeeperConstraintTemplatePodStatusCRDName, func(crd *apiextensionsv1beta1.CustomResourceDefinition) (*apiextensionsv1beta1.CustomResourceDefinition, error) {
+		return resources.GatekeeperConstraintTemplatePodStatusCRDName, func(crd *apiextensionsv1.CustomResourceDefinition) (*apiextensionsv1.CustomResourceDefinition, error) {
 			crd.Labels = map[string]string{"gatekeeper.sh/system": "yes"}
 			crd.Spec.Group = statusAPIGroup
-			crd.Spec.Versions = []apiextensionsv1beta1.CustomResourceDefinitionVersion{
-				{Name: constraintTemplatePodStatusAPIVersion, Served: true, Storage: true},
+			crd.Spec.Versions = []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name:    constraintTemplatePodStatusAPIVersion,
+					Served:  true,
+					Storage: true,
+					Schema: &apiextensionsv1.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+							XPreserveUnknownFields: resources.Bool(true),
+							Type:                   "object",
+						},
+					},
+					Subresources: &apiextensionsv1.CustomResourceSubresources{
+						Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+					},
+				},
 			}
-			crd.Spec.Scope = apiextensionsv1beta1.NamespaceScoped
+			crd.Spec.Scope = apiextensionsv1.NamespaceScoped
 			crd.Spec.Names.Kind = "ConstraintTemplatePodStatus"
 			crd.Spec.Names.Plural = "constrainttemplatepodstatuses"
-			crd.Spec.Subresources = &apiextensionsv1beta1.CustomResourceSubresources{Status: &apiextensionsv1beta1.CustomResourceSubresourceStatus{}}
+
+			return crd, nil
+		}
+	}
+}
+
+func MutatorPodStatusCRDCreator() reconciling.NamedCustomResourceDefinitionCreatorGetter {
+	return func() (string, reconciling.CustomResourceDefinitionCreator) {
+		return resources.GatekeeperMutatorPodStatusCRDName, func(crd *apiextensionsv1.CustomResourceDefinition) (*apiextensionsv1.CustomResourceDefinition, error) {
+			crd.Annotations = map[string]string{"controller-gen.kubebuilder.io/version": "v0.5.2"}
+			crd.Labels = map[string]string{"gatekeeper.sh/system": "yes"}
+			crd.Spec.Group = mutatorPodStatusAPIGroup
+			crd.Spec.Versions = []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name:    mutatorPodStatusAPIVersion,
+					Served:  true,
+					Storage: true,
+					Schema: &apiextensionsv1.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+							XPreserveUnknownFields: resources.Bool(true),
+							Type:                   "object",
+						},
+					},
+					Subresources: &apiextensionsv1.CustomResourceSubresources{
+						Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+					},
+				},
+			}
+			crd.Spec.Scope = apiextensionsv1.NamespaceScoped
+			crd.Spec.Names.Kind = "MutatorPodStatus"
+			crd.Spec.Names.Plural = "mutatorpodstatuses"
+
+			return crd, nil
+		}
+	}
+}
+
+func AssignCRDCreator() reconciling.NamedCustomResourceDefinitionCreatorGetter {
+	return func() (string, reconciling.CustomResourceDefinitionCreator) {
+		return resources.GatekeeperAssignCRDName, func(crd *apiextensionsv1.CustomResourceDefinition) (*apiextensionsv1.CustomResourceDefinition, error) {
+			crd.Annotations = map[string]string{"controller-gen.kubebuilder.io/version": "v0.5.2"}
+			crd.Labels = map[string]string{"gatekeeper.sh/system": "yes"}
+			crd.Spec.Group = assignAPIGroup
+			crd.Spec.Versions = []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name:    assignAPIVersion,
+					Served:  true,
+					Storage: true,
+					Schema: &apiextensionsv1.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+							XPreserveUnknownFields: resources.Bool(true),
+							Type:                   "object",
+						},
+					},
+					Subresources: &apiextensionsv1.CustomResourceSubresources{
+						Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+					},
+				},
+			}
+			crd.Spec.Scope = apiextensionsv1.ClusterScoped
+			crd.Spec.Names.Kind = "Assign"
+			crd.Spec.Names.Plural = "assign"
+
+			return crd, nil
+		}
+	}
+}
+
+func AssignMetadataCRDCreator() reconciling.NamedCustomResourceDefinitionCreatorGetter {
+	return func() (string, reconciling.CustomResourceDefinitionCreator) {
+		return resources.GatekeeperAssignMetadataCRDName, func(crd *apiextensionsv1.CustomResourceDefinition) (*apiextensionsv1.CustomResourceDefinition, error) {
+			crd.Annotations = map[string]string{"controller-gen.kubebuilder.io/version": "v0.5.2"}
+			crd.Labels = map[string]string{"gatekeeper.sh/system": "yes"}
+			crd.Spec.Group = assignMetadataAPIGroup
+			crd.Spec.Versions = []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name:    assignMetadataAPIVersion,
+					Served:  true,
+					Storage: true,
+					Schema: &apiextensionsv1.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+							XPreserveUnknownFields: resources.Bool(true),
+							Type:                   "object",
+						},
+					},
+					Subresources: &apiextensionsv1.CustomResourceSubresources{
+						Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+					},
+				},
+			}
+			crd.Spec.Scope = apiextensionsv1.ClusterScoped
+			crd.Spec.Names.Kind = "AssignMetadata"
+			crd.Spec.Names.Plural = "assignmetadata"
 
 			return crd, nil
 		}

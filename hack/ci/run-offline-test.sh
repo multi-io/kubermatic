@@ -30,7 +30,6 @@ cd "$(dirname "$0")/"
 source ../lib.sh
 
 echodate "Getting secrets from Vault"
-export VAULT_ADDR=https://vault.loodse.com/
 export VAULT_TOKEN=$(vault write \
   --format=json auth/approle/login \
   role_id=${VAULT_ROLE_ID} secret_id=${VAULT_SECRET_ID} |
@@ -128,6 +127,7 @@ trap finish EXIT
 docker ps &> /dev/null || start-docker.sh
 
 retry 5 docker login -u ${QUAY_IO_USERNAME} -p ${QUAY_IO_PASSWORD} quay.io
+retry 5 buildah login -u "$QUAY_IO_USERNAME" -p "$QUAY_IO_PASSWORD" quay.io
 
 echodate "Building and pushing Docker images"
 

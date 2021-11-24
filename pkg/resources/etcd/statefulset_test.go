@@ -22,8 +22,6 @@ import (
 	"strings"
 	"testing"
 
-	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
-	"k8c.io/kubermatic/v2/pkg/semver"
 	testhelper "k8c.io/kubermatic/v2/pkg/test"
 )
 
@@ -44,7 +42,7 @@ func TestGetEtcdCommand(t *testing.T) {
 			clusterName:      "62m9k9tqlm",
 			clusterNamespace: "cluster-62m9k9tqlm",
 			launcherEnabled:  true,
-			expectedArgs:     13,
+			expectedArgs:     11,
 		},
 		{
 			name:                  "with-corruption-flags",
@@ -72,32 +70,6 @@ func TestGetEtcdCommand(t *testing.T) {
 			}
 
 			testhelper.CompareOutput(t, fmt.Sprintf("etcd-command-%s", test.name), cmd, *update, ".sh")
-		})
-	}
-}
-
-func TestGetImageTag(t *testing.T) {
-	testCases := []struct {
-		name           string
-		cluster        *kubermaticv1.Cluster
-		expectedResult string
-	}{
-		{
-			name: "Kubernetes 1.17",
-			cluster: &kubermaticv1.Cluster{
-				Spec: kubermaticv1.ClusterSpec{Version: *semver.NewSemverOrDie("1.17.0")},
-			},
-			expectedResult: etcdImageTagV34,
-		},
-	}
-
-	for idx := range testCases {
-		tc := testCases[idx]
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			if result := ImageTag(tc.cluster); result != tc.expectedResult {
-				t.Fatalf("expected result %s but got result %s", tc.expectedResult, result)
-			}
 		})
 	}
 }

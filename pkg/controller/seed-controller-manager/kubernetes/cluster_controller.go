@@ -69,6 +69,7 @@ type Features struct {
 	EtcdDataCorruptionChecks     bool
 	KubernetesOIDCAuthentication bool
 	EtcdLauncher                 bool
+	Konnectivity                 bool
 }
 
 // Reconciler is a controller which is responsible for managing clusters
@@ -94,11 +95,13 @@ type Reconciler struct {
 	inClusterPrometheusRemoteWriteConfigsFile        string
 	monitoringEnvironmentLabel                       string
 	monitoringScrapeAnnotationPrefix                 string
+	userClusterMLAEnabled                            bool
 	dockerPullConfigJSON                             []byte
-	nodeLocalDNSCacheEnabled                         bool
 	kubermaticImage                                  string
 	etcdLauncherImage                                string
 	dnatControllerImage                              string
+	machineControllerImageTag                        string
+	machineControllerImageRepository                 string
 	concurrentClusterUpdates                         int
 	etcdBackupRestoreController                      bool
 	backupSchedule                                   time.Duration
@@ -135,8 +138,8 @@ func Add(
 	inClusterPrometheusDisableDefaultScrapingConfigs bool,
 	inClusterPrometheusScrapingConfigsFile string,
 	inClusterPrometheusRemoteWriteConfigsFile string,
+	userClusterMLAEnabled bool,
 	dockerPullConfigJSON []byte,
-	nodeLocalDNSCacheEnabled bool,
 	concurrentClusterUpdates int,
 	etcdBackupRestoreController bool,
 	backupSchedule time.Duration,
@@ -147,6 +150,8 @@ func Add(
 	keycloakFacade keycloak.Facade,
 	etcdLauncherImage string,
 	dnatControllerImage string,
+	machineControllerImageTag string,
+	machineControllerImageRepository string,
 
 	tunnelingAgentIP string,
 	caBundle *certificates.CABundle,
@@ -173,11 +178,13 @@ func Add(
 		inClusterPrometheusRemoteWriteConfigsFile:        inClusterPrometheusRemoteWriteConfigsFile,
 		monitoringEnvironmentLabel:                       monitoringEnvironmentLabel,
 		monitoringScrapeAnnotationPrefix:                 monitoringScrapeAnnotationPrefix,
+		userClusterMLAEnabled:                            userClusterMLAEnabled,
 		dockerPullConfigJSON:                             dockerPullConfigJSON,
-		nodeLocalDNSCacheEnabled:                         nodeLocalDNSCacheEnabled,
 		kubermaticImage:                                  kubermaticImage,
 		etcdLauncherImage:                                etcdLauncherImage,
 		dnatControllerImage:                              dnatControllerImage,
+		machineControllerImageTag:                        machineControllerImageTag,
+		machineControllerImageRepository:                 machineControllerImageRepository,
 		concurrentClusterUpdates:                         concurrentClusterUpdates,
 		etcdBackupRestoreController:                      etcdBackupRestoreController,
 		backupSchedule:                                   backupSchedule,

@@ -19,28 +19,28 @@ package hack
 import (
 	"net/http"
 
-	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
-	v2 "k8c.io/kubermatic/v2/pkg/handler/v2"
-	"k8c.io/kubermatic/v2/pkg/resources/certificates"
-	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
-
 	"github.com/gorilla/mux"
 	prometheusapi "github.com/prometheus/client_golang/api"
 	"github.com/prometheus/client_golang/prometheus"
 
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/handler"
 	"k8c.io/kubermatic/v2/pkg/handler/auth"
 	"k8c.io/kubermatic/v2/pkg/handler/test"
 	"k8c.io/kubermatic/v2/pkg/handler/v1/common"
+	v2 "k8c.io/kubermatic/v2/pkg/handler/v2"
 	"k8c.io/kubermatic/v2/pkg/keycloak"
 	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
 	"k8c.io/kubermatic/v2/pkg/provider"
 	"k8c.io/kubermatic/v2/pkg/provider/kubernetes"
+	"k8c.io/kubermatic/v2/pkg/resources/certificates"
 	"k8c.io/kubermatic/v2/pkg/serviceaccount"
 	"k8c.io/kubermatic/v2/pkg/version"
+	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 	"k8c.io/kubermatic/v2/pkg/watcher"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // NewTestRouting is a hack that helps us avoid circular imports
@@ -72,6 +72,7 @@ func NewTestRouting(
 	privilegedProjectMemberProvider provider.PrivilegedProjectMemberProvider,
 	versions []*version.Version,
 	updates []*version.Update,
+	providerIncompatibilities []*version.ProviderIncompatibility,
 	saTokenAuthenticator serviceaccount.TokenAuthenticator,
 	saTokenGenerator serviceaccount.TokenGenerator,
 	eventRecorderProvider provider.EventRecorderProvider,
@@ -84,57 +85,82 @@ func NewTestRouting(
 	privilegedExternalClusterProvider provider.PrivilegedExternalClusterProvider,
 	constraintTemplateProvider provider.ConstraintTemplateProvider,
 	constraintProviderGetter provider.ConstraintProviderGetter,
-	kubermaticVersions kubermatic.Versions) http.Handler {
+	alertmanagerProviderGetter provider.AlertmanagerProviderGetter,
+	clusterTemplateProvider provider.ClusterTemplateProvider,
+	clusterTemplateInstanceProviderGetter provider.ClusterTemplateInstanceProviderGetter,
+	ruleGroupProviderGetter provider.RuleGroupProviderGetter,
+	kubermaticVersions kubermatic.Versions,
+	defaultConstraintProvider provider.DefaultConstraintProvider,
+	privilegedAllowedRegistryProvider provider.PrivilegedAllowedRegistryProvider,
+	etcdBackupConfigProviderGetter provider.EtcdBackupConfigProviderGetter,
+	etcdRestoreProviderGetter provider.EtcdRestoreProviderGetter,
+	etcdBackupConfigProjectProviderGetter provider.EtcdBackupConfigProjectProviderGetter,
+	etcdRestoreProjectProviderGetter provider.EtcdRestoreProjectProviderGetter,
+	backupCredentialsProviderGetter provider.BackupCredentialsProviderGetter,
+	privilegedMLAAdminSettingProviderGetter provider.PrivilegedMLAAdminSettingProviderGetter,
+	masterClient client.Client) http.Handler {
 
-	updateManager := version.New(versions, updates)
+	updateManager := version.New(versions, updates, providerIncompatibilities)
 
 	routingParams := handler.RoutingParams{
-		Log:                                   kubermaticlog.Logger,
-		PresetsProvider:                       presetsProvider,
-		SeedsGetter:                           seedsGetter,
-		SeedsClientGetter:                     seedClientGetter,
-		SSHKeyProvider:                        sshKeyProvider,
-		PrivilegedSSHKeyProvider:              privilegedSSHKeyProvider,
-		UserProvider:                          userProvider,
-		ServiceAccountProvider:                serviceAccountProvider,
-		PrivilegedServiceAccountProvider:      privilegedServiceAccountProvider,
-		ServiceAccountTokenProvider:           serviceAccountTokenProvider,
-		PrivilegedServiceAccountTokenProvider: privilegedServiceAccountTokenProvider,
-		ProjectProvider:                       projectProvider,
-		MdRequestProviderGetter:               mdRequestProviderGetter,
-		PrivilegedProjectProvider:             privilegedProjectProvider,
-		OIDCIssuerVerifier:                    issuerVerifier,
-		TokenVerifiers:                        tokenVerifiers,
-		TokenExtractors:                       tokenExtractors,
-		ClusterProviderGetter:                 clusterProvidersGetter,
-		AddonProviderGetter:                   addonProviderGetter,
-		AddonConfigProvider:                   addonConfigProvider,
-		UpdateManager:                         updateManager,
-		PrometheusClient:                      prometheusClient,
-		ProjectMemberProvider:                 projectMemberProvider,
-		PrivilegedProjectMemberProvider:       privilegedProjectMemberProvider,
-		UserProjectMapper:                     projectMemberProvider, /*satisfies also a different interface*/
-		SATokenAuthenticator:                  saTokenAuthenticator,
-		SATokenGenerator:                      saTokenGenerator,
-		EventRecorderProvider:                 eventRecorderProvider,
-		KeycloakFacade:                        keycloakFacade,
-		ExposeStrategy:                        kubermaticv1.ExposeStrategyNodePort,
-		AccessibleAddons:                      sets.String{},
-		UserInfoGetter:                        userInfoGetter,
-		SettingsProvider:                      settingsProvider,
-		AdminProvider:                         adminProvider,
-		AdmissionPluginProvider:               admissionPluginProvider,
-		SettingsWatcher:                       settingsWatcher,
-		UserWatcher:                           userWatcher,
-		ExternalClusterProvider:               externalClusterProvider,
-		PrivilegedExternalClusterProvider:     privilegedExternalClusterProvider,
-		ConstraintTemplateProvider:            constraintTemplateProvider,
-		ConstraintProviderGetter:              constraintProviderGetter,
-		Versions:                              kubermaticVersions,
-		CABundle:                              certificates.NewFakeCABundle().CertPool(),
+		KeycloakFacade:                          keycloakFacade,
+		MdRequestProviderGetter:                 mdRequestProviderGetter,
+		Log:                                     kubermaticlog.Logger,
+		PresetsProvider:                         presetsProvider,
+		SeedsGetter:                             seedsGetter,
+		SeedsClientGetter:                       seedClientGetter,
+		SSHKeyProvider:                          sshKeyProvider,
+		PrivilegedSSHKeyProvider:                privilegedSSHKeyProvider,
+		UserProvider:                            userProvider,
+		ServiceAccountProvider:                  serviceAccountProvider,
+		PrivilegedServiceAccountProvider:        privilegedServiceAccountProvider,
+		ServiceAccountTokenProvider:             serviceAccountTokenProvider,
+		PrivilegedServiceAccountTokenProvider:   privilegedServiceAccountTokenProvider,
+		ProjectProvider:                         projectProvider,
+		PrivilegedProjectProvider:               privilegedProjectProvider,
+		OIDCIssuerVerifier:                      issuerVerifier,
+		TokenVerifiers:                          tokenVerifiers,
+		TokenExtractors:                         tokenExtractors,
+		ClusterProviderGetter:                   clusterProvidersGetter,
+		AddonProviderGetter:                     addonProviderGetter,
+		AddonConfigProvider:                     addonConfigProvider,
+		UpdateManager:                           updateManager,
+		PrometheusClient:                        prometheusClient,
+		ProjectMemberProvider:                   projectMemberProvider,
+		PrivilegedProjectMemberProvider:         privilegedProjectMemberProvider,
+		UserProjectMapper:                       projectMemberProvider, /*satisfies also a different interface*/
+		SATokenAuthenticator:                    saTokenAuthenticator,
+		SATokenGenerator:                        saTokenGenerator,
+		EventRecorderProvider:                   eventRecorderProvider,
+		ExposeStrategy:                          kubermaticv1.ExposeStrategyNodePort,
+		AccessibleAddons:                        sets.String{},
+		UserInfoGetter:                          userInfoGetter,
+		SettingsProvider:                        settingsProvider,
+		AdminProvider:                           adminProvider,
+		AdmissionPluginProvider:                 admissionPluginProvider,
+		SettingsWatcher:                         settingsWatcher,
+		UserWatcher:                             userWatcher,
+		ExternalClusterProvider:                 externalClusterProvider,
+		PrivilegedExternalClusterProvider:       privilegedExternalClusterProvider,
+		ConstraintTemplateProvider:              constraintTemplateProvider,
+		ConstraintProviderGetter:                constraintProviderGetter,
+		DefaultConstraintProvider:               defaultConstraintProvider,
+		AlertmanagerProviderGetter:              alertmanagerProviderGetter,
+		ClusterTemplateProvider:                 clusterTemplateProvider,
+		ClusterTemplateInstanceProviderGetter:   clusterTemplateInstanceProviderGetter,
+		RuleGroupProviderGetter:                 ruleGroupProviderGetter,
+		PrivilegedAllowedRegistryProvider:       privilegedAllowedRegistryProvider,
+		EtcdBackupConfigProviderGetter:          etcdBackupConfigProviderGetter,
+		EtcdRestoreProviderGetter:               etcdRestoreProviderGetter,
+		EtcdBackupConfigProjectProviderGetter:   etcdBackupConfigProjectProviderGetter,
+		EtcdRestoreProjectProviderGetter:        etcdRestoreProjectProviderGetter,
+		BackupCredentialsProviderGetter:         backupCredentialsProviderGetter,
+		PrivilegedMLAAdminSettingProviderGetter: privilegedMLAAdminSettingProviderGetter,
+		Versions:                                kubermaticVersions,
+		CABundle:                                certificates.NewFakeCABundle().CertPool(),
 	}
 
-	r := handler.NewRouting(routingParams)
+	r := handler.NewRouting(routingParams, masterClient)
 	rv2 := v2.NewV2Routing(routingParams)
 
 	mainRouter := mux.NewRouter()

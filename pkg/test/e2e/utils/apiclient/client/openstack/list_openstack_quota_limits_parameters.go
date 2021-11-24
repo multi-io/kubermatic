@@ -16,52 +16,66 @@ import (
 	"github.com/go-openapi/strfmt"
 )
 
-// NewListOpenstackQuotaLimitsParams creates a new ListOpenstackQuotaLimitsParams object
-// with the default values initialized.
+// NewListOpenstackQuotaLimitsParams creates a new ListOpenstackQuotaLimitsParams object,
+// with the default timeout for this client.
+//
+// Default values are not hydrated, since defaults are normally applied by the API server side.
+//
+// To enforce default values in parameter, use SetDefaults or WithDefaults.
 func NewListOpenstackQuotaLimitsParams() *ListOpenstackQuotaLimitsParams {
-
 	return &ListOpenstackQuotaLimitsParams{
-
 		timeout: cr.DefaultTimeout,
 	}
 }
 
 // NewListOpenstackQuotaLimitsParamsWithTimeout creates a new ListOpenstackQuotaLimitsParams object
-// with the default values initialized, and the ability to set a timeout on a request
+// with the ability to set a timeout on a request.
 func NewListOpenstackQuotaLimitsParamsWithTimeout(timeout time.Duration) *ListOpenstackQuotaLimitsParams {
-
 	return &ListOpenstackQuotaLimitsParams{
-
 		timeout: timeout,
 	}
 }
 
 // NewListOpenstackQuotaLimitsParamsWithContext creates a new ListOpenstackQuotaLimitsParams object
-// with the default values initialized, and the ability to set a context for a request
+// with the ability to set a context for a request.
 func NewListOpenstackQuotaLimitsParamsWithContext(ctx context.Context) *ListOpenstackQuotaLimitsParams {
-
 	return &ListOpenstackQuotaLimitsParams{
-
 		Context: ctx,
 	}
 }
 
 // NewListOpenstackQuotaLimitsParamsWithHTTPClient creates a new ListOpenstackQuotaLimitsParams object
-// with the default values initialized, and the ability to set a custom HTTPClient for a request
+// with the ability to set a custom HTTPClient for a request.
 func NewListOpenstackQuotaLimitsParamsWithHTTPClient(client *http.Client) *ListOpenstackQuotaLimitsParams {
-
 	return &ListOpenstackQuotaLimitsParams{
 		HTTPClient: client,
 	}
 }
 
-/*ListOpenstackQuotaLimitsParams contains all the parameters to send to the API endpoint
-for the list openstack quota limits operation typically these are written to a http.Request
+/* ListOpenstackQuotaLimitsParams contains all the parameters to send to the API endpoint
+   for the list openstack quota limits operation.
+
+   Typically these are written to a http.Request.
 */
 type ListOpenstackQuotaLimitsParams struct {
 	timeout    time.Duration
 	Context    context.Context
 	HTTPClient *http.Client
+}
+
+// WithDefaults hydrates default values in the list openstack quota limits params (not the query body).
+//
+// All values with no default are reset to their zero value.
+func (o *ListOpenstackQuotaLimitsParams) WithDefaults() *ListOpenstackQuotaLimitsParams {
+	o.SetDefaults()
+	return o
+}
+
+// SetDefaults hydrates default values in the list openstack quota limits params (not the query body).
+//
+// All values with no default are reset to their zero value.
+func (o *ListOpenstackQuotaLimitsParams) SetDefaults() {
+	// no default values defined for this parameter
 }
 
 // WithTimeout adds the timeout to the list openstack quota limits params

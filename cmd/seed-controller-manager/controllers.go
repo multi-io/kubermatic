@@ -20,11 +20,15 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	utilpointer "k8s.io/utils/pointer"
 	"time"
 
 	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/addon"
 	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/addoninstaller"
 	cloudcontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/cloud"
+	clustertemplatecontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/cluster-template-controller"
+	seedconstraintsynchronizer "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/constraint-controller"
 	constrainttemplatecontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/constraint-template-controller"
 	etcdbackupcontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/etcdbackup"
 	etcdrestorecontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/etcdrestore"
@@ -61,10 +65,12 @@ var AllControllers = map[string]controllerCreator{
 	seedresourcesuptodatecondition.ControllerName: createSeedConditionUpToDateController,
 	rancher.ControllerName:                        createRancherController,
 	pvwatcher.ControllerName:                      createPvWatcherController,
+	seedconstraintsynchronizer.ControllerName:     createConstraintController,
 	localstoragepvwatcher.ControllerName:          createLocalStoragePVController,
 	constrainttemplatecontroller.ControllerName:   createConstraintTemplateController,
 	initialmachinedeployment.ControllerName:       createInitialMachineDeploymentController,
 	mla.ControllerName:                            createMLAController,
+	clustertemplatecontroller.ControllerName:      createClusterTemplateController,
 }
 
 type controllerCreator func(*controllerContext) error
@@ -87,6 +93,65 @@ func createSeedConditionUpToDateController(ctrlCtx *controllerContext) error {
 		ctrlCtx.runOptions.workerName,
 		ctrlCtx.versions,
 	)
+}
+
+func defaultComponentSettings(runOptions controllerRunOptions, seed *kubermaticv1.Seed) (kubermaticv1.ComponentSettings, error) {
+	// Copy default settings.
+	settings := seed.Spec.DefaultComponentSettings
+
+	if replicas := runOptions.apiServerDefaultReplicas; replicas != 0 {
+		if settings.Apiserver.Replicas != nil && replicas != int(*settings.Apiserver.Replicas) {
+			return settings, fmt.Errorf(
+				"conflicting settings, cli option api-server-default-replicas (%v) and field Seed.spec.defaultComponentSettings.apiserver.replicas (%v) do not match",
+				replicas,
+				*settings.Apiserver.Replicas,
+			)
+		}
+
+		settings.Apiserver.Replicas = utilpointer.Int32Ptr(int32(replicas))
+	}
+
+	if reconcilingDisabled := runOptions.apiServerEndpointReconcilingDisabled; reconcilingDisabled {
+		settings.Apiserver.EndpointReconcilingDisabled = &reconcilingDisabled
+	}
+
+	if nodePortRange := runOptions.nodePortRange; nodePortRange != "" {
+		if settings.Apiserver.NodePortRange != "" && settings.Apiserver.NodePortRange != nodePortRange {
+			return settings, fmt.Errorf(
+				"conflicting settings, cli option nodeport-range (%v) and field Seed.spec.defaultComponentSettings.apiserver.nodePortRange (%v) do not match",
+				nodePortRange,
+				settings.Apiserver.NodePortRange,
+			)
+		}
+
+		settings.Apiserver.NodePortRange = nodePortRange
+	}
+
+	if replicas := runOptions.controllerManagerDefaultReplicas; replicas != 0 {
+		if settings.ControllerManager.Replicas != nil && replicas != int(*settings.ControllerManager.Replicas) {
+			return settings, fmt.Errorf(
+				"conflicting settings, cli option controller-manager-default-replicas (%v) and field Seed.spec.defaultComponentSettings.controllerManager.replicas (%v) do not match",
+				replicas,
+				*settings.ControllerManager.Replicas,
+			)
+		}
+
+		settings.ControllerManager.Replicas = utilpointer.Int32Ptr(int32(replicas))
+	}
+
+	if replicas := runOptions.schedulerDefaultReplicas; replicas != 0 {
+		if settings.Scheduler.Replicas != nil && replicas != int(*settings.Scheduler.Replicas) {
+			return settings, fmt.Errorf(
+				"conflicting settings, cli option schedular-default-replicas (%v) and field Seed.spec.defaultComponentSettings.schedular.replicas (%v) do not match",
+				replicas,
+				*settings.Scheduler.Replicas,
+			)
+		}
+
+		settings.Scheduler.Replicas = utilpointer.Int32Ptr(int32(replicas))
+	}
+
+	return settings, nil
 }
 
 func createCloudController(ctrlCtx *controllerContext) error {
@@ -130,8 +195,8 @@ func createKubernetesController(ctrlCtx *controllerContext) error {
 		ctrlCtx.runOptions.inClusterPrometheusDisableDefaultScrapingConfigs,
 		ctrlCtx.runOptions.inClusterPrometheusScrapingConfigsFile,
 		ctrlCtx.runOptions.inClusterPrometheusRemoteWriteConfigsFile,
+		userClusterMLAEnabled(ctrlCtx),
 		ctrlCtx.dockerPullConfigJSON,
-		ctrlCtx.runOptions.enableNodeLocalDNSCache,
 		ctrlCtx.runOptions.concurrentClusterUpdate,
 		ctrlCtx.runOptions.enableEtcdBackupRestoreController,
 		backupInterval,
@@ -141,6 +206,8 @@ func createKubernetesController(ctrlCtx *controllerContext) error {
 		ctrlCtx.keycloakFacade,
 		ctrlCtx.runOptions.etcdLauncherImage,
 		ctrlCtx.runOptions.dnatControllerImage,
+		ctrlCtx.runOptions.machineControllerImageTag,
+		ctrlCtx.runOptions.machineControllerImageRepository,
 		ctrlCtx.runOptions.tunnelingAgentIP.String(),
 		ctrlCtx.runOptions.caBundle,
 		kubernetescontroller.Features{
@@ -148,6 +215,7 @@ func createKubernetesController(ctrlCtx *controllerContext) error {
 			EtcdDataCorruptionChecks:     ctrlCtx.runOptions.featureGates.Enabled(features.EtcdDataCorruptionChecks),
 			KubernetesOIDCAuthentication: ctrlCtx.runOptions.featureGates.Enabled(features.OpenIDAuthPlugin),
 			EtcdLauncher:                 ctrlCtx.runOptions.featureGates.Enabled(features.EtcdLauncher),
+			Konnectivity:                 ctrlCtx.runOptions.featureGates.Enabled(features.KonnectivityService),
 		},
 		ctrlCtx.versions,
 	)
@@ -254,7 +322,7 @@ func getContainerFromFile(path string) (*corev1.Container, error) {
 }
 
 func createUpdateController(ctrlCtx *controllerContext) error {
-	updateManager, err := version.NewFromFiles(ctrlCtx.runOptions.versionsFile, ctrlCtx.runOptions.updatesFile)
+	updateManager, err := version.NewFromFiles(ctrlCtx.runOptions.versionsFile, ctrlCtx.runOptions.updatesFile, ctrlCtx.runOptions.providerIncompatibilitiesFile)
 	if err != nil {
 		return fmt.Errorf("failed to create update manager: %v", err)
 	}
@@ -287,7 +355,6 @@ func createAddonController(ctrlCtx *controllerContext) error {
 		},
 		ctrlCtx.runOptions.kubernetesAddonsPath,
 		ctrlCtx.runOptions.overwriteRegistry,
-		ctrlCtx.runOptions.enableNodeLocalDNSCache,
 		ctrlCtx.clientProvider,
 		ctrlCtx.runOptions.externalURL,
 		ctrlCtx.seedGetter,
@@ -365,8 +432,39 @@ func createMLAController(ctrlCtx *controllerContext) error {
 		ctrlCtx.runOptions.workerCount,
 		ctrlCtx.runOptions.workerName,
 		ctrlCtx.versions,
+		ctrlCtx.runOptions.mlaNamespace,
 		ctrlCtx.runOptions.grafanaURL,
 		ctrlCtx.runOptions.grafanaHeaderName,
 		ctrlCtx.runOptions.grafanaSecret,
+		ctrlCtx.runOptions.overwriteRegistry,
+		ctrlCtx.runOptions.cortexAlertmanagerURL,
+		ctrlCtx.runOptions.cortexRulerURL,
+		ctrlCtx.runOptions.lokiRulerURL,
+		ctrlCtx.runOptions.enableUserClusterMLA,
+	)
+}
+
+func userClusterMLAEnabled(ctrlCtx *controllerContext) bool {
+	return ctrlCtx.runOptions.featureGates.Enabled(features.UserClusterMLA) && ctrlCtx.runOptions.enableUserClusterMLA
+}
+
+func createConstraintController(ctrlCtx *controllerContext) error {
+	return seedconstraintsynchronizer.Add(
+		ctrlCtx.ctx,
+		ctrlCtx.mgr,
+		ctrlCtx.log,
+		ctrlCtx.runOptions.workerName,
+		ctrlCtx.runOptions.namespace,
+		ctrlCtx.runOptions.workerCount,
+	)
+}
+
+func createClusterTemplateController(ctrlCtx *controllerContext) error {
+	return clustertemplatecontroller.Add(
+		ctrlCtx.mgr,
+		ctrlCtx.log,
+		ctrlCtx.runOptions.workerName,
+		ctrlCtx.runOptions.namespace,
+		ctrlCtx.runOptions.workerCount,
 	)
 }

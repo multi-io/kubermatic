@@ -10,11 +10,6 @@ a dummy release in a dedicated GitHub repo. The purpose is to
 * test that releasing code actually works, and
 * to provide test builds for internal purposes.
 
-## deploy-ci-kubermatic-io.sh
-
-This script is used as a postsubmit job and updates the CI cluster
-after every commit to master.
-
 ## deploy-dev-asia.sh
 
 This script is used as a postsubmit job and updates the dev-asia seed
@@ -117,17 +112,6 @@ TBD
 This script creates a local kind cluster, compiles the KKP binaries,
 creates all Docker images and loads them into the kind cluster,
 then installs KKP using the KKP installer + operator and sets up a
-single shared master/seed system.
-This serves as the precursor for all other tests.
-
-This script should be sourced, not called, so callers get the variables
-it sets.
-
-## setup-legacy-kubermatic-in-kind.sh
-
-This script creates a local kind cluster, compiles the KKP binaries,
-creates all Docker images and loads them into the kind cluster,
-then installs KKP using the legacy `kubermatic` Helm chart and sets up a
 single shared master/seed system.
 This serves as the precursor for all other tests.
 

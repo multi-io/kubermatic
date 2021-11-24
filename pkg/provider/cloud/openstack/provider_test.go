@@ -140,7 +140,7 @@ func TestInitializeCloudProvider(t *testing.T) {
 						Openstack: &kubermaticv1.OpenstackCloudSpec{
 							SecurityGroups: "metakube-cluster-xyz",
 							FloatingIPPool: "external-network",
-							Network:        "metakube-cluster-xyz",
+							Network:        "kubernetes-cluster-xyz",
 							SubnetID:       ostesting.SubnetID,
 							RouterID:       ostesting.RouterID,
 							ServerGroupID:  ostesting.ServerGroupID,
@@ -172,7 +172,7 @@ func TestInitializeCloudProvider(t *testing.T) {
 						Openstack: &kubermaticv1.OpenstackCloudSpec{
 							SecurityGroups: "metakube-cluster-xyz",
 							FloatingIPPool: "external-network",
-							Network:        "metakube-cluster-xyz",
+							Network:        "kubernetes-cluster-xyz",
 							SubnetID:       ostesting.SubnetID,
 							RouterID:       ostesting.RouterID,
 							ServerGroupID:  ostesting.ServerGroupID,
@@ -205,7 +205,7 @@ func TestInitializeCloudProvider(t *testing.T) {
 				Spec: kubermaticv1.ClusterSpec{
 					Cloud: kubermaticv1.CloudSpec{
 						Openstack: &kubermaticv1.OpenstackCloudSpec{
-							Network: "metakube-cluster-xyz",
+							Network: "kubernetes-cluster-xyz",
 						},
 					},
 				},
@@ -230,7 +230,7 @@ func TestInitializeCloudProvider(t *testing.T) {
 						Openstack: &kubermaticv1.OpenstackCloudSpec{
 							SecurityGroups: "metakube-cluster-xyz",
 							FloatingIPPool: "external-network",
-							Network:        "metakube-cluster-xyz",
+							Network:        "kubernetes-cluster-xyz",
 							SubnetID:       ostesting.SubnetID,
 							SubnetCIDR:     "192.168.1.0/24",
 							RouterID:       ostesting.RouterID,
@@ -259,7 +259,7 @@ func TestInitializeCloudProvider(t *testing.T) {
 				Spec: kubermaticv1.ClusterSpec{
 					Cloud: kubermaticv1.CloudSpec{
 						Openstack: &kubermaticv1.OpenstackCloudSpec{
-							Network:  "metakube-cluster-xyz",
+							Network:  "kubernetes-cluster-xyz",
 							SubnetID: ostesting.SubnetID,
 						},
 					},
@@ -284,7 +284,7 @@ func TestInitializeCloudProvider(t *testing.T) {
 						Openstack: &kubermaticv1.OpenstackCloudSpec{
 							SecurityGroups: "metakube-cluster-xyz",
 							FloatingIPPool: "external-network",
-							Network:        "metakube-cluster-xyz",
+							Network:        "kubernetes-cluster-xyz",
 							SubnetID:       ostesting.SubnetID,
 							RouterID:       ostesting.RouterID,
 							ServerGroupID:  ostesting.ServerGroupID,

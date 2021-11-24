@@ -27,14 +27,15 @@ import (
 	"strings"
 
 	"github.com/gorilla/securecookie"
+
 	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
+	apiv2 "k8c.io/kubermatic/v2/pkg/api/v2"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/handler/auth"
-	kcerrors "k8c.io/kubermatic/v2/pkg/util/errors"
-
 	"k8c.io/kubermatic/v2/pkg/handler/middleware"
 	"k8c.io/kubermatic/v2/pkg/handler/v1/common"
 	"k8c.io/kubermatic/v2/pkg/provider"
+	kcerrors "k8c.io/kubermatic/v2/pkg/util/errors"
 
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/tools/clientcmd"
@@ -145,6 +146,19 @@ func GetOidcKubeconfigEndpoint(ctx context.Context, userInfoGetter provider.User
 	adminClientCfg.AuthInfos["default"] = clientCmdAuth
 
 	return &encodeKubeConfigResponse{clientCfg: adminClientCfg, filePrefix: "oidc"}, nil
+}
+
+func GetClusterOidcEndpoint(ctx context.Context, userInfoGetter provider.UserInfoGetter, projectID, clusterID string, projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider) (interface{}, error) {
+	cluster, err := GetCluster(ctx, projectProvider, privilegedProjectProvider, userInfoGetter, projectID, clusterID, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return apiv2.OIDCSpec{
+		IssuerURL:    cluster.Spec.OIDC.IssuerURL,
+		ClientID:     cluster.Spec.OIDC.ClientID,
+		ClientSecret: cluster.Spec.OIDC.ClientSecret,
+	}, nil
 }
 
 func CreateOIDCKubeconfigEndpoint(ctx context.Context, projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, oidcIssuerVerifier auth.OIDCIssuerVerifier, oidcCfg common.OIDCConfiguration, req CreateOIDCKubeconfigReq) (interface{}, error) {

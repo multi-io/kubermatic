@@ -58,7 +58,7 @@ func NewPatchNodeDeploymentRequestOK() *PatchNodeDeploymentRequestOK {
 	return &PatchNodeDeploymentRequestOK{}
 }
 
-/*PatchNodeDeploymentRequestOK handles this case with default header values.
+/* PatchNodeDeploymentRequestOK describes a response with status code 200, with default header values.
 
 NodeDeploymentRequest
 */
@@ -69,7 +69,6 @@ type PatchNodeDeploymentRequestOK struct {
 func (o *PatchNodeDeploymentRequestOK) Error() string {
 	return fmt.Sprintf("[PATCH /api/v1/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/ndrequests/{ndrequest_id}][%d] patchNodeDeploymentRequestOK  %+v", 200, o.Payload)
 }
-
 func (o *PatchNodeDeploymentRequestOK) GetPayload() *models.NodeDeploymentRequest {
 	return o.Payload
 }
@@ -91,7 +90,7 @@ func NewPatchNodeDeploymentRequestUnauthorized() *PatchNodeDeploymentRequestUnau
 	return &PatchNodeDeploymentRequestUnauthorized{}
 }
 
-/*PatchNodeDeploymentRequestUnauthorized handles this case with default header values.
+/* PatchNodeDeploymentRequestUnauthorized describes a response with status code 401, with default header values.
 
 EmptyResponse is a empty response
 */
@@ -112,7 +111,7 @@ func NewPatchNodeDeploymentRequestForbidden() *PatchNodeDeploymentRequestForbidd
 	return &PatchNodeDeploymentRequestForbidden{}
 }
 
-/*PatchNodeDeploymentRequestForbidden handles this case with default header values.
+/* PatchNodeDeploymentRequestForbidden describes a response with status code 403, with default header values.
 
 EmptyResponse is a empty response
 */
@@ -135,7 +134,7 @@ func NewPatchNodeDeploymentRequestDefault(code int) *PatchNodeDeploymentRequestD
 	}
 }
 
-/*PatchNodeDeploymentRequestDefault handles this case with default header values.
+/* PatchNodeDeploymentRequestDefault describes a response with status code -1, with default header values.
 
 errorResponse
 */
@@ -153,7 +152,6 @@ func (o *PatchNodeDeploymentRequestDefault) Code() int {
 func (o *PatchNodeDeploymentRequestDefault) Error() string {
 	return fmt.Sprintf("[PATCH /api/v1/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/ndrequests/{ndrequest_id}][%d] patchNodeDeploymentRequest default  %+v", o._statusCode, o.Payload)
 }
-
 func (o *PatchNodeDeploymentRequestDefault) GetPayload() *models.ErrorResponse {
 	return o.Payload
 }

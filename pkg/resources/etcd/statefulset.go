@@ -34,16 +34,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/klog"
 )
 
 const (
 	name = "etcd"
 
 	dataDir = "/var/run/etcd/pod_${POD_NAME}/"
-	// ImageTag defines the image tag to use for the etcd image
-	// etcdImageTagV33 = "v3.3.18"
-	etcdImageTagV34 = "v3.4.3"
 )
 
 var (
@@ -79,7 +75,7 @@ func StatefulSetCreator(data etcdStatefulSetCreatorData, enableDataCorruptionChe
 
 			replicas := computeReplicas(data, set)
 			set.Name = resources.EtcdStatefulSetName
-			set.Spec.Replicas = resources.Int32(int32(replicas))
+			set.Spec.Replicas = resources.Int32(replicas)
 			set.Spec.UpdateStrategy.Type = appsv1.RollingUpdateStatefulSetStrategyType
 			set.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
 			set.Spec.ServiceName = resources.EtcdServiceName
@@ -161,10 +157,6 @@ func StatefulSetCreator(data etcdStatefulSetCreatorData, enableDataCorruptionChe
 						{
 							Name:  "TOKEN",
 							Value: data.Cluster().Name,
-						},
-						{
-							Name:  "ETCD_CLUSTER_SIZE",
-							Value: strconv.Itoa(replicas),
 						},
 						{
 							Name:  "ENABLE_CORRUPTION_CHECK",
@@ -362,47 +354,47 @@ func getBasePodLabels(cluster *kubermaticv1.Cluster) map[string]string {
 // TODO: Other functions use this function, switch them to getLauncherImage
 func ImageTag(c *kubermaticv1.Cluster) string {
 	/* Remove because we use v3.4.X for kubernetes < 1.17 too
-	if c.Spec.Version.Minor() < 17 {
-		return etcdImageTagV33
+	if c.Spec.Version.Minor() < 22 {
+		return "v3.4.3"
 	}
 	*/
-	return etcdImageTagV34
+	return "v3.5.0"
 }
 
-func computeReplicas(data etcdStatefulSetCreatorData, set *appsv1.StatefulSet) int {
+func computeReplicas(data etcdStatefulSetCreatorData, set *appsv1.StatefulSet) int32 {
 	if !data.Cluster().Spec.Features[kubermaticv1.ClusterFeatureEtcdLauncher] {
 		return kubermaticv1.DefaultEtcdClusterSize
 	}
-	etcdClusterSize := kubermaticv1.DefaultEtcdClusterSize
-	if v := data.Cluster().Spec.ComponentsOverride.Etcd.Replicas; v != nil {
-		// handle existing clusters that don't have a configured size
-		if *v < kubermaticv1.DefaultEtcdClusterSize {
-			klog.V(2).Infof("etcdClusterSize [%d] is smaller than DefaultEtcdClusterSize [%d]. Falling back to DefaultEtcdClusterSize", etcdClusterSize, kubermaticv1.DefaultEtcdClusterSize)
-		} else {
-			etcdClusterSize = int(*v)
-		}
-	}
-	if etcdClusterSize > kubermaticv1.MaxEtcdClusterSize {
-		klog.V(2).Infof("etcdClusterSize [%d] is larger than MaxEtcdClusterSize [%d]. Falling back to MaxEtcdClusterSize", etcdClusterSize, kubermaticv1.MaxEtcdClusterSize)
-		etcdClusterSize = kubermaticv1.MaxEtcdClusterSize
-	}
+	etcdClusterSize := getClusterSize(data.Cluster().Spec.ComponentsOverride.Etcd)
 	if set.Spec.Replicas == nil { // new replicaset
 		return etcdClusterSize
 	}
-	replicas := int(*set.Spec.Replicas)
+	replicas := *set.Spec.Replicas
 	// at required size. do nothing
 	if etcdClusterSize == replicas {
 		return replicas
 	}
 	isEtcdHealthy := data.Cluster().Status.ExtendedHealth.Etcd == kubermaticv1.HealthStatusUp
 	if isEtcdHealthy { // no scaling until we are healthy
-
 		if etcdClusterSize > replicas {
 			return replicas + 1
 		}
 		return replicas - 1
 	}
 	return replicas
+}
+
+func getClusterSize(settings kubermaticv1.EtcdStatefulSetSettings) int32 {
+	if settings.Replicas == nil {
+		return kubermaticv1.DefaultEtcdClusterSize
+	}
+	if *settings.Replicas < kubermaticv1.MinEtcdClusterSize {
+		return kubermaticv1.MinEtcdClusterSize
+	}
+	if *settings.Replicas > kubermaticv1.MaxEtcdClusterSize {
+		return kubermaticv1.MaxEtcdClusterSize
+	}
+	return *settings.Replicas
 }
 
 type commandTplData struct {
@@ -418,7 +410,6 @@ func getEtcdCommand(name, namespace string, enableCorruptionCheck, launcherEnabl
 	if launcherEnabled {
 		command := []string{"/opt/bin/etcd-launcher",
 			"-namespace", "$(NAMESPACE)",
-			"-etcd-cluster-size", "$(ETCD_CLUSTER_SIZE)",
 			"-pod-name", "$(POD_NAME)",
 			"-pod-ip", "$(POD_IP)",
 			"-api-version", "$(ETCDCTL_API)",

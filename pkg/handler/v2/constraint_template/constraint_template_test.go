@@ -63,7 +63,7 @@ func TestListConstraintTemplates(t *testing.T) {
 		t.Run(tc.Name, func(t *testing.T) {
 			req := httptest.NewRequest("GET", "/api/v2/constrainttemplates", strings.NewReader(""))
 			res := httptest.NewRecorder()
-			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, nil, tc.ExistingObjects, nil, nil, hack.NewTestRouting)
+			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, nil, tc.ExistingObjects, nil, nil, nil, hack.NewTestRouting)
 			if err != nil {
 				t.Fatalf("failed to create test endpoint due to %v", err)
 			}
@@ -98,7 +98,7 @@ func TestGetConstraintTemplates(t *testing.T) {
 		{
 			Name:             "scenario 1: get existing constraint template",
 			CTName:           "ct1",
-			ExpectedResponse: `{"name":"ct1","spec":{"crd":{"spec":{"names":{"kind":"labelconstraint","shortNames":["lc"]}}},"targets":[{"target":"admission.k8s.gatekeeper.sh","rego":"\n\t\tpackage k8srequiredlabels\n\n        deny[{\"msg\": msg, \"details\": {\"missing_labels\": missing}}] {\n          provided := {label | input.review.object.metadata.labels[label]}\n          required := {label | label := input.parameters.labels[_]}\n          missing := required - provided\n          count(missing) \u003e 0\n          msg := sprintf(\"you must provide labels: %v\", [missing])\n        }"}],"selector":{"providers":["aws","gcp"],"labelSelector":{"matchLabels":{"deployment":"prod","domain":"sales"},"matchExpressions":[{"key":"cluster","operator":"Exists"}]}}},"status":{}}`,
+			ExpectedResponse: `{"name":"ct1","spec":{"crd":{"spec":{"names":{"kind":"labelconstraint","shortNames":["lc"]},"validation":{"openAPIV3Schema":{"required":["labels"],"properties":{"labels":{"type":"array","items":{"type":"string"}}}}}}},"targets":[{"target":"admission.k8s.gatekeeper.sh","rego":"\n\t\tpackage k8srequiredlabels\n\n        deny[{\"msg\": msg, \"details\": {\"missing_labels\": missing}}] {\n          provided := {label | input.review.object.metadata.labels[label]}\n          required := {label | label := input.parameters.labels[_]}\n          missing := required - provided\n          count(missing) \u003e 0\n          msg := sprintf(\"you must provide labels: %v\", [missing])\n        }"}],"selector":{"providers":["aws","gcp"],"labelSelector":{"matchLabels":{"deployment":"prod","domain":"sales"},"matchExpressions":[{"key":"cluster","operator":"Exists"}]}}},"status":{}}`,
 			HTTPStatus:       http.StatusOK,
 			ExistingObjects: test.GenDefaultKubermaticObjects(
 				test.GenConstraintTemplate("ct1"),
@@ -107,7 +107,7 @@ func TestGetConstraintTemplates(t *testing.T) {
 			ExistingAPIUser: test.GenDefaultAPIUser(),
 		},
 		{
-			Name:             "scenario 1: get non-existing constraint template",
+			Name:             "scenario 2: get non-existing constraint template",
 			CTName:           "missing",
 			ExpectedResponse: `{"error":{"code":404,"message":"constrainttemplates.kubermatic.k8s.io \"missing\" not found"}}`,
 			HTTPStatus:       http.StatusNotFound,
@@ -123,7 +123,7 @@ func TestGetConstraintTemplates(t *testing.T) {
 		t.Run(tc.Name, func(t *testing.T) {
 			req := httptest.NewRequest("GET", fmt.Sprintf("/api/v2/constrainttemplates/%s", tc.CTName), strings.NewReader(""))
 			res := httptest.NewRecorder()
-			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, nil, tc.ExistingObjects, nil, nil, hack.NewTestRouting)
+			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, nil, tc.ExistingObjects, nil, nil, nil, hack.NewTestRouting)
 			if err != nil {
 				t.Fatalf("failed to create test endpoint due to %v", err)
 			}
@@ -151,7 +151,7 @@ func TestCreateConstraintTemplates(t *testing.T) {
 		{
 			Name:             "scenario 1: admin can create constraint template",
 			CTtoCreate:       test.GenDefaultConstraintTemplate("labelconstraint"),
-			ExpectedResponse: `{"name":"labelconstraint","spec":{"crd":{"spec":{"names":{"kind":"labelconstraint","shortNames":["lc"]}}},"targets":[{"target":"admission.k8s.gatekeeper.sh","rego":"\n\t\tpackage k8srequiredlabels\n\n        deny[{\"msg\": msg, \"details\": {\"missing_labels\": missing}}] {\n          provided := {label | input.review.object.metadata.labels[label]}\n          required := {label | label := input.parameters.labels[_]}\n          missing := required - provided\n          count(missing) \u003e 0\n          msg := sprintf(\"you must provide labels: %v\", [missing])\n        }"}],"selector":{"providers":["aws","gcp"],"labelSelector":{"matchLabels":{"deployment":"prod","domain":"sales"},"matchExpressions":[{"key":"cluster","operator":"Exists"}]}}},"status":{}}`,
+			ExpectedResponse: `{"name":"labelconstraint","spec":{"crd":{"spec":{"names":{"kind":"labelconstraint","shortNames":["lc"]},"validation":{"openAPIV3Schema":{"required":["labels"],"properties":{"labels":{"type":"array","items":{"type":"string"}}}}}}},"targets":[{"target":"admission.k8s.gatekeeper.sh","rego":"\n\t\tpackage k8srequiredlabels\n\n        deny[{\"msg\": msg, \"details\": {\"missing_labels\": missing}}] {\n          provided := {label | input.review.object.metadata.labels[label]}\n          required := {label | label := input.parameters.labels[_]}\n          missing := required - provided\n          count(missing) \u003e 0\n          msg := sprintf(\"you must provide labels: %v\", [missing])\n        }"}],"selector":{"providers":["aws","gcp"],"labelSelector":{"matchLabels":{"deployment":"prod","domain":"sales"},"matchExpressions":[{"key":"cluster","operator":"Exists"}]}}},"status":{}}`,
 			HTTPStatus:       http.StatusOK,
 			ExistingAPIUser:  test.GenDefaultAdminAPIUser(),
 		},
@@ -219,7 +219,7 @@ func TestCreateConstraintTemplates(t *testing.T) {
 			}
 			req := httptest.NewRequest("POST", "/api/v2/constrainttemplates", bytes.NewBuffer(body))
 			res := httptest.NewRecorder()
-			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, nil, []ctrlruntimeclient.Object{test.APIUserToKubermaticUser(*tc.ExistingAPIUser)}, nil, nil, hack.NewTestRouting)
+			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, nil, []ctrlruntimeclient.Object{test.APIUserToKubermaticUser(*tc.ExistingAPIUser)}, nil, nil, nil, hack.NewTestRouting)
 			if err != nil {
 				t.Fatalf("failed to create test endpoint due to %v", err)
 			}
@@ -250,7 +250,7 @@ func TestPatchConstraintTemplates(t *testing.T) {
 			Name:             "scenario 1: admin can patch constraint template",
 			RawPatch:         `{"spec":{"crd":{"spec":{"names":{"kind":"labelconstraint","shortNames":["lc", "lcon"]}}},"selector":{"Providers":["aws","gcp","azure"],"LabelSelector":{"matchLabels":{"deployment":"prod","domain":"db"},"matchExpressions":[{"key":"cluster","operator":"Exists"}]}}}}`,
 			CTName:           "labelconstraint",
-			ExpectedResponse: `{"name":"labelconstraint","spec":{"crd":{"spec":{"names":{"kind":"labelconstraint","shortNames":["lc","lcon"]}}},"targets":[{"target":"admission.k8s.gatekeeper.sh","rego":"\n\t\tpackage k8srequiredlabels\n\n        deny[{\"msg\": msg, \"details\": {\"missing_labels\": missing}}] {\n          provided := {label | input.review.object.metadata.labels[label]}\n          required := {label | label := input.parameters.labels[_]}\n          missing := required - provided\n          count(missing) \u003e 0\n          msg := sprintf(\"you must provide labels: %v\", [missing])\n        }"}],"selector":{"providers":["aws","gcp"],"labelSelector":{"matchLabels":{"deployment":"prod","domain":"sales"},"matchExpressions":[{"key":"cluster","operator":"Exists"}]}}},"status":{}}`,
+			ExpectedResponse: `{"name":"labelconstraint","spec":{"crd":{"spec":{"names":{"kind":"labelconstraint","shortNames":["lc","lcon"]},"validation":{"openAPIV3Schema":{"required":["labels"],"properties":{"labels":{"type":"array","items":{"type":"string"}}}}}}},"targets":[{"target":"admission.k8s.gatekeeper.sh","rego":"\n\t\tpackage k8srequiredlabels\n\n        deny[{\"msg\": msg, \"details\": {\"missing_labels\": missing}}] {\n          provided := {label | input.review.object.metadata.labels[label]}\n          required := {label | label := input.parameters.labels[_]}\n          missing := required - provided\n          count(missing) \u003e 0\n          msg := sprintf(\"you must provide labels: %v\", [missing])\n        }"}],"selector":{"providers":["aws","gcp"],"labelSelector":{"matchLabels":{"deployment":"prod","domain":"sales"},"matchExpressions":[{"key":"cluster","operator":"Exists"}]}}},"status":{}}`,
 			HTTPStatus:       http.StatusOK,
 			ExistingAPIUser:  test.GenDefaultAdminAPIUser(),
 			ExistingObjects:  []ctrlruntimeclient.Object{test.GenTestSeed(), test.GenConstraintTemplate("labelconstraint")},
@@ -308,7 +308,7 @@ func TestPatchConstraintTemplates(t *testing.T) {
 
 			req := httptest.NewRequest("PATCH", fmt.Sprintf("/api/v2/constrainttemplates/%s", tc.CTName), strings.NewReader(tc.RawPatch))
 			res := httptest.NewRecorder()
-			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, nil, tc.ExistingObjects, nil, nil, hack.NewTestRouting)
+			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, nil, tc.ExistingObjects, nil, nil, nil, hack.NewTestRouting)
 			if err != nil {
 				t.Fatalf("failed to create test endpoint due to %v", err)
 			}
@@ -365,7 +365,7 @@ func TestDeleteConstraintTemplates(t *testing.T) {
 			tc.ExistingObjects = append(tc.ExistingObjects, test.APIUserToKubermaticUser(*tc.ExistingAPIUser))
 			req := httptest.NewRequest("DELETE", fmt.Sprintf("/api/v2/constrainttemplates/%s", tc.CTToDeleteName), strings.NewReader(""))
 			res := httptest.NewRecorder()
-			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, nil, tc.ExistingObjects, nil, nil, hack.NewTestRouting)
+			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, nil, tc.ExistingObjects, nil, nil, nil, hack.NewTestRouting)
 			if err != nil {
 				t.Fatalf("failed to create test endpoint due to %v", err)
 			}

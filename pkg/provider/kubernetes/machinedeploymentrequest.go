@@ -17,13 +17,13 @@ import (
 type MachineDeploymentRequestProvider struct {
 	// createSeedImpersonatedClient is used as a ground for impersonation
 	// whenever a connection to Seed API server is required
-	createSeedImpersonatedClient impersonationClient
+	createSeedImpersonatedClient ImpersonationClient
 }
 
 // NewMachineDeploymentRequestProvider returns a new MachineDeploymentRequest provider that respects RBAC policies
 // it uses createSeedImpersonatedClient to create a connection that uses user impersonation
 func NewMachineDeploymentRequestProvider(
-	createSeedImpersonatedClient impersonationClient) *MachineDeploymentRequestProvider {
+	createSeedImpersonatedClient ImpersonationClient) *MachineDeploymentRequestProvider {
 	return &MachineDeploymentRequestProvider{
 		createSeedImpersonatedClient: createSeedImpersonatedClient,
 	}

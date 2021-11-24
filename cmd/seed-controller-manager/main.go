@@ -27,14 +27,12 @@ import (
 
 	"github.com/go-logr/zapr"
 	gatekeeperv1beta1 "github.com/open-policy-agent/frameworks/constraint/pkg/apis/templates/v1beta1"
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
 	clusterv1alpha1 "github.com/kubermatic/machine-controller/pkg/apis/cluster/v1alpha1"
 	"k8c.io/kubermatic/v2/pkg/cluster/client"
 	"k8c.io/kubermatic/v2/pkg/collectors"
-	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/keycloak"
 	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
 	"k8c.io/kubermatic/v2/pkg/metrics"
@@ -44,7 +42,6 @@ import (
 	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 	clustermutation "k8c.io/kubermatic/v2/pkg/webhook/cluster/mutation"
 	clustervalidation "k8c.io/kubermatic/v2/pkg/webhook/cluster/validation"
-	"sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	autoscalingv1beta2 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1beta2"
@@ -59,6 +56,7 @@ const (
 	controllerName = "seed-controller-manager"
 )
 
+//nolint:gocritic,exitAfterDefer
 func main() {
 	klog.InitFlags(nil)
 	pprofOpts := &pprof.Opts{}
@@ -122,7 +120,7 @@ func main() {
 	if err := clusterv1alpha1.AddToScheme(mgr.GetScheme()); err != nil {
 		kubermaticlog.Logger.Fatalw("failed to register scheme", zap.Stringer("api", clusterv1alpha1.SchemeGroupVersion), zap.Error(err))
 	}
-	if err := gatekeeperv1beta1.AddToSchemes.AddToScheme(mgr.GetScheme()); err != nil {
+	if err := gatekeeperv1beta1.AddToScheme(mgr.GetScheme()); err != nil {
 		log.Fatalw("Failed to register scheme", zap.Stringer("api", gatekeeperv1beta1.SchemeGroupVersion), zap.Error(err))
 	}
 
@@ -139,7 +137,7 @@ Please install the VerticalPodAutoscaler according to the documentation: https:/
 	metrics.RegisterRuntimErrorMetricCounter("kubermatic_controller_manager", prometheus.DefaultRegisterer)
 
 	// Default to empty JSON object
-	// TODO(irozzo) Do not create secret and image pull secret if empty
+	// TODO: Do not create secret and image pull secret if empty
 	dockerPullConfigJSON := []byte("{}")
 	if options.dockerPullConfigJSONFile != "" {
 		dockerPullConfigJSON, err = ioutil.ReadFile(options.dockerPullConfigJSONFile)
@@ -168,33 +166,6 @@ Please install the VerticalPodAutoscaler according to the documentation: https:/
 		log.Fatalw("Failed to get clientProvider", zap.Error(err))
 	}
 
-	if options.admissionWebhook.Configured() {
-		if err := options.admissionWebhook.Configure(mgr.GetWebhookServer()); err != nil {
-			log.Fatalw("Failed to configure admission webhook server", zap.Error(err))
-		}
-		// Register Seed validation admission webhook
-		h, err := seedValidationHandler(rootCtx, mgr.GetClient(), options)
-		if err != nil {
-			log.Fatalw("Failed to build Seed validation handler", zap.Error(err))
-		}
-
-		componentsSettings, err := defaultComponentSettings(
-			int32(options.apiServerDefaultReplicas),
-			int32(options.controllerManagerDefaultReplicas),
-			int32(options.schedulerDefaultReplicas),
-			options.apiServerEndpointReconcilingDisabled,
-			options.defaultComponentSettings)
-		if err != nil {
-			log.Panicw("construct default components overrides", zap.Error(err))
-		}
-
-		// Setup the admission handler for kubermatic Seed CRDs
-		h.SetupWebhookWithManager(mgr)
-		// Setup the validation admission handler for kubermatic Cluster CRDs
-		clustervalidation.NewAdmissionHandler(mgr.GetClient(), options.featureGates).SetupWebhookWithManager(mgr)
-		// Setup the mutation admission handler for kubermatic Cluster CRDs
-		clustermutation.NewAdmissionHandler(componentsSettings).SetupWebhookWithManager(mgr)
-	}
 
 	kcInternal := keycloak.NewClient(requireEnv("KEYCLOAK_INTERNAL_URL"), requireEnv("KEYCLOAK_INTERNAL_ADMIN_USER"), requireEnv("KEYCLOAK_INTERNAL_ADMIN_PASSWORD"))
 	kcExternal := keycloak.NewClient(requireEnv("KEYCLOAK_EXTERNAL_URL"), requireEnv("KEYCLOAK_EXTERNAL_ADMIN_USER"), requireEnv("KEYCLOAK_EXTERNAL_ADMIN_PASSWORD"))
@@ -212,6 +183,36 @@ Please install the VerticalPodAutoscaler according to the documentation: https:/
 		log:                  log,
 		keycloakFacade:       keycloakFacade,
 		versions:             versions,
+	}
+
+	if options.admissionWebhook.Configured() {
+		if err := options.admissionWebhook.Configure(mgr.GetWebhookServer()); err != nil {
+			log.Fatalw("Failed to configure admission webhook server", zap.Error(err))
+		}
+		// Register Seed validation admission webhook
+		h, err := seedValidationHandler(rootCtx, mgr.GetClient(), options)
+		if err != nil {
+			log.Fatalw("Failed to build Seed validation handler", zap.Error(err))
+		}
+
+		// Setup the admission handler for kubermatic Seed CRDs
+		h.SetupWebhookWithManager(mgr)
+		// Setup the validation admission handler for kubermatic Cluster CRDs
+		clustervalidation.NewAdmissionHandler(options.featureGates).SetupWebhookWithManager(mgr)
+		// Setup the mutation admission handler for kubermatic Cluster CRDs
+		getter, err := seedGetterFactory(rootCtx, mgr.GetAPIReader(), options)
+		if err != nil {
+			log.Fatalf("make seed getter with api reader: %v", err)
+		}
+		seed, err := getter()
+		if err != nil {
+			log.Fatalf("could not get seed resource: %v", err)
+		}
+		settings, err := defaultComponentSettings(ctrlCtx.runOptions, seed)
+		if err != nil {
+			log.Fatal(err)
+		}
+		clustermutation.NewAdmissionHandler(settings).SetupWebhookWithManager(mgr)
 	}
 
 	if err := createAllControllers(ctrlCtx); err != nil {
@@ -250,25 +251,4 @@ func requireEnv(key string) string {
 		log.Fatalf("Required environment variable not set: %s", key)
 	}
 	return value
-}
-
-// Constructs default components overrides for clusters. Uses settings file if given
-// and cli option values if not (to allow backward compatibility).
-func defaultComponentSettings(apiReplicas, cmReplicas, schedulerReplicas int32, apiDisableEndpointReconcile bool, settingsFile string) (kubermaticv1.ComponentSettings, error) {
-	var ret kubermaticv1.ComponentSettings
-	if settingsFile != "" {
-		content, err := ioutil.ReadFile(settingsFile)
-		if err != nil {
-			return ret, errors.Wrap(err, "read components settings file")
-		}
-		if err := yaml.Unmarshal(content, &ret); err != nil {
-			return ret, errors.Wrap(err, "unmarshal components settings file")
-		}
-		return ret, nil
-	}
-	ret.Apiserver.Replicas = &apiReplicas
-	ret.Apiserver.EndpointReconcilingDisabled = &apiDisableEndpointReconcile
-	ret.ControllerManager.Replicas = &cmReplicas
-	ret.Scheduler.Replicas = &schedulerReplicas
-	return ret, nil
 }

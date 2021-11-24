@@ -25,13 +25,22 @@ limitations under the License.
 //
 // https://www.syseleven.de/agb-sla-metakube
 //
-//     Version: 2.11
+//     Version: 2.18
 //
 //     Consumes:
 //     - application/json
 //
 //     Produces:
 //     - application/json
+//
+//     Security:
+//     - api_key:
+//
+//     SecurityDefinitions:
+//     api_key:
+//          type: apiKey
+//          name: Authorization
+//          in: header
 //
 // swagger:meta
 package main
@@ -54,7 +63,6 @@ import (
 	"go.uber.org/zap"
 
 	clusterv1alpha1 "github.com/kubermatic/machine-controller/pkg/apis/cluster/v1alpha1"
-
 	"k8c.io/kubermatic/v2/pkg/cluster/client"
 	"k8c.io/kubermatic/v2/pkg/controller/master-controller-manager/rbac"
 	kubermaticclientset "k8c.io/kubermatic/v2/pkg/crd/client/clientset/versioned"
@@ -80,6 +88,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	"k8s.io/klog"
 	"k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	ctrlruntime "sigs.k8s.io/controller-runtime"
@@ -121,7 +130,19 @@ func main() {
 		kubermaticlog.Logger.Fatalw("failed to register scheme", zap.Stringer("api", gatekeeperconfigv1alpha1.GroupVersion), zap.Error(err))
 	}
 
-	providers, err := createInitProviders(ctx, options)
+	masterCfg, err := ctrlruntime.GetConfig()
+	if err != nil {
+		kubermaticlog.Logger.Fatalw("unable to build client configuration from kubeconfig due to %v", err)
+	}
+
+	// We use the manager only to get a lister-backed ctrlruntimeclient.Client. We can not use it for most
+	// other actions, because it doesn't support impersonation (and can't be changed to do that as that would mean it has to replicate the apiservers RBAC for the lister)
+	mgr, err := manager.New(masterCfg, manager.Options{MetricsBindAddress: "0"})
+	if err != nil {
+		kubermaticlog.Logger.Fatalw("failed to construct manager: %v", err)
+	}
+
+	providers, err := createInitProviders(ctx, options, masterCfg, mgr)
 	if err != nil {
 		log.Fatalw("failed to create and initialize providers", "error", err)
 	}
@@ -133,7 +154,7 @@ func main() {
 	if err != nil {
 		log.Fatalw("failed to create auth clients", "error", err)
 	}
-	updateManager, err := version.NewFromFiles(options.versionsFile, options.updatesFile)
+	updateManager, err := version.NewFromFiles(options.versionsFile, options.updatesFile, options.providerIncompatibilitiesFile)
 	if err != nil {
 		log.Fatalw("failed to create update manager", "error", err)
 	}
@@ -142,7 +163,7 @@ func main() {
 	keycloakFacade := keycloak.NewGroup()
 	keycloakFacade.RegisterKeycloak(kcExternal)
 	keycloakFacade.RegisterKeycloak(kcInternal)
-	apiHandler, err := createAPIHandler(options, providers, oidcIssuerVerifier, tokenVerifiers, tokenExtractors, updateManager, keycloakFacade)
+	apiHandler, err := createAPIHandler(options, providers, oidcIssuerVerifier, tokenVerifiers, tokenExtractors, updateManager, keycloakFacade, mgr)
 	if err != nil {
 		log.Fatalw("failed to create API Handler", "error", err)
 	}
@@ -166,24 +187,12 @@ func requireEnv(key string) string {
 	return value
 }
 
-func createInitProviders(ctx context.Context, options serverRunOptions) (providers, error) {
-	masterCfg, err := ctrlruntime.GetConfig()
-	if err != nil {
-		return providers{}, fmt.Errorf("unable to build client configuration from kubeconfig due to %v", err)
-	}
-
+func createInitProviders(ctx context.Context, options serverRunOptions, masterCfg *rest.Config, mgr manager.Manager) (providers, error) {
 	// create other providers
 	kubeMasterClient := kubernetes.NewForConfigOrDie(masterCfg)
 	kubeMasterInformerFactory := informers.NewSharedInformerFactory(kubeMasterClient, 30*time.Minute)
 	kubermaticMasterClient := kubermaticclientset.NewForConfigOrDie(masterCfg)
 	kubermaticMasterInformerFactory := kubermaticinformers.NewSharedInformerFactory(kubermaticMasterClient, 30*time.Minute)
-
-	// We use the manager only to get a lister-backed ctrlruntimeclient.Client. We can not use it for most
-	// other actions, because it doesn't support impersonation (and can't be changed to do that as that would mean it has to replicate the apiservers RBAC for the lister)
-	mgr, err := manager.New(masterCfg, manager.Options{MetricsBindAddress: "0"})
-	if err != nil {
-		return providers{}, fmt.Errorf("failed to construct manager: %v", err)
-	}
 
 	client := mgr.GetClient()
 
@@ -273,9 +282,24 @@ func createInitProviders(ctx context.Context, options serverRunOptions) (provide
 		return providers{}, fmt.Errorf("failed to create external cluster provider due to %v", err)
 	}
 
+	defaultConstraintProvider, err := kubernetesprovider.NewDefaultConstraintProvider(defaultImpersonationClient.CreateImpersonatedClient, mgr.GetClient(), options.namespace)
+	if err != nil {
+		return providers{}, fmt.Errorf("failed to create default constraint provider due to %w", err)
+	}
+
 	constraintTemplateProvider, err := kubernetesprovider.NewConstraintTemplateProvider(defaultImpersonationClient.CreateImpersonatedClient, mgr.GetClient())
 	if err != nil {
 		return providers{}, fmt.Errorf("failed to create constraint template provider due to %v", err)
+	}
+
+	clusterTemplateProvider, err := kubernetesprovider.NewClusterTemplateProvider(defaultImpersonationClient.CreateImpersonatedClient, client)
+	if err != nil {
+		return providers{}, fmt.Errorf("failed to create cluster template provider due to %v", err)
+	}
+
+	privilegedAllowedRegistryProvider, err := kubernetesprovider.NewAllowedRegistryPrivilegedProvider(mgr.GetClient())
+	if err != nil {
+		return providers{}, fmt.Errorf("failed to create allowed registry provider due to %v", err)
 	}
 
 	constraintProviderGetter := kubernetesprovider.ConstraintProviderFactory(mgr.GetRESTMapper(), seedKubeconfigGetter)
@@ -291,6 +315,24 @@ func createInitProviders(ctx context.Context, options serverRunOptions) (provide
 
 	addonProviderGetter := kubernetesprovider.AddonProviderFactory(mgr.GetRESTMapper(), seedKubeconfigGetter, options.accessibleAddons)
 
+	alertmanagerProviderGetter := kubernetesprovider.AlertmanagerProviderFactory(mgr.GetRESTMapper(), seedKubeconfigGetter)
+
+	ruleGroupProviderGetter := kubernetesprovider.RuleGroupProviderFactory(mgr.GetRESTMapper(), seedKubeconfigGetter)
+
+	clusterTemplateInstanceProviderGetter := kubernetesprovider.ClusterTemplateInstanceProviderFactory(mgr.GetRESTMapper(), seedKubeconfigGetter)
+
+	etcdBackupConfigProviderGetter := kubernetesprovider.EtcdBackupConfigProviderFactory(mgr.GetRESTMapper(), seedKubeconfigGetter)
+
+	etcdRestoreProviderGetter := kubernetesprovider.EtcdRestoreProviderFactory(mgr.GetRESTMapper(), seedKubeconfigGetter)
+
+	etcdBackupConfigProjectProviderGetter := kubernetesprovider.EtcdBackupConfigProjectProviderFactory(mgr.GetRESTMapper(), seedKubeconfigGetter)
+
+	etcdRestoreProjectProviderGetter := kubernetesprovider.EtcdRestoreProjectProviderFactory(mgr.GetRESTMapper(), seedKubeconfigGetter)
+
+	backupCredentialsProviderGetter := kubernetesprovider.BackupCredentialsProviderFactory(mgr.GetRESTMapper(), seedKubeconfigGetter)
+
+	privilegedMLAAdminSettingProviderGetter := kubernetesprovider.PrivilegedMLAAdminSettingProviderFactory(mgr.GetRESTMapper(), seedKubeconfigGetter)
+
 	settingsWatcher, err := kuberneteswatcher.NewSettingsWatcher(settingsProvider)
 	if err != nil {
 		return providers{}, fmt.Errorf("failed to create settings watcher due to %v", err)
@@ -302,36 +344,48 @@ func createInitProviders(ctx context.Context, options serverRunOptions) (provide
 	}
 
 	return providers{
-		sshKey:                                sshKeyProvider,
-		privilegedSSHKeyProvider:              privilegedSSHKeyProvider,
-		user:                                  userProvider,
-		serviceAccountProvider:                serviceAccountProvider,
-		privilegedServiceAccountProvider:      serviceAccountProvider,
-		serviceAccountTokenProvider:           serviceAccountTokenProvider,
-		privilegedServiceAccountTokenProvider: serviceAccountTokenProvider,
-		project:                               projectProvider,
-		privilegedProject:                     privilegedProjectProvider,
-		projectMember:                         projectMemberProvider,
-		privilegedProjectMemberProvider:       projectMemberProvider,
-		memberMapper:                          projectMemberProvider,
-		eventRecorderProvider:                 eventRecorderProvider,
-		clusterProviderGetter:                 clusterProviderGetter,
-		mdRequestProviderGetter:               machineDeploymentRequestProviderGetter,
-		seedsGetter:                           seedsGetter,
-		seedClientGetter:                      seedClientGetter,
-		addons:                                addonProviderGetter,
-		addonConfigProvider:                   addonConfigProvider,
-		userInfoGetter:                        userInfoGetter,
-		settingsProvider:                      settingsProvider,
-		adminProvider:                         adminProvider,
-		presetProvider:                        presetsProvider,
-		admissionPluginProvider:               admissionPluginProvider,
-		settingsWatcher:                       settingsWatcher,
-		userWatcher:                           userWatcher,
-		externalClusterProvider:               externalClusterProvider,
-		privilegedExternalClusterProvider:     externalClusterProvider,
-		constraintTemplateProvider:            constraintTemplateProvider,
-		constraintProviderGetter:              constraintProviderGetter,
+		mdRequestProviderGetter:                 machineDeploymentRequestProviderGetter,
+		sshKey:                                  sshKeyProvider,
+		privilegedSSHKeyProvider:                privilegedSSHKeyProvider,
+		user:                                    userProvider,
+		serviceAccountProvider:                  serviceAccountProvider,
+		privilegedServiceAccountProvider:        serviceAccountProvider,
+		serviceAccountTokenProvider:             serviceAccountTokenProvider,
+		privilegedServiceAccountTokenProvider:   serviceAccountTokenProvider,
+		project:                                 projectProvider,
+		privilegedProject:                       privilegedProjectProvider,
+		projectMember:                           projectMemberProvider,
+		privilegedProjectMemberProvider:         projectMemberProvider,
+		memberMapper:                            projectMemberProvider,
+		eventRecorderProvider:                   eventRecorderProvider,
+		clusterProviderGetter:                   clusterProviderGetter,
+		seedsGetter:                             seedsGetter,
+		seedClientGetter:                        seedClientGetter,
+		addons:                                  addonProviderGetter,
+		addonConfigProvider:                     addonConfigProvider,
+		userInfoGetter:                          userInfoGetter,
+		settingsProvider:                        settingsProvider,
+		adminProvider:                           adminProvider,
+		presetProvider:                          presetsProvider,
+		admissionPluginProvider:                 admissionPluginProvider,
+		settingsWatcher:                         settingsWatcher,
+		userWatcher:                             userWatcher,
+		externalClusterProvider:                 externalClusterProvider,
+		privilegedExternalClusterProvider:       externalClusterProvider,
+		constraintTemplateProvider:              constraintTemplateProvider,
+		defaultConstraintProvider:               defaultConstraintProvider,
+		constraintProviderGetter:                constraintProviderGetter,
+		alertmanagerProviderGetter:              alertmanagerProviderGetter,
+		clusterTemplateProvider:                 clusterTemplateProvider,
+		ruleGroupProviderGetter:                 ruleGroupProviderGetter,
+		clusterTemplateInstanceProviderGetter:   clusterTemplateInstanceProviderGetter,
+		privilegedAllowedRegistryProvider:       privilegedAllowedRegistryProvider,
+		etcdBackupConfigProviderGetter:          etcdBackupConfigProviderGetter,
+		etcdRestoreProviderGetter:               etcdRestoreProviderGetter,
+		etcdBackupConfigProjectProviderGetter:   etcdBackupConfigProjectProviderGetter,
+		etcdRestoreProjectProviderGetter:        etcdRestoreProjectProviderGetter,
+		backupCredentialsProviderGetter:         backupCredentialsProviderGetter,
+		privilegedMLAAdminSettingProviderGetter: privilegedMLAAdminSettingProviderGetter,
 	}, nil
 }
 
@@ -382,7 +436,7 @@ func createAuthClients(options serverRunOptions, prov providers) (auth.TokenVeri
 	return tokenVerifiers, tokenExtractors, nil
 }
 
-func createAPIHandler(options serverRunOptions, prov providers, oidcIssuerVerifier auth.OIDCIssuerVerifier, tokenVerifiers auth.TokenVerifier, tokenExtractors auth.TokenExtractor, updateManager common.UpdateManager, keycloakFacade keycloak.Facade) (http.HandlerFunc, error) {
+func createAPIHandler(options serverRunOptions, prov providers, oidcIssuerVerifier auth.OIDCIssuerVerifier, tokenVerifiers auth.TokenVerifier, tokenExtractors auth.TokenExtractor, updateManager common.UpdateManager, keycloakFacade keycloak.Facade, mgr manager.Manager) (http.HandlerFunc, error) {
 	var prometheusClient prometheusapi.Client
 	if options.featureGates.Enabled(features.PrometheusEndpoint) {
 		var err error
@@ -400,52 +454,64 @@ func createAPIHandler(options serverRunOptions, prov providers, oidcIssuerVerifi
 	serviceAccountTokenAuth := serviceaccount.JWTTokenAuthenticator([]byte(options.serviceAccountSigningKey))
 
 	routingParams := handler.RoutingParams{
-		Log:                                   kubermaticlog.New(options.log.Debug, options.log.Format).Sugar(),
-		PresetsProvider:                       prov.presetProvider,
-		SeedsGetter:                           prov.seedsGetter,
-		SeedsClientGetter:                     prov.seedClientGetter,
-		SSHKeyProvider:                        prov.sshKey,
-		PrivilegedSSHKeyProvider:              prov.privilegedSSHKeyProvider,
-		UserProvider:                          prov.user,
-		ServiceAccountProvider:                prov.serviceAccountProvider,
-		PrivilegedServiceAccountProvider:      prov.privilegedServiceAccountProvider,
-		ServiceAccountTokenProvider:           prov.serviceAccountTokenProvider,
-		PrivilegedServiceAccountTokenProvider: prov.privilegedServiceAccountTokenProvider,
-		ProjectProvider:                       prov.project,
-		MdRequestProviderGetter:               prov.mdRequestProviderGetter,
-		PrivilegedProjectProvider:             prov.privilegedProject,
-		OIDCIssuerVerifier:                    oidcIssuerVerifier,
-		TokenVerifiers:                        tokenVerifiers,
-		TokenExtractors:                       tokenExtractors,
-		ClusterProviderGetter:                 prov.clusterProviderGetter,
-		AddonProviderGetter:                   prov.addons,
-		AddonConfigProvider:                   prov.addonConfigProvider,
-		UpdateManager:                         updateManager,
-		PrometheusClient:                      prometheusClient,
-		ProjectMemberProvider:                 prov.projectMember,
-		PrivilegedProjectMemberProvider:       prov.privilegedProjectMemberProvider,
-		UserProjectMapper:                     prov.memberMapper,
-		SATokenAuthenticator:                  serviceAccountTokenAuth,
-		SATokenGenerator:                      serviceAccountTokenGenerator,
-		EventRecorderProvider:                 prov.eventRecorderProvider,
-		KeycloakFacade:                        keycloakFacade,
-		ExposeStrategy:                        options.exposeStrategy,
-		AccessibleAddons:                      options.accessibleAddons,
-		UserInfoGetter:                        prov.userInfoGetter,
-		SettingsProvider:                      prov.settingsProvider,
-		AdminProvider:                         prov.adminProvider,
-		AdmissionPluginProvider:               prov.admissionPluginProvider,
-		SettingsWatcher:                       prov.settingsWatcher,
-		UserWatcher:                           prov.userWatcher,
-		ExternalClusterProvider:               prov.externalClusterProvider,
-		PrivilegedExternalClusterProvider:     prov.privilegedExternalClusterProvider,
-		ConstraintTemplateProvider:            prov.constraintTemplateProvider,
-		ConstraintProviderGetter:              prov.constraintProviderGetter,
-		Versions:                              options.versions,
-		CABundle:                              options.caBundle.CertPool(),
+		KeycloakFacade:                          keycloakFacade,
+		MdRequestProviderGetter:                 prov.mdRequestProviderGetter,
+		Log:                                     kubermaticlog.New(options.log.Debug, options.log.Format).Sugar(),
+		PresetsProvider:                         prov.presetProvider,
+		SeedsGetter:                             prov.seedsGetter,
+		SeedsClientGetter:                       prov.seedClientGetter,
+		SSHKeyProvider:                          prov.sshKey,
+		PrivilegedSSHKeyProvider:                prov.privilegedSSHKeyProvider,
+		UserProvider:                            prov.user,
+		ServiceAccountProvider:                  prov.serviceAccountProvider,
+		PrivilegedServiceAccountProvider:        prov.privilegedServiceAccountProvider,
+		ServiceAccountTokenProvider:             prov.serviceAccountTokenProvider,
+		PrivilegedServiceAccountTokenProvider:   prov.privilegedServiceAccountTokenProvider,
+		ProjectProvider:                         prov.project,
+		PrivilegedProjectProvider:               prov.privilegedProject,
+		OIDCIssuerVerifier:                      oidcIssuerVerifier,
+		TokenVerifiers:                          tokenVerifiers,
+		TokenExtractors:                         tokenExtractors,
+		ClusterProviderGetter:                   prov.clusterProviderGetter,
+		AddonProviderGetter:                     prov.addons,
+		AddonConfigProvider:                     prov.addonConfigProvider,
+		UpdateManager:                           updateManager,
+		PrometheusClient:                        prometheusClient,
+		ProjectMemberProvider:                   prov.projectMember,
+		PrivilegedProjectMemberProvider:         prov.privilegedProjectMemberProvider,
+		UserProjectMapper:                       prov.memberMapper,
+		SATokenAuthenticator:                    serviceAccountTokenAuth,
+		SATokenGenerator:                        serviceAccountTokenGenerator,
+		EventRecorderProvider:                   prov.eventRecorderProvider,
+		ExposeStrategy:                          options.exposeStrategy,
+		AccessibleAddons:                        options.accessibleAddons,
+		UserInfoGetter:                          prov.userInfoGetter,
+		SettingsProvider:                        prov.settingsProvider,
+		AdminProvider:                           prov.adminProvider,
+		AdmissionPluginProvider:                 prov.admissionPluginProvider,
+		SettingsWatcher:                         prov.settingsWatcher,
+		UserWatcher:                             prov.userWatcher,
+		ExternalClusterProvider:                 prov.externalClusterProvider,
+		PrivilegedExternalClusterProvider:       prov.privilegedExternalClusterProvider,
+		ConstraintTemplateProvider:              prov.constraintTemplateProvider,
+		DefaultConstraintProvider:               prov.defaultConstraintProvider,
+		ConstraintProviderGetter:                prov.constraintProviderGetter,
+		AlertmanagerProviderGetter:              prov.alertmanagerProviderGetter,
+		ClusterTemplateProvider:                 prov.clusterTemplateProvider,
+		ClusterTemplateInstanceProviderGetter:   prov.clusterTemplateInstanceProviderGetter,
+		RuleGroupProviderGetter:                 prov.ruleGroupProviderGetter,
+		PrivilegedAllowedRegistryProvider:       prov.privilegedAllowedRegistryProvider,
+		EtcdBackupConfigProviderGetter:          prov.etcdBackupConfigProviderGetter,
+		EtcdRestoreProviderGetter:               prov.etcdRestoreProviderGetter,
+		EtcdBackupConfigProjectProviderGetter:   prov.etcdBackupConfigProjectProviderGetter,
+		EtcdRestoreProjectProviderGetter:        prov.etcdRestoreProjectProviderGetter,
+		BackupCredentialsProviderGetter:         prov.backupCredentialsProviderGetter,
+		PrivilegedMLAAdminSettingProviderGetter: prov.privilegedMLAAdminSettingProviderGetter,
+		Versions:                                options.versions,
+		CABundle:                                options.caBundle.CertPool(),
 	}
 
-	r := handler.NewRouting(routingParams)
+	r := handler.NewRouting(routingParams, mgr.GetClient())
 	rv2 := v2.NewV2Routing(routingParams)
 
 	registerMetrics()

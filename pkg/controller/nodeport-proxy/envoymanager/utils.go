@@ -24,11 +24,11 @@ import (
 
 	"github.com/pkg/errors"
 
+	"k8c.io/kubermatic/v2/pkg/resources/nodeportproxy"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-
-	"k8c.io/kubermatic/v2/pkg/resources/nodeportproxy"
 )
 
 // SortServicesByCreationTimestamp sorts the Service slice in descending order
@@ -136,7 +136,7 @@ func portHostMappingFromAnnotation(svc *corev1.Service) (portHostMapping, error)
 }
 
 func (p portHostMapping) validate(svc *corev1.Service) error {
-	// TODO(irozzo): validate that hosts are well formed FQDN
+	// TODO: validate that hosts are well formed FQDN
 	portNames, hosts := p.portHostSets()
 	if len(p) > hosts.Len() {
 		return fmt.Errorf("duplicated hostname in port host mapping of service: %v", p)

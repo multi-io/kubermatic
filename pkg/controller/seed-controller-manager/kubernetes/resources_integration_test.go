@@ -22,6 +22,7 @@ import (
 	"context"
 	"testing"
 
+	k8cuserclusterclient "k8c.io/kubermatic/v2/pkg/cluster/client"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
 	"k8c.io/kubermatic/v2/pkg/resources"
@@ -32,27 +33,41 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	autoscalingv1beta2 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1beta2"
+	"k8s.io/utils/pointer"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
+
+type testUserClusterConnectionProvider struct {
+	userClusterConnectionProvider
+	ctrlruntimeclient.Client
+}
+
+func (c *testUserClusterConnectionProvider) GetClient(context.Context, *kubermaticv1.Cluster, ...k8cuserclusterclient.ConfigOption) (ctrlruntimeclient.Client, error) {
+	return c, nil
+}
+
+func (c *testUserClusterConnectionProvider) Get(ctx context.Context, key ctrlruntimeclient.ObjectKey, obj ctrlruntimeclient.Object) error {
+	switch x := obj.(type) {
+	case *corev1.ServiceAccount:
+		x.Secrets = append(x.Secrets, corev1.ObjectReference{
+			Name: "token-name",
+		})
+	case *corev1.Secret:
+		x.Data["ca.crt"] = []byte("ca.crtGARBAGE")
+		x.Data["token"] = []byte("tokenGARBAGE")
+	}
+	return nil
+}
 
 func TestEnsureResourcesAreDeployedIdempotency(t *testing.T) {
 	kubermaticlog.Logger = kubermaticlog.New(true, kubermaticlog.FormatJSON).Sugar()
 	env := &envtest.Environment{
 		// Uncomment this to get the logs from etcd+apiserver
 		// AttachControlPlaneOutput: true,
-		KubeAPIServerFlags: []string{
-			"--etcd-servers={{ if .EtcdURL }}{{ .EtcdURL.String }}{{ end }}",
-			"--cert-dir={{ .CertDir }}",
-			"--insecure-port={{ if .URL }}{{ .URL.Port }}{{ end }}",
-			"--insecure-bind-address={{ if .URL }}{{ .URL.Hostname }}{{ end }}",
-			"--secure-port={{ if .SecurePort }}{{ .SecurePort }}{{ end }}",
-			"--admission-control=AlwaysAdmit",
-			// Upstream does not have `--allow-privileged`,
-			"--allow-privileged",
-		},
 	}
+
 	cfg, err := env.Start()
 	if err != nil {
 		t.Fatalf("failed to start testenv: %v", err)
@@ -71,7 +86,7 @@ func TestEnsureResourcesAreDeployedIdempotency(t *testing.T) {
 		t.Fatalf("failed to register vertical pod autoscaler resources to scheme: %v", err)
 	}
 	crdInstallOpts := envtest.CRDInstallOptions{
-		Paths:              []string{"../../../../charts/kubermatic/crd"},
+		Paths:              []string{"../../../../charts/kubermatic-operator/crd"},
 		ErrorIfPathMissing: true,
 	}
 	if _, err := envtest.InstallCRDs(cfg, crdInstallOpts); err != nil {
@@ -94,10 +109,18 @@ func TestEnsureResourcesAreDeployedIdempotency(t *testing.T) {
 		},
 		Spec: kubermaticv1.ClusterSpec{
 			ExposeStrategy: kubermaticv1.ExposeStrategyLoadBalancer,
+			ClusterNetwork: kubermaticv1.ClusterNetworkingConfig{
+				Pods:                     kubermaticv1.NetworkRanges{CIDRBlocks: []string{"10.241.0.0/16"}},
+				Services:                 kubermaticv1.NetworkRanges{CIDRBlocks: []string{"172.193.0.0/20"}},
+				DNSDomain:                "cluster.local",
+				ProxyMode:                resources.IPVSProxyMode,
+				NodeLocalDNSCacheEnabled: pointer.BoolPtr(true),
+			},
 			Cloud: kubermaticv1.CloudSpec{
 				DatacenterName: "my-dc",
+				Fake:           &kubermaticv1.FakeCloudSpec{},
 			},
-			Version: *semver.NewSemverOrDie("1.18.9"),
+			Version: *semver.NewSemverOrDie("1.22.2"),
 		},
 		Status: kubermaticv1.ClusterStatus{
 			NamespaceName: "cluster-test-cluster",
@@ -109,6 +132,12 @@ func TestEnsureResourcesAreDeployedIdempotency(t *testing.T) {
 
 	// This is used as basis to sync the clusters address which we in turn do
 	// before creating any deployments.
+	namespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: testCluster.Status.NamespaceName,
+		},
+	}
+
 	lbService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: testCluster.Status.NamespaceName,
@@ -130,6 +159,9 @@ func TestEnsureResourcesAreDeployedIdempotency(t *testing.T) {
 		},
 	}
 
+	if err := mgr.GetClient().Create(ctx, namespace); err != nil {
+		t.Fatalf("failed to create namespace: %v", err)
+	}
 	if err := mgr.GetClient().Create(ctx, testCluster); err != nil {
 		t.Fatalf("failed to create testcluster: %v", err)
 	}
@@ -173,11 +205,8 @@ func TestEnsureResourcesAreDeployedIdempotency(t *testing.T) {
 				},
 			}, nil
 		},
-		caBundle: caBundle,
-	}
-
-	if err := r.ensureClusterNetworkDefaults(ctx, testCluster); err != nil {
-		t.Fatalf("failed to sync initial network default: %v", err)
+		caBundle:                caBundle,
+		userClusterConnProvider: new(testUserClusterConnectionProvider),
 	}
 
 	if err := r.ensureResourcesAreDeployed(ctx, testCluster); err != nil {

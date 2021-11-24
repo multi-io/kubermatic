@@ -6,6 +6,9 @@ package models
 // Editing this file might prove futile when you re-run the swagger generate command
 
 import (
+	"context"
+
+	"github.com/go-openapi/errors"
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/swag"
 )
@@ -18,12 +21,65 @@ type ClusterStatus struct {
 	// URL specifies the address at which the cluster is available
 	URL string `json:"url,omitempty"`
 
+	// external c c m migration
+	ExternalCCMMigration ExternalCCMMigrationStatus `json:"externalCCMMigration,omitempty"`
+
 	// version
 	Version Semver `json:"version,omitempty"`
 }
 
 // Validate validates this cluster status
 func (m *ClusterStatus) Validate(formats strfmt.Registry) error {
+	var res []error
+
+	if err := m.validateExternalCCMMigration(formats); err != nil {
+		res = append(res, err)
+	}
+
+	if len(res) > 0 {
+		return errors.CompositeValidationError(res...)
+	}
+	return nil
+}
+
+func (m *ClusterStatus) validateExternalCCMMigration(formats strfmt.Registry) error {
+	if swag.IsZero(m.ExternalCCMMigration) { // not required
+		return nil
+	}
+
+	if err := m.ExternalCCMMigration.Validate(formats); err != nil {
+		if ve, ok := err.(*errors.Validation); ok {
+			return ve.ValidateName("externalCCMMigration")
+		}
+		return err
+	}
+
+	return nil
+}
+
+// ContextValidate validate this cluster status based on the context it is used
+func (m *ClusterStatus) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
+	var res []error
+
+	if err := m.contextValidateExternalCCMMigration(ctx, formats); err != nil {
+		res = append(res, err)
+	}
+
+	if len(res) > 0 {
+		return errors.CompositeValidationError(res...)
+	}
+	return nil
+}
+
+func (m *ClusterStatus) contextValidateExternalCCMMigration(ctx context.Context, formats strfmt.Registry) error {
+
+	if err := m.ExternalCCMMigration.ContextValidate(ctx, formats); err != nil {
+		if ve, ok := err.(*errors.Validation); ok {
+			return ve.ValidateName("externalCCMMigration")
+		}
+		return err
+	}
+
 	return nil
 }
 

@@ -42,13 +42,25 @@ spec:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
         prometheus.io/scrape: "true"
-        prometheus.io/port: "http-metrics"
+        prometheus.io/port: "{{ .Values.promtail.config.server.http_listen_port }}"
         kubermatic.io/chart: promtail
     spec:
       serviceAccountName: {{ template "promtail.serviceAccountName" . }}
     {{- if .Values.promtail.priorityClassName }}
       priorityClassName: {{ .Values.promtail.priorityClassName }}
     {{- end }}
+      {{- if .Values.promtail.initContainer.enabled }}
+      initContainers:
+        - name: init
+          image: "{{ .Values.promtail.initContainer.image.registry }}/{{ .Values.promtail.initContainer.image.repository }}:{{ .Values.promtail.initContainer.image.tag }}"
+          imagePullPolicy: {{ .Values.promtail.initContainer.image.pullPolicy }}
+          command:
+            - sh
+            - -c
+            - sysctl -w fs.inotify.max_user_instances={{ .Values.promtail.initContainer.fsInotifyMaxUserInstances }}
+          securityContext:
+            privileged: true
+      {{- end }}
       containers:
         - name: promtail
           image: "{{ .Values.promtail.image.repository }}:{{ .Values.promtail.image.tag }}"
@@ -71,6 +83,9 @@ spec:
           - name: pods
             mountPath: /var/log/pods
             readOnly: true
+          {{- with .Values.promtail.extraVolumeMounts }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
           env:
           - name: HOSTNAME
             valueFrom:
@@ -109,3 +124,6 @@ spec:
         - name: pods
           hostPath:
             path: /var/log/pods
+        {{- with .Values.promtail.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}

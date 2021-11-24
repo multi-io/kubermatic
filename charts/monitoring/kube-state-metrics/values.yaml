@@ -14,14 +14,14 @@
 
 kubeStateMetrics:
   image:
-    repository: quay.io/coreos/kube-state-metrics
-    tag: v1.9.7
+    repository: k8s.gcr.io/kube-state-metrics/kube-state-metrics
+    tag: v2.2.0
   resources:
     requests:
-      cpu: 50m
+      cpu: 250m
       memory: 32Mi
     limits:
-      cpu: 250m
+      cpu: 1
       memory: 128Mi
 
   resizer:

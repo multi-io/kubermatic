@@ -25,6 +25,21 @@ promtail:
     servicePort: 3100
     serviceScheme: http
 
+  initContainer:
+    # -- Specifies whether the init container for setting inotify max user instances is to be enabled
+    enabled: true
+    image:
+      # -- The Docker registry for the init container
+      registry: docker.io
+      # -- Docker image repository for the init container
+      repository: busybox
+      # -- Docker tag for the init container
+      tag: 1.33
+      # -- Docker image pull policy for the init container image
+      pullPolicy: IfNotPresent
+    # -- The inotify max user instances to configure
+    fsInotifyMaxUserInstances: 256
+
   nodeSelector: {}
   affinity: {}
 
@@ -273,6 +288,43 @@ promtail:
         - __meta_kubernetes_pod_annotation_kubernetes_io_config_mirror
         - __meta_kubernetes_pod_container_name
         target_label: __path__
+    - job_name: kubelet-journal-logs
+      journal:
+        path: /var/log/journal
+        max_age: 12h
+        labels:
+          job: systemd-journal
+      pipeline_stages:
+      - match:
+          selector: '{unit!="kubelet.service"}'
+          action: drop
+      relabel_configs:
+        - source_labels: ['__journal__systemd_unit']
+          target_label: 'unit'
+        - source_labels: ['__journal__hostname']
+          target_label: 'hostname'
+    - job_name: kubernetes-events
+      kubernetes_sd_configs:
+      - role: pod
+      pipeline_stages:
+      - match:
+          selector: '{app="eventrouter"}'
+          stages:
+          - json:
+              expressions:
+                namespace: event.metadata.namespace
+          - labels:
+              namespace: ""
+
+  extraVolumes:
+    - name: journal
+      hostPath:
+        path: /var/log/journal
+
+  extraVolumeMounts:
+    - name: journal
+      mountPath: /var/log/journal
+      readOnly: true
 
   tolerations:
   - key: node-role.kubernetes.io/master

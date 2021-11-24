@@ -28,6 +28,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ghodss/yaml"
 	"go.uber.org/zap"
 
@@ -39,6 +40,7 @@ import (
 	"k8c.io/kubermatic/v2/pkg/provider"
 	"k8c.io/kubermatic/v2/pkg/resources"
 	"k8c.io/kubermatic/v2/pkg/resources/machinecontroller"
+	"k8c.io/kubermatic/v2/pkg/util/kubectl"
 	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 
 	corev1 "k8s.io/api/core/v1"
@@ -87,7 +89,6 @@ type Reconciler struct {
 	overwriteRegistry        string
 	recorder                 record.EventRecorder
 	KubeconfigProvider       KubeconfigProvider
-	nodeLocalDNSCacheEnabled bool
 	externalURL              string
 	seedGetter               provider.SeedGetter
 	versions                 kubermatic.Versions
@@ -104,7 +105,6 @@ func Add(
 	addonCtxVariables map[string]interface{},
 	kubernetesAddonDir,
 	overwriteRegistey string,
-	nodeLocalDNSCacheEnabled bool,
 	kubeconfigProvider KubeconfigProvider,
 	externalURL string,
 	seedGetter provider.SeedGetter,
@@ -124,7 +124,6 @@ func Add(
 		workerName:               workerName,
 		recorder:                 mgr.GetEventRecorderFor(ControllerName),
 		overwriteRegistry:        overwriteRegistey,
-		nodeLocalDNSCacheEnabled: nodeLocalDNSCacheEnabled,
 		externalURL:              externalURL,
 		seedGetter:               seedGetter,
 		versions:                 versions,
@@ -311,7 +310,8 @@ func (r *Reconciler) getAddonManifests(ctx context.Context, log *zap.SugaredLogg
 		return nil, err
 	}
 	dnsResolverIP := clusterIP
-	if r.nodeLocalDNSCacheEnabled {
+	if cluster.Spec.ClusterNetwork.NodeLocalDNSCacheEnabled == nil || *cluster.Spec.ClusterNetwork.NodeLocalDNSCacheEnabled {
+		// NOTE: even if NodeLocalDNSCacheEnabled is nil, we assume it is enabled (backward compatibility for already existing clusters)
 		dnsResolverIP = machinecontroller.NodeLocalDNSCacheAddress
 	}
 
@@ -505,10 +505,22 @@ func (r *Reconciler) setupManifestInteraction(ctx context.Context, log *zap.Suga
 	return kubeconfigFilename, manifestFilename, done, nil
 }
 
-func (r *Reconciler) getApplyCommand(ctx context.Context, kubeconfigFilename, manifestFilename string, selector fmt.Stringer) *exec.Cmd {
-	// kubectl apply --prune -f manifest.yaml -l app=nginx
-	cmd := exec.CommandContext(ctx, "kubectl", "--kubeconfig", kubeconfigFilename, "apply", "--prune", "-f", manifestFilename, "-l", selector.String())
-	return cmd
+func (r *Reconciler) getApplyCommand(ctx context.Context, kubeconfigFilename, manifestFilename string, selector fmt.Stringer, clusterVersion *semver.Version) (*exec.Cmd, error) {
+	binary, err := kubectl.BinaryForClusterVersion(clusterVersion)
+	if err != nil {
+		return nil, fmt.Errorf("failed to determine kubectl binary to use: %w", err)
+	}
+
+	cmd := exec.CommandContext(
+		ctx,
+		binary,
+		"--kubeconfig", kubeconfigFilename,
+		"apply",
+		"--prune",
+		"--filename", manifestFilename,
+		"--selector", selector.String(),
+	)
+	return cmd, nil
 }
 
 func (r *Reconciler) ensureIsInstalled(ctx context.Context, log *zap.SugaredLogger, addon *kubermaticv1.Addon, cluster *kubermaticv1.Cluster) error {
@@ -530,7 +542,11 @@ func (r *Reconciler) ensureIsInstalled(ctx context.Context, log *zap.SugaredLogg
 
 	// We delete all resources with this label which are not in the combined manifest
 	selector := labels.SelectorFromSet(r.getAddonLabel(addon))
-	cmd := r.getApplyCommand(ctx, kubeconfigFilename, manifestFilename, selector)
+	cmd, err := r.getApplyCommand(ctx, kubeconfigFilename, manifestFilename, selector, cluster.Spec.Version.Version)
+	if err != nil {
+		return fmt.Errorf("failed to create command: %w", err)
+	}
+
 	cmdLog := log.With("cmd", strings.Join(cmd.Args, " "))
 
 	cmdLog.Debug("Applying manifest...")
@@ -574,7 +590,12 @@ func (r *Reconciler) cleanupManifests(ctx context.Context, log *zap.SugaredLogge
 	}
 	defer done()
 
-	cmd := deleteCommand(ctx, kubeconfigFilename, manifestFilename)
+	binary, err := kubectl.BinaryForClusterVersion(cluster.Spec.Version.Version)
+	if err != nil {
+		return fmt.Errorf("failed to determine kubectl binary to use: %w", err)
+	}
+
+	cmd := exec.CommandContext(ctx, binary, "--kubeconfig", kubeconfigFilename, "delete", "-f", manifestFilename, "--ignore-not-found")
 	cmdLog := log.With("cmd", strings.Join(cmd.Args, " "))
 
 	cmdLog.Debug("Deleting resources...")
@@ -616,10 +637,6 @@ func (r *Reconciler) ensureRequiredResourceTypesExist(ctx context.Context, log *
 	}
 
 	return nil, nil
-}
-
-func deleteCommand(ctx context.Context, kubeconfigFilename, manifestFilename string) *exec.Cmd {
-	return exec.CommandContext(ctx, "kubectl", "--kubeconfig", kubeconfigFilename, "delete", "-f", manifestFilename, "--ignore-not-found")
 }
 
 func setAddonCodition(a *kubermaticv1.Addon, condType kubermaticv1.AddonConditionType, status corev1.ConditionStatus) {

@@ -68,6 +68,48 @@ const (
 	// PrivilegedAddonProviderContextKey key under which the current PrivilegedAddonProvider is kept in the ctx
 	PrivilegedAddonProviderContextKey kubermaticcontext.Key = "privileged-addon-provider"
 
+	// AlertmanagerProviderContextKey key under which the current AlertmanagerProvider is kept in the ctx
+	AlertmanagerProviderContextKey kubermaticcontext.Key = "alertmanager-provider"
+
+	// PrivilegedAlertmanagerProviderContextKey key under which the current PrivilegedAlertmanagerProvider is kept in the ctx
+	PrivilegedAlertmanagerProviderContextKey kubermaticcontext.Key = "privileged-alertmanager-provider"
+
+	// RuleGroupProviderContextKey key under which the current RuleGroupProvider is kept in the ctx
+	RuleGroupProviderContextKey kubermaticcontext.Key = "rulegroup-provider"
+
+	// PrivilegedRuleGroupProviderContextKey key under which the current PrivilegedRuleGroupProvider is kept in the ctx
+	PrivilegedRuleGroupProviderContextKey kubermaticcontext.Key = "privileged-rulegroup-provider"
+
+	// EtcdBackupConfigProviderContextKey key under which the current EtcdBackupConfigProvider is kept in the ctx
+	EtcdBackupConfigProviderContextKey kubermaticcontext.Key = "etcdbackupconfig-provider"
+
+	// PrivilegedEtcdBackupConfigProviderContextKey key under which the current PrivilegedEtcdBackupConfigProvider is kept in the ctx
+	PrivilegedEtcdBackupConfigProviderContextKey kubermaticcontext.Key = "privileged-etcdbackupconfig-provider"
+
+	// EtcdRestoreProviderContextKey key under which the current EtcdRestoreProvider is kept in the ctx
+	EtcdRestoreProviderContextKey kubermaticcontext.Key = "etcdbrestore-provider"
+
+	// PrivilegedEtcdRestoreProviderContextKey key under which the current PrivilegedEtcdRestoreProvider is kept in the ctx
+	PrivilegedEtcdRestoreProviderContextKey kubermaticcontext.Key = "privileged-etcdrestore-provider"
+
+	// EtcdBackupConfigProjectProviderContextKey key under which the current EtcdBackupConfigProjectProvider is kept in the ctx
+	EtcdBackupConfigProjectProviderContextKey kubermaticcontext.Key = "etcdbackupconfig-project-provider"
+
+	// PrivilegedEtcdBackupConfigProjectProviderContextKey key under which the current PrivilegedEtcdBackupConfigProjectProvider is kept in the ctx
+	PrivilegedEtcdBackupConfigProjectProviderContextKey kubermaticcontext.Key = "privileged-etcdbackupconfig-project-provider"
+
+	// EtcdRestoreProjectProviderContextKey key under which the current EtcdRestoreProjectProvider is kept in the ctx
+	EtcdRestoreProjectProviderContextKey kubermaticcontext.Key = "etcdbrestore-project-provider"
+
+	// PrivilegedEtcdRestoreProjectProviderContextKey key under which the current PrivilegedEtcdRestoreProjectProvider is kept in the ctx
+	PrivilegedEtcdRestoreProjectProviderContextKey kubermaticcontext.Key = "privileged-etcdrestore-project-provider"
+
+	// BackupCredentialsProviderContextKey key under which the current BackupCredentialsProvider is kept in the ctx
+	BackupCredentialsProviderContextKey kubermaticcontext.Key = "backupcredentials-provider"
+
+	// PrivilegedMLAAdminSettingProviderContextKey key under which the current PrivilegedMLAAdminSettingProvider is kept in the ctx
+	PrivilegedMLAAdminSettingProviderContextKey kubermaticcontext.Key = "privileged-mla-admin-setting-provider"
+
 	// ConstraintProviderContextKey key under which the current ConstraintProvider is kept in the ctx
 	ConstraintProviderContextKey kubermaticcontext.Key = "constraint-provider"
 
@@ -78,7 +120,7 @@ const (
 	SeedsGetterContextKey kubermaticcontext.Key = "seeds-getter"
 )
 
-//seedClusterGetter defines functionality to retrieve a seed name
+// seedClusterGetter defines functionality to retrieve a seed name
 type seedClusterGetter interface {
 	GetSeedCluster() apiv1.SeedCluster
 }
@@ -443,4 +485,385 @@ func getConstraintProvider(clusterProviderGetter provider.ClusterProviderGetter,
 	}
 
 	return constraintProviderGetter(seed)
+}
+
+// Alertmanagers is a middleware that injects the current AlertmanagerProvider into the ctx
+func Alertmanagers(clusterProviderGetter provider.ClusterProviderGetter, alertmanagerProviderGetter provider.AlertmanagerProviderGetter, seedsGetter provider.SeedsGetter) endpoint.Middleware {
+	return func(next endpoint.Endpoint) endpoint.Endpoint {
+		return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+			seedCluster := request.(seedClusterGetter).GetSeedCluster()
+
+			alertmanagerProvider, err := getAlertmanagerProvider(clusterProviderGetter, alertmanagerProviderGetter, seedsGetter, seedCluster.SeedName, seedCluster.ClusterID)
+			if err != nil {
+				return nil, err
+			}
+			ctx = context.WithValue(ctx, AlertmanagerProviderContextKey, alertmanagerProvider)
+			return next(ctx, request)
+		}
+	}
+}
+
+// PrivilegedAlertmanagers is a middleware that injects the current PrivilegedAlertmanagerProvider into the ctx
+func PrivilegedAlertmanagers(clusterProviderGetter provider.ClusterProviderGetter, alertmanagerProviderGetter provider.AlertmanagerProviderGetter, seedsGetter provider.SeedsGetter) endpoint.Middleware {
+	return func(next endpoint.Endpoint) endpoint.Endpoint {
+		return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+			seedCluster := request.(seedClusterGetter).GetSeedCluster()
+			alertmanagerProvider, err := getAlertmanagerProvider(clusterProviderGetter, alertmanagerProviderGetter, seedsGetter, seedCluster.SeedName, seedCluster.ClusterID)
+			if err != nil {
+				return nil, err
+			}
+			privilegedAlertmanagerProvider := alertmanagerProvider.(provider.PrivilegedAlertmanagerProvider)
+			ctx = context.WithValue(ctx, PrivilegedAlertmanagerProviderContextKey, privilegedAlertmanagerProvider)
+			return next(ctx, request)
+		}
+	}
+}
+
+func getAlertmanagerProvider(clusterProviderGetter provider.ClusterProviderGetter, alertmanagerProviderGetter provider.AlertmanagerProviderGetter, seedsGetter provider.SeedsGetter, seedName, clusterID string) (provider.AlertmanagerProvider, error) {
+	seeds, err := seedsGetter()
+	if err != nil {
+		return nil, err
+	}
+
+	if clusterID != "" {
+		for _, seed := range seeds {
+			clusterProvider, err := clusterProviderGetter(seed)
+			if err != nil {
+				return nil, common.KubernetesErrorToHTTPError(err)
+			}
+			if clusterProvider.IsCluster(clusterID) {
+				seedName = seed.Name
+				break
+			}
+		}
+	}
+
+	seed, found := seeds[seedName]
+	if !found {
+		return nil, fmt.Errorf("couldn't find seed %q", seedName)
+	}
+
+	return alertmanagerProviderGetter(seed)
+}
+
+// RuleGroups is a middleware that injects the current RuleGroupProvider into the ctx
+func RuleGroups(clusterProviderGetter provider.ClusterProviderGetter, ruleGroupProviderGetter provider.RuleGroupProviderGetter, seedsGetter provider.SeedsGetter) endpoint.Middleware {
+	return func(next endpoint.Endpoint) endpoint.Endpoint {
+		return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+			seedCluster := request.(seedClusterGetter).GetSeedCluster()
+
+			ruleGroupProvider, err := getRuleGroupProvider(clusterProviderGetter, ruleGroupProviderGetter, seedsGetter, seedCluster.SeedName, seedCluster.ClusterID)
+			if err != nil {
+				return nil, err
+			}
+			ctx = context.WithValue(ctx, RuleGroupProviderContextKey, ruleGroupProvider)
+			return next(ctx, request)
+		}
+	}
+}
+
+// PrivilegedRuleGroups is a middleware that injects the current PrivilegedRuleGroupProvider into the ctx
+func PrivilegedRuleGroups(clusterProviderGetter provider.ClusterProviderGetter, ruleGroupProviderGetter provider.RuleGroupProviderGetter, seedsGetter provider.SeedsGetter) endpoint.Middleware {
+	return func(next endpoint.Endpoint) endpoint.Endpoint {
+		return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+			seedCluster := request.(seedClusterGetter).GetSeedCluster()
+			ruleGroupProvider, err := getRuleGroupProvider(clusterProviderGetter, ruleGroupProviderGetter, seedsGetter, seedCluster.SeedName, seedCluster.ClusterID)
+			if err != nil {
+				return nil, err
+			}
+			privilegedRuleGroupProvider := ruleGroupProvider.(provider.PrivilegedRuleGroupProvider)
+			ctx = context.WithValue(ctx, PrivilegedRuleGroupProviderContextKey, privilegedRuleGroupProvider)
+			return next(ctx, request)
+		}
+	}
+}
+
+func getRuleGroupProvider(clusterProviderGetter provider.ClusterProviderGetter, ruleGroupProviderGetter provider.RuleGroupProviderGetter, seedsGetter provider.SeedsGetter, seedName, clusterID string) (provider.RuleGroupProvider, error) {
+	seeds, err := seedsGetter()
+	if err != nil {
+		return nil, err
+	}
+
+	if clusterID != "" {
+		for _, seed := range seeds {
+			clusterProvider, err := clusterProviderGetter(seed)
+			if err != nil {
+				return nil, common.KubernetesErrorToHTTPError(err)
+			}
+			if clusterProvider.IsCluster(clusterID) {
+				seedName = seed.Name
+				break
+			}
+		}
+	}
+
+	seed, found := seeds[seedName]
+	if !found {
+		return nil, fmt.Errorf("couldn't find seed %q", seedName)
+	}
+
+	return ruleGroupProviderGetter(seed)
+}
+
+// EtcdBackupConfig is a middleware that injects the current EtcdBackupConfigProvider into the ctx
+func EtcdBackupConfig(clusterProviderGetter provider.ClusterProviderGetter, etcdBackupConfigProviderGetter provider.EtcdBackupConfigProviderGetter, seedsGetter provider.SeedsGetter) endpoint.Middleware {
+	return func(next endpoint.Endpoint) endpoint.Endpoint {
+		return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+			seedCluster := request.(seedClusterGetter).GetSeedCluster()
+
+			etcdBackupConfigProvider, err := getEtcdBackupConfigProvider(clusterProviderGetter, etcdBackupConfigProviderGetter, seedsGetter, seedCluster.SeedName, seedCluster.ClusterID)
+			if err != nil {
+				return nil, err
+			}
+			ctx = context.WithValue(ctx, EtcdBackupConfigProviderContextKey, etcdBackupConfigProvider)
+			return next(ctx, request)
+		}
+	}
+}
+
+// PrivilegedEtcdBackupConfig is a middleware that injects the current PrivilegedEtcdBackupConfigProvider into the ctx
+func PrivilegedEtcdBackupConfig(clusterProviderGetter provider.ClusterProviderGetter, etcdBackupConfigProviderGetter provider.EtcdBackupConfigProviderGetter, seedsGetter provider.SeedsGetter) endpoint.Middleware {
+	return func(next endpoint.Endpoint) endpoint.Endpoint {
+		return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+			seedCluster := request.(seedClusterGetter).GetSeedCluster()
+			ebcProvider, err := getEtcdBackupConfigProvider(clusterProviderGetter, etcdBackupConfigProviderGetter, seedsGetter, seedCluster.SeedName, seedCluster.ClusterID)
+			if err != nil {
+				return nil, err
+			}
+			privilegedEtcdBackupConfigProvider := ebcProvider.(provider.PrivilegedEtcdBackupConfigProvider)
+			ctx = context.WithValue(ctx, PrivilegedEtcdBackupConfigProviderContextKey, privilegedEtcdBackupConfigProvider)
+			return next(ctx, request)
+		}
+	}
+}
+
+func getEtcdBackupConfigProvider(clusterProviderGetter provider.ClusterProviderGetter, etcdBackupConfigProviderGetter provider.EtcdBackupConfigProviderGetter, seedsGetter provider.SeedsGetter, seedName, clusterID string) (provider.EtcdBackupConfigProvider, error) {
+	seeds, err := seedsGetter()
+	if err != nil {
+		return nil, err
+	}
+
+	if clusterID != "" {
+		for _, seed := range seeds {
+			clusterProvider, err := clusterProviderGetter(seed)
+			if err != nil {
+				return nil, common.KubernetesErrorToHTTPError(err)
+			}
+			if clusterProvider.IsCluster(clusterID) {
+				seedName = seed.Name
+				break
+			}
+		}
+	}
+
+	seed, found := seeds[seedName]
+	if !found {
+		return nil, fmt.Errorf("couldn't find seed %q", seedName)
+	}
+
+	return etcdBackupConfigProviderGetter(seed)
+}
+
+// EtcdRestore is a middleware that injects the current EtcdRestoreProvider into the ctx
+func EtcdRestore(clusterProviderGetter provider.ClusterProviderGetter, etcdRestoreProviderGetter provider.EtcdRestoreProviderGetter, seedsGetter provider.SeedsGetter) endpoint.Middleware {
+	return func(next endpoint.Endpoint) endpoint.Endpoint {
+		return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+			seedCluster := request.(seedClusterGetter).GetSeedCluster()
+
+			etcdRestoreProvider, err := getEtcdRestoreProvider(clusterProviderGetter, etcdRestoreProviderGetter, seedsGetter, seedCluster.SeedName, seedCluster.ClusterID)
+			if err != nil {
+				return nil, err
+			}
+			ctx = context.WithValue(ctx, EtcdRestoreProviderContextKey, etcdRestoreProvider)
+			return next(ctx, request)
+		}
+	}
+}
+
+// PrivilegedEtcdRestore is a middleware that injects the current PrivilegedEtcdRestoreProvider into the ctx
+func PrivilegedEtcdRestore(clusterProviderGetter provider.ClusterProviderGetter, etcdRestoreProviderGetter provider.EtcdRestoreProviderGetter, seedsGetter provider.SeedsGetter) endpoint.Middleware {
+	return func(next endpoint.Endpoint) endpoint.Endpoint {
+		return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+			seedCluster := request.(seedClusterGetter).GetSeedCluster()
+			erProvider, err := getEtcdRestoreProvider(clusterProviderGetter, etcdRestoreProviderGetter, seedsGetter, seedCluster.SeedName, seedCluster.ClusterID)
+			if err != nil {
+				return nil, err
+			}
+			privilegedEtcdRestoreProvider := erProvider.(provider.PrivilegedEtcdRestoreProvider)
+			ctx = context.WithValue(ctx, PrivilegedEtcdRestoreProviderContextKey, privilegedEtcdRestoreProvider)
+			return next(ctx, request)
+		}
+	}
+}
+
+func getEtcdRestoreProvider(clusterProviderGetter provider.ClusterProviderGetter, etcdRestoreProviderGetter provider.EtcdRestoreProviderGetter, seedsGetter provider.SeedsGetter, seedName, clusterID string) (provider.EtcdRestoreProvider, error) {
+	seeds, err := seedsGetter()
+	if err != nil {
+		return nil, err
+	}
+
+	if clusterID != "" {
+		for _, seed := range seeds {
+			clusterProvider, err := clusterProviderGetter(seed)
+			if err != nil {
+				return nil, common.KubernetesErrorToHTTPError(err)
+			}
+			if clusterProvider.IsCluster(clusterID) {
+				seedName = seed.Name
+				break
+			}
+		}
+	}
+
+	seed, found := seeds[seedName]
+	if !found {
+		return nil, fmt.Errorf("couldn't find seed %q", seedName)
+	}
+
+	return etcdRestoreProviderGetter(seed)
+}
+
+// EtcdBackupConfigProject is a middleware that injects the current EtcdBackupConfigProjectProvider into the ctx
+func EtcdBackupConfigProject(etcdBackupConfigProjectProviderGetter provider.EtcdBackupConfigProjectProviderGetter, seedsGetter provider.SeedsGetter) endpoint.Middleware {
+	return func(next endpoint.Endpoint) endpoint.Endpoint {
+		return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+			etcdBackupConfigProvider, err := getEtcdBackupConfigProjectProvider(etcdBackupConfigProjectProviderGetter, seedsGetter)
+			if err != nil {
+				return nil, err
+			}
+			ctx = context.WithValue(ctx, EtcdBackupConfigProjectProviderContextKey, etcdBackupConfigProvider)
+			return next(ctx, request)
+		}
+	}
+}
+
+// PrivilegedEtcdBackupConfigProject is a middleware that injects the current PrivilegedEtcdBackupConfigProjectProvider into the ctx
+func PrivilegedEtcdBackupConfigProject(etcdBackupConfigProjectProviderGetter provider.EtcdBackupConfigProjectProviderGetter, seedsGetter provider.SeedsGetter) endpoint.Middleware {
+	return func(next endpoint.Endpoint) endpoint.Endpoint {
+		return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+			ebcProvider, err := getEtcdBackupConfigProjectProvider(etcdBackupConfigProjectProviderGetter, seedsGetter)
+			if err != nil {
+				return nil, err
+			}
+			privilegedEtcdBackupConfigProvider := ebcProvider.(provider.PrivilegedEtcdBackupConfigProjectProvider)
+			ctx = context.WithValue(ctx, PrivilegedEtcdBackupConfigProjectProviderContextKey, privilegedEtcdBackupConfigProvider)
+			return next(ctx, request)
+		}
+	}
+}
+
+func getEtcdBackupConfigProjectProvider(etcdBackupConfigProjectProviderGetter provider.EtcdBackupConfigProjectProviderGetter, seedsGetter provider.SeedsGetter) (provider.EtcdBackupConfigProjectProvider, error) {
+	seeds, err := seedsGetter()
+	if err != nil {
+		return nil, err
+	}
+
+	return etcdBackupConfigProjectProviderGetter(seeds)
+}
+
+// EtcdRestoreProject is a middleware that injects the current EtcdRestoreProjectProvider into the ctx
+func EtcdRestoreProject(etcdRestoreProjectProviderGetter provider.EtcdRestoreProjectProviderGetter, seedsGetter provider.SeedsGetter) endpoint.Middleware {
+	return func(next endpoint.Endpoint) endpoint.Endpoint {
+		return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+			etcdRestoreProvider, err := getEtcdRestoreProjectProvider(etcdRestoreProjectProviderGetter, seedsGetter)
+			if err != nil {
+				return nil, err
+			}
+			ctx = context.WithValue(ctx, EtcdRestoreProjectProviderContextKey, etcdRestoreProvider)
+			return next(ctx, request)
+		}
+	}
+}
+
+// PrivilegedEtcdRestoreProject is a middleware that injects the current PrivilegedEtcdRestoreProjectProvider into the ctx
+func PrivilegedEtcdRestoreProject(etcdRestoreProjectProviderGetter provider.EtcdRestoreProjectProviderGetter, seedsGetter provider.SeedsGetter) endpoint.Middleware {
+	return func(next endpoint.Endpoint) endpoint.Endpoint {
+		return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+			ebcProvider, err := getEtcdRestoreProjectProvider(etcdRestoreProjectProviderGetter, seedsGetter)
+			if err != nil {
+				return nil, err
+			}
+			privilegedEtcdRestoreProvider := ebcProvider.(provider.PrivilegedEtcdRestoreProjectProvider)
+			ctx = context.WithValue(ctx, PrivilegedEtcdRestoreProjectProviderContextKey, privilegedEtcdRestoreProvider)
+			return next(ctx, request)
+		}
+	}
+}
+
+func getEtcdRestoreProjectProvider(etcdRestoreProjectProviderGetter provider.EtcdRestoreProjectProviderGetter, seedsGetter provider.SeedsGetter) (provider.EtcdRestoreProjectProvider, error) {
+	seeds, err := seedsGetter()
+	if err != nil {
+		return nil, err
+	}
+
+	return etcdRestoreProjectProviderGetter(seeds)
+}
+
+// BackupCredentials is a middleware that injects the current BackupCredentialsProvider into the ctx
+func BackupCredentials(backupCredentialsProviderGetter provider.BackupCredentialsProviderGetter, seedsGetter provider.SeedsGetter) endpoint.Middleware {
+	return func(next endpoint.Endpoint) endpoint.Endpoint {
+		return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+			seedCluster := request.(seedClusterGetter).GetSeedCluster()
+
+			seeds, err := seedsGetter()
+			if err != nil {
+				return nil, err
+			}
+
+			seed, found := seeds[seedCluster.SeedName]
+			if !found {
+				return nil, k8cerrors.NewBadRequest("couldn't find seed %q", seedCluster.SeedName)
+			}
+
+			backupCredentialsProvider, err := backupCredentialsProviderGetter(seed)
+			if err != nil {
+				return nil, err
+			}
+
+			ctx = context.WithValue(ctx, BackupCredentialsProviderContextKey, backupCredentialsProvider)
+			return next(ctx, request)
+		}
+	}
+}
+
+// PrivilegedMLAAdminSetting is a middleware that injects the current PrivilegedMLAAdminSettingProvider into the ctx
+func PrivilegedMLAAdminSetting(clusterProviderGetter provider.ClusterProviderGetter, mlaAdminSettingProviderGetter provider.PrivilegedMLAAdminSettingProviderGetter, seedsGetter provider.SeedsGetter) endpoint.Middleware {
+	return func(next endpoint.Endpoint) endpoint.Endpoint {
+		return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+			seedCluster := request.(seedClusterGetter).GetSeedCluster()
+			privilegedMLAAdminSettingProvider, err := getPrivilegedMLAAdminSettingProvider(clusterProviderGetter, mlaAdminSettingProviderGetter, seedsGetter, seedCluster.SeedName, seedCluster.ClusterID)
+			if err != nil {
+				return nil, err
+			}
+			ctx = context.WithValue(ctx, PrivilegedMLAAdminSettingProviderContextKey, privilegedMLAAdminSettingProvider)
+			return next(ctx, request)
+		}
+	}
+}
+
+func getPrivilegedMLAAdminSettingProvider(clusterProviderGetter provider.ClusterProviderGetter, mlaAdminSettingProviderGetter provider.PrivilegedMLAAdminSettingProviderGetter, seedsGetter provider.SeedsGetter, seedName, clusterID string) (provider.PrivilegedMLAAdminSettingProvider, error) {
+	seeds, err := seedsGetter()
+	if err != nil {
+		return nil, err
+	}
+
+	if clusterID != "" {
+		for _, seed := range seeds {
+			clusterProvider, err := clusterProviderGetter(seed)
+			if err != nil {
+				return nil, common.KubernetesErrorToHTTPError(err)
+			}
+			if clusterProvider.IsCluster(clusterID) {
+				seedName = seed.Name
+				break
+			}
+		}
+	}
+
+	seed, found := seeds[seedName]
+	if !found {
+		return nil, fmt.Errorf("couldn't find seed %q", seedName)
+	}
+
+	return mlaAdminSettingProviderGetter(seed)
 }

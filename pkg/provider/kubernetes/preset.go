@@ -195,12 +195,42 @@ func filterOutPresets(userInfo *provider.UserInfo, list *kubermaticv1.PresetList
 	var presetList []kubermaticv1.Preset
 
 	for _, preset := range list.Items {
+		// find preset based on domains and emails
+		// Example: [ "example.com", "foobar@example.com", "foo.bar@test.com"]
+		// --> all "example.com" emails and "foo.bar@test.com" will get the preset
+		requiredEmails := preset.Spec.RequiredEmails
+
+		// assure backwards compatibility
 		requiredEmailDomain := preset.Spec.RequiredEmailDomain
-		// find preset for specific email domain
 		if requiredEmailDomain != "" {
+			requiredEmails = append(requiredEmails, requiredEmailDomain)
+		}
+
+		if len(requiredEmails) != 0 {
 			userDomain := strings.Split(userInfo.Email, "@")
-			if len(userDomain) == 2 && strings.EqualFold(userDomain[1], requiredEmailDomain) {
-				presetList = append(presetList, preset)
+			for _, emailItem := range requiredEmails {
+				// Special case:
+				//   userDomain = foo@bar@acme.com
+				//     user: foo@bar
+				//     domain: acme.com
+				//   --> take last element: userDomain[len(userDomain)-1]
+				reqEmail := strings.Split(emailItem, "@")
+
+				// if it's a domain, we compare it against the userDomain,
+				// otherwise, it has to match the whole email
+				if len(reqEmail) == 1 {
+					// domain provided
+					if len(userDomain) >= 2 && strings.EqualFold(userDomain[len(userDomain)-1], reqEmail[0]) {
+						presetList = append(presetList, preset)
+						break
+					}
+				} else {
+					// email provided
+					if strings.EqualFold(userInfo.Email, emailItem) {
+						presetList = append(presetList, preset)
+						break
+					}
+				}
 			}
 		} else {
 			// find preset for "all" without RequiredEmailDomain field
@@ -213,7 +243,7 @@ func filterOutPresets(userInfo *provider.UserInfo, list *kubermaticv1.PresetList
 func (m *PresetsProvider) SetCloudCredentials(userInfo *provider.UserInfo, presetName string, cloud kubermaticv1.CloudSpec, dc *kubermaticv1.Datacenter) (*kubermaticv1.CloudSpec, error) {
 
 	if cloud.VSphere != nil {
-		return m.setVsphereCredentials(userInfo, presetName, cloud)
+		return m.setVsphereCredentials(userInfo, presetName, cloud, dc)
 	}
 	if cloud.Openstack != nil {
 		return m.setOpenStackCredentials(userInfo, presetName, cloud, dc)
@@ -435,7 +465,7 @@ func (m *PresetsProvider) setOpenStackCredentials(userInfo *provider.UserInfo, p
 
 }
 
-func (m *PresetsProvider) setVsphereCredentials(userInfo *provider.UserInfo, presetName string, cloud kubermaticv1.CloudSpec) (*kubermaticv1.CloudSpec, error) {
+func (m *PresetsProvider) setVsphereCredentials(userInfo *provider.UserInfo, presetName string, cloud kubermaticv1.CloudSpec, dc *kubermaticv1.Datacenter) (*kubermaticv1.CloudSpec, error) {
 	preset, err := m.GetPreset(userInfo, presetName)
 	if err != nil {
 		return nil, err
@@ -450,6 +480,10 @@ func (m *PresetsProvider) setVsphereCredentials(userInfo *provider.UserInfo, pre
 	cloud.VSphere.VMNetName = credentials.VMNetName
 	cloud.VSphere.Datastore = credentials.Datastore
 	cloud.VSphere.DatastoreCluster = credentials.DatastoreCluster
+	cloud.VSphere.ResourcePool = credentials.ResourcePool
+	if cloud.VSphere.StoragePolicy == "" {
+		cloud.VSphere.StoragePolicy = dc.Spec.VSphere.DefaultStoragePolicy
+	}
 	return &cloud, nil
 
 }

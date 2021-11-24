@@ -157,14 +157,6 @@ run-operator:
 run-master-controller-manager:
 	./hack/run-master-controller-manager.sh
 
-.PHONY: run-nodeport-proxy-e2e-test-in-kind
-run-nodeport-proxy-e2e-test-in-kind:
-	./hack/run-nodeport-proxy-e2e-test-in-kind.sh
-
-.PHONY: run-expose-strategy-e2e-test-in-kind
-run-expose-strategy-e2e-test-in-kind:
-	./hack/run-expose-strategy-e2e-test-in-kind.sh
-
 .PHONY: verify
 verify:
 	./hack/verify-codegen.sh
