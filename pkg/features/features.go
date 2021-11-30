@@ -53,6 +53,10 @@ const (
 
 	// UserClusterMLA if enabled MonitoringLoggingAlerting stack will be deployed with corresponding controller
 	UserClusterMLA = "UserClusterMLA"
+
+	// PriorityClasses if enabled will apply priority classes to all managed seed infrastructure
+	// with levels depending on criticality
+	PriorityClasses = "PriorityClasses"
 )
 
 // FeatureGate is map of key=value pairs that enables/disables various features.
