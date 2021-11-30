@@ -358,9 +358,9 @@ func (os *Provider) InitializeCloudProvider(cluster *kubermaticv1.Cluster, updat
 	return cluster, nil
 }
 
+//nolint:golint,cyclomatic
 // CleanUpCloudProvider does the clean-up in particular:
 // removes security group and network configuration
-//nolint:golint,cyclomatic
 func (os *Provider) CleanUpCloudProvider(cluster *kubermaticv1.Cluster, update provider.ClusterUpdater) (*kubermaticv1.Cluster, error) {
 	netClient, err := os.getClientFunc(cluster.Spec.Cloud, os.dc, os.secretKeySelector, os.caBundle)
 	if err != nil {
