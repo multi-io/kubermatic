@@ -21,8 +21,8 @@ var (
 				corev1.ResourceCPU:    resource.MustParse("50m"),
 			},
 			MaxAllowed: corev1.ResourceList{
-				corev1.ResourceMemory: resource.MustParse("3Gi"),
-				corev1.ResourceCPU:    resource.MustParse("600m"),
+				corev1.ResourceMemory: resource.MustParse("8Gi"),
+				corev1.ResourceCPU:    resource.MustParse("2"),
 			},
 		},
 	}
