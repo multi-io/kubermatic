@@ -46,7 +46,6 @@ import (
 	corev1lister "k8s.io/client-go/listers/core/v1"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/klog"
-	apiregistrationv1beta1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -640,9 +639,6 @@ type ECDSAKeyPair struct {
 
 // CRDCreateor defines an interface to create/update CustomRessourceDefinitions
 type CRDCreateor = func(version semver.Semver, existing *apiextensionsv1beta1.CustomResourceDefinition) (*apiextensionsv1beta1.CustomResourceDefinition, error)
-
-// APIServiceCreator defines an interface to create/update APIService's
-type APIServiceCreator = func(existing *apiregistrationv1beta1.APIService) (*apiregistrationv1beta1.APIService, error)
 
 // Requirements are how much resources are needed by containers in the pod
 type Requirements struct {
