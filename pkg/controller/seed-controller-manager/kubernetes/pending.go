@@ -33,7 +33,8 @@ const (
 
 func (r *Reconciler) reconcileCluster(ctx context.Context, cluster *kubermaticv1.Cluster) (*reconcile.Result, error) {
 	// Create the namespace
-	if err := r.ensureNamespaceExists(ctx, cluster); err != nil {
+	namespace, err := r.ensureNamespaceExists(ctx, cluster)
+	if err != nil {
 		return nil, err
 	}
 
@@ -53,8 +54,12 @@ func (r *Reconciler) reconcileCluster(ctx context.Context, cluster *kubermaticv1
 	}
 
 	// Deploy & Update master components for Kubernetes
-	if err := r.ensureResourcesAreDeployed(ctx, cluster); err != nil {
+	res, err := r.ensureResourcesAreDeployed(ctx, cluster, namespace)
+	if err != nil {
 		return nil, err
+	}
+	if !res.IsZero() {
+		return res, nil
 	}
 
 	var finalizers []string
@@ -75,10 +80,6 @@ func (r *Reconciler) reconcileCluster(ctx context.Context, cluster *kubermaticv1
 			finalizers = append(finalizers, kubermaticapiv1.NodeDeletionFinalizer)
 		}
 
-	}
-
-	if !kuberneteshelper.HasFinalizer(cluster, kubermaticapiv1.ClusterRoleBindingsCleanupFinalizer) {
-		finalizers = append(finalizers, kubermaticapiv1.ClusterRoleBindingsCleanupFinalizer)
 	}
 
 	if len(finalizers) > 0 {

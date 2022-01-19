@@ -19,6 +19,7 @@ package kubernetes
 import (
 	"context"
 	"fmt"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/resources"
@@ -51,73 +52,75 @@ import (
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (r *Reconciler) ensureResourcesAreDeployed(ctx context.Context, cluster *kubermaticv1.Cluster) error {
+func (r *Reconciler) ensureResourcesAreDeployed(ctx context.Context, cluster *kubermaticv1.Cluster, namespace *corev1.Namespace) (*reconcile.Result, error) {
 	seed, err := r.seedGetter()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	data, err := r.getClusterTemplateData(ctx, cluster, seed)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// check that all services are available
 	if err := r.ensureServices(ctx, cluster, data); err != nil {
-		return err
+		return nil, err
 	}
 
 	// Set the hostname & url
 	if err := r.syncAddress(ctx, r.log.With("cluster", cluster.Name), cluster, seed); err != nil {
-		return fmt.Errorf("failed to sync address: %v", err)
+		return nil, fmt.Errorf("failed to sync address: %v", err)
 	}
 
 	// We should not proceed without having an IP address unless tunneling
 	// strategy is used. Its required for all Kubeconfigs & triggers errors
 	// otherwise.
 	if cluster.Address.IP == "" && cluster.Spec.ExposeStrategy != kubermaticv1.ExposeStrategyTunneling {
-		return nil
+		// This can happen e.g. if a LB external IP address has not yet been allocated by a CCM.
+		// Try to reconcile after some time and do not return an error.
+		return nil, nil
 	}
 
 	// check that all secrets are available // New way of handling secrets
 	if err := r.ensureSecrets(ctx, cluster, data); err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := r.ensureServiceAccounts(ctx, cluster); err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := r.ensureRoles(ctx, cluster); err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := r.ensureRoleBindings(ctx, cluster); err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := r.ensureClusterRoles(ctx); err != nil {
-		return err
+		return nil, err
 	}
 
-	if err := r.ensureClusterRoleBindings(ctx, cluster); err != nil {
-		return err
+	if err := r.ensureClusterRoleBindings(ctx, cluster, namespace); err != nil {
+		return nil, err
 	}
 
 	if err := r.ensureNetworkPolicies(ctx, cluster, data); err != nil {
-		return err
+		return nil, err
 	}
 
 	// check that all StatefulSets are created
 	if err := r.ensureStatefulSets(ctx, cluster, data); err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := r.ensureEtcdBackupConfigs(ctx, cluster, data); err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := r.ensureEtcdBackupConfigs(ctx, cluster, data); err != nil {
-		return err
+		return nil, err
 	}
 
 	// Wait until the cloud provider infra is ready before attempting
@@ -127,56 +130,56 @@ func (r *Reconciler) ensureResourcesAreDeployed(ctx context.Context, cluster *ku
 	// isn't working correctly"
 	// https://github.com/kubermatic/kubermatic/issues/2948
 	if kubermaticv1.HealthStatusUp != cluster.Status.ExtendedHealth.CloudProviderInfrastructure {
-		return nil
+		return nil, nil
 	}
 
 	// check that all ConfigMaps are available
 	if err := r.ensureConfigMaps(ctx, cluster, data); err != nil {
-		return err
+		return nil, err
 	}
 
 	// check that all Deployments are available
 	if err := r.ensureDeployments(ctx, cluster, data); err != nil {
-		return err
+		return nil, err
 	}
 
 	// This needs to happen after other secrets are created
 	// because it uses some secrets created in previous steps.
 	if data.IsKonnectivityEnabled() {
 		if err := r.ensureKonnectivitySecrets(ctx, cluster, data); err != nil {
-			return err
+			return nil, err
 		}
 
 		// check that all Deployments are available
 		if err := r.ensureKonnectivityDeployments(ctx, cluster, data); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	// check that all CronJobs are created
 	if err := r.ensureCronJobs(ctx, cluster, data); err != nil {
-		return err
+		return nil, err
 	}
 
 	// check that all PodDisruptionBudgets are created
 	if err := r.ensurePodDisruptionBudgets(ctx, cluster, data); err != nil {
-		return err
+		return nil, err
 	}
 
 	// satisfy go fmt: declared but not used
 	_ = r.ensureVerticalPodAutoscalers
 	// check that all VerticalPodAutoscalers are created
 	if err := r.sys11EnsureVerticalPodAutoscalers(ctx, cluster, data); err != nil {
-		return err
+		return nil, err
 	}
 
 	if cluster.Spec.ExposeStrategy == kubermaticv1.ExposeStrategyLoadBalancer {
 		if err := nodeportproxy.EnsureResources(ctx, r.Client, data); err != nil {
-			return fmt.Errorf("failed to ensure NodePortProxy resources: %v", err)
+			return nil, fmt.Errorf("failed to ensure NodePortProxy resources: %v", err)
 		}
 	}
 
-	return nil
+	return &reconcile.Result{}, nil
 }
 
 func (r *Reconciler) getClusterTemplateData(ctx context.Context, cluster *kubermaticv1.Cluster, seed *kubermaticv1.Seed) (*resources.TemplateData, error) {
@@ -224,19 +227,23 @@ func (r *Reconciler) getClusterTemplateData(ctx context.Context, cluster *kuberm
 }
 
 // ensureNamespaceExists will create the cluster namespace
-func (r *Reconciler) ensureNamespaceExists(ctx context.Context, cluster *kubermaticv1.Cluster) error {
+func (r *Reconciler) ensureNamespaceExists(ctx context.Context, cluster *kubermaticv1.Cluster) (*corev1.Namespace, error) {
 	if cluster.Status.NamespaceName == "" {
 		err := r.updateCluster(ctx, cluster, func(c *kubermaticv1.Cluster) {
 			c.Status.NamespaceName = fmt.Sprintf("cluster-%s", c.Name)
 		})
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	ns := &corev1.Namespace{}
-	if err := r.Get(ctx, types.NamespacedName{Name: cluster.Status.NamespaceName}, ns); !errors.IsNotFound(err) {
-		return err
+	err := r.Get(ctx, types.NamespacedName{Name: cluster.Status.NamespaceName}, ns)
+	if err == nil {
+		return ns, nil // found it
+	}
+	if !errors.IsNotFound(err) {
+		return nil, err // something bad happened when trying to get the namespace
 	}
 
 	ns = &corev1.Namespace{
@@ -245,11 +252,11 @@ func (r *Reconciler) ensureNamespaceExists(ctx context.Context, cluster *kuberma
 			OwnerReferences: []metav1.OwnerReference{r.getOwnerRefForCluster(cluster)},
 		},
 	}
-	if err := r.Client.Create(ctx, ns); err != nil {
-		return fmt.Errorf("failed to create Namespace %s: %v", cluster.Status.NamespaceName, err)
+	if err := r.Create(ctx, ns); err != nil {
+		return nil, fmt.Errorf("failed to create Namespace %s: %v", cluster.Status.NamespaceName, err)
 	}
 
-	return nil
+	return ns, nil
 }
 
 // GetServiceCreators returns all service creators that are currently in use
@@ -468,7 +475,7 @@ func (r *Reconciler) ensureRoleBindings(ctx context.Context, c *kubermaticv1.Clu
 
 func (r *Reconciler) ensureClusterRoles(ctx context.Context) error {
 	namedClusterRoleCreatorGetters := []reconciling.NamedClusterRoleCreatorGetter{
-		usercluster.ClusterRoleCreator,
+		usercluster.ClusterRole(),
 	}
 	if err := reconciling.ReconcileClusterRoles(ctx, namedClusterRoleCreatorGetters, "", r.Client); err != nil {
 		return fmt.Errorf("failed to ensure Cluster Roles: %v", err)
@@ -477,9 +484,9 @@ func (r *Reconciler) ensureClusterRoles(ctx context.Context) error {
 	return nil
 }
 
-func (r *Reconciler) ensureClusterRoleBindings(ctx context.Context, c *kubermaticv1.Cluster) error {
+func (r *Reconciler) ensureClusterRoleBindings(ctx context.Context, c *kubermaticv1.Cluster, namespace *corev1.Namespace) error {
 	namedClusterRoleBindingsCreatorGetters := []reconciling.NamedClusterRoleBindingCreatorGetter{
-		usercluster.ClusterRoleBinding(c.Status.NamespaceName),
+		usercluster.ClusterRoleBinding(namespace),
 	}
 	if err := reconciling.ReconcileClusterRoleBindings(ctx, namedClusterRoleBindingsCreatorGetters, "", r.Client); err != nil {
 		return fmt.Errorf("failed to ensure Cluster Role Bindings: %v", err)
