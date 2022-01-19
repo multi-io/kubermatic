@@ -94,7 +94,6 @@ type controllerRunOptions struct {
 	admissionWebhook                                 webhook.Options
 	concurrentClusterUpdate                          int
 	addonEnforceInterval                             int
-	defaultComponentSettings                         string
 	caBundle                                         *certificates.CABundle
 
 	// OIDC configuration

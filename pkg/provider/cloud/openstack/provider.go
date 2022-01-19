@@ -88,11 +88,11 @@ func NewCloudProvider(
 		return nil, errors.New("datacenter is not an Openstack datacenter")
 	}
 	return &Provider{
-		dc:                dc.Spec.Openstack,
-		secretKeySelector: secretKeyGetter,
-		caBundle:          caBundle,
-		nodePortsRange:    nodePortsRange,
-		getClientFunc:     getNetClientForCluster,
+		dc:                   dc.Spec.Openstack,
+		secretKeySelector:    secretKeyGetter,
+		caBundle:             caBundle,
+		nodePortsRange:       nodePortsRange,
+		getClientFunc:        getNetClientForCluster,
 		getComputeClientFunc: getComputeClientForCluster,
 	}, nil
 }

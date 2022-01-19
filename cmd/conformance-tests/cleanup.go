@@ -37,7 +37,7 @@ var (
 		metav1.NamespaceSystem,
 		metav1.NamespacePublic,
 		corev1.NamespaceNodeLease,
-	// Sys11 disable kubernetesdashboard.Namespace,
+		// Sys11 disable kubernetesdashboard.Namespace,
 		resources.CloudInitSettingsNamespace,
 	)
 )

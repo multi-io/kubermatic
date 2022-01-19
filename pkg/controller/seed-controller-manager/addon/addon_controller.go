@@ -81,17 +81,17 @@ type KubeconfigProvider interface {
 type Reconciler struct {
 	ctrlruntimeclient.Client
 
-	log                      *zap.SugaredLogger
-	workerName               string
-	addonEnforceInterval     int
-	addonVariables           map[string]interface{}
-	kubernetesAddonDir       string
-	overwriteRegistry        string
-	recorder                 record.EventRecorder
-	KubeconfigProvider       KubeconfigProvider
-	externalURL              string
-	seedGetter               provider.SeedGetter
-	versions                 kubermatic.Versions
+	log                  *zap.SugaredLogger
+	workerName           string
+	addonEnforceInterval int
+	addonVariables       map[string]interface{}
+	kubernetesAddonDir   string
+	overwriteRegistry    string
+	recorder             record.EventRecorder
+	KubeconfigProvider   KubeconfigProvider
+	externalURL          string
+	seedGetter           provider.SeedGetter
+	versions             kubermatic.Versions
 }
 
 // Add creates a new Addon controller that is responsible for
@@ -116,17 +116,17 @@ func Add(
 	reconciler := &Reconciler{
 		Client: client,
 
-		log:                      log,
-		addonVariables:           addonCtxVariables,
-		addonEnforceInterval:     addonEnforceInterval,
-		kubernetesAddonDir:       kubernetesAddonDir,
-		KubeconfigProvider:       kubeconfigProvider,
-		workerName:               workerName,
-		recorder:                 mgr.GetEventRecorderFor(ControllerName),
-		overwriteRegistry:        overwriteRegistey,
-		externalURL:              externalURL,
-		seedGetter:               seedGetter,
-		versions:                 versions,
+		log:                  log,
+		addonVariables:       addonCtxVariables,
+		addonEnforceInterval: addonEnforceInterval,
+		kubernetesAddonDir:   kubernetesAddonDir,
+		KubeconfigProvider:   kubeconfigProvider,
+		workerName:           workerName,
+		recorder:             mgr.GetEventRecorderFor(ControllerName),
+		overwriteRegistry:    overwriteRegistey,
+		externalURL:          externalURL,
+		seedGetter:           seedGetter,
+		versions:             versions,
 	}
 
 	ctrlOptions := controller.Options{

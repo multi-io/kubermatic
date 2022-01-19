@@ -19,13 +19,14 @@ package testing
 import (
 	"encoding/json"
 	"fmt"
-	osservergroups "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/servergroups"
 	"io/ioutil"
 	"net/http"
 	"reflect"
 	"sync"
 	"testing"
 	"time"
+
+	osservergroups "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/servergroups"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/external"
@@ -510,7 +511,7 @@ func NewSimulator(t *testing.T) *Simulator {
 		Register(func() Resource { return &SecGroupRule{} }).
 		Register(func() Resource { return &Router{} }).
 		Register(func() Resource { return &Port{} }).
-		Register(func() Resource { return &ServerGroup{}})
+		Register(func() Resource { return &ServerGroup{} })
 }
 
 func (s *Simulator) TearDown() {

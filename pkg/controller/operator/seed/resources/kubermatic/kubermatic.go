@@ -32,15 +32,15 @@ import (
 )
 
 const (
-	serviceAccountName                = "kubermatic-seed"
-	backupContainersConfigMapName     = "backup-containers"
-	storeContainerKey                 = "store-container.yaml"
-	cleanupContainerKey               = "cleanup-container.yaml"
-	restoreS3SettingsConfigMapName    = "s3-settings"
-	deleteContainerKey                = "delete-container.yaml"
-	s3EndpointKey                     = "ENDPOINT"
-	s3BucketNameKey                   = "BUCKET_NAME"
-	caBundleConfigMapName             = "ca-bundle"
+	serviceAccountName             = "kubermatic-seed"
+	backupContainersConfigMapName  = "backup-containers"
+	storeContainerKey              = "store-container.yaml"
+	cleanupContainerKey            = "cleanup-container.yaml"
+	restoreS3SettingsConfigMapName = "s3-settings"
+	deleteContainerKey             = "delete-container.yaml"
+	s3EndpointKey                  = "ENDPOINT"
+	s3BucketNameKey                = "BUCKET_NAME"
+	caBundleConfigMapName          = "ca-bundle"
 )
 
 func ClusterRoleBindingName(cfg *operatorv1alpha1.KubermaticConfiguration) string {

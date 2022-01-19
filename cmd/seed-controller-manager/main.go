@@ -166,7 +166,6 @@ Please install the VerticalPodAutoscaler according to the documentation: https:/
 		log.Fatalw("Failed to get clientProvider", zap.Error(err))
 	}
 
-
 	kcInternal := keycloak.NewClient(requireEnv("KEYCLOAK_INTERNAL_URL"), requireEnv("KEYCLOAK_INTERNAL_ADMIN_USER"), requireEnv("KEYCLOAK_INTERNAL_ADMIN_PASSWORD"))
 	kcExternal := keycloak.NewClient(requireEnv("KEYCLOAK_EXTERNAL_URL"), requireEnv("KEYCLOAK_EXTERNAL_ADMIN_USER"), requireEnv("KEYCLOAK_EXTERNAL_ADMIN_PASSWORD"))
 	keycloakFacade := keycloak.NewGroup()

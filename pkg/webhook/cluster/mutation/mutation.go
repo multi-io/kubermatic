@@ -243,7 +243,7 @@ func (h *AdmissionHandler) defaultClusterComponentSettings(c *kubermaticv1.Clust
 	if !settings.Openstack.EnableIngressHostname {
 		settings.Openstack.EnableIngressHostname = h.defaultComponentSettings.Openstack.EnableIngressHostname
 	}
-	
+
 	// Always enable external CCM
 	if c.Spec.Cloud.Anexia != nil || c.Spec.Cloud.Kubevirt != nil {
 		c.Spec.Features[kubermaticv1.ClusterFeatureExternalCloudProvider] = true
