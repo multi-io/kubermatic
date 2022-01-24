@@ -102,24 +102,28 @@ require (
 )
 
 replace (
-	github.com/openshift/api => github.com/openshift/api v0.0.0-20210428205234-a8389931bee7
-	github.com/openshift/client-go => github.com/openshift/client-go v0.0.0-20210112165513-ebc401615f47
-	github.com/openshift/library-go => github.com/mhenriks/library-go v0.0.0-20210511195009-51ba86622560
-	github.com/operator-framework/operator-lifecycle-manager => github.com/operator-framework/operator-lifecycle-manager v0.0.0-20190128024246-5eb7ae5bdb7a
+	golang.org/x/net => golang.org/x/net v0.0.0-20211209124913-491a49abca63 // fixes CVE-2021-44716
+
+	// etcd.v3 needs an old version for the google.golang.org/grpc/naming package, which got removed in grpc 1.30+
+	google.golang.org/grpc => google.golang.org/grpc v1.29.1
 	k8s.io/api => k8s.io/api v0.22.2
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.22.2
 	k8s.io/apimachinery => k8s.io/apimachinery v0.22.2
 	k8s.io/client-go => k8s.io/client-go v0.22.2
-	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.22.2
 	k8s.io/code-generator => k8s.io/code-generator v0.22.2
 	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.22.2
-	k8s.io/kubectl => k8s.io/kubectl v0.22.2
 	k8s.io/kubelet => k8s.io/kubelet v0.22.2
 	k8s.io/metrics => k8s.io/metrics v0.22.2
 )
 
-replace github.com/kubermatic/machine-controller => github.com/syseleven/machine-controller v1.36.2-sys11-3
 
-replace google.golang.org/grpc => google.golang.org/grpc v1.29.1
+replace (
+	github.com/openshift/api => github.com/openshift/api v0.0.0-20210428205234-a8389931bee7
+	github.com/openshift/client-go => github.com/openshift/client-go v0.0.0-20210112165513-ebc401615f47
+	github.com/openshift/library-go => github.com/mhenriks/library-go v0.0.0-20210511195009-51ba86622560
+	github.com/operator-framework/operator-lifecycle-manager => github.com/operator-framework/operator-lifecycle-manager v0.0.0-20190128024246-5eb7ae5bdb7a
+	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.22.2
+)
+replace github.com/kubermatic/machine-controller => github.com/syseleven/machine-controller v1.36.2-sys11-3
 
 replace github.com/ajeddeloh/go-json => github.com/coreos/go-json v0.0.0-20211020211907-c63f628265de
