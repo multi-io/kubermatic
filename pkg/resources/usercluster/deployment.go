@@ -147,6 +147,10 @@ func DeploymentCreator(data userclusterControllerData) reconciling.NamedDeployme
 				fmt.Sprintf("-node-local-dns-cache=%t", data.NodeLocalDNSCacheEnabled()),
 			}, getNetworkArgs(data)...)
 
+			if data.Cluster().Spec.DebugLog {
+				args = append(args, "-log-debug=true")
+			}
+
 			if data.Cluster().Spec.ClusterNetwork.DNSDomain != "" {
 				args = append(args, "-cluster-dns-domain", data.Cluster().Spec.ClusterNetwork.DNSDomain)
 			}
