@@ -139,6 +139,7 @@ func NewTemplateData(
 			MajorMinorVersion:    cluster.Spec.Version.MajorMinor(),
 			Features:             sets.StringKeySet(cluster.Spec.Features),
 			CloudSpec:            cluster.Spec.Cloud,
+			ComponentsOverride:   cluster.Spec.ComponentsOverride,
 			Network: ClusterNetwork{
 				DNSDomain:         cluster.Spec.ClusterNetwork.DNSDomain,
 				DNSClusterIP:      dnsClusterIP,
@@ -217,6 +218,8 @@ type ClusterData struct {
 	StoragePolicy string
 	// CSIMigration indicates if the cluster needed the CSIMigration
 	CSIMigration bool
+
+	ComponentsOverride kubermaticv1.ComponentSettings
 }
 
 type ClusterNetwork struct {
