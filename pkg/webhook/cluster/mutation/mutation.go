@@ -151,6 +151,10 @@ func (h *AdmissionHandler) Handle(ctx context.Context, req webhook.AdmissionRequ
 			settings.Openstack.EnableIngressHostname = h.defaultSettings.Openstack.EnableIngressHostname
 		}
 
+		if settings.Autoscaler.SkipNodesWithLocalStorage == nil {
+			settings.Autoscaler.SkipNodesWithLocalStorage = h.defaultSettings.Autoscaler.SkipNodesWithLocalStorage
+		}
+
 		response := webhook.Patched("default componentsOverride",
 			jsonpatch.Operation{
 				Operation: "remove",
