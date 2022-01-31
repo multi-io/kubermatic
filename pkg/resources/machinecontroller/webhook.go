@@ -96,7 +96,7 @@ func WebhookDeploymentCreator(data machinecontrollerData) reconciling.NamedDeplo
 
 			dep.Spec.Template.Spec.InitContainers = []corev1.Container{}
 
-			repository := data.ImageRegistry(resources.RegistryDocker) + "/kubermatic/machine-controller"
+			repository := data.ImageRegistry(resources.RegistryDocker) + "/syseleven/machine-controller"
 			if r := data.MachineControllerImageRepository(); r != "" {
 				repository = r
 			}

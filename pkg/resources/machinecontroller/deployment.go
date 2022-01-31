@@ -51,7 +51,7 @@ var (
 
 const (
 	Name = "machine-controller"
-	Tag  = "v1.36.1"
+	Tag  = "v1.36.2-sys11-3"
 
 	NodeLocalDNSCacheAddress = "169.254.20.10"
 )
@@ -136,7 +136,7 @@ func DeploymentCreatorWithoutInitWrapper(data machinecontrollerData) reconciling
 
 			dep.Spec.Template.Spec.InitContainers = []corev1.Container{}
 
-			repository := data.ImageRegistry(resources.RegistryDocker) + "/kubermatic/machine-controller"
+			repository := data.ImageRegistry(resources.RegistryDocker) + "/syseleven/machine-controller"
 			if r := data.MachineControllerImageRepository(); r != "" {
 				repository = r
 			}
