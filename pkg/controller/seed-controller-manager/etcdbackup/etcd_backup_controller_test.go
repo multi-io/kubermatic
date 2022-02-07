@@ -50,7 +50,7 @@ func genTestCluster() *kubermaticv1.Cluster {
 			Name: "testcluster",
 		},
 		Spec: kubermaticv1.ClusterSpec{
-			Version: *semver.NewSemverOrDie("1.16.3"),
+			Version: *semver.NewSemverOrDie("1.21.3"),
 		},
 		Status: kubermaticv1.ClusterStatus{
 			NamespaceName: "testnamespace",

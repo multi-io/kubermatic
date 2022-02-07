@@ -333,6 +333,11 @@ func (r *reconciler) syncAllClustersNS(
 			log.Debugw("Cluster paused, skipping", "cluster", clusterName)
 			continue
 		}
+		// skip 1.18 because 2.18 does not support it. The change is to be reverted later.
+		if userCluster.Spec.Version.Major() == 1 && userCluster.Spec.Version.Minor() <= 18 {
+			log.Debugw("Cluster is 1.18, skipping", "cluster", clusterName)
+			continue
+		}
 
 		if !userCluster.DeletionTimestamp.IsZero() {
 			log.Debugw("Cluster deletion in progress, skipping", "cluster", clusterName)

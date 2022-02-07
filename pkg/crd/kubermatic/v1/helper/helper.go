@@ -52,6 +52,10 @@ func ClusterReconcileWrapper(
 	if cluster.Spec.Pause {
 		return nil, nil
 	}
+	// skip 1.18 because 2.18 does not support it. The change is to be reverted later.
+	if v := cluster.Spec.Version; v.Version != nil && v.Major() == 1 && v.Minor() <= 18 {
+		return nil, nil
+	}
 
 	reconcilingStatus := corev1.ConditionFalse
 	result, err := reconcile()
