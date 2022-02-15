@@ -356,10 +356,13 @@ func (r *Reconciler) getAddonManifests(ctx context.Context, log *zap.SugaredLogg
 		return nil, err
 	}
 	seedDC := seed.Name
-	if seedDC == "dbl1" {
+	switch seedDC {
+	case "dbl1":
 		seedDC = "syseleven-dbl1-1"
-	} else if seedDC == "bki1" {
+	case "bki1":
 		seedDC = "syseleven-dbl1-1"
+	case "fes1":
+		seedDC = "syseleven-fes1-1"
 	}
 	data.ExternalURL = fmt.Sprintf("app.%s.%s", seedDC, r.externalURL)
 	if cluster.Spec.Cloud.Openstack != nil {

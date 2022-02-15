@@ -33,7 +33,7 @@ func ServiceCreator(exposeStrategy kubermaticv1.ExposeStrategy) reconciling.Name
 	return func() (string, reconciling.ServiceCreator) {
 		return resources.OpenVPNServerServiceName, func(se *corev1.Service) (*corev1.Service, error) {
 			se.Name = resources.OpenVPNServerServiceName
-			se.Labels = resources.BaseAppLabels(name, nil)
+			se.Labels = resources.BaseAppLabels(containerServerName, nil)
 
 			if se.Annotations == nil {
 				se.Annotations = map[string]string{}
@@ -55,7 +55,7 @@ func ServiceCreator(exposeStrategy kubermaticv1.ExposeStrategy) reconciling.Name
 				return nil, fmt.Errorf("unsupported expose strategy: %q", exposeStrategy)
 			}
 			se.Spec.Selector = map[string]string{
-				resources.AppLabelKey: name,
+				resources.AppLabelKey: containerServerName,
 			}
 			if len(se.Spec.Ports) == 0 {
 				se.Spec.Ports = make([]corev1.ServicePort, 1)

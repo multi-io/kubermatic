@@ -166,7 +166,7 @@ func DeploymentCreator(data *resources.TemplateData) reconciling.NamedDeployment
 				name:                defaultResourceRequirements.DeepCopy(),
 				openvpnSidecar.Name: openvpnSidecar.Resources.DeepCopy(),
 			}
-			err = resources.SetResourceRequirements(dep.Spec.Template.Spec.Containers, defResourceRequirements, resources.GetOverrides(data.Cluster().Spec.ComponentsOverride), dep.Annotations)
+			err = resources.SetResourceRequirements(dep.Spec.Template.Spec.Containers, dep.Annotations, defResourceRequirements, resources.GetOverrides(data.Cluster().Spec.ComponentsOverride))
 			if err != nil {
 				return nil, fmt.Errorf("failed to set resource requirements: %v", err)
 			}

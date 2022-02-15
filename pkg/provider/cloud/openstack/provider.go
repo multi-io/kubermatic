@@ -339,7 +339,7 @@ func (os *Provider) InitializeCloudProvider(cluster *kubermaticv1.Cluster, updat
 		})
 		if err != nil {
 			err = fmt.Errorf("add server group ID to cluster: %w", err)
-			if e := deleteServerGroup(netClient, sg.ID); e != nil {
+			if e := deleteServerGroup(computeClient, sg.ID); e != nil {
 				err = fmt.Errorf("delete server group after failure: %v: %w", e, err)
 			}
 			return nil, err
@@ -414,7 +414,7 @@ func (os *Provider) CleanUpCloudProvider(cluster *kubermaticv1.Cluster, update p
 	}
 
 	if resources.ServerGroupID != "" && kubernetes.HasAnyFinalizer(cluster, ServerGroupCleanupFinalizer) {
-		computeClient, err := os.getClientFunc(cluster.Spec.Cloud, os.dc, os.secretKeySelector, nil)
+		computeClient, err := os.getComputeClientFunc(cluster.Spec.Cloud, os.dc, os.secretKeySelector, nil)
 		if err != nil {
 			return nil, fmt.Errorf("get compute client: %v", err)
 		}
@@ -423,6 +423,7 @@ func (os *Provider) CleanUpCloudProvider(cluster *kubermaticv1.Cluster, update p
 			if !isNotFoundErr(err) {
 				return cluster, fmt.Errorf("delete server group for cluster '%s': %v", cluster.Name, err)
 			}
+			return cluster, fmt.Errorf("delete server group for cluster '%s': %v", cluster.Name, err)
 		}
 	}
 
@@ -447,8 +448,15 @@ func (os *Provider) CleanUpCloudProvider(cluster *kubermaticv1.Cluster, update p
 	return cluster, nil
 }
 
-func deleteServerGroup(client *gophercloud.ServiceClient, id string) error {
-	if err := osservergroups.Delete(client, id).ExtractErr(); err != nil {
+func deleteServerGroup(computeClient *gophercloud.ServiceClient, id string) error {
+	// Microversion 2.15 or later required for 'soft-anti-affinity'
+	microVersionBefore := computeClient.Microversion
+	computeClient.Microversion = "2.15"
+	defer func() {
+		computeClient.Microversion = microVersionBefore
+	}()
+
+	if err := osservergroups.Delete(computeClient, id).ExtractErr(); err != nil {
 		return fmt.Errorf("delete server group with ID '%s': %v", id, err)
 	}
 	return nil

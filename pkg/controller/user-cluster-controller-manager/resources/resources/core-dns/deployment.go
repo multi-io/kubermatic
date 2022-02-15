@@ -111,7 +111,7 @@ func DeploymentCreator(kubernetesVersion *semver.Version) reconciling.NamedDeplo
 			// Sys11 end
 
 			dep.Spec.Template.Spec.Containers = getContainers(kubernetesVersion)
-			err := resources.SetResourceRequirements(dep.Spec.Template.Spec.Containers, defaultResourceRequirements, nil, dep.Annotations)
+			err := resources.SetResourceRequirements(dep.Spec.Template.Spec.Containers, dep.Annotations, defaultResourceRequirements, nil)
 			if err != nil {
 				return nil, fmt.Errorf("failed to set resource requirements: %v", err)
 			}
@@ -156,10 +156,6 @@ func getContainers(clusterVersion *semver.Version) []corev1.Container {
 				{
 					Name:      extraConfigVolume,
 					MountPath: extraConfigsMountPath,
-				},
-				{
-					Name:      "tmp",
-					MountPath: "/tmp",
 				},
 			},
 			Ports: []corev1.ContainerPort{
@@ -226,12 +222,6 @@ func getContainers(clusterVersion *semver.Version) []corev1.Container {
 
 func getVolumes() []corev1.Volume {
 	return []corev1.Volume{
-		{
-			Name: "tmp",
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{},
-			},
-		},
 		{
 			Name: "config-volume",
 			VolumeSource: corev1.VolumeSource{

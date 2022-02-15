@@ -344,7 +344,7 @@ func deploymentEnvoy(image string, data nodePortProxyData) reconciling.NamedDepl
 					MountPath: "/etc/envoy",
 				}},
 			}}
-			err := resources.SetResourceRequirements(d.Spec.Template.Spec.Containers, defaultResourceRequirements, nil, d.Annotations)
+			err := resources.SetResourceRequirements(d.Spec.Template.Spec.Containers, d.Annotations, defaultResourceRequirements, nil)
 			if err != nil {
 				return nil, fmt.Errorf("failed to set resource requirements: %v", err)
 			}
@@ -390,7 +390,7 @@ func deploymentLBUpdater(image string) reconciling.NamedDeploymentCreatorGetter 
 					}},
 				}},
 			}}
-			err := resources.SetResourceRequirements(d.Spec.Template.Spec.Containers, defaultResourceRequirements, nil, d.Annotations)
+			err := resources.SetResourceRequirements(d.Spec.Template.Spec.Containers, d.Annotations, defaultResourceRequirements, nil)
 			if err != nil {
 				return nil, fmt.Errorf("failed to set resource requirements: %v", err)
 			}

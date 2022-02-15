@@ -109,6 +109,7 @@ func NewTemplateData(
 			MajorMinorVersion:    cluster.Spec.Version.MajorMinor(),
 			Features:             sets.StringKeySet(cluster.Spec.Features),
 			CloudSpec:            cluster.Spec.Cloud,
+			ComponentsOverride:   cluster.Spec.ComponentsOverride,
 			Network: ClusterNetwork{
 				DNSDomain:         cluster.Spec.ClusterNetwork.DNSDomain,
 				DNSClusterIP:      dnsClusterIP,
@@ -171,6 +172,8 @@ type ClusterData struct {
 	// CloudSpec contains the complete access data to the cluster's cloud provider.
 	// CAUTION: This is internal information and subject to change; using it is not recommended!
 	CloudSpec kubermaticv1.CloudSpec
+
+	ComponentsOverride kubermaticv1.ComponentSettings
 }
 
 type ClusterNetwork struct {

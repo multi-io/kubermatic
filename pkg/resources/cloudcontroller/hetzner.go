@@ -127,7 +127,7 @@ func hetznerDeploymentCreator(data *resources.TemplateData) reconciling.NamedDep
 				ccmContainerName:    hetznerResourceRequirements.DeepCopy(),
 				openvpnSidecar.Name: openvpnSidecar.Resources.DeepCopy(),
 			}
-			err = resources.SetResourceRequirements(dep.Spec.Template.Spec.Containers, defResourceRequirements, nil, dep.Annotations)
+			err = resources.SetResourceRequirements(dep.Spec.Template.Spec.Containers, dep.Annotations, defResourceRequirements, nil)
 			if err != nil {
 				return nil, fmt.Errorf("failed to set resource requirements: %v", err)
 			}

@@ -106,7 +106,7 @@ func ControllerDeploymentCreator() reconciling.NamedDeploymentCreatorGetter {
 
 			dep.Spec.Template.Spec.InitContainers = []corev1.Container{}
 			dep.Spec.Template.Spec.Containers = getControllerContainers()
-			err := resources.SetResourceRequirements(dep.Spec.Template.Spec.Containers, defaultResourceRequirements, nil, dep.Annotations)
+			err := resources.SetResourceRequirements(dep.Spec.Template.Spec.Containers, dep.Annotations, defaultResourceRequirements, nil)
 			if err != nil {
 				return nil, fmt.Errorf("failed to set resource requirements: %v", err)
 			}
@@ -154,7 +154,7 @@ func AuditDeploymentCreator() reconciling.NamedDeploymentCreatorGetter {
 
 			dep.Spec.Template.Spec.InitContainers = []corev1.Container{}
 			dep.Spec.Template.Spec.Containers = getAuditContainers()
-			err := resources.SetResourceRequirements(dep.Spec.Template.Spec.Containers, defaultResourceRequirements, nil, dep.Annotations)
+			err := resources.SetResourceRequirements(dep.Spec.Template.Spec.Containers, dep.Annotations, defaultResourceRequirements, nil)
 			if err != nil {
 				return nil, fmt.Errorf("failed to set resource requirements: %v", err)
 			}

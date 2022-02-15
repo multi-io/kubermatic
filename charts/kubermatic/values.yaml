@@ -115,6 +115,8 @@ kubermatic:
     #   If enabled the all etcd clusters will be started with --experimental-initial-corrupt-check=true --experimental-corrupt-check-time=10m
     # - EtcdLauncher
     #   If enabled will apply the cluster level etcd-launcher feature flag on all clusters, unless it's explicitly disabled at the cluster level
+    # - PriorityClasses
+    #   If enabled will apply priority classes to all managed seed infrastructure with levels depending on criticality
     # For example:
     # featureGates: "OpenIDAuthPlugin=true,VerticalPodAutoscaler=true"
     featureGates: ""

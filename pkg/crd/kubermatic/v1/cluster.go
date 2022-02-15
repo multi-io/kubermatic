@@ -378,6 +378,8 @@ type ComponentSettings struct {
 	Scheduler         ControllerSettings      `json:"scheduler"`
 	Etcd              EtcdStatefulSetSettings `json:"etcd"`
 	Prometheus        StatefulSetSettings     `json:"prometheus"`
+	OpenVPN           OpenVPNSettings         `json:"openvpn"`
+	Autoscaler        AutoscalerSettings      `json:"autoscaler"`
 
 	Openstack OpenstackSettings `json:"openstack"`
 }
@@ -406,6 +408,33 @@ type DeploymentSettings struct {
 
 type StatefulSetSettings struct {
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+type OpenVPNSettings struct {
+	Server                OpenVPNServerSettings                `json:"server"`
+	IPFixup               OpenVPNIPFixupSettings               `json:"ipFixup"`
+	Exporter              OpenVPNExporterSettings              `json:"exporter"`
+	IPTablesInitContainer OpenVPNIPTablesInitContainerSettings `json:"ipTablesInitContainer"`
+}
+
+type OpenVPNServerSettings struct {
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+type OpenVPNIPFixupSettings struct {
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+type OpenVPNExporterSettings struct {
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+type OpenVPNIPTablesInitContainerSettings struct {
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+type AutoscalerSettings struct {
+	SkipNodesWithLocalStorage *bool `json:"skipNodesWithLocalStorage,omitempty"`
 }
 
 type EtcdStatefulSetSettings struct {

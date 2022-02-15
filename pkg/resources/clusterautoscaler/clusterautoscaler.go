@@ -140,7 +140,7 @@ func DeploymentCreator(data clusterautoscalerData) reconciling.NamedDeploymentCr
 
 			// This likely won't be enough for bigger clusters, see https://github.com/kubermatic/kubermatic/issues/3568
 			// for details on how we want to fix this: https://github.com/kubermatic/kubermatic/issues/3568
-			err = resources.SetResourceRequirements(dep.Spec.Template.Spec.Containers, defaultResourceRequirements, nil, dep.Annotations)
+			err = resources.SetResourceRequirements(dep.Spec.Template.Spec.Containers, dep.Annotations, defaultResourceRequirements, nil)
 			if err != nil {
 				return nil, fmt.Errorf("failed to set resource requirements: %v", err)
 			}

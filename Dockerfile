@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM alpine:3.13
+FROM alpine:3.15
 LABEL maintainer="support@kubermatic.com"
 
 ENV KUBERMATIC_CHARTS_DIRECTORY=/opt/charts/
@@ -22,7 +22,7 @@ ADD https://storage.googleapis.com/kubernetes-release/release/v1.20.5/bin/linux/
 RUN wget -q -O- https://get.helm.sh/helm-v3.5.0-linux-amd64.tar.gz | tar xzOf - linux-amd64/helm > /usr/local/bin/helm
 
 # We need the ca-certs so they api doesn't crash because it can't verify the certificate of Dex
-RUN chmod +x /usr/local/bin/kubectl /usr/local/bin/helm && apk --no-cache add ca-certificates=~20191127
+RUN chmod +x /usr/local/bin/kubectl /usr/local/bin/helm && apk --no-cache add ca-certificates=~20211220
 
 # Do not needless copy all binaries into the image.
 COPY ./_build/image-loader \

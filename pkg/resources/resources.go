@@ -46,7 +46,6 @@ import (
 	corev1lister "k8s.io/client-go/listers/core/v1"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/klog"
-	apiregistrationv1beta1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -131,7 +130,10 @@ const (
 	// EtcdDefragCronJobName is the name for the defrag cronjob deployment
 	EtcdDefragCronJobName = "etcd-defragger"
 	// OpenVPNServerServiceName is the name for the openvpn server service
-	OpenVPNServerServiceName = "openvpn-server"
+	OpenVPNServerServiceName     = "openvpn-server"
+	openVPNServerContainerName   = "openvpn-server"
+	openVPNIPFixupContainerName  = "ip-fixup"
+	openVPNExporterContainerName = "openvpn-exporter"
 	// MachineControllerWebhookServiceName is the name of the machine-controller webhook service
 	MachineControllerWebhookServiceName = "machine-controller-webhook"
 	//GatekeeperWebhookServiceName is the name of the gatekeeper webhook service
@@ -638,9 +640,6 @@ type ECDSAKeyPair struct {
 // CRDCreateor defines an interface to create/update CustomRessourceDefinitions
 type CRDCreateor = func(version semver.Semver, existing *apiextensionsv1beta1.CustomResourceDefinition) (*apiextensionsv1beta1.CustomResourceDefinition, error)
 
-// APIServiceCreator defines an interface to create/update APIService's
-type APIServiceCreator = func(existing *apiregistrationv1beta1.APIService) (*apiregistrationv1beta1.APIService, error)
-
 // Requirements are how much resources are needed by containers in the pod
 type Requirements struct {
 	Name     string                       `json:"name,omitempty"`
@@ -1080,35 +1079,46 @@ func GetHTTPProxyEnvVarsFromSeed(seed *kubermaticv1.Seed, inClusterAPIServerURL 
 // SetResourceRequirements sets resource requirements on provided slice of containers.
 // The highest priority has requirements provided using overrides, then requirements provided by the vpa-updater
 // (if VPA is enabled), and at the end provided default requirements for a given resource.
-func SetResourceRequirements(containers []corev1.Container, defaultRequirements, overrides map[string]*corev1.ResourceRequirements, annotations map[string]string) error {
-	// do not accidentally modify the map of default requirements
-	requirements := map[string]*corev1.ResourceRequirements{}
-	for k, v := range defaultRequirements {
-		requirements[k] = v.DeepCopy()
+func SetResourceRequirements(containers []corev1.Container, annotations map[string]string, defaultRequirements, overrides map[string]*corev1.ResourceRequirements) error {
+	// do not accidentally modify the map of default vpa
+	vpa, err := vpaResourceRequirements(containers, annotations)
+	if err != nil {
+		return err
+	}
+	for i := range containers {
+		if v := vpa[containers[i].Name]; v != nil {
+			containers[i].Resources = *v
+		} else if v := defaultRequirements[containers[i].Name]; v != nil {
+			containers[i].Resources = *v
+		}
 	}
 
+	for i := range containers {
+		if v := overrides[containers[i].Name]; v != nil {
+			containers[i].Resources = *v
+		}
+	}
+
+	return nil
+}
+
+func vpaResourceRequirements(containers []corev1.Container, annotations map[string]string) (map[string]*corev1.ResourceRequirements, error) {
 	val, ok := annotations[kubermaticv1.UpdatedByVPALabelKey]
 	if ok && val != "" {
 		var req []Requirements
 		err := json.Unmarshal([]byte(val), &req)
 		if err != nil {
-			return fmt.Errorf("failed to unmarshal resource requirements provided by vpa from annotation %s: %v", kubermaticv1.UpdatedByVPALabelKey, err)
+			return nil, fmt.Errorf("failed to unmarshal resource requirements provided by vpa from annotation %s: %v", kubermaticv1.UpdatedByVPALabelKey, err)
 		}
+		result := make(map[string]*corev1.ResourceRequirements)
 		for _, r := range req {
-			requirements[r.Name] = r.Requires
+			if r.Requires != nil {
+				result[r.Name] = r.Requires
+			}
 		}
+		return result, nil
 	}
-	for k, v := range overrides {
-		requirements[k] = v.DeepCopy()
-	}
-
-	for i := range containers {
-		if requirements[containers[i].Name] != nil {
-			containers[i].Resources = *requirements[containers[i].Name]
-		}
-	}
-
-	return nil
+	return nil, nil
 }
 
 func GetOverrides(componentSettings kubermaticv1.ComponentSettings) map[string]*corev1.ResourceRequirements {
@@ -1127,6 +1137,15 @@ func GetOverrides(componentSettings kubermaticv1.ComponentSettings) map[string]*
 	}
 	if componentSettings.Prometheus.Resources != nil {
 		r[PrometheusStatefulSetName] = componentSettings.Prometheus.Resources.DeepCopy()
+	}
+	if v := componentSettings.OpenVPN.Server.Resources; v != nil {
+		r[openVPNServerContainerName] = v
+	}
+	if v := componentSettings.OpenVPN.IPFixup.Resources; v != nil {
+		r[openVPNIPFixupContainerName] = v
+	}
+	if v := componentSettings.OpenVPN.Exporter.Resources; v != nil {
+		r[openVPNExporterContainerName] = v
 	}
 
 	return r
