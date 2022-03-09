@@ -58,7 +58,7 @@ func NewGetKubeLoginClusterKubeconfigOK() *GetKubeLoginClusterKubeconfigOK {
 	return &GetKubeLoginClusterKubeconfigOK{}
 }
 
-/*GetKubeLoginClusterKubeconfigOK handles this case with default header values.
+/* GetKubeLoginClusterKubeconfigOK describes a response with status code 200, with default header values.
 
 Kubeconfig is a clusters kubeconfig
 */
@@ -69,7 +69,6 @@ type GetKubeLoginClusterKubeconfigOK struct {
 func (o *GetKubeLoginClusterKubeconfigOK) Error() string {
 	return fmt.Sprintf("[GET /api/v1/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/kubeloginkubeconfig][%d] getKubeLoginClusterKubeconfigOK  %+v", 200, o.Payload)
 }
-
 func (o *GetKubeLoginClusterKubeconfigOK) GetPayload() []uint8 {
 	return o.Payload
 }
@@ -89,7 +88,7 @@ func NewGetKubeLoginClusterKubeconfigUnauthorized() *GetKubeLoginClusterKubeconf
 	return &GetKubeLoginClusterKubeconfigUnauthorized{}
 }
 
-/*GetKubeLoginClusterKubeconfigUnauthorized handles this case with default header values.
+/* GetKubeLoginClusterKubeconfigUnauthorized describes a response with status code 401, with default header values.
 
 EmptyResponse is a empty response
 */
@@ -110,7 +109,7 @@ func NewGetKubeLoginClusterKubeconfigForbidden() *GetKubeLoginClusterKubeconfigF
 	return &GetKubeLoginClusterKubeconfigForbidden{}
 }
 
-/*GetKubeLoginClusterKubeconfigForbidden handles this case with default header values.
+/* GetKubeLoginClusterKubeconfigForbidden describes a response with status code 403, with default header values.
 
 EmptyResponse is a empty response
 */
@@ -133,7 +132,7 @@ func NewGetKubeLoginClusterKubeconfigDefault(code int) *GetKubeLoginClusterKubec
 	}
 }
 
-/*GetKubeLoginClusterKubeconfigDefault handles this case with default header values.
+/* GetKubeLoginClusterKubeconfigDefault describes a response with status code -1, with default header values.
 
 errorResponse
 */
@@ -151,7 +150,6 @@ func (o *GetKubeLoginClusterKubeconfigDefault) Code() int {
 func (o *GetKubeLoginClusterKubeconfigDefault) Error() string {
 	return fmt.Sprintf("[GET /api/v1/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/kubeloginkubeconfig][%d] getKubeLoginClusterKubeconfig default  %+v", o._statusCode, o.Payload)
 }
-
 func (o *GetKubeLoginClusterKubeconfigDefault) GetPayload() *models.ErrorResponse {
 	return o.Payload
 }

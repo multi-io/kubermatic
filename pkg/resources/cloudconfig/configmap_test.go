@@ -21,13 +21,14 @@ import (
 
 	"github.com/go-test/deep"
 	"gopkg.in/gcfg.v1"
-	"k8s.io/utils/pointer"
 
 	openstack "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/openstack/types"
 	vsphere "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/vsphere/types"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/resources"
 	"k8c.io/kubermatic/v2/pkg/semver"
+
+	"k8s.io/utils/pointer"
 )
 
 func TestVSphereCloudConfig(t *testing.T) {
@@ -64,6 +65,11 @@ func TestVSphereCloudConfig(t *testing.T) {
 				Workspace: vsphere.WorkspaceOpts{
 					VCenterIP: "vsphere.com",
 				},
+				VirtualCenter: map[string]*vsphere.VirtualCenterConfig{
+					"vsphere.com": {
+						VCenterPort: "443",
+					},
+				},
 			},
 		},
 		{
@@ -92,6 +98,11 @@ func TestVSphereCloudConfig(t *testing.T) {
 				},
 				Workspace: vsphere.WorkspaceOpts{
 					VCenterIP: "vsphere.com",
+				},
+				VirtualCenter: map[string]*vsphere.VirtualCenterConfig{
+					"vsphere.com": {
+						VCenterPort: "9443",
+					},
 				},
 			},
 		},
@@ -126,6 +137,11 @@ func TestVSphereCloudConfig(t *testing.T) {
 				Workspace: vsphere.WorkspaceOpts{
 					VCenterIP:        "vsphere.com",
 					DefaultDatastore: "super-cool-datastore",
+				},
+				VirtualCenter: map[string]*vsphere.VirtualCenterConfig{
+					"vsphere.com": {
+						VCenterPort: "9443",
+					},
 				},
 			},
 		},

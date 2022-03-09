@@ -6,6 +6,8 @@ package models
 // Editing this file might prove futile when you re-run the swagger generate command
 
 import (
+	"context"
+
 	"github.com/go-openapi/errors"
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/swag"
@@ -28,11 +30,24 @@ type AWSNodeSpec struct {
 	AvailabilityZone string `json:"availabilityZone,omitempty"`
 
 	// instance type
+	// Example: t2.micro
 	// Required: true
 	InstanceType *string `json:"instanceType"`
 
 	// IsSpotInstance indicates whether the created machine is an aws ec2 spot instance or on-demand ec2 instance.
 	IsSpotInstance bool `json:"isSpotInstance,omitempty"`
+
+	// SpotInstanceInterruptionBehavior sets the interruption behavior for the spot instance when capacity is no longer
+	// available at the price you specified, if there is no capacity, or if a constraint cannot be met. Charges for EBS
+	// volume storage apply when an instance is stopped.
+	SpotInstanceInterruptionBehavior string `json:"spotInstanceInterruptionBehavior,omitempty"`
+
+	// SpotInstanceMaxPrice is the maximum price you are willing to pay per instance hour. Your instance runs when
+	// your maximum price is greater than the Spot Price.
+	SpotInstanceMaxPrice string `json:"spotInstanceMaxPrice,omitempty"`
+
+	// SpotInstancePersistentRequest ensures that your request will be submitted every time your Spot Instance is terminated.
+	SpotInstancePersistentRequest bool `json:"spotInstancePersistentRequest,omitempty"`
 
 	// The VPC subnet to which the node shall be connected.
 	SubnetID string `json:"subnetID,omitempty"`
@@ -45,6 +60,7 @@ type AWSNodeSpec struct {
 	VolumeSize *int64 `json:"diskSize"`
 
 	// volume type
+	// Example: gp2, io1, st1, sc1, standard
 	// Required: true
 	VolumeType *string `json:"volumeType"`
 }
@@ -95,6 +111,11 @@ func (m *AWSNodeSpec) validateVolumeType(formats strfmt.Registry) error {
 		return err
 	}
 
+	return nil
+}
+
+// ContextValidate validates this a w s node spec based on context it is used
+func (m *AWSNodeSpec) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
 	return nil
 }
 

@@ -27,15 +27,25 @@ import (
 	"k8c.io/kubermatic/v2/pkg/handler/middleware"
 	"k8c.io/kubermatic/v2/pkg/handler/v1/common"
 	"k8c.io/kubermatic/v2/pkg/handler/v2/addon"
+	"k8c.io/kubermatic/v2/pkg/handler/v2/alertmanager"
+	allowedregistry "k8c.io/kubermatic/v2/pkg/handler/v2/allowed_registry"
+	"k8c.io/kubermatic/v2/pkg/handler/v2/backupcredentials"
 	"k8c.io/kubermatic/v2/pkg/handler/v2/cluster"
+	clustertemplate "k8c.io/kubermatic/v2/pkg/handler/v2/cluster_template"
 	"k8c.io/kubermatic/v2/pkg/handler/v2/constraint"
 	constrainttemplate "k8c.io/kubermatic/v2/pkg/handler/v2/constraint_template"
+	"k8c.io/kubermatic/v2/pkg/handler/v2/etcdbackupconfig"
+	"k8c.io/kubermatic/v2/pkg/handler/v2/etcdrestore"
 	externalcluster "k8c.io/kubermatic/v2/pkg/handler/v2/external_cluster"
 	"k8c.io/kubermatic/v2/pkg/handler/v2/gatekeeperconfig"
 	kubernetesdashboard "k8c.io/kubermatic/v2/pkg/handler/v2/kubernetes-dashboard"
 	"k8c.io/kubermatic/v2/pkg/handler/v2/machine"
+	mlaadminsetting "k8c.io/kubermatic/v2/pkg/handler/v2/mla_admin_setting"
 	"k8c.io/kubermatic/v2/pkg/handler/v2/preset"
 	"k8c.io/kubermatic/v2/pkg/handler/v2/provider"
+	"k8c.io/kubermatic/v2/pkg/handler/v2/rulegroup"
+	"k8c.io/kubermatic/v2/pkg/handler/v2/seedsettings"
+	"k8c.io/kubermatic/v2/pkg/handler/v2/version"
 )
 
 // RegisterV2 declares all router paths for v2
@@ -70,6 +80,10 @@ func (r Routing) RegisterV2(mux *mux.Router, metrics common.ServerMetrics) {
 		Path("/projects/{project_id}/clusters/{cluster_id}/health").
 		Handler(r.getClusterHealth())
 
+	mux.Methods(http.MethodPost).
+		Path("/projects/{project_id}/clusters/{cluster_id}/externalccmmigration").
+		Handler(r.migrateClusterToExternalCCM())
+
 	mux.Methods(http.MethodGet).
 		Path("/projects/{project_id}/clusters/{cluster_id}/kubeconfig").
 		Handler(r.getClusterKubeconfig())
@@ -85,6 +99,10 @@ func (r Routing) RegisterV2(mux *mux.Router, metrics common.ServerMetrics) {
 	mux.Methods(http.MethodGet).
 		Path("/projects/{project_id}/clusters/{cluster_id}/oidckubeconfig").
 		Handler(r.getOidcClusterKubeconfig())
+
+	mux.Methods(http.MethodGet).
+		Path("/projects/{project_id}/clusters/{cluster_id}/oidc").
+		Handler(r.getClusterOidc())
 
 	mux.Methods(http.MethodGet).
 		Path("/projects/{project_id}/clusters/{cluster_id}/metrics").
@@ -175,6 +193,10 @@ func (r Routing) RegisterV2(mux *mux.Router, metrics common.ServerMetrics) {
 		Path("/projects/{project_id}/clusters/{cluster_id}/machinedeployments/{machinedeployment_id}").
 		Handler(r.patchMachineDeployment())
 
+	mux.Methods(http.MethodPost).
+		Path("/projects/{project_id}/clusters/{cluster_id}/machinedeployments/{machinedeployment_id}/restart").
+		Handler(r.restartMachineDeployment())
+
 	mux.Methods(http.MethodGet).
 		Path("/projects/{project_id}/clusters/{cluster_id}/machinedeployments/{machinedeployment_id}/nodes/events").
 		Handler(r.listMachineDeploymentNodesEvents())
@@ -258,6 +280,27 @@ func (r Routing) RegisterV2(mux *mux.Router, metrics common.ServerMetrics) {
 		Path("/constrainttemplates/{ct_name}").
 		Handler(r.deleteConstraintTemplate())
 
+	// Define a set of endpoints for default constraints
+	mux.Methods(http.MethodPost).
+		Path("/constraints").
+		Handler(r.createDefaultConstraint())
+
+	mux.Methods(http.MethodGet).
+		Path("/constraints").
+		Handler(r.listDefaultConstraint())
+
+	mux.Methods(http.MethodGet).
+		Path("/constraints/{constraint_name}").
+		Handler(r.getDefaultConstraint())
+
+	mux.Methods(http.MethodDelete).
+		Path("/constraints/{constraint_name}").
+		Handler(r.deleteDefaultConstraint())
+
+	mux.Methods(http.MethodPatch).
+		Path("/constraints/{constraint_name}").
+		Handler(r.patchDefaultConstraint())
+
 	// Define a set of endpoints for gatekeeper constraints
 	mux.Methods(http.MethodGet).
 		Path("/projects/{project_id}/clusters/{cluster_id}/constraints").
@@ -320,6 +363,19 @@ func (r Routing) RegisterV2(mux *mux.Router, metrics common.ServerMetrics) {
 	mux.Methods(http.MethodDelete).
 		Path("/projects/{project_id}/clusters/{cluster_id}/addons/{addon_id}").
 		Handler(r.deleteAddon())
+
+	// Defines a set of HTTP endpoints for managing alertmanager
+	mux.Methods(http.MethodGet).
+		Path("/projects/{project_id}/clusters/{cluster_id}/alertmanager/config").
+		Handler(r.getAlertmanager())
+
+	mux.Methods(http.MethodPut).
+		Path("/projects/{project_id}/clusters/{cluster_id}/alertmanager/config").
+		Handler(r.updateAlertmanager())
+
+	mux.Methods(http.MethodDelete).
+		Path("/projects/{project_id}/clusters/{cluster_id}/alertmanager/config").
+		Handler(r.resetAlertmanager())
 
 	// Defines a set of HTTP endpoints for various cloud providers
 	// Note that these endpoints don't require credentials as opposed to the ones defined under /providers/*
@@ -474,6 +530,141 @@ func (r Routing) RegisterV2(mux *mux.Router, metrics common.ServerMetrics) {
 		Path("/providers/{provider_name}/presets").
 		Handler(r.updatePreset())
 
+	mux.Methods(http.MethodGet).
+		Path("/seeds/{seed_name}/settings").
+		Handler(r.getSeedSettings())
+
+	// Define an endpoint to retrieve the Kubernetes versions supported by the given provider
+	mux.Methods(http.MethodGet).
+		Path("/providers/{provider_name}/versions").
+		Handler(r.listVersionsByProvider())
+
+	// Define a set of endpoints for cluster templates management
+	mux.Methods(http.MethodPost).
+		Path("/projects/{project_id}/clustertemplates").
+		Handler(r.createClusterTemplate())
+	mux.Methods(http.MethodGet).
+		Path("/projects/{project_id}/clustertemplates").
+		Handler(r.listClusterTemplates())
+	mux.Methods(http.MethodGet).
+		Path("/projects/{project_id}/clustertemplates/{template_id}").
+		Handler(r.getClusterTemplate())
+	mux.Methods(http.MethodDelete).
+		Path("/projects/{project_id}/clustertemplates/{template_id}").
+		Handler(r.deleteClusterTemplate())
+	mux.Methods(http.MethodPost).
+		Path("/projects/{project_id}/clustertemplates/{template_id}/instances").
+		Handler(r.createClusterTemplateInstance())
+
+	// Defines a set of HTTP endpoints for managing rule groups
+	mux.Methods(http.MethodGet).
+		Path("/projects/{project_id}/clusters/{cluster_id}/rulegroups/{rulegroup_id}").
+		Handler(r.getRuleGroup())
+
+	mux.Methods(http.MethodGet).
+		Path("/projects/{project_id}/clusters/{cluster_id}/rulegroups").
+		Handler(r.listRuleGroups())
+
+	mux.Methods(http.MethodPost).
+		Path("/projects/{project_id}/clusters/{cluster_id}/rulegroups").
+		Handler(r.createRuleGroup())
+
+	mux.Methods(http.MethodPut).
+		Path("/projects/{project_id}/clusters/{cluster_id}/rulegroups/{rulegroup_id}").
+		Handler(r.updateRuleGroup())
+
+	mux.Methods(http.MethodDelete).
+		Path("/projects/{project_id}/clusters/{cluster_id}/rulegroups/{rulegroup_id}").
+		Handler(r.deleteRuleGroup())
+
+	// Defines a set of HTTP endpoints for managing allowed registries
+	mux.Methods(http.MethodPost).
+		Path("/allowedregistries").
+		Handler(r.createAllowedRegistry())
+
+	mux.Methods(http.MethodGet).
+		Path("/allowedregistries").
+		Handler(r.listAllowedRegistries())
+
+	mux.Methods(http.MethodGet).
+		Path("/allowedregistries/{allowed_registry}").
+		Handler(r.getAllowedRegistry())
+
+	mux.Methods(http.MethodDelete).
+		Path("/allowedregistries/{allowed_registry}").
+		Handler(r.deleteAllowedRegistry())
+
+	mux.Methods(http.MethodPatch).
+		Path("/allowedregistries/{allowed_registry}").
+		Handler(r.patchAllowedRegistry())
+
+	// Defines a set of HTTP endpoints for managing etcd backup configs
+	mux.Methods(http.MethodPost).
+		Path("/projects/{project_id}/clusters/{cluster_id}/etcdbackupconfigs").
+		Handler(r.createEtcdBackupConfig())
+
+	mux.Methods(http.MethodGet).
+		Path("/projects/{project_id}/clusters/{cluster_id}/etcdbackupconfigs/{ebc_id}").
+		Handler(r.getEtcdBackupConfig())
+
+	mux.Methods(http.MethodGet).
+		Path("/projects/{project_id}/clusters/{cluster_id}/etcdbackupconfigs").
+		Handler(r.listEtcdBackupConfig())
+
+	mux.Methods(http.MethodDelete).
+		Path("/projects/{project_id}/clusters/{cluster_id}/etcdbackupconfigs/{ebc_id}").
+		Handler(r.deleteEtcdBackupConfig())
+
+	mux.Methods(http.MethodPatch).
+		Path("/projects/{project_id}/clusters/{cluster_id}/etcdbackupconfigs/{ebc_id}").
+		Handler(r.patchEtcdBackupConfig())
+
+	mux.Methods(http.MethodGet).
+		Path("/projects/{project_id}/etcdbackupconfigs").
+		Handler(r.listProjectEtcdBackupConfig())
+
+	// Defines a set of HTTP endpoints for managing etcd backup restores
+	mux.Methods(http.MethodPost).
+		Path("/projects/{project_id}/clusters/{cluster_id}/etcdrestores").
+		Handler(r.createEtcdRestore())
+
+	mux.Methods(http.MethodGet).
+		Path("/projects/{project_id}/clusters/{cluster_id}/etcdrestores/{er_name}").
+		Handler(r.getEtcdRestore())
+
+	mux.Methods(http.MethodGet).
+		Path("/projects/{project_id}/clusters/{cluster_id}/etcdrestores").
+		Handler(r.listEtcdRestore())
+
+	mux.Methods(http.MethodDelete).
+		Path("/projects/{project_id}/clusters/{cluster_id}/etcdrestores/{er_name}").
+		Handler(r.deleteEtcdRestore())
+
+	mux.Methods(http.MethodGet).
+		Path("/projects/{project_id}/etcdrestores").
+		Handler(r.listProjectEtcdRestore())
+
+	// Defines a set of HTTP endpoints for managing etcd backup restores
+	mux.Methods(http.MethodPut).
+		Path("/seeds/{seed_name}/backupcredentials").
+		Handler(r.createOrUpdateBackupCredentials())
+
+	// Defines a set of HTTP endpoints for managing MLA admin setting
+	mux.Methods(http.MethodGet).
+		Path("/projects/{project_id}/clusters/{cluster_id}/mlaadminsetting").
+		Handler(r.getMLAAdminSetting())
+
+	mux.Methods(http.MethodPost).
+		Path("/projects/{project_id}/clusters/{cluster_id}/mlaadminsetting").
+		Handler(r.createMLAAdminSetting())
+
+	mux.Methods(http.MethodPut).
+		Path("/projects/{project_id}/clusters/{cluster_id}/mlaadminsetting").
+		Handler(r.updateMLAAdminSetting())
+
+	mux.Methods(http.MethodDelete).
+		Path("/projects/{project_id}/clusters/{cluster_id}/mlaadminsetting").
+		Handler(r.deleteMLAAdminSetting())
 }
 
 // swagger:route POST /api/v2/projects/{project_id}/clusters project createClusterV2
@@ -500,7 +691,7 @@ func (r Routing) createCluster() http.Handler {
 			middleware.Keycloak(r.keycloakFacade),
 			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
 		)(cluster.CreateEndpoint(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter,
-			r.presetsProvider, r.exposeStrategy, r.userInfoGetter, r.settingsProvider, r.updateManager, r.caBundle)),
+			r.presetsProvider, r.exposeStrategy, r.userInfoGetter, r.settingsProvider, r.updateManager, r.caBundle, r.supportManager)),
 		cluster.DecodeCreateReq,
 		handler.SetStatusCreatedHeader(handler.EncodeJSON),
 		r.defaultServerOptions()...,
@@ -524,7 +715,7 @@ func (r Routing) listClusters() http.Handler {
 		endpoint.Chain(
 			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
 			middleware.UserSaver(r.userProvider),
-		)(cluster.ListEndpoint(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter, r.clusterProviderGetter, r.userInfoGetter)),
+		)(cluster.ListEndpoint(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter, r.clusterProviderGetter, r.userInfoGetter, r.supportManager)),
 		common.DecodeGetProject,
 		handler.EncodeJSON,
 		r.defaultServerOptions()...,
@@ -550,7 +741,7 @@ func (r Routing) getCluster() http.Handler {
 			middleware.UserSaver(r.userProvider),
 			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
 			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-		)(cluster.GetEndpoint(r.projectProvider, r.privilegedProjectProvider, r.userInfoGetter)),
+		)(cluster.GetEndpoint(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter, r.userInfoGetter, r.supportManager)),
 		cluster.DecodeGetClusterReq,
 		handler.EncodeJSON,
 		r.defaultServerOptions()...,
@@ -604,7 +795,7 @@ func (r Routing) patchCluster() http.Handler {
 			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
 			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
 			middleware.Keycloak(r.keycloakFacade),
-		)(cluster.PatchEndpoint(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter, r.userInfoGetter, r.caBundle)),
+		)(cluster.PatchEndpoint(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter, r.userInfoGetter, r.caBundle, r.supportManager)),
 		cluster.DecodePatchReq,
 		handler.EncodeJSON,
 		r.defaultServerOptions()...,
@@ -714,6 +905,33 @@ func (r Routing) getOidcClusterKubeconfig() http.Handler {
 		)(cluster.GetSysElevenOidcKubeconfigEndpoint(r.projectProvider, r.userInfoGetter)),
 		cluster.DecodeGetAdminKubeconfig,
 		cluster.EncodeKubeconfig,
+		r.defaultServerOptions()...,
+	)
+}
+
+// getClusterOidc returns the OIDC spec for the user cluster.
+// swagger:route GET /api/v2/projects/{project_id}/clusters/{cluster_id}/oidc project getClusterOidc
+//
+//     Gets the OIDC params for the specified cluster with OIDC authentication.
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       200: OIDCSpec
+//       401: empty
+//       403: empty
+func (r Routing) getClusterOidc() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+		)(cluster.GetClusterOidcEndpoint(r.projectProvider, r.privilegedProjectProvider, r.userInfoGetter)),
+		cluster.DecodeGetClusterReq,
+		handler.EncodeJSON,
 		r.defaultServerOptions()...,
 	)
 }
@@ -1402,6 +1620,132 @@ func (r Routing) createConstraint() http.Handler {
 	)
 }
 
+// swagger:route POST /api/v2/constraints constraint createDefaultConstraint
+//
+//     Creates default constraint
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       200: Constraint
+//       401: empty
+//       403: empty
+func (r Routing) createDefaultConstraint() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+		)(constraint.CreateDefaultEndpoint(r.userInfoGetter, r.defaultConstraintProvider, r.constraintTemplateProvider)),
+		constraint.DecodeCreateDefaultConstraintReq,
+		handler.EncodeJSON,
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route GET /api/v2/constraints constraint listDefaultConstraint
+//
+//     List default constraint.
+//
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       200: []Constraint
+//       401: empty
+//       403: empty
+func (r Routing) listDefaultConstraint() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+		)(constraint.ListDefaultEndpoint(r.defaultConstraintProvider)),
+		common.DecodeEmptyReq,
+		handler.EncodeJSON,
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route GET /api/v2/constraints/{constraint_name} constraint getDefaultConstraint
+//
+//     Gets an specified default constraint
+//
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       200: Constraint
+//       401: empty
+//       403: empty
+func (r Routing) getDefaultConstraint() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+		)(constraint.GetDefaultEndpoint(r.defaultConstraintProvider)),
+		constraint.DecodeDefaultConstraintReq,
+		handler.EncodeJSON,
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route DELETE /api/v2/constraints/{constraint_name} constraints deleteDefaultConstraint
+//
+//     Deletes a specified default constraint.
+//
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       200: empty
+//       401: empty
+//       403: empty
+func (r Routing) deleteDefaultConstraint() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+		)(constraint.DeleteDefaultEndpoint(r.userInfoGetter, r.defaultConstraintProvider)),
+		constraint.DecodeDefaultConstraintReq,
+		handler.EncodeJSON,
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route PATCH /api/v2/constraints/{constraint_name} constraint patchDefaultConstraint
+//
+//     Patch a specified default constraint
+//
+//     Consumes:
+//     - application/json
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       200: Constraint
+//       401: empty
+//       403: empty
+func (r Routing) patchDefaultConstraint() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+		)(constraint.PatchDefaultEndpoint(r.userInfoGetter, r.defaultConstraintProvider, r.constraintTemplateProvider)),
+		constraint.DecodePatchDefaultConstraintReq,
+		handler.EncodeJSON,
+		r.defaultServerOptions()...,
+	)
+}
+
 // swagger:route PATCH /api/v2/projects/{project_id}/clusters/{cluster_id}/constraints/{constraint_name} project patchConstraint
 //
 //     Patches a given constraint for the specified cluster.
@@ -1424,7 +1768,7 @@ func (r Routing) patchConstraint() http.Handler {
 			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
 			middleware.Constraints(r.clusterProviderGetter, r.constraintProviderGetter, r.seedsGetter),
 			middleware.PrivilegedConstraints(r.clusterProviderGetter, r.constraintProviderGetter, r.seedsGetter),
-		)(constraint.PatchEndpoint(r.userInfoGetter, r.projectProvider, r.privilegedProjectProvider)),
+		)(constraint.PatchEndpoint(r.userInfoGetter, r.projectProvider, r.privilegedProjectProvider, r.constraintTemplateProvider)),
 		constraint.DecodePatchConstraintReq,
 		handler.EncodeJSON,
 		r.defaultServerOptions()...,
@@ -1753,6 +2097,35 @@ func (r Routing) patchMachineDeployment() http.Handler {
 			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
 		)(machine.PatchMachineDeployment(r.sshKeyProvider, r.projectProvider, r.privilegedProjectProvider, r.seedsGetter, r.userInfoGetter)),
 		machine.DecodePatchMachineDeployment,
+		handler.EncodeJSON,
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route POST /api/v2/projects/{project_id}/clusters/{cluster_id}/machinedeployments/{machinedeployment_id} project restartMachineDeployment
+//
+//     Schedules rolling restart of a machine deployment that is assigned to the given cluster.
+//
+//     Consumes:
+//     - application/json
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       200: NodeDeployment
+//       401: empty
+//       403: empty
+func (r Routing) restartMachineDeployment() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+		)(machine.RestartMachineDeployment(r.projectProvider, r.privilegedProjectProvider, r.userInfoGetter)),
+		machine.DecodeGetMachineDeployment,
 		handler.EncodeJSON,
 		r.defaultServerOptions()...,
 	)
@@ -2273,7 +2646,7 @@ func (r Routing) listAWSSizesNoCredentials() http.Handler {
 			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
 			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
 		)(provider.AWSSizeNoCredentialsEndpoint(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter, r.settingsProvider, r.userInfoGetter)),
-		cluster.DecodeGetClusterReq,
+		provider.DecodeAWSSizeNoCredentialsReq,
 		handler.EncodeJSON,
 		r.defaultServerOptions()...,
 	)
@@ -3198,6 +3571,1033 @@ func (r Routing) updatePreset() http.Handler {
 			middleware.UserSaver(r.userProvider),
 		)(preset.UpdatePreset(r.presetsProvider, r.userInfoGetter)),
 		preset.DecodeUpdatePreset,
+		handler.EncodeJSON,
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route GET /api/v2/providers/{provider_name}/versions version listVersionsByProvider
+//
+// Lists all versions which don't result in automatic updates for a given provider
+//
+//     Consumes:
+//	   - application/json
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       200: VersionList
+//       401: empty
+//       403: empty
+func (r Routing) listVersionsByProvider() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+		)(version.ListVersions(r.updateManager)),
+		version.DecodeListProviderVersions,
+		handler.EncodeJSON,
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route GET /api/v2/projects/{project_id}/clusters/{cluster_id}/alertmanager/config project getAlertmanager
+//
+//     Gets the alertmanager configuration for the specified cluster.
+//
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       200: Alertmanager
+//       401: empty
+//       403: empty
+func (r Routing) getAlertmanager() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.Alertmanagers(r.clusterProviderGetter, r.alertmanagerProviderGetter, r.seedsGetter),
+			middleware.PrivilegedAlertmanagers(r.clusterProviderGetter, r.alertmanagerProviderGetter, r.seedsGetter),
+		)(alertmanager.GetEndpoint(r.userInfoGetter, r.projectProvider, r.privilegedProjectProvider)),
+		alertmanager.DecodeGetAlertmanagerReq,
+		handler.EncodeJSON,
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route PUT /api/v2/projects/{project_id}/clusters/{cluster_id}/alertmanager/config project updateAlertmanager
+//
+//     Updates an alertmanager configuration for the given cluster
+//
+//     Consumes:
+//     - application/json
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       200: Alertmanager
+//       401: empty
+//       403: empty
+func (r Routing) updateAlertmanager() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.Alertmanagers(r.clusterProviderGetter, r.alertmanagerProviderGetter, r.seedsGetter),
+			middleware.PrivilegedAlertmanagers(r.clusterProviderGetter, r.alertmanagerProviderGetter, r.seedsGetter),
+		)(alertmanager.UpdateEndpoint(r.userInfoGetter, r.projectProvider, r.privilegedProjectProvider)),
+		alertmanager.DecodeUpdateAlertmanagerReq,
+		handler.EncodeJSON,
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route DELETE /api/v2/projects/{project_id}/clusters/{cluster_id}/alertmanager/config project resetAlertmanager
+//
+//     Resets the alertmanager configuration to default for the specified cluster.
+//
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       200: empty
+//       401: empty
+//       403: empty
+func (r Routing) resetAlertmanager() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.Alertmanagers(r.clusterProviderGetter, r.alertmanagerProviderGetter, r.seedsGetter),
+			middleware.PrivilegedAlertmanagers(r.clusterProviderGetter, r.alertmanagerProviderGetter, r.seedsGetter),
+		)(alertmanager.ResetEndpoint(r.userInfoGetter, r.projectProvider, r.privilegedProjectProvider)),
+		alertmanager.DecodeResetAlertmanagerReq,
+		handler.EncodeJSON,
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route GET /api/v2/seeds/{seed_name}/settings seed getSeedSettings
+//
+//     Gets the seed settings.
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       200: SeedSettings
+//       401: empty
+//       403: empty
+func (r Routing) getSeedSettings() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+		)(seedsettings.GetSeedSettingsEndpoint(r.seedsGetter)),
+		seedsettings.DecodeGetSeedSettingsReq,
+		handler.EncodeJSON,
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route POST /api/v2/projects/{project_id}/clustertemplates project createClusterTemplate
+//
+//     Creates a cluster templates for the given project.
+//
+//     Consumes:
+//     - application/json
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       201: ClusterTemplate
+//       401: empty
+//       403: empty
+func (r Routing) createClusterTemplate() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.Keycloak(r.keycloakFacade),
+		)(clustertemplate.CreateEndpoint(r.projectProvider, r.privilegedProjectProvider, r.userInfoGetter, r.clusterTemplateProvider, r.settingsProvider, r.updateManager, r.seedsGetter, r.presetsProvider, r.caBundle, r.exposeStrategy, r.sshKeyProvider, r.supportManager)),
+		clustertemplate.DecodeCreateReq,
+		handler.SetStatusCreatedHeader(handler.EncodeJSON),
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route GET /api/v2/projects/{project_id}/clustertemplates project listClusterTemplates
+//
+//     List cluster templates for the given project.
+//
+//     Consumes:
+//     - application/json
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       200: ClusterTemplateList
+//       401: empty
+//       403: empty
+func (r Routing) listClusterTemplates() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+		)(clustertemplate.ListEndpoint(r.projectProvider, r.privilegedProjectProvider, r.userInfoGetter, r.clusterTemplateProvider)),
+		clustertemplate.DecodeListReq,
+		handler.EncodeJSON,
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route GET /api/v2/projects/{project_id}/clustertemplates/{template_id} project getClusterTemplate
+//
+//     Get cluster template.
+//
+//     Consumes:
+//     - application/json
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       200: ClusterTemplate
+//       401: empty
+//       403: empty
+func (r Routing) getClusterTemplate() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+		)(clustertemplate.GetEndpoint(r.projectProvider, r.privilegedProjectProvider, r.userInfoGetter, r.clusterTemplateProvider)),
+		clustertemplate.DecodeGetReq,
+		handler.EncodeJSON,
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route DELETE /api/v2/projects/{project_id}/clustertemplates/{template_id} project deleteClusterTemplate
+//
+//     Delete cluster template.
+//
+//     Consumes:
+//     - application/json
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       200: empty
+//       401: empty
+//       403: empty
+func (r Routing) deleteClusterTemplate() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+		)(clustertemplate.DeleteEndpoint(r.projectProvider, r.privilegedProjectProvider, r.userInfoGetter, r.clusterTemplateProvider)),
+		clustertemplate.DecodeGetReq,
+		handler.EncodeJSON,
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route POST /api/v2/projects/{project_id}/clustertemplates/{template_id}/instances project createClusterTemplateInstance
+//
+//     Create cluster template instance.
+//
+//     Consumes:
+//     - application/json
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       201: ClusterTemplateInstance
+//       401: empty
+//       403: empty
+func (r Routing) createClusterTemplateInstance() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+		)(clustertemplate.CreateInstanceEndpoint(r.projectProvider, r.privilegedProjectProvider, r.userInfoGetter, r.clusterTemplateProvider, r.seedsGetter, r.clusterTemplateInstanceProviderGetter)),
+		clustertemplate.DecodeCreateInstanceReq,
+		handler.SetStatusCreatedHeader(handler.EncodeJSON),
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route GET /api/v2/projects/{project_id}/clusters/{cluster_id}/rulegroups/{rulegroup_id} rulegroup getRuleGroup
+//
+//     Gets a specified rule group for the given cluster.
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       200: RuleGroup
+//       401: empty
+//       403: empty
+func (r Routing) getRuleGroup() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.RuleGroups(r.clusterProviderGetter, r.ruleGroupProviderGetter, r.seedsGetter),
+			middleware.PrivilegedRuleGroups(r.clusterProviderGetter, r.ruleGroupProviderGetter, r.seedsGetter),
+		)(rulegroup.GetEndpoint(r.userInfoGetter, r.projectProvider, r.privilegedProjectProvider)),
+		rulegroup.DecodeGetReq,
+		handler.EncodeJSON,
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route GET /api/v2/projects/{project_id}/clusters/{cluster_id}/rulegroups rulegroup listRuleGroups
+//
+//     Lists rule groups that belong to the given cluster
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       200: []RuleGroup
+//       401: empty
+//       403: empty
+func (r Routing) listRuleGroups() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.RuleGroups(r.clusterProviderGetter, r.ruleGroupProviderGetter, r.seedsGetter),
+			middleware.PrivilegedRuleGroups(r.clusterProviderGetter, r.ruleGroupProviderGetter, r.seedsGetter),
+		)(rulegroup.ListEndpoint(r.userInfoGetter, r.projectProvider, r.privilegedProjectProvider)),
+		rulegroup.DecodeListReq,
+		handler.EncodeJSON,
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route POST /api/v2/projects/{project_id}/clusters/{cluster_id}/rulegroups rulegroup createRuleGroup
+//
+//     Creates a rule group that will belong to the given cluster
+//
+//     Consumes:
+//     - application/json
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       201: RuleGroup
+//       401: empty
+//       403: empty
+func (r Routing) createRuleGroup() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.RuleGroups(r.clusterProviderGetter, r.ruleGroupProviderGetter, r.seedsGetter),
+			middleware.PrivilegedRuleGroups(r.clusterProviderGetter, r.ruleGroupProviderGetter, r.seedsGetter),
+		)(rulegroup.CreateEndpoint(r.userInfoGetter, r.projectProvider, r.privilegedProjectProvider)),
+		rulegroup.DecodeCreateReq,
+		handler.SetStatusCreatedHeader(handler.EncodeJSON),
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route PUT /api/v2/projects/{project_id}/clusters/{cluster_id}/rulegroups/{rulegroup_id} rulegroup updateRuleGroup
+//
+//     Updates the specified rule group for the given cluster.
+//
+//     Consumes:
+//     - application/json
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       200: RuleGroup
+//       401: empty
+//       403: empty
+func (r Routing) updateRuleGroup() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.RuleGroups(r.clusterProviderGetter, r.ruleGroupProviderGetter, r.seedsGetter),
+			middleware.PrivilegedRuleGroups(r.clusterProviderGetter, r.ruleGroupProviderGetter, r.seedsGetter),
+		)(rulegroup.UpdateEndpoint(r.userInfoGetter, r.projectProvider, r.privilegedProjectProvider)),
+		rulegroup.DecodeUpdateReq,
+		handler.EncodeJSON,
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route DELETE /api/v2/projects/{project_id}/clusters/{cluster_id}/rulegroups/{rulegroup_id} rulegroup deleteRuleGroup
+//
+//    Deletes the given rule group that belongs to the cluster.
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       200: empty
+//       401: empty
+//       403: empty
+func (r Routing) deleteRuleGroup() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.RuleGroups(r.clusterProviderGetter, r.ruleGroupProviderGetter, r.seedsGetter),
+			middleware.PrivilegedRuleGroups(r.clusterProviderGetter, r.ruleGroupProviderGetter, r.seedsGetter),
+		)(rulegroup.DeleteEndpoint(r.userInfoGetter, r.projectProvider, r.privilegedProjectProvider)),
+		rulegroup.DecodeDeleteReq,
+		handler.EncodeJSON,
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route POST /api/v2/projects/{project_id}/clusters/{cluster_id}/externalccmmigration migrateClusterToExternalCCM
+//
+//    Enable the migration to the external CCM for the given cluster
+//
+//	   Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       200: empty
+//       401: empty
+//       403: empty
+func (r Routing) migrateClusterToExternalCCM() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+		)(cluster.MigrateEndpointToExternalCCM(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter, r.userInfoGetter, r.supportManager)),
+		cluster.DecodeGetClusterReq,
+		handler.EncodeJSON,
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route POST /api/v2/allowedregistries allowedregistry createAllowedRegistry
+//
+//     Creates a allowed registry
+//
+//     Consumes:
+//     - application/json
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       201: AllowedRegistry
+//       401: empty
+//       403: empty
+func (r Routing) createAllowedRegistry() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+		)(allowedregistry.CreateEndpoint(r.userInfoGetter, r.privilegedAllowedRegistryProvider)),
+		allowedregistry.DecodeCreateAllowedRegistryRequest,
+		handler.SetStatusCreatedHeader(handler.EncodeJSON),
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route GET /api/v2/allowedregistries allowedregistry listAllowedRegistries
+//
+//     List allowed registries.
+//
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       200: []AllowedRegistry
+//       401: empty
+//       403: empty
+func (r Routing) listAllowedRegistries() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+		)(allowedregistry.ListEndpoint(r.userInfoGetter, r.privilegedAllowedRegistryProvider)),
+		common.DecodeEmptyReq,
+		handler.EncodeJSON,
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route GET /api/v2/allowedregistries/{allowed_registry} allowedregistries getAllowedRegistry
+//
+//     Get allowed registries specified by name
+//
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       200: AllowedRegistry
+//       401: empty
+//       403: empty
+func (r Routing) getAllowedRegistry() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+		)(allowedregistry.GetEndpoint(r.userInfoGetter, r.privilegedAllowedRegistryProvider)),
+		allowedregistry.DecodeGetAllowedRegistryRequest,
+		handler.EncodeJSON,
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route DELETE /api/v2/allowedregistries/{allowed_registry} allowedregistries deleteAllowedRegistry
+//
+//    Deletes the given allowed registry.
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       200: empty
+//       401: empty
+//       403: empty
+func (r Routing) deleteAllowedRegistry() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+		)(allowedregistry.DeleteEndpoint(r.userInfoGetter, r.privilegedAllowedRegistryProvider)),
+		allowedregistry.DecodeGetAllowedRegistryRequest,
+		handler.EncodeJSON,
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route PATCH /api/v2/allowedregistries/{allowed_registry} allowedregistries patchAllowedRegistry
+//
+//     Patch a specified allowed registry
+//
+//     Consumes:
+//     - application/json
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       200: ConstraintTemplate
+//       401: empty
+//       403: empty
+func (r Routing) patchAllowedRegistry() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+		)(allowedregistry.PatchEndpoint(r.userInfoGetter, r.privilegedAllowedRegistryProvider)),
+		allowedregistry.DecodePatchAllowedRegistryReq,
+		handler.EncodeJSON,
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route POST /api/v2/projects/{project_id}/clusters/{cluster_id}/etcdbackupconfigs etcdbackupconfig createEtcdBackupConfig
+//
+//     Creates a etcd backup config that will belong to the given cluster
+//
+//     Consumes:
+//     - application/json
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       201: EtcdBackupConfig
+//       401: empty
+//       403: empty
+func (r Routing) createEtcdBackupConfig() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.EtcdBackupConfig(r.clusterProviderGetter, r.etcdBackupConfigProviderGetter, r.seedsGetter),
+			middleware.PrivilegedEtcdBackupConfig(r.clusterProviderGetter, r.etcdBackupConfigProviderGetter, r.seedsGetter),
+		)(etcdbackupconfig.CreateEndpoint(r.userInfoGetter, r.projectProvider, r.privilegedProjectProvider)),
+		etcdbackupconfig.DecodeCreateEtcdBackupConfigReq,
+		handler.SetStatusCreatedHeader(handler.EncodeJSON),
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route GET /api/v2/projects/{project_id}/clusters/{cluster_id}/etcdbackupconfigs/{ebc_id} etcdbackupconfig getEtcdBackupConfig
+//
+//     Gets a etcd backup config for a given cluster based on its id
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       200: EtcdBackupConfig
+//       401: empty
+//       403: empty
+func (r Routing) getEtcdBackupConfig() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.EtcdBackupConfig(r.clusterProviderGetter, r.etcdBackupConfigProviderGetter, r.seedsGetter),
+			middleware.PrivilegedEtcdBackupConfig(r.clusterProviderGetter, r.etcdBackupConfigProviderGetter, r.seedsGetter),
+		)(etcdbackupconfig.GetEndpoint(r.userInfoGetter, r.projectProvider, r.privilegedProjectProvider)),
+		etcdbackupconfig.DecodeGetEtcdBackupConfigReq,
+		handler.EncodeJSON,
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route GET /api/v2/projects/{project_id}/clusters/{cluster_id}/etcdbackupconfigs etcdbackupconfig listEtcdBackupConfig
+//
+//     List etcd backup configs for a given cluster
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       200: []EtcdBackupConfig
+//       401: empty
+//       403: empty
+func (r Routing) listEtcdBackupConfig() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.EtcdBackupConfig(r.clusterProviderGetter, r.etcdBackupConfigProviderGetter, r.seedsGetter),
+			middleware.PrivilegedEtcdBackupConfig(r.clusterProviderGetter, r.etcdBackupConfigProviderGetter, r.seedsGetter),
+		)(etcdbackupconfig.ListEndpoint(r.userInfoGetter, r.projectProvider, r.privilegedProjectProvider)),
+		etcdbackupconfig.DecodeListEtcdBackupConfigReq,
+		handler.EncodeJSON,
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route DELETE /api/v2/projects/{project_id}/clusters/{cluster_id}/etcdbackupconfigs/{ebc_id} etcdbackupconfig deleteEtcdBackupConfig
+//
+//     Deletes a etcd backup config for a given cluster based on its id
+//
+//     Responses:
+//       default: errorResponse
+//       200: empty
+//       401: empty
+//       403: empty
+func (r Routing) deleteEtcdBackupConfig() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.EtcdBackupConfig(r.clusterProviderGetter, r.etcdBackupConfigProviderGetter, r.seedsGetter),
+			middleware.PrivilegedEtcdBackupConfig(r.clusterProviderGetter, r.etcdBackupConfigProviderGetter, r.seedsGetter),
+		)(etcdbackupconfig.DeleteEndpoint(r.userInfoGetter, r.projectProvider, r.privilegedProjectProvider)),
+		etcdbackupconfig.DecodeGetEtcdBackupConfigReq,
+		handler.EncodeJSON,
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route PATCH /api/v2/projects/{project_id}/clusters/{cluster_id}/etcdbackupconfigs/{ebc_id} etcdbackupconfig patchEtcdBackupConfig
+//
+//     Patches a etcd backup config for a given cluster based on its id
+//
+//     Consumes:
+//     - application/json
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       200: EtcdBackupConfig
+//       401: empty
+//       403: empty
+func (r Routing) patchEtcdBackupConfig() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.EtcdBackupConfig(r.clusterProviderGetter, r.etcdBackupConfigProviderGetter, r.seedsGetter),
+			middleware.PrivilegedEtcdBackupConfig(r.clusterProviderGetter, r.etcdBackupConfigProviderGetter, r.seedsGetter),
+		)(etcdbackupconfig.PatchEndpoint(r.userInfoGetter, r.projectProvider, r.privilegedProjectProvider)),
+		etcdbackupconfig.DecodePatchEtcdBackupConfigReq,
+		handler.EncodeJSON,
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route GET /api/v2/projects/{project_id}/etcdbackupconfigs etcdbackupconfig listProjectEtcdBackupConfig
+//
+//     List etcd backup configs for a given project
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       200: []EtcdBackupConfig
+//       401: empty
+//       403: empty
+func (r Routing) listProjectEtcdBackupConfig() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+			middleware.EtcdBackupConfigProject(r.etcdBackupConfigProjectProviderGetter, r.seedsGetter),
+			middleware.PrivilegedEtcdBackupConfigProject(r.etcdBackupConfigProjectProviderGetter, r.seedsGetter),
+		)(etcdbackupconfig.ProjectListEndpoint(r.userInfoGetter, r.projectProvider, r.privilegedProjectProvider)),
+		etcdbackupconfig.DecodeListProjectEtcdBackupConfigReq,
+		handler.EncodeJSON,
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route POST /api/v2/projects/{project_id}/clusters/{cluster_id}/etcdrestores etcdrestore createEtcdRestore
+//
+//     Creates a etcd backup restore for a given cluster
+//
+//     Consumes:
+//     - application/json
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       201: EtcdBackupConfig
+//       401: empty
+//       403: empty
+func (r Routing) createEtcdRestore() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.EtcdRestore(r.clusterProviderGetter, r.etcdRestoreProviderGetter, r.seedsGetter),
+			middleware.PrivilegedEtcdRestore(r.clusterProviderGetter, r.etcdRestoreProviderGetter, r.seedsGetter),
+		)(etcdrestore.CreateEndpoint(r.userInfoGetter, r.projectProvider, r.privilegedProjectProvider)),
+		etcdrestore.DecodeCreateEtcdRestoreReq,
+		handler.SetStatusCreatedHeader(handler.EncodeJSON),
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route GET /api/v2/projects/{project_id}/clusters/{cluster_id}/etcdrestores/{er_name} etcdrestore getEtcdRestore
+//
+//     Gets a etcd backup restore for a given cluster based on its name
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       200: EtcdRestore
+//       401: empty
+//       403: empty
+func (r Routing) getEtcdRestore() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.EtcdRestore(r.clusterProviderGetter, r.etcdRestoreProviderGetter, r.seedsGetter),
+			middleware.PrivilegedEtcdRestore(r.clusterProviderGetter, r.etcdRestoreProviderGetter, r.seedsGetter),
+		)(etcdrestore.GetEndpoint(r.userInfoGetter, r.projectProvider, r.privilegedProjectProvider)),
+		etcdrestore.DecodeGetEtcdRestoreReq,
+		handler.EncodeJSON,
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route GET /api/v2/projects/{project_id}/clusters/{cluster_id}/etcdrestores etcdrestore listEtcdRestore
+//
+//     List etcd backup restores for a given cluster
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       200: []EtcdRestore
+//       401: empty
+//       403: empty
+func (r Routing) listEtcdRestore() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.EtcdRestore(r.clusterProviderGetter, r.etcdRestoreProviderGetter, r.seedsGetter),
+			middleware.PrivilegedEtcdRestore(r.clusterProviderGetter, r.etcdRestoreProviderGetter, r.seedsGetter),
+		)(etcdrestore.ListEndpoint(r.userInfoGetter, r.projectProvider, r.privilegedProjectProvider)),
+		etcdrestore.DecodeListEtcdRestoreReq,
+		handler.EncodeJSON,
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route DELETE /api/v2/projects/{project_id}/clusters/{cluster_id}/etcdrestores/{er_name} etcdrestore deleteEtcdRestore
+//
+//     Deletes a etcd restore config for a given cluster based on its name
+//
+//     Responses:
+//       default: errorResponse
+//       200: empty
+//       401: empty
+//       403: empty
+//       409: errorResponse
+func (r Routing) deleteEtcdRestore() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.EtcdRestore(r.clusterProviderGetter, r.etcdRestoreProviderGetter, r.seedsGetter),
+			middleware.PrivilegedEtcdRestore(r.clusterProviderGetter, r.etcdRestoreProviderGetter, r.seedsGetter),
+		)(etcdrestore.DeleteEndpoint(r.userInfoGetter, r.projectProvider, r.privilegedProjectProvider)),
+		etcdrestore.DecodeGetEtcdRestoreReq,
+		handler.EncodeJSON,
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route GET /api/v2/projects/{project_id}/etcdrestores etcdrestore listProjectEtcdRestore
+//
+//     List etcd backup restores for a given project
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       200: []EtcdRestore
+//       401: empty
+//       403: empty
+func (r Routing) listProjectEtcdRestore() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+			middleware.EtcdRestoreProject(r.etcdRestoreProjectProviderGetter, r.seedsGetter),
+			middleware.PrivilegedEtcdRestoreProject(r.etcdRestoreProjectProviderGetter, r.seedsGetter),
+		)(etcdrestore.ProjectListEndpoint(r.userInfoGetter, r.projectProvider, r.privilegedProjectProvider)),
+		etcdrestore.DecodeListProjectEtcdRestoreReq,
+		handler.EncodeJSON,
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route PUT /api/v2/seeds/{seed_name}/backupcredentials backupcredentials createOrUpdateBackupCredentials
+//
+//     Creates or updates backup credentials for a given seed
+//
+//     Consumes:
+//     - application/json
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       200: empty
+//       401: empty
+//       403: empty
+func (r Routing) createOrUpdateBackupCredentials() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+			middleware.BackupCredentials(r.backupCredentialsProviderGetter, r.seedsGetter),
+		)(backupcredentials.CreateOrUpdateEndpoint(r.userInfoGetter)),
+		backupcredentials.DecodeBackupCredentialsReq,
+		handler.EncodeJSON,
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route GET /api/v2/projects/{project_id}/clusters/{cluster_id}/mlaadminsetting mlaadminsetting getMLAAdminSetting
+//
+//     Gets MLA Admin settings for the given cluster.
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       200: MLAAdminSetting
+//       401: empty
+//       403: empty
+func (r Routing) getMLAAdminSetting() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.PrivilegedMLAAdminSetting(r.clusterProviderGetter, r.privilegedMLAAdminSettingProviderGetter, r.seedsGetter),
+		)(mlaadminsetting.GetEndpoint(r.userInfoGetter, r.projectProvider, r.privilegedProjectProvider)),
+		mlaadminsetting.DecodeGetReq,
+		handler.EncodeJSON,
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route POST /api/v2/projects/{project_id}/clusters/{cluster_id}/mlaadminsetting mlaadminsetting createMLAAdminSetting
+//
+//     Creates MLA admin setting that will belong to the given cluster
+//
+//     Consumes:
+//     - application/json
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       201: MLAAdminSetting
+//       401: empty
+//       403: empty
+func (r Routing) createMLAAdminSetting() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.PrivilegedMLAAdminSetting(r.clusterProviderGetter, r.privilegedMLAAdminSettingProviderGetter, r.seedsGetter),
+		)(mlaadminsetting.CreateEndpoint(r.userInfoGetter, r.projectProvider, r.privilegedProjectProvider)),
+		mlaadminsetting.DecodeCreateReq,
+		handler.SetStatusCreatedHeader(handler.EncodeJSON),
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route PUT /api/v2/projects/{project_id}/clusters/{cluster_id}/mlaadminsetting mlaadminsetting updateMLAAdminSetting
+//
+//     Updates the MLA admin setting for the given cluster.
+//
+//     Consumes:
+//     - application/json
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       200: MLAAdminSetting
+//       401: empty
+//       403: empty
+func (r Routing) updateMLAAdminSetting() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.PrivilegedMLAAdminSetting(r.clusterProviderGetter, r.privilegedMLAAdminSettingProviderGetter, r.seedsGetter),
+		)(mlaadminsetting.UpdateEndpoint(r.userInfoGetter, r.projectProvider, r.privilegedProjectProvider)),
+		mlaadminsetting.DecodeUpdateReq,
+		handler.EncodeJSON,
+		r.defaultServerOptions()...,
+	)
+}
+
+// swagger:route DELETE /api/v2/projects/{project_id}/clusters/{cluster_id}/mlaadminsetting mlaadminsetting deleteMLAAdminSetting
+//
+//    Deletes the MLA admin setting that belongs to the cluster.
+//
+//     Produces:
+//     - application/json
+//
+//     Responses:
+//       default: errorResponse
+//       200: empty
+//       401: empty
+//       403: empty
+func (r Routing) deleteMLAAdminSetting() http.Handler {
+	return httptransport.NewServer(
+		endpoint.Chain(
+			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
+			middleware.UserSaver(r.userProvider),
+			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
+			middleware.PrivilegedMLAAdminSetting(r.clusterProviderGetter, r.privilegedMLAAdminSettingProviderGetter, r.seedsGetter),
+		)(mlaadminsetting.DeleteEndpoint(r.userInfoGetter, r.projectProvider, r.privilegedProjectProvider)),
+		mlaadminsetting.DecodeDeleteReq,
 		handler.EncodeJSON,
 		r.defaultServerOptions()...,
 	)

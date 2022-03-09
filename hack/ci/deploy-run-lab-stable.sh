@@ -27,11 +27,7 @@ if [[ "${DEPLOY_STACK}" == "kubermatic" ]]; then
 fi
 
 echodate "Getting secrets from Vault"
-export VAULT_ADDR=https://vault.loodse.com/
-retry 5 vault write \
-  --format=json auth/approle/login \
-  role_id=${VAULT_ROLE_ID} secret_id=${VAULT_SECRET_ID} > /tmp/vault-token-response.json
-export VAULT_TOKEN="$(cat /tmp/vault-token-response.json | jq .auth.client_token -r)"
+retry 5 vault_ci_login
 export KUBECONFIG=/tmp/kubeconfig
 export VALUES_FILE=/tmp/values.yaml
 
@@ -41,5 +37,5 @@ vault kv get -field=values.yaml dev/seed-clusters/run.lab.kubermatic.io > ${VALU
 echodate "Successfully got secrets for run from Vault"
 
 echodate "Deploying ${DEPLOY_STACK} stack to run.lab.kubermatic.io"
-TILLER_NAMESPACE=kubermatic ./hack/ci/deploy.sh master ${VALUES_FILE}
+./hack/ci/deploy.sh master ${VALUES_FILE}
 echodate "Successfully deployed ${DEPLOY_STACK} stack to run.lab.kubermatic.io"

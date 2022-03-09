@@ -34,7 +34,6 @@ linters:
     - unconvert
     - ineffassign
     - goconst
-    - gocyclo
     - misspell
     - gosimple
     - unused

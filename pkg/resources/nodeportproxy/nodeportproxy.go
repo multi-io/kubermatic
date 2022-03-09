@@ -40,7 +40,7 @@ const (
 	imageName          = "kubermatic/nodeport-proxy"
 	envoyAppLabelValue = name + "-envoy"
 
-	// NodePortPRoxyExposeNamespacedAnnotationKey is the annotation key used to indicate that
+	// NodePortProxyExposeNamespacedAnnotationKey is the annotation key used to indicate that
 	// a service should be exposed by the namespaced NodeportProxy instance.
 	// We use it when clusters get exposed via a LoadBalancer, to allow re-using that LoadBalancer
 	// for both the kube-apiserver and the openVPN server
@@ -64,7 +64,7 @@ const (
 	SNIType
 	// TunnelingType configures Envoy to terminate the tunnel and stream the
 	// data to the destination.
-	// The only supported tunneling tecnique at the moment in HTTP/2 Connect.
+	// The only supported tunneling technique at the moment in HTTP/2 Connect.
 	TunnelingType
 )
 
@@ -150,6 +150,7 @@ type nodePortProxyData interface {
 	ImageRegistry(string) string
 	NodePortProxyTag() string
 	Cluster() *kubermaticv1.Cluster
+	SupportsFailureDomainZoneAntiAffinity() bool
 }
 
 func EnsureResources(ctx context.Context, client ctrlruntimeclient.Client, data nodePortProxyData) error {
@@ -348,6 +349,14 @@ func deploymentEnvoy(image string, data nodePortProxyData) reconciling.NamedDepl
 			if err != nil {
 				return nil, fmt.Errorf("failed to set resource requirements: %v", err)
 			}
+
+			d.Spec.Template.Spec.Affinity = resources.HostnameAntiAffinity(envoyAppLabelValue, data.Cluster().Name)
+			if data.SupportsFailureDomainZoneAntiAffinity() {
+				antiAffinities := d.Spec.Template.Spec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution
+				antiAffinities = append(antiAffinities, resources.FailureDomainZoneAntiAffinity(envoyAppLabelValue))
+				d.Spec.Template.Spec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution = antiAffinities
+			}
+
 			d.Spec.Template.Spec.Volumes = []corev1.Volume{{
 				Name: volumeMountNameEnvoyConfig,
 				VolumeSource: corev1.VolumeSource{

@@ -14,34 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// NB: The following block has an empty line separating it from the
-// package declaration. This is intentional, to not treat the Swagger
-// spec as a godoc. During client generation, the empty line is
-// temporarily removed.
-
-// MetaKube API.
-// MetaKube API. This describes possible operations which can be made against the MetaKube API.
-//
-//     Schemes: https
-//     Host: metakube.syseleven.de
-//
-//     Security:
-//     - api_key:
-//
-//     SecurityDefinitions:
-//     api_key:
-//          type: apiKey
-//          name: Authorization
-//          in: header
-//
-// swagger:meta
-
 package handler
 
 import (
 	"net/http"
-
-	admissionplugin "k8c.io/kubermatic/v2/pkg/handler/v1/admission-plugin"
 
 	"github.com/go-kit/kit/endpoint"
 	httptransport "github.com/go-kit/kit/transport/http"
@@ -50,6 +26,7 @@ import (
 	"k8c.io/kubermatic/v2/pkg/handler/middleware"
 	v1 "k8c.io/kubermatic/v2/pkg/handler/v1"
 	"k8c.io/kubermatic/v2/pkg/handler/v1/addon"
+	admissionplugin "k8c.io/kubermatic/v2/pkg/handler/v1/admission-plugin"
 	"k8c.io/kubermatic/v2/pkg/handler/v1/cluster"
 	"k8c.io/kubermatic/v2/pkg/handler/v1/common"
 	"k8c.io/kubermatic/v2/pkg/handler/v1/dc"
@@ -1561,7 +1538,7 @@ func (r Routing) createDC() http.Handler {
 		endpoint.Chain(
 			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
 			middleware.UserSaver(r.userProvider),
-		)(dc.CreateEndpoint(r.seedsGetter, r.userInfoGetter, r.seedsClientGetter)),
+		)(dc.CreateEndpoint(r.seedsGetter, r.userInfoGetter, r.masterClient)),
 		dc.DecodeCreateDCReq,
 		SetStatusCreatedHeader(EncodeJSON),
 		r.defaultServerOptions()...,
@@ -1588,7 +1565,7 @@ func (r Routing) updateDC() http.Handler {
 		endpoint.Chain(
 			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
 			middleware.UserSaver(r.userProvider),
-		)(dc.UpdateEndpoint(r.seedsGetter, r.userInfoGetter, r.seedsClientGetter)),
+		)(dc.UpdateEndpoint(r.seedsGetter, r.userInfoGetter, r.masterClient)),
 		dc.DecodeUpdateDCReq,
 		EncodeJSON,
 		r.defaultServerOptions()...,
@@ -1615,7 +1592,7 @@ func (r Routing) patchDC() http.Handler {
 		endpoint.Chain(
 			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
 			middleware.UserSaver(r.userProvider),
-		)(dc.PatchEndpoint(r.seedsGetter, r.userInfoGetter, r.seedsClientGetter)),
+		)(dc.PatchEndpoint(r.seedsGetter, r.userInfoGetter, r.masterClient)),
 		dc.DecodePatchDCReq,
 		EncodeJSON,
 		r.defaultServerOptions()...,
@@ -1639,7 +1616,7 @@ func (r Routing) deleteDC() http.Handler {
 		endpoint.Chain(
 			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
 			middleware.UserSaver(r.userProvider),
-		)(dc.DeleteEndpoint(r.seedsGetter, r.userInfoGetter, r.seedsClientGetter)),
+		)(dc.DeleteEndpoint(r.seedsGetter, r.userInfoGetter, r.masterClient)),
 		dc.DecodeDeleteDCReq,
 		EncodeJSON,
 		r.defaultServerOptions()...,
@@ -1863,7 +1840,7 @@ func (r Routing) createCluster() http.Handler {
 			middleware.Keycloak(r.keycloakFacade),
 			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
 		)(cluster.CreateEndpoint(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter, r.presetsProvider,
-			r.exposeStrategy, r.userInfoGetter, r.settingsProvider, r.updateManager, r.caBundle)),
+			r.exposeStrategy, r.userInfoGetter, r.settingsProvider, r.updateManager, r.caBundle, r.supportManager)),
 		cluster.DecodeCreateReq,
 		SetStatusCreatedHeader(EncodeJSON),
 		r.defaultServerOptions()...,
@@ -1888,7 +1865,7 @@ func (r Routing) listClusters() http.Handler {
 			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
 			middleware.UserSaver(r.userProvider),
 			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-		)(cluster.ListEndpoint(r.projectProvider, r.privilegedProjectProvider, r.userInfoGetter)),
+		)(cluster.ListEndpoint(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter, r.userInfoGetter, r.supportManager)),
 		cluster.DecodeListReq,
 		EncodeJSON,
 		r.defaultServerOptions()...,
@@ -1912,7 +1889,7 @@ func (r Routing) listClustersForProject() http.Handler {
 		endpoint.Chain(
 			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
 			middleware.UserSaver(r.userProvider),
-		)(cluster.ListAllEndpoint(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter, r.clusterProviderGetter, r.userInfoGetter)),
+		)(cluster.ListAllEndpoint(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter, r.clusterProviderGetter, r.userInfoGetter, r.supportManager)),
 		common.DecodeGetProject,
 		EncodeJSON,
 		r.defaultServerOptions()...,
@@ -1938,7 +1915,7 @@ func (r Routing) getCluster() http.Handler {
 			middleware.UserSaver(r.userProvider),
 			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
 			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-		)(cluster.GetEndpoint(r.projectProvider, r.privilegedProjectProvider, r.userInfoGetter)),
+		)(cluster.GetEndpoint(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter, r.userInfoGetter, r.supportManager)),
 		common.DecodeGetClusterReq,
 		EncodeJSON,
 		r.defaultServerOptions()...,
@@ -1965,7 +1942,7 @@ func (r Routing) patchCluster() http.Handler {
 			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
 			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
 			middleware.Keycloak(r.keycloakFacade),
-		)(cluster.PatchEndpoint(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter, r.userInfoGetter, r.caBundle)),
+		)(cluster.PatchEndpoint(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter, r.userInfoGetter, r.caBundle, r.supportManager)),
 		cluster.DecodePatchReq,
 		EncodeJSON,
 		r.defaultServerOptions()...,

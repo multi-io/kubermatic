@@ -1,3 +1,5 @@
+// +build ee
+
 /*
 Copyright 2020 The Kubermatic Kubernetes Platform contributors.
 
@@ -62,7 +64,7 @@ func TestReconcile(t *testing.T) {
 		userClient           ctrlruntimeclient.Client
 	}{
 		{
-			name: "scenario 1: sync constraint to user cluster",
+			name: "scenario 1: sync constraint with rawJSON to user cluster",
 			namespacedName: types.NamespacedName{
 				Namespace: "namespace",
 				Name:      constraintName,
@@ -71,7 +73,14 @@ func TestReconcile(t *testing.T) {
 			seedClient: fakectrlruntimeclient.
 				NewClientBuilder().
 				WithScheme(scheme.Scheme).
-				WithObjects(test.GenConstraint(constraintName, "namespace", kind)).
+				WithObjects(
+					func() ctrlruntimeclient.Object {
+						c := test.GenConstraint(constraintName, "namespace", kind)
+						c.Spec.Parameters = map[string]interface{}{
+							"rawJSON": `{"labels":["gatekeeper","opa"]}`,
+						}
+						return c
+					}()).
 				Build(),
 			userClient: fakectrlruntimeclient.
 				NewClientBuilder().
@@ -129,6 +138,70 @@ func TestReconcile(t *testing.T) {
 				WithScheme(scheme.Scheme).
 				Build(),
 		},
+		{
+			name: "scenario 4: sync constraint to user cluster",
+			namespacedName: types.NamespacedName{
+				Namespace: "namespace",
+				Name:      constraintName,
+			},
+			expectedConstraint: test.GenDefaultAPIConstraint(constraintName, kind),
+			seedClient: fakectrlruntimeclient.
+				NewClientBuilder().
+				WithScheme(scheme.Scheme).
+				WithObjects(test.GenConstraint(constraintName, "namespace", kind)).
+				Build(),
+			userClient: fakectrlruntimeclient.
+				NewClientBuilder().
+				WithScheme(scheme.Scheme).
+				Build(),
+		},
+		{
+			name: "scenario 5: don't create kubermatic constraint on user cluster when the corresponding constraint on user cluster ns is disabled",
+			namespacedName: types.NamespacedName{
+				Namespace: "namespace",
+				Name:      constraintName,
+			},
+			expectedGetErrStatus: metav1.StatusReasonNotFound,
+			seedClient: fakectrlruntimeclient.
+				NewClientBuilder().
+				WithScheme(scheme.Scheme).
+				WithObjects(func() *v1.Constraint {
+					c := test.GenConstraint(constraintName, "namespace", kind)
+					c.Spec.Disabled = true
+					return c
+				}()).
+				Build(),
+			userClient: fakectrlruntimeclient.
+				NewClientBuilder().
+				WithScheme(scheme.Scheme).
+				Build(),
+		},
+		{
+			name: "scenario 6: delete kubermatic constraint on user cluster when the corresponding constraint on user cluster ns is disabled",
+			namespacedName: types.NamespacedName{
+				Namespace: "namespace",
+				Name:      constraintName,
+			},
+			expectedGetErrStatus: metav1.StatusReasonNotFound,
+			seedClient: fakectrlruntimeclient.
+				NewClientBuilder().
+				WithScheme(scheme.Scheme).
+				WithObjects(func() *v1.Constraint {
+					c := test.GenConstraint(constraintName, "namespace", kind)
+					c.Spec.Disabled = true
+					return c
+				}()).
+				Build(),
+			userClient: fakectrlruntimeclient.
+				NewClientBuilder().
+				WithScheme(scheme.Scheme).
+				WithObjects(&test.RequiredLabel{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: constraintName,
+					},
+				}).
+				Build(),
+		},
 	}
 
 	for _, tc := range testCases {
@@ -176,29 +249,34 @@ func TestReconcile(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to unmarshall expected match: %v", err)
 			}
-			expectedMatch, found, err := unstructured.NestedFieldNoCopy(reqLabel.Object, "spec", "match")
+			resultMatch, found, err := unstructured.NestedFieldNoCopy(reqLabel.Object, "spec", "match")
 			if err != nil || !found {
 				t.Fatalf("failed to get nested match field (found %t): %v", found, err)
 			}
 
-			// get params
-			var paramsMap map[string]interface{}
-			err = json.Unmarshal([]byte(tc.expectedConstraint.Spec.Parameters.RawJSON), &paramsMap)
-			if err != nil {
-				t.Fatalf("failed to unmarshall expected params: %v", err)
-			}
-			expectedParams, found, err := unstructured.NestedFieldNoCopy(reqLabel.Object, "spec", "parameters")
+			resultParams, found, err := unstructured.NestedFieldNoCopy(reqLabel.Object, "spec", "parameters")
 			if err != nil || !found {
 				t.Fatalf("failed to get nested params field (found %t): %v", found, err)
 			}
 
 			// compare
-			if !reflect.DeepEqual(matchMap, expectedMatch) {
+			if !reflect.DeepEqual(matchMap, resultMatch) {
 				t.Fatalf(" diff: %s", diff.ObjectGoPrintSideBySide(matchMap, matchMap))
 			}
 
-			if !reflect.DeepEqual(paramsMap, expectedParams) {
-				t.Fatalf(" diff: %s", diff.ObjectGoPrintSideBySide(paramsMap, expectedParams))
+			// cast params to bytes for comparison
+			expectedParamsBytes, err := json.Marshal(tc.expectedConstraint.Spec.Parameters)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			resultParamsBytes, err := json.Marshal(resultParams)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if !reflect.DeepEqual(expectedParamsBytes, resultParamsBytes) {
+				t.Fatalf(" diff: %s", diff.ObjectGoPrintSideBySide(expectedParamsBytes, resultParamsBytes))
 			}
 
 			if !reflect.DeepEqual(reqLabel.GetName(), tc.expectedConstraint.Name) {

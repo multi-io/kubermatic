@@ -38,6 +38,13 @@ spec:
                   app: etcd
               topologyKey: kubernetes.io/hostname
             weight: 10
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: etcd
+                  cluster: de-test-01
+              topologyKey: node.syseleven.de/physical-host-id
+            weight: 100
       containers:
       - command:
         - /bin/sh
@@ -95,7 +102,7 @@ spec:
           value: /etc/etcd/pki/client/apiserver-etcd-client.crt
         - name: ETCDCTL_KEY
           value: /etc/etcd/pki/client/apiserver-etcd-client.key
-        image: gcr.io/etcd-development/etcd:v3.5.0
+        image: gcr.io/etcd-development/etcd:v3.5.1
         imagePullPolicy: IfNotPresent
         livenessProbe:
           failureThreshold: 3

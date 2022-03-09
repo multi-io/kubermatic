@@ -24,18 +24,23 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
 )
 
 const (
-	imageName = "grafana/promtail"
-	tag       = "2.1.0"
-	appName   = "mla-promtail"
+	imageName     = "grafana/promtail"
+	imageTag      = "2.2.1"
+	initImageName = "busybox"
+	initImageTag  = "1.33"
+	appName       = "mla-promtail"
+	containerName = "promtail"
 
 	configVolumeName         = "config"
 	configVolumeMountPath    = "/etc/promtail"
+	certificatesVolumeName   = "certificates"
 	runVolumeName            = "run"
 	runVolumeMountPath       = "/run/promtail"
 	containerVolumeName      = "containers"
@@ -46,6 +51,8 @@ const (
 
 	promtailNameKey     = "app.kubernetes.io/name"
 	promtailInstanceKey = "app.kubernetes.io/instance"
+
+	inotifyMaxUserInstances = 256
 )
 
 var (
@@ -53,9 +60,19 @@ var (
 		promtailNameKey:     resources.PromtailDaemonSetName,
 		promtailInstanceKey: resources.PromtailDaemonSetName,
 	}
+	defaultResourceRequirements = corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("64Mi"),
+			corev1.ResourceCPU:    resource.MustParse("50m"),
+		},
+		Limits: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("128Mi"),
+			corev1.ResourceCPU:    resource.MustParse("200m"),
+		},
+	}
 )
 
-func DaemonSetCreator() reconciling.NamedDaemonSetCreatorGetter {
+func DaemonSetCreator(overrides *corev1.ResourceRequirements) reconciling.NamedDaemonSetCreatorGetter {
 	return func() (string, reconciling.DaemonSetCreator) {
 		return resources.PromtailDaemonSetName, func(ds *appsv1.DaemonSet) (*appsv1.DaemonSet, error) {
 			ds.Labels = resources.BaseAppLabels(appName, nil)
@@ -70,10 +87,25 @@ func DaemonSetCreator() reconciling.NamedDaemonSetCreatorGetter {
 				RunAsUser:  pointer.Int64Ptr(0),
 				RunAsGroup: pointer.Int64Ptr(0),
 			}
+			ds.Spec.Template.Spec.InitContainers = []corev1.Container{
+				{
+					Name:            "init-inotify",
+					Image:           fmt.Sprintf("%s/%s:%s", resources.RegistryDocker, initImageName, initImageTag),
+					ImagePullPolicy: corev1.PullAlways,
+					Command: []string{
+						"sh",
+						"-c",
+						fmt.Sprintf("sysctl -w fs.inotify.max_user_instances=%d", inotifyMaxUserInstances),
+					},
+					SecurityContext: &corev1.SecurityContext{
+						Privileged: pointer.BoolPtr(true),
+					},
+				},
+			}
 			ds.Spec.Template.Spec.Containers = []corev1.Container{
 				{
-					Name:            "promtail",
-					Image:           fmt.Sprintf("%s/%s:%s", resources.RegistryDocker, imageName, tag),
+					Name:            containerName,
+					Image:           fmt.Sprintf("%s/%s:%s", resources.RegistryDocker, imageName, imageTag),
 					ImagePullPolicy: corev1.PullAlways,
 					Args: []string{
 						"-config.file=/etc/promtail/promtail.yaml",
@@ -82,6 +114,10 @@ func DaemonSetCreator() reconciling.NamedDaemonSetCreatorGetter {
 						{
 							Name:      configVolumeName,
 							MountPath: configVolumeMountPath,
+						},
+						{
+							Name:      certificatesVolumeName,
+							MountPath: resources.PromtailClientCertMountPath,
 						},
 						{
 							Name:      runVolumeName,
@@ -146,6 +182,14 @@ func DaemonSetCreator() reconciling.NamedDaemonSetCreatorGetter {
 					Key:      "node-role.kubernetes.io/master",
 					Operator: corev1.TolerationOpExists,
 				},
+				{
+					Effect:   corev1.TaintEffectNoSchedule,
+					Operator: corev1.TolerationOpExists,
+				},
+				{
+					Effect:   corev1.TaintEffectNoExecute,
+					Operator: corev1.TolerationOpExists,
+				},
 			}
 			hostPathUnset := corev1.HostPathUnset
 			ds.Spec.Template.Spec.Volumes = []corev1.Volume{
@@ -154,6 +198,15 @@ func DaemonSetCreator() reconciling.NamedDaemonSetCreatorGetter {
 					VolumeSource: corev1.VolumeSource{
 						Secret: &corev1.SecretVolumeSource{
 							SecretName: resources.PromtailSecretName,
+						},
+					},
+				},
+				{
+					Name: certificatesVolumeName,
+					VolumeSource: corev1.VolumeSource{
+						Secret: &corev1.SecretVolumeSource{
+							SecretName:  resources.PromtailCertificatesSecretName,
+							DefaultMode: pointer.Int32Ptr(0400),
 						},
 					},
 				},
@@ -184,6 +237,19 @@ func DaemonSetCreator() reconciling.NamedDaemonSetCreatorGetter {
 						},
 					},
 				},
+			}
+
+			defResourceRequirements := map[string]*corev1.ResourceRequirements{
+				containerName: defaultResourceRequirements.DeepCopy(),
+			}
+			var overridesRequirements map[string]*corev1.ResourceRequirements
+			if overrides != nil {
+				overridesRequirements = map[string]*corev1.ResourceRequirements{
+					containerName: overrides.DeepCopy(),
+				}
+			}
+			if err := resources.SetResourceRequirements(ds.Spec.Template.Spec.Containers, ds.Annotations, defResourceRequirements, overridesRequirements); err != nil {
+				return nil, fmt.Errorf("failed to set resource requirements: %w", err)
 			}
 			return ds, nil
 		}

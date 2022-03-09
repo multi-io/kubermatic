@@ -52,6 +52,10 @@ func ClusterReconcileWrapper(
 	if cluster.Spec.Pause {
 		return nil, nil
 	}
+	// skip 1.18 because 2.18 does not support it. The change is to be reverted later.
+	if v := cluster.Spec.Version; v.Version != nil && v.Major() == 1 && v.Minor() <= 18 {
+		return nil, nil
+	}
 
 	reconcilingStatus := corev1.ConditionFalse
 	result, err := reconcile()
@@ -209,4 +213,16 @@ func GetHealthStatus(status kubermaticv1.HealthStatus, cluster *kubermaticv1.Clu
 
 func uniqueVersion(v kubermatic.Versions) string {
 	return v.KubermaticCommit
+}
+
+func NeedCCMMigration(cluster *kubermaticv1.Cluster) bool {
+	_, ccmOk := cluster.Annotations[kubermaticv1.CCMMigrationNeededAnnotation]
+	_, csiOk := cluster.Annotations[kubermaticv1.CSIMigrationNeededAnnotation]
+	migrated := ClusterConditionHasStatus(cluster, kubermaticv1.ClusterConditionCSIKubeletMigrationCompleted, corev1.ConditionTrue)
+
+	return ccmOk && csiOk && !migrated
+}
+
+func CCMMigrationCompleted(cluster *kubermaticv1.Cluster) bool {
+	return ClusterConditionHasStatus(cluster, kubermaticv1.ClusterConditionCSIKubeletMigrationCompleted, corev1.ConditionTrue)
 }

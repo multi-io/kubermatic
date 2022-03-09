@@ -85,6 +85,18 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ConstraintTemplateList{},
 		&Constraint{},
 		&ConstraintList{},
+		&Alertmanager{},
+		&AlertmanagerList{},
+		&ClusterTemplate{},
+		&ClusterTemplateList{},
+		&ClusterTemplateInstance{},
+		&ClusterTemplateInstanceList{},
+		&RuleGroup{},
+		&RuleGroupList{},
+		&AllowedRegistry{},
+		&AllowedRegistryList{},
+		&MLAAdminSetting{},
+		&MLAAdminSettingList{},
 	)
 
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)

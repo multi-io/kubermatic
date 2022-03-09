@@ -23,9 +23,6 @@ import (
 	"reflect"
 	"strings"
 
-	kerrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-
 	k8cuserclusterclient "k8c.io/kubermatic/v2/pkg/cluster/client"
 	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/cloud"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
@@ -35,15 +32,16 @@ import (
 	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 
 	corev1 "k8s.io/api/core/v1"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -60,7 +58,7 @@ type extractGroupPrefixFunc func(groupName string) string
 // it uses createSeedImpersonatedClient to create a connection that uses user impersonation
 func NewClusterProvider(
 	cfg *restclient.Config,
-	createSeedImpersonatedClient impersonationClient,
+	createSeedImpersonatedClient ImpersonationClient,
 	userClusterConnProvider UserClusterConnectionProvider,
 	workerName string,
 	extractGroupPrefix extractGroupPrefixFunc,
@@ -86,7 +84,7 @@ func NewClusterProvider(
 type ClusterProvider struct {
 	// createSeedImpersonatedClient is used as a ground for impersonation
 	// whenever a connection to Seed API server is required
-	createSeedImpersonatedClient impersonationClient
+	createSeedImpersonatedClient ImpersonationClient
 
 	// userClusterConnProvider used for obtaining a connection to the client's cluster
 	userClusterConnProvider UserClusterConnectionProvider

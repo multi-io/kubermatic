@@ -6,6 +6,8 @@ package models
 // Editing this file might prove futile when you re-run the swagger generate command
 
 import (
+	"context"
+
 	"github.com/go-openapi/errors"
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/swag"
@@ -35,13 +37,40 @@ func (m *NodeDeploymentRequestSpec) Validate(formats strfmt.Registry) error {
 }
 
 func (m *NodeDeploymentRequestSpec) validateNd(formats strfmt.Registry) error {
-
 	if swag.IsZero(m.Nd) { // not required
 		return nil
 	}
 
 	if m.Nd != nil {
 		if err := m.Nd.Validate(formats); err != nil {
+			if ve, ok := err.(*errors.Validation); ok {
+				return ve.ValidateName("nd")
+			}
+			return err
+		}
+	}
+
+	return nil
+}
+
+// ContextValidate validate this node deployment request spec based on the context it is used
+func (m *NodeDeploymentRequestSpec) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
+	var res []error
+
+	if err := m.contextValidateNd(ctx, formats); err != nil {
+		res = append(res, err)
+	}
+
+	if len(res) > 0 {
+		return errors.CompositeValidationError(res...)
+	}
+	return nil
+}
+
+func (m *NodeDeploymentRequestSpec) contextValidateNd(ctx context.Context, formats strfmt.Registry) error {
+
+	if m.Nd != nil {
+		if err := m.Nd.ContextValidate(ctx, formats); err != nil {
 			if ve, ok := err.(*errors.Validation); ok {
 				return ve.ValidateName("nd")
 			}

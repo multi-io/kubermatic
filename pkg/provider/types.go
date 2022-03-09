@@ -20,9 +20,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	providerconfig "github.com/kubermatic/machine-controller/pkg/providerconfig/types"
-
 	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	ksemver "k8c.io/kubermatic/v2/pkg/semver"
@@ -45,8 +45,8 @@ var (
 	ErrAlreadyExists = errors.New("the given resource already exists")
 )
 
-// Constants defining known cloud providers.
 const (
+	// Constants defining known cloud providers.
 	FakeCloudProvider         = "fake"
 	DigitaloceanCloudProvider = "digitalocean"
 	BringYourOwnCloudProvider = "bringyourown"
@@ -66,6 +66,34 @@ const (
 
 	DefaultKubeconfigFieldPath = "kubeconfig"
 )
+
+func supportedProviders() []string {
+	return []string{
+		FakeCloudProvider,
+		DigitaloceanCloudProvider,
+		BringYourOwnCloudProvider,
+		AWSCloudProvider,
+		AzureCloudProvider,
+		OpenstackCloudProvider,
+		PacketCloudProvider,
+		HetznerCloudProvider,
+		VSphereCloudProvider,
+		GCPCloudProvider,
+		KubevirtCloudProvider,
+		AlibabaCloudProvider,
+		AnexiaCloudProvider,
+	}
+}
+
+func IsProviderSupported(name string) bool {
+	for _, provider := range supportedProviders() {
+		if strings.EqualFold(name, provider) {
+			return true
+		}
+	}
+
+	return false
+}
 
 // CloudProvider declares a set of methods for interacting with a cloud provider
 type CloudProvider interface {
@@ -872,4 +900,369 @@ type PrivilegedConstraintProvider interface {
 	// Note that this function:
 	// is unsafe in a sense that it uses privileged account to update the resource
 	UpdateUnsecured(constraint *kubermaticv1.Constraint) (*kubermaticv1.Constraint, error)
+}
+
+// DefaultConstraintProvider declares the set of method for interacting with default constraints
+type DefaultConstraintProvider interface {
+	// List gets a list of default constraints
+	//
+	// Note that the list is taken from the cache
+	List() (*kubermaticv1.ConstraintList, error)
+
+	// Get gets the given default constraints
+	Get(name string) (*kubermaticv1.Constraint, error)
+
+	// Create creates the given default constraint
+	Create(constraint *kubermaticv1.Constraint) (*kubermaticv1.Constraint, error)
+
+	// Delete deletes the given default constraint
+	Delete(name string) error
+
+	// Update a default constraint
+	Update(ct *kubermaticv1.Constraint) (*kubermaticv1.Constraint, error)
+}
+
+// AlertmanagerProvider declares the set of method for interacting with alertmanagers
+type AlertmanagerProvider interface {
+	// Get gets the given alertmanager and the config secret
+	Get(cluster *kubermaticv1.Cluster, userInfo *UserInfo) (*kubermaticv1.Alertmanager, *corev1.Secret, error)
+
+	// Update updates the given alertmanager and the config secret
+	Update(alertmanager *kubermaticv1.Alertmanager, configSecret *corev1.Secret, userInfo *UserInfo) (*kubermaticv1.Alertmanager, *corev1.Secret, error)
+
+	// Reset resets the given alertmanager to default
+	Reset(cluster *kubermaticv1.Cluster, userInfo *UserInfo) error
+}
+
+// PrivilegedAlertmanagerProvider declares the set of method for interacting with alertmanagers using a privileged client
+type PrivilegedAlertmanagerProvider interface {
+	// GetUnsecured gets the given alertmanager and the config secret using a privileged client
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to get the resource
+	GetUnsecured(cluster *kubermaticv1.Cluster) (*kubermaticv1.Alertmanager, *corev1.Secret, error)
+
+	// UpdateUnsecured updates the given alertmanager and the config secret using a privileged client
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to update the resource
+	UpdateUnsecured(alertmanager *kubermaticv1.Alertmanager, configSecret *corev1.Secret) (*kubermaticv1.Alertmanager, *corev1.Secret, error)
+
+	// ResetUnsecured resets the given alertmanager to default using a privileged client
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to reset the resource
+	ResetUnsecured(cluster *kubermaticv1.Cluster) error
+}
+
+// ClusterTemplateProvider declares the set of method for interacting with cluster templates
+type ClusterTemplateProvider interface {
+	New(userInfo *UserInfo, newClusterTemplate *kubermaticv1.ClusterTemplate, scope, projectID string) (*kubermaticv1.ClusterTemplate, error)
+	List(userInfo *UserInfo, projectID string) ([]kubermaticv1.ClusterTemplate, error)
+	Get(userInfo *UserInfo, projectID, templateID string) (*kubermaticv1.ClusterTemplate, error)
+	Delete(userInfo *UserInfo, projectID, templateID string) error
+}
+
+// ClusterTemplateInstanceProvider declares the set of method for interacting with cluster templates
+type ClusterTemplateInstanceProvider interface {
+	Create(userInfo *UserInfo, template *kubermaticv1.ClusterTemplate, project *kubermaticv1.Project, replicas int64) (*kubermaticv1.ClusterTemplateInstance, error)
+	Get(userInfo *UserInfo, name string) (*kubermaticv1.ClusterTemplateInstance, error)
+	List(userInfo *UserInfo, options ClusterTemplateInstanceListOptions) (*kubermaticv1.ClusterTemplateInstanceList, error)
+	Patch(userInfo *UserInfo, instance *kubermaticv1.ClusterTemplateInstance) (*kubermaticv1.ClusterTemplateInstance, error)
+}
+
+// PrivilegedClusterTemplateInstanceProvider declares the set of methods for interacting with the cluster template instances
+// as an admin.
+type PrivilegedClusterTemplateInstanceProvider interface {
+	// CreateUnsecured create cluster template instance
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to get the resource
+	CreateUnsecured(template *kubermaticv1.ClusterTemplate, project *kubermaticv1.Project, replicas int64) (*kubermaticv1.ClusterTemplateInstance, error)
+
+	// GetUnsecured gets cluster template instance
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to get the resource
+	GetUnsecured(name string) (*kubermaticv1.ClusterTemplateInstance, error)
+
+	// ListUnsecured lists cluster template instances
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to get the resource
+	ListUnsecured(options ClusterTemplateInstanceListOptions) (*kubermaticv1.ClusterTemplateInstanceList, error)
+
+	// PatchUnsecured patches cluster template instances
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to get the resource
+	PatchUnsecured(instance *kubermaticv1.ClusterTemplateInstance) (*kubermaticv1.ClusterTemplateInstance, error)
+}
+
+// ClusterTemplateInstanceListOptions allows to set filters that will be applied to filter the result.
+type ClusterTemplateInstanceListOptions struct {
+	// ProjectID list only instances with the specified ID
+	ProjectID string
+
+	// TemplateID list only instances with the specified ID
+	TemplateID string
+}
+
+type RuleGroupListOptions struct {
+	RuleGroupType kubermaticv1.RuleGroupType
+}
+
+// RuleGroupProvider declares the set of methods for interacting with ruleGroups
+type RuleGroupProvider interface {
+	// Get gets the given ruleGroup
+	Get(userInfo *UserInfo, cluster *kubermaticv1.Cluster, ruleGroupName string) (*kubermaticv1.RuleGroup, error)
+
+	// List gets a list of ruleGroups, by default it returns all ruleGroup objects.
+	// If you would like to filer the result, please set RuleGroupListOptions
+	List(userInfo *UserInfo, cluster *kubermaticv1.Cluster, options *RuleGroupListOptions) ([]*kubermaticv1.RuleGroup, error)
+
+	// Create creates the given ruleGroup
+	Create(userInfo *UserInfo, ruleGroup *kubermaticv1.RuleGroup) (*kubermaticv1.RuleGroup, error)
+
+	// Update updates an ruleGroup
+	Update(userInfo *UserInfo, newRuleGroup *kubermaticv1.RuleGroup) (*kubermaticv1.RuleGroup, error)
+
+	// Delete deletes the ruleGroup with the given name
+	Delete(userInfo *UserInfo, cluster *kubermaticv1.Cluster, ruleGroupName string) error
+}
+
+type PrivilegedRuleGroupProvider interface {
+	// GetUnsecured gets the given ruleGroup
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to get the resource
+	GetUnsecured(cluster *kubermaticv1.Cluster, ruleGroupName string) (*kubermaticv1.RuleGroup, error)
+
+	// ListUnsecured gets a list of ruleGroups, by default it returns all ruleGroup objects.
+	// If you would like to filer the result, please set RuleGroupListOptions
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to get the resources
+	ListUnsecured(cluster *kubermaticv1.Cluster, options *RuleGroupListOptions) ([]*kubermaticv1.RuleGroup, error)
+
+	// CreateUnsecured creates the given ruleGroup
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to create the resource
+	CreateUnsecured(ruleGroup *kubermaticv1.RuleGroup) (*kubermaticv1.RuleGroup, error)
+
+	// UpdateUnsecured updates an ruleGroup
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to update the resource
+	UpdateUnsecured(newRuleGroup *kubermaticv1.RuleGroup) (*kubermaticv1.RuleGroup, error)
+
+	// DeleteUnsecured deletes the ruleGroup with the given name
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to delete the resource
+	DeleteUnsecured(cluster *kubermaticv1.Cluster, ruleGroupName string) error
+}
+
+// PrivilegedAllowedRegistryProvider declares the set of method for interacting with allowed registries
+type PrivilegedAllowedRegistryProvider interface {
+	// CreateUnsecured creates the given allowed registry
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to create the resource
+	CreateUnsecured(ar *kubermaticv1.AllowedRegistry) (*kubermaticv1.AllowedRegistry, error)
+
+	// GetUnsecured gets the given allowed registry
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to get the resource
+	GetUnsecured(name string) (*kubermaticv1.AllowedRegistry, error)
+
+	// ListUnsecured gets a list of all allowed registries
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to get the resources
+	ListUnsecured() (*kubermaticv1.AllowedRegistryList, error)
+
+	// UpdateUnsecured updates the allowed registry
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to update the resource
+	UpdateUnsecured(ar *kubermaticv1.AllowedRegistry) (*kubermaticv1.AllowedRegistry, error)
+
+	// DeleteUnsecured deletes the allowed registry with the given name
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to delete the resource
+	DeleteUnsecured(name string) error
+}
+
+// EtcdBackupConfigProvider declares the set of method for interacting with etcd backup configs
+type EtcdBackupConfigProvider interface {
+	// Create creates the given etcdBackupConfig
+	Create(userInfo *UserInfo, etcdBackupConfig *kubermaticv1.EtcdBackupConfig) (*kubermaticv1.EtcdBackupConfig, error)
+
+	// Get gets the given etcdBackupConfig
+	Get(userInfo *UserInfo, cluster *kubermaticv1.Cluster, name string) (*kubermaticv1.EtcdBackupConfig, error)
+
+	// List gets a list of etcdBackupConfig for a given cluster
+	List(userInfo *UserInfo, cluster *kubermaticv1.Cluster) (*kubermaticv1.EtcdBackupConfigList, error)
+
+	// Delete deletes the given etcdBackupConfig
+	Delete(userInfo *UserInfo, cluster *kubermaticv1.Cluster, name string) error
+
+	// Patch updates the given etcdBackupConfig
+	Patch(userInfo *UserInfo, old, new *kubermaticv1.EtcdBackupConfig) (*kubermaticv1.EtcdBackupConfig, error)
+}
+
+// PrivilegedEtcdBackupConfigProvider declares the set of method for interacting with etcd backup configs using a privileged client
+type PrivilegedEtcdBackupConfigProvider interface {
+	// CreateUnsecured creates the given etcdBackupConfig
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to create the resource
+	CreateUnsecured(etcdBackupConfig *kubermaticv1.EtcdBackupConfig) (*kubermaticv1.EtcdBackupConfig, error)
+
+	// GetUnsecured gets the given etcdBackupConfig
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to get the resource
+	GetUnsecured(cluster *kubermaticv1.Cluster, name string) (*kubermaticv1.EtcdBackupConfig, error)
+
+	// ListUnsecured gets a list of all etcdBackupConfigs for a given cluster
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to list the resources
+	ListUnsecured(cluster *kubermaticv1.Cluster) (*kubermaticv1.EtcdBackupConfigList, error)
+
+	// DeleteUnsecured deletes the given etcdBackupConfig
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to delete the resource
+	DeleteUnsecured(cluster *kubermaticv1.Cluster, name string) error
+
+	// PatchUnsecured patches the given etcdBackupConfig
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to patch the resource
+	PatchUnsecured(old, new *kubermaticv1.EtcdBackupConfig) (*kubermaticv1.EtcdBackupConfig, error)
+}
+
+// EtcdRestoreProvider declares the set of method for interacting with etcd backup restores
+type EtcdRestoreProvider interface {
+	// Create creates the given etcdRestore
+	Create(userInfo *UserInfo, etcdRestore *kubermaticv1.EtcdRestore) (*kubermaticv1.EtcdRestore, error)
+
+	// Get gets the given etcdRestore
+	Get(userInfo *UserInfo, cluster *kubermaticv1.Cluster, name string) (*kubermaticv1.EtcdRestore, error)
+
+	// List gets a list of etcdRestore for a given cluster
+	List(userInfo *UserInfo, cluster *kubermaticv1.Cluster) (*kubermaticv1.EtcdRestoreList, error)
+
+	// Delete deletes the given etcdRestore
+	Delete(userInfo *UserInfo, cluster *kubermaticv1.Cluster, name string) error
+}
+
+// PrivilegedEtcdRestoreProvider declares the set of method for interacting with etcd backup configs using a privileged client
+type PrivilegedEtcdRestoreProvider interface {
+	// CreateUnsecured creates the given etcdRestore
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to create the resource
+	CreateUnsecured(etcdRestore *kubermaticv1.EtcdRestore) (*kubermaticv1.EtcdRestore, error)
+
+	// GetUnsecured gets the given etcdRestore
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to get the resource
+	GetUnsecured(cluster *kubermaticv1.Cluster, name string) (*kubermaticv1.EtcdRestore, error)
+
+	// ListUnsecured gets a list of all etcdRestores for a given cluster
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to list the resources
+	ListUnsecured(cluster *kubermaticv1.Cluster) (*kubermaticv1.EtcdRestoreList, error)
+
+	// DeleteUnsecured deletes the given etcdRestore
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to delete the resource
+	DeleteUnsecured(cluster *kubermaticv1.Cluster, name string) error
+}
+
+// EtcdBackupConfigProjectProvider declares the set of method for interacting with etcd backup configs across projects and its seeds
+type EtcdBackupConfigProjectProvider interface {
+	// List gets a list of etcdBackupConfig for a given project
+	List(userInfo *UserInfo, projectID string) ([]*kubermaticv1.EtcdBackupConfigList, error)
+}
+
+// PrivilegedEtcdBackupConfigProjectProvider declares the set of method for interacting with etcd backup configs using a privileged client across projects and its seeds
+type PrivilegedEtcdBackupConfigProjectProvider interface {
+	// ListUnsecured gets a list of all etcdBackupConfigs for a given project
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to list the resources
+	ListUnsecured(projectID string) ([]*kubermaticv1.EtcdBackupConfigList, error)
+}
+
+// EtcdRestoreProjectProvider declares the set of method for interacting with etcd backup restores across projects and its seeds
+type EtcdRestoreProjectProvider interface {
+	// List gets a list of etcdRestore for a given project
+	List(userInfo *UserInfo, projectID string) ([]*kubermaticv1.EtcdRestoreList, error)
+}
+
+// PrivilegedEtcdRestoreProjectProvider declares the set of method for interacting with etcd backup configs using a privileged client across projects and its seeds
+type PrivilegedEtcdRestoreProjectProvider interface {
+	// ListUnsecured gets a list of all etcdRestores for a given project
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to list the resources
+	ListUnsecured(projectID string) ([]*kubermaticv1.EtcdRestoreList, error)
+}
+
+// BackupCredentialsProvider declares the set of method for interacting with etcd backup credentials using a privileged client
+type BackupCredentialsProvider interface {
+	// CreateUnsecured creates the backup credentials
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to create the resource
+	CreateUnsecured(credentials *corev1.Secret) (*corev1.Secret, error)
+
+	// GetUnsecured gets the backup credentials
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to get the resource
+	GetUnsecured() (*corev1.Secret, error)
+
+	// UpdateUnsecured updates the backup credentials
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to update the resource
+	UpdateUnsecured(new *corev1.Secret) (*corev1.Secret, error)
+}
+
+type PrivilegedMLAAdminSettingProvider interface {
+	// GetUnsecured gets the given MLAAdminSetting
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to get the resource
+	GetUnsecured(cluster *kubermaticv1.Cluster) (*kubermaticv1.MLAAdminSetting, error)
+
+	// CreateUnsecured creates the given MLAAdminSetting
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to create the resource
+	CreateUnsecured(mlaAdminSetting *kubermaticv1.MLAAdminSetting) (*kubermaticv1.MLAAdminSetting, error)
+
+	// UpdateUnsecured updates an MLAAdminSetting
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to update the resource
+	UpdateUnsecured(newMLAAdminSetting *kubermaticv1.MLAAdminSetting) (*kubermaticv1.MLAAdminSetting, error)
+
+	// DeleteUnsecured deletes the MLAAdminSetting with the given name
+	//
+	// Note that this function:
+	// is unsafe in a sense that it uses privileged account to delete the resource
+	DeleteUnsecured(cluster *kubermaticv1.Cluster) error
 }

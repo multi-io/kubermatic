@@ -21,11 +21,11 @@ import (
 	"errors"
 	"fmt"
 
-	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
-
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/features"
 	"k8c.io/kubermatic/v2/pkg/provider"
+
+	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type ValidationHandlerBuilder struct {
@@ -50,7 +50,7 @@ func (v *ValidationHandlerBuilder) FeatureGates(features features.FeatureGate) *
 }
 
 // WorkerName sets the workerName value to be used to list clusters.
-// TODO(irozzo) check how this is useful.
+// TODO check how this is useful.
 func (v *ValidationHandlerBuilder) WorkerName(workerName string) *ValidationHandlerBuilder {
 	v.workerName = workerName
 	return v

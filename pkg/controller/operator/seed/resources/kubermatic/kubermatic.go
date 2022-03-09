@@ -18,7 +18,11 @@ package kubermatic
 
 import (
 	"fmt"
+	"strings"
 
+	"go.uber.org/zap"
+
+	"k8c.io/kubermatic/v2/pkg/controller/operator/common"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	operatorv1alpha1 "k8c.io/kubermatic/v2/pkg/crd/operator/v1alpha1"
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
@@ -28,17 +32,15 @@ import (
 )
 
 const (
-	serviceAccountName                    = "kubermatic-seed"
-	backupContainersConfigMapName         = "backup-containers"
-	storeContainerKey                     = "store-container.yaml"
-	cleanupContainerKey                   = "cleanup-container.yaml"
-	defaultComponentSettingsConfigMapName = "default-component-settings"
-	defaultComponentSettingsConfigKey     = "config.yaml"
-	restoreS3SettingsConfigMapName        = "s3-settings"
-	deleteContainerKey                    = "delete-container.yaml"
-	s3EndpointKey                         = "ENDPOINT"
-	s3BucketNameKey                       = "BUCKET_NAME"
-	caBundleConfigMapName                 = "ca-bundle"
+	serviceAccountName             = "kubermatic-seed"
+	backupContainersConfigMapName  = "backup-containers"
+	storeContainerKey              = "store-container.yaml"
+	cleanupContainerKey            = "cleanup-container.yaml"
+	restoreS3SettingsConfigMapName = "s3-settings"
+	deleteContainerKey             = "delete-container.yaml"
+	s3EndpointKey                  = "ENDPOINT"
+	s3BucketNameKey                = "BUCKET_NAME"
+	caBundleConfigMapName          = "ca-bundle"
 )
 
 func ClusterRoleBindingName(cfg *operatorv1alpha1.KubermaticConfiguration) string {
@@ -77,7 +79,7 @@ func ClusterRoleBindingCreator(cfg *operatorv1alpha1.KubermaticConfiguration, se
 	}
 }
 
-func BackupContainersConfigMapCreator(cfg *operatorv1alpha1.KubermaticConfiguration) reconciling.NamedConfigMapCreatorGetter {
+func BackupContainersConfigMapCreator(cfg *operatorv1alpha1.KubermaticConfiguration, seed *kubermaticv1.Seed, log *zap.SugaredLogger) reconciling.NamedConfigMapCreatorGetter {
 	return func() (string, reconciling.ConfigMapCreator) {
 		return backupContainersConfigMapName, func(c *corev1.ConfigMap) (*corev1.ConfigMap, error) {
 			if c.Data == nil {
@@ -86,7 +88,19 @@ func BackupContainersConfigMapCreator(cfg *operatorv1alpha1.KubermaticConfigurat
 
 			c.Data[storeContainerKey] = cfg.Spec.SeedController.BackupStoreContainer
 			c.Data[cleanupContainerKey] = cfg.Spec.SeedController.BackupCleanupContainer
-			if cfg.Spec.SeedController.BackupRestore.Enabled {
+
+			if cfg.Spec.SeedController.BackupStoreContainer == strings.TrimSpace(common.DefaultBackupStoreContainer) &&
+				seed.Spec.BackupRestore != nil {
+				c.Data[storeContainerKey] = strings.TrimSpace(common.DefaultNewBackupStoreContainer)
+				log.Debugw("Defaulting field", "field", "seedController.backupRestoreContainer")
+			}
+
+			if seed.Spec.BackupRestore != nil {
+				if cfg.Spec.SeedController.BackupDeleteContainer == "" {
+					cfg.Spec.SeedController.BackupDeleteContainer = strings.TrimSpace(common.DefaultNewBackupDeleteContainer)
+					log.Debugw("Defaulting field", "field", "seedController.backupDeleteContainer")
+				}
+
 				c.Data[deleteContainerKey] = cfg.Spec.SeedController.BackupDeleteContainer
 			}
 
@@ -95,22 +109,8 @@ func BackupContainersConfigMapCreator(cfg *operatorv1alpha1.KubermaticConfigurat
 	}
 }
 
-func DefaultClusterComponentSettingsYAML(seed *kubermaticv1.Seed) reconciling.NamedConfigMapCreatorGetter {
-	return func() (string, reconciling.ConfigMapCreator) {
-		return defaultComponentSettingsConfigMapName, func(c *corev1.ConfigMap) (*corev1.ConfigMap, error) {
-			if c.Data == nil {
-				c.Data = make(map[string]string)
-			}
-
-			c.Data[defaultComponentSettingsConfigKey] = seed.Spec.DefaultClusterComponentSettingsYAML
-
-			return c, nil
-		}
-	}
-}
-
-func RestoreS3SettingsConfigMapCreator(backupRestore kubermaticv1.SeedBackupRestoreConfiguration) reconciling.NamedConfigMapCreatorGetter {
-	if !backupRestore.Enabled {
+func RestoreS3SettingsConfigMapCreator(backupRestore *kubermaticv1.SeedBackupRestoreConfiguration) reconciling.NamedConfigMapCreatorGetter {
+	if backupRestore == nil {
 		return nil
 	}
 

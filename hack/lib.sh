@@ -93,7 +93,7 @@ EOF
 
 containerize() {
   local cmd="$1"
-  local image="${CONTAINERIZE_IMAGE:-quay.io/kubermatic/util:1.5.0}"
+  local image="${CONTAINERIZE_IMAGE:-quay.io/kubermatic/util:1.6.0}"
   local gocache="${CONTAINERIZE_GOCACHE:-/tmp/.gocache}"
 
   if ! [ -f /.dockerenv ]; then
@@ -128,6 +128,24 @@ ensure_github_host_pubkey() {
     echo "$github_rsa_key" >> "$HOME/.ssh/known_hosts"
     chmod 600 "$HOME/.ssh/known_hosts"
   fi
+}
+
+vault_ci_login() {
+  # already logged in
+  if [ -n "${VAULT_TOKEN:-}" ]; then
+    return 0
+  fi
+
+  # check environment variables
+  if [ -z "${VAULT_ROLE_ID:-}" ] || [ -z "${VAULT_SECRET_ID:-}" ]; then
+    echo "VAULT_ROLE_ID and VAULT_SECRET_ID must be set to programmatically authenticate against Vault."
+    return 1
+  fi
+
+  local token
+  token=$(vault write --format=json auth/approle/login "role_id=$VAULT_ROLE_ID" "secret_id=$VAULT_SECRET_ID" | jq -r '.auth.client_token')
+
+  export VAULT_TOKEN="$token"
 }
 
 get_latest_dashboard_hash() {
@@ -190,7 +208,6 @@ format_dashboard() {
     jq '(.templating.list[] | select(.type=="datasource") | .current) = {}' |
     jq '(.templating.list[] | select(.type=="interval") | .current) = {}' |
     jq '(.panels[] | select(.scopedVars!=null) | .scopedVars) = {}' |
-    jq '(.templating.list[] | select(.type=="datasource") | .hide) = 2' |
     jq '(.annotations.list) = []' |
     jq '(.links) = []' |
     jq '(.refresh) = "30s"' |

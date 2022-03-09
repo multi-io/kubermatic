@@ -39,6 +39,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -68,6 +69,7 @@ type Features struct {
 	EtcdDataCorruptionChecks     bool
 	KubernetesOIDCAuthentication bool
 	EtcdLauncher                 bool
+	Konnectivity                 bool
 	PriorityClasses              bool
 }
 
@@ -94,11 +96,13 @@ type Reconciler struct {
 	inClusterPrometheusRemoteWriteConfigsFile        string
 	monitoringEnvironmentLabel                       string
 	monitoringScrapeAnnotationPrefix                 string
+	userClusterMLAEnabled                            bool
 	dockerPullConfigJSON                             []byte
-	nodeLocalDNSCacheEnabled                         bool
 	kubermaticImage                                  string
 	etcdLauncherImage                                string
 	dnatControllerImage                              string
+	machineControllerImageTag                        string
+	machineControllerImageRepository                 string
 	concurrentClusterUpdates                         int
 	etcdBackupRestoreController                      bool
 	backupSchedule                                   time.Duration
@@ -135,8 +139,8 @@ func Add(
 	inClusterPrometheusDisableDefaultScrapingConfigs bool,
 	inClusterPrometheusScrapingConfigsFile string,
 	inClusterPrometheusRemoteWriteConfigsFile string,
+	userClusterMLAEnabled bool,
 	dockerPullConfigJSON []byte,
-	nodeLocalDNSCacheEnabled bool,
 	concurrentClusterUpdates int,
 	etcdBackupRestoreController bool,
 	backupSchedule time.Duration,
@@ -147,6 +151,8 @@ func Add(
 	keycloakFacade keycloak.Facade,
 	etcdLauncherImage string,
 	dnatControllerImage string,
+	machineControllerImageTag string,
+	machineControllerImageRepository string,
 
 	tunnelingAgentIP string,
 	caBundle *certificates.CABundle,
@@ -173,11 +179,13 @@ func Add(
 		inClusterPrometheusRemoteWriteConfigsFile:        inClusterPrometheusRemoteWriteConfigsFile,
 		monitoringEnvironmentLabel:                       monitoringEnvironmentLabel,
 		monitoringScrapeAnnotationPrefix:                 monitoringScrapeAnnotationPrefix,
+		userClusterMLAEnabled:                            userClusterMLAEnabled,
 		dockerPullConfigJSON:                             dockerPullConfigJSON,
-		nodeLocalDNSCacheEnabled:                         nodeLocalDNSCacheEnabled,
 		kubermaticImage:                                  kubermaticImage,
 		etcdLauncherImage:                                etcdLauncherImage,
 		dnatControllerImage:                              dnatControllerImage,
+		machineControllerImageTag:                        machineControllerImageTag,
+		machineControllerImageRepository:                 machineControllerImageRepository,
 		concurrentClusterUpdates:                         concurrentClusterUpdates,
 		etcdBackupRestoreController:                      etcdBackupRestoreController,
 		backupSchedule:                                   backupSchedule,
@@ -215,6 +223,7 @@ func Add(
 		&autoscalingv1beta2.VerticalPodAutoscaler{},
 		&rbacv1.Role{},
 		&rbacv1.RoleBinding{},
+		&networkingv1.NetworkPolicy{},
 	}
 
 	for _, t := range typesToWatch {

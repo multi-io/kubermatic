@@ -5,7 +5,7 @@ stages:
 - release
 
 variables:
-  GO_VERSION: "1.14.9"
+  GO_VERSION: "1.16.10"
   KUBERMATIC_EDITION: ee
   GO111MODULE: "on"
   KUBERMATICCOMMIT: "${CI_COMMIT_TAG}"
@@ -84,7 +84,7 @@ verify-codegen:
 
 lint:
   stage: test
-  image: golangci/golangci-lint:v1.30.0
+  image: golangci/golangci-lint:v1.41.1
   script:
   - export KUBERMATIC_EDITION=ee
   - make lint
@@ -101,6 +101,8 @@ lint:
 verify-swagger-spec:
   stage: test
   script:
+  - apt-get update
+  - apt-get install -y jq
   - go mod vendor
   - ./hack/verify-swagger.sh
   needs: ["go-mod-vendor"]

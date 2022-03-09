@@ -58,7 +58,7 @@ func NewCreateNodeDeploymentRequestCreated() *CreateNodeDeploymentRequestCreated
 	return &CreateNodeDeploymentRequestCreated{}
 }
 
-/*CreateNodeDeploymentRequestCreated handles this case with default header values.
+/* CreateNodeDeploymentRequestCreated describes a response with status code 201, with default header values.
 
 NodeDeploymentRequest
 */
@@ -69,7 +69,6 @@ type CreateNodeDeploymentRequestCreated struct {
 func (o *CreateNodeDeploymentRequestCreated) Error() string {
 	return fmt.Sprintf("[POST /api/v1/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/ndrequests][%d] createNodeDeploymentRequestCreated  %+v", 201, o.Payload)
 }
-
 func (o *CreateNodeDeploymentRequestCreated) GetPayload() *models.NodeDeploymentRequest {
 	return o.Payload
 }
@@ -91,7 +90,7 @@ func NewCreateNodeDeploymentRequestUnauthorized() *CreateNodeDeploymentRequestUn
 	return &CreateNodeDeploymentRequestUnauthorized{}
 }
 
-/*CreateNodeDeploymentRequestUnauthorized handles this case with default header values.
+/* CreateNodeDeploymentRequestUnauthorized describes a response with status code 401, with default header values.
 
 EmptyResponse is a empty response
 */
@@ -112,7 +111,7 @@ func NewCreateNodeDeploymentRequestForbidden() *CreateNodeDeploymentRequestForbi
 	return &CreateNodeDeploymentRequestForbidden{}
 }
 
-/*CreateNodeDeploymentRequestForbidden handles this case with default header values.
+/* CreateNodeDeploymentRequestForbidden describes a response with status code 403, with default header values.
 
 EmptyResponse is a empty response
 */
@@ -135,7 +134,7 @@ func NewCreateNodeDeploymentRequestDefault(code int) *CreateNodeDeploymentReques
 	}
 }
 
-/*CreateNodeDeploymentRequestDefault handles this case with default header values.
+/* CreateNodeDeploymentRequestDefault describes a response with status code -1, with default header values.
 
 errorResponse
 */
@@ -153,7 +152,6 @@ func (o *CreateNodeDeploymentRequestDefault) Code() int {
 func (o *CreateNodeDeploymentRequestDefault) Error() string {
 	return fmt.Sprintf("[POST /api/v1/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/ndrequests][%d] createNodeDeploymentRequest default  %+v", o._statusCode, o.Payload)
 }
-
 func (o *CreateNodeDeploymentRequestDefault) GetPayload() *models.ErrorResponse {
 	return o.Payload
 }

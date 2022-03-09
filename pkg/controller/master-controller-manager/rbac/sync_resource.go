@@ -22,6 +22,7 @@ import (
 
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 
+	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -174,8 +175,52 @@ func (c *resourcesController) syncClusterResource(ctx context.Context, obj ctrlr
 	if err := c.ensureRBACRoleBindingForClusterConstraints(ctx, projectName, metaObject); err != nil {
 		return fmt.Errorf("failed to sync RBAC RoleBinding for %s resource for %s cluster provider in namespace %s, due to = %v", rmapping, c.providerName, metaObject.GetNamespace(), err)
 	}
+	if err := c.ensureRBACRoleForEtcdBackupConfigs(ctx, projectName, metaObject); err != nil {
+		return fmt.Errorf("failed to sync RBAC Role for %s resource for %s cluster provider in namespace %s, due to = %v", rmapping, c.providerName, metaObject.GetNamespace(), err)
+	}
+	if err := c.ensureRBACRoleBindingForEtcdBackupConfigs(ctx, projectName, metaObject); err != nil {
+		return fmt.Errorf("failed to sync RBAC RoleBinding for %s resource for %s cluster provider in namespace %s, due to = %v", rmapping, c.providerName, metaObject.GetNamespace(), err)
+	}
+	if err := c.ensureRBACRoleForEtcdRestores(ctx, projectName, metaObject); err != nil {
+		return fmt.Errorf("failed to sync RBAC Role for %s resource for %s cluster provider in namespace %s, due to = %v", rmapping, c.providerName, metaObject.GetNamespace(), err)
+	}
+	if err := c.ensureRBACRoleBindingForEtcdRestores(ctx, projectName, metaObject); err != nil {
+		return fmt.Errorf("failed to sync RBAC RoleBinding for %s resource for %s cluster provider in namespace %s, due to = %v", rmapping, c.providerName, metaObject.GetNamespace(), err)
+	}
+	mlaEnabled, err := userClusterMLAEnabled(metaObject)
+	if err != nil {
+		return fmt.Errorf("failed to sync resource: %w", err)
+	}
+	if mlaEnabled {
+		if err := c.ensureRBACRoleForClusterAlertmanagers(ctx, projectName, metaObject); err != nil {
+			return fmt.Errorf("failed to sync RBAC Role for %s resource for %s cluster provider in namespace %s, due to = %v", rmapping, c.providerName, metaObject.GetNamespace(), err)
+		}
+		if err := c.ensureRBACRoleBindingForClusterAlertmanagers(ctx, projectName, metaObject); err != nil {
+			return fmt.Errorf("failed to sync RBAC RoleBinding for %s resource for %s cluster provider in namespace %s, due to = %v", rmapping, c.providerName, metaObject.GetNamespace(), err)
+		}
+		if err := c.ensureRBACRoleForClusterAlertmanagerConfigSecrets(ctx, projectName, metaObject); err != nil {
+			return fmt.Errorf("failed to sync RBAC Role for %s resource for %s cluster provider in namespace %s, due to = %v", rmapping, c.providerName, metaObject.GetNamespace(), err)
+		}
+		if err := c.ensureRBACRoleBindingForClusterAlertmanagerConfigSecrets(ctx, projectName, metaObject); err != nil {
+			return fmt.Errorf("failed to sync RBAC RoleBinding for %s resource for %s cluster provider in namespace %s, due to = %v", rmapping, c.providerName, metaObject.GetNamespace(), err)
+		}
+		if err := c.ensureRBACRoleForClusterRuleGroups(ctx, projectName, metaObject); err != nil {
+			return fmt.Errorf("failed to sync RBAC Role for %s resource for %s cluster provider in namespace %s, due to = %v", rmapping, c.providerName, metaObject.GetNamespace(), err)
+		}
+		if err := c.ensureRBACRoleBindingForClusterRuleGroups(ctx, projectName, metaObject); err != nil {
+			return fmt.Errorf("failed to sync RBAC RoleBinding for %s resource for %s cluster provider in namespace %s, due to = %v", rmapping, c.providerName, metaObject.GetNamespace(), err)
+		}
+	}
 
 	return nil
+}
+
+func userClusterMLAEnabled(object metav1.Object) (bool, error) {
+	cluster, ok := object.(*kubermaticv1.Cluster)
+	if !ok {
+		return false, fmt.Errorf("ensure resources called with non-cluster: %+v", object)
+	}
+	return cluster.Spec.MLA != nil && (cluster.Spec.MLA.MonitoringEnabled || cluster.Spec.MLA.LoggingEnabled), nil
 }
 
 func getProjectName(metaObject metav1.Object, rmapping *meta.RESTMapping) (string, error) {
@@ -614,6 +659,27 @@ func shouldSkipRBACRoleForClusterNamespaceResource(projectName string, cluster *
 	return false, generatedRole, nil
 }
 
+// shouldSkipRBACRoleForClusterNamespaceNamedResource will tell you if you should skip the generation of Role/Rolebinding of a named resource or not,
+// because for some groupPrefixes we actually don't create Role
+// note that this method returns generated role if is not meant to be skipped
+func shouldSkipRBACRoleForClusterNamespaceNamedResource(projectName string, cluster *kubermaticv1.Cluster, resourceName, policyAPIGroups, policyResource, kind, groupPrefix string) (bool, *rbacv1.Role, error) {
+	generatedRole, err := generateRBACRoleForClusterNamespaceNamedResource(
+		cluster,
+		GenerateActualGroupNameFor(projectName, groupPrefix),
+		policyAPIGroups,
+		policyResource,
+		kind,
+		resourceName,
+	)
+	if err != nil {
+		return false, generatedRole, err
+	}
+	if generatedRole == nil {
+		return true, nil, nil
+	}
+	return false, generatedRole, nil
+}
+
 // ensureClusterRBACRoleBindingForEtcdLauncher ensures the ClusterRoleBinding required to allow the etcd launcher to get Clusters on the Seed
 func (c *resourcesController) ensureClusterRBACRoleBindingForEtcdLauncher(ctx context.Context, resourceName, resourceKind, namespace, projectName string, object metav1.Object) error {
 
@@ -657,6 +723,226 @@ func (c *resourcesController) ensureClusterRBACRoleBindingForEtcdLauncher(ctx co
 		return err
 	}
 
+	return nil
+}
+
+func (c *resourcesController) ensureRBACRoleForClusterAlertmanagers(ctx context.Context, projectName string, object metav1.Object) error {
+	cluster, ok := object.(*kubermaticv1.Cluster)
+	if !ok {
+		return fmt.Errorf("ensureRBACRoleForClusterAlertmanagers called with non-cluster: %+v", object)
+	}
+
+	var roleList rbacv1.RoleList
+	opts := &ctrlruntimeclient.ListOptions{Namespace: cluster.Status.NamespaceName}
+	if err := c.client.List(ctx, &roleList, opts); err != nil {
+		return err
+	}
+
+	for _, groupPrefix := range AllGroupsPrefixes {
+		skip, generatedRole, err := shouldSkipRBACRoleForClusterNamespaceNamedResource(
+			projectName,
+			cluster,
+			alertmanagerName,
+			kubermaticv1.GroupName,
+			kubermaticv1.AlertmanagerResourceName,
+			kubermaticv1.AlertmanagerKindName,
+			groupPrefix)
+		if err != nil {
+			return err
+		}
+		if skip {
+			klog.V(4).Infof("skipping Role generation for cluster alertmanagers for group %q and cluster namespace %q", groupPrefix, cluster.Status.NamespaceName)
+			continue
+		}
+
+		var sharedExistingRole rbacv1.Role
+		key := ctrlruntimeclient.ObjectKey{Name: generatedRole.Name, Namespace: cluster.Status.NamespaceName}
+		if err := c.client.Get(ctx, key, &sharedExistingRole); err != nil {
+			if kerrors.IsNotFound(err) {
+				if err := c.client.Create(ctx, generatedRole); err != nil {
+					return err
+				}
+				continue
+			}
+			return err
+		}
+
+		// make sure that existing rbac role has appropriate rules/policies
+
+		if equality.Semantic.DeepEqual(sharedExistingRole.Rules, generatedRole.Rules) {
+			continue
+		}
+		existingRole := sharedExistingRole.DeepCopy()
+		existingRole.Rules = generatedRole.Rules
+		if err := c.client.Update(ctx, existingRole); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *resourcesController) ensureRBACRoleBindingForClusterAlertmanagers(ctx context.Context, projectName string, object metav1.Object) error {
+	cluster, ok := object.(*kubermaticv1.Cluster)
+	if !ok {
+		return fmt.Errorf("ensureRBACRoleBindingForClusterAlertmanagers called with non-cluster: %+v", object)
+	}
+
+	for _, groupPrefix := range AllGroupsPrefixes {
+		skip, _, err := shouldSkipRBACRoleForClusterNamespaceNamedResource(
+			projectName,
+			cluster,
+			alertmanagerName,
+			kubermaticv1.GroupName,
+			kubermaticv1.AlertmanagerResourceName,
+			kubermaticv1.AlertmanagerKindName,
+			groupPrefix)
+		if err != nil {
+			return err
+		}
+		if skip {
+			klog.V(4).Infof("skipping RoleBinding generation for cluster alertmanagers for group %q and cluster namespace %q", groupPrefix, cluster.Status.NamespaceName)
+			continue
+		}
+
+		generatedRoleBinding := generateRBACRoleBindingForClusterNamespaceNamedResource(
+			cluster,
+			GenerateActualGroupNameFor(projectName, groupPrefix),
+			kubermaticv1.AlertmanagerKindName,
+			alertmanagerName,
+		)
+
+		var sharedExistingRoleBinding rbacv1.RoleBinding
+		key := ctrlruntimeclient.ObjectKey{Name: generatedRoleBinding.Name, Namespace: cluster.Status.NamespaceName}
+		if err := c.client.Get(ctx, key, &sharedExistingRoleBinding); err != nil {
+			if kerrors.IsNotFound(err) {
+				if err := c.client.Create(ctx, generatedRoleBinding); err != nil {
+					return err
+				}
+				continue
+			}
+			return err
+		}
+
+		// sharedExistingRoleBinding found
+		if equality.Semantic.DeepEqual(sharedExistingRoleBinding.Subjects, generatedRoleBinding.Subjects) {
+			continue
+		}
+		existingRoleBinding := sharedExistingRoleBinding.DeepCopy()
+		existingRoleBinding.Subjects = generatedRoleBinding.Subjects
+		if err := c.client.Update(ctx, existingRoleBinding); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *resourcesController) ensureRBACRoleForClusterAlertmanagerConfigSecrets(ctx context.Context, projectName string, object metav1.Object) error {
+	cluster, ok := object.(*kubermaticv1.Cluster)
+	if !ok {
+		return fmt.Errorf("ensureRBACRoleForClusterAlertmanagerConfigSecrets called with non-cluster: %+v", object)
+	}
+
+	var roleList rbacv1.RoleList
+	opts := &ctrlruntimeclient.ListOptions{Namespace: cluster.Status.NamespaceName}
+	if err := c.client.List(ctx, &roleList, opts); err != nil {
+		return err
+	}
+
+	for _, groupPrefix := range AllGroupsPrefixes {
+		skip, generatedRole, err := shouldSkipRBACRoleForClusterNamespaceNamedResource(
+			projectName,
+			cluster,
+			defaultAlertmanagerConfigSecretName,
+			corev1.GroupName,
+			"secrets",
+			"Secret",
+			groupPrefix)
+		if err != nil {
+			return err
+		}
+		if skip {
+			klog.V(4).Infof("skipping Role generation for cluster alertmanager config secrets for group %q and cluster namespace %q", groupPrefix, cluster.Status.NamespaceName)
+			continue
+		}
+
+		var sharedExistingRole rbacv1.Role
+		key := ctrlruntimeclient.ObjectKey{Name: generatedRole.Name, Namespace: cluster.Status.NamespaceName}
+		if err := c.client.Get(ctx, key, &sharedExistingRole); err != nil {
+			if kerrors.IsNotFound(err) {
+				if err := c.client.Create(ctx, generatedRole); err != nil {
+					return err
+				}
+				continue
+			}
+			return err
+		}
+
+		// make sure that existing rbac role has appropriate rules/policies
+
+		if equality.Semantic.DeepEqual(sharedExistingRole.Rules, generatedRole.Rules) {
+			continue
+		}
+		existingRole := sharedExistingRole.DeepCopy()
+		existingRole.Rules = generatedRole.Rules
+		if err := c.client.Update(ctx, existingRole); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *resourcesController) ensureRBACRoleBindingForClusterAlertmanagerConfigSecrets(ctx context.Context, projectName string, object metav1.Object) error {
+	cluster, ok := object.(*kubermaticv1.Cluster)
+	if !ok {
+		return fmt.Errorf("ensureRBACRoleBindingForClusterAlertmanagerConfigSecrets called with non-cluster: %+v", object)
+	}
+
+	for _, groupPrefix := range AllGroupsPrefixes {
+		skip, _, err := shouldSkipRBACRoleForClusterNamespaceNamedResource(
+			projectName,
+			cluster,
+			defaultAlertmanagerConfigSecretName,
+			corev1.GroupName,
+			"secrets",
+			"Secret",
+			groupPrefix)
+		if err != nil {
+			return err
+		}
+		if skip {
+			klog.V(4).Infof("skipping RoleBinding generation for cluster alertmanager config secrets for group %q and cluster namespace %q", groupPrefix, cluster.Status.NamespaceName)
+			continue
+		}
+
+		generatedRoleBinding := generateRBACRoleBindingForClusterNamespaceNamedResource(
+			cluster,
+			GenerateActualGroupNameFor(projectName, groupPrefix),
+			"Secret",
+			defaultAlertmanagerConfigSecretName,
+		)
+
+		var sharedExistingRoleBinding rbacv1.RoleBinding
+		key := ctrlruntimeclient.ObjectKey{Name: generatedRoleBinding.Name, Namespace: cluster.Status.NamespaceName}
+		if err := c.client.Get(ctx, key, &sharedExistingRoleBinding); err != nil {
+			if kerrors.IsNotFound(err) {
+				if err := c.client.Create(ctx, generatedRoleBinding); err != nil {
+					return err
+				}
+				continue
+			}
+			return err
+		}
+
+		// sharedExistingRoleBinding found
+		if equality.Semantic.DeepEqual(sharedExistingRoleBinding.Subjects, generatedRoleBinding.Subjects) {
+			continue
+		}
+		existingRoleBinding := sharedExistingRoleBinding.DeepCopy()
+		existingRoleBinding.Subjects = generatedRoleBinding.Subjects
+		if err := c.client.Update(ctx, existingRoleBinding); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -767,37 +1053,56 @@ func (c *resourcesController) ensureRBACRoleBindingForClusterConstraints(ctx con
 	return nil
 }
 
-func (c *resourcesController) ensureRBACForEtcdLauncher(ctx context.Context, cli ctrlruntimeclient.Client, metaObject metav1.Object, projectName string, rmapping *meta.RESTMapping) error {
-	cluster, ok := metaObject.(*kubermaticv1.Cluster)
+func (c *resourcesController) ensureRBACRoleForClusterRuleGroups(ctx context.Context, projectName string, object metav1.Object) error {
+	cluster, ok := object.(*kubermaticv1.Cluster)
 	if !ok {
-		return fmt.Errorf("ensureRBACForEtcdLauncher called with non-cluster: %+v", metaObject)
+		return fmt.Errorf("ensureRBACRoleForClusterRuleGroups called with non-cluster: %+v", object)
 	}
-	if err := c.ensureClusterRBACRoleForEtcdLauncher(ctx, projectName, metaObject); err != nil {
-		return fmt.Errorf("failed to sync RBAC ClusterRole for %s resource for %s cluster provider: %v", rmapping, c.providerName, err)
+
+	var roleList rbacv1.RoleList
+	opts := &ctrlruntimeclient.ListOptions{Namespace: cluster.Status.NamespaceName}
+	if err := c.client.List(ctx, &roleList, opts); err != nil {
+		return err
 	}
-	if err := c.ensureClusterRBACRoleBindingForEtcdLauncher(ctx, cluster.Name, kubermaticv1.ClusterKindName, cluster.Status.NamespaceName, projectName, metaObject); err != nil {
-		return fmt.Errorf("failed to sync RBAC ClusterRoleBinding for %s resource for %s cluster provider: %v", rmapping, c.providerName, err)
-	}
-	if err := c.ensureClusterRBACRoleBindingForEtcdLauncher(ctx, fmt.Sprintf("cluster-%s-ca-bundle", cluster.Name), "Configmap", cluster.Status.NamespaceName, projectName, metaObject); err != nil {
-		return fmt.Errorf("failed to sync RBAC ClusterRoleBinding for %s resource for %s cluster provider: %v", rmapping, c.providerName, err)
-	}
-	if err := c.ensureRBACRoleForEtcdLauncher(ctx, metaObject, kubermaticv1.EtcdRestoreResourceName, kubermaticv1.GroupName, kubermaticv1.EtcdRestoreKindName); err != nil {
-		return fmt.Errorf("failed to sync etcd restore RBAC Role for %s resource for %s cluster provider in namespace %s, due to = %v", rmapping, c.providerName, metaObject.GetNamespace(), err)
-	}
-	if err := c.ensureRBACRoleBindingForEtcdLauncher(ctx, metaObject, kubermaticv1.EtcdRestoreKindName); err != nil {
-		return fmt.Errorf("failed to sync etcd restore RBAC ClusterRoleBinding for %s resource for %s cluster provider: %v", rmapping, c.providerName, err)
-	}
-	if err := c.ensureRBACRoleForEtcdLauncher(ctx, metaObject, "secrets", "", "Secret"); err != nil {
-		return fmt.Errorf("failed to sync etcd restore RBAC Role for %s resource for %s cluster provider in namespace %s, due to = %v", rmapping, c.providerName, metaObject.GetNamespace(), err)
-	}
-	if err := c.ensureRBACRoleBindingForEtcdLauncher(ctx, metaObject, "Secret"); err != nil {
-		return fmt.Errorf("failed to sync etcd restore RBAC ClusterRoleBinding for %s resource for %s cluster provider: %v", rmapping, c.providerName, err)
-	}
-	if err := c.ensureRBACRoleForEtcdLauncher(ctx, metaObject, "statefulsets", "apps", "StatefulSet"); err != nil {
-		return fmt.Errorf("failed to sync etcd launcher RBAC Role for %s resource for %s cluster provider in namespace %s, due to = %v", rmapping, c.providerName, metaObject.GetNamespace(), err)
-	}
-	if err := c.ensureRBACRoleBindingForEtcdLauncher(ctx, metaObject, "StatefulSet"); err != nil {
-		return fmt.Errorf("failed to sync etcd launcher RBAC CluclustersterRoleBinding for %s resource for %s cluster provider: %v", rmapping, c.providerName, err)
+
+	for _, groupPrefix := range AllGroupsPrefixes {
+		skip, generatedRole, err := shouldSkipRBACRoleForClusterNamespaceResource(
+			projectName,
+			cluster,
+			kubermaticv1.RuleGroupResourceName,
+			kubermaticv1.GroupName,
+			kubermaticv1.RuleGroupKindName,
+			groupPrefix)
+		if err != nil {
+			return err
+		}
+		if skip {
+			klog.V(4).Infof("skipping Role generation for cluster constraints for group %q and cluster namespace %q", groupPrefix, cluster.Status.NamespaceName)
+			continue
+		}
+
+		var sharedExistingRole rbacv1.Role
+		key := ctrlruntimeclient.ObjectKey{Name: generatedRole.Name, Namespace: cluster.Status.NamespaceName}
+		if err := c.client.Get(ctx, key, &sharedExistingRole); err != nil {
+			if kerrors.IsNotFound(err) {
+				if err := c.client.Create(ctx, generatedRole); err != nil {
+					return err
+				}
+				continue
+			}
+			return err
+		}
+
+		// make sure that existing rbac role has appropriate rules/policies
+
+		if equality.Semantic.DeepEqual(sharedExistingRole.Rules, generatedRole.Rules) {
+			continue
+		}
+		existingRole := sharedExistingRole.DeepCopy()
+		existingRole.Rules = generatedRole.Rules
+		if err := c.client.Update(ctx, existingRole); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -842,6 +1147,308 @@ func (c *resourcesController) ensureClusterRBACRoleForEtcdLauncher(ctx context.C
 	updatedClusterRole.Rules = generatedClusterRole.Rules
 	if err := c.client.Update(ctx, updatedClusterRole); err != nil {
 		return err
+	}
+	return nil
+}
+
+func (c *resourcesController) ensureRBACRoleBindingForClusterRuleGroups(ctx context.Context, projectName string, object metav1.Object) error {
+	cluster, ok := object.(*kubermaticv1.Cluster)
+	if !ok {
+		return fmt.Errorf("ensureRBACRoleBindingForClusterRuleGroups called with non-cluster: %+v", object)
+	}
+
+	for _, groupPrefix := range AllGroupsPrefixes {
+		skip, _, err := shouldSkipRBACRoleForClusterNamespaceResource(
+			projectName,
+			cluster,
+			kubermaticv1.RuleGroupResourceName,
+			kubermaticv1.GroupName,
+			kubermaticv1.RuleGroupKindName,
+			groupPrefix)
+		if err != nil {
+			return err
+		}
+		if skip {
+			klog.V(4).Infof("skipping RoleBinding generation for cluster constraints for group %q and cluster namespace %q", groupPrefix, cluster.Status.NamespaceName)
+			continue
+		}
+
+		generatedRoleBinding := generateRBACRoleBindingForClusterNamespaceResource(
+			cluster,
+			GenerateActualGroupNameFor(projectName, groupPrefix),
+			kubermaticv1.RuleGroupKindName,
+		)
+
+		var sharedExistingRoleBinding rbacv1.RoleBinding
+		key := ctrlruntimeclient.ObjectKey{Name: generatedRoleBinding.Name, Namespace: cluster.Status.NamespaceName}
+		if err := c.client.Get(ctx, key, &sharedExistingRoleBinding); err != nil {
+			if kerrors.IsNotFound(err) {
+				if err := c.client.Create(ctx, generatedRoleBinding); err != nil {
+					return err
+				}
+				continue
+			}
+			return err
+		}
+
+		// sharedExistingRoleBinding found
+		if equality.Semantic.DeepEqual(sharedExistingRoleBinding.Subjects, generatedRoleBinding.Subjects) {
+			continue
+		}
+		existingRoleBinding := sharedExistingRoleBinding.DeepCopy()
+		existingRoleBinding.Subjects = generatedRoleBinding.Subjects
+		if err := c.client.Update(ctx, existingRoleBinding); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *resourcesController) ensureRBACForEtcdLauncher(ctx context.Context, cli ctrlruntimeclient.Client, metaObject metav1.Object, projectName string, rmapping *meta.RESTMapping) error {
+	cluster, ok := metaObject.(*kubermaticv1.Cluster)
+	if !ok {
+		return fmt.Errorf("ensureRBACForEtcdLauncher called with non-cluster: %+v", metaObject)
+	}
+	if err := c.ensureClusterRBACRoleForEtcdLauncher(ctx, projectName, metaObject); err != nil {
+		return fmt.Errorf("failed to sync RBAC ClusterRole for %s resource for %s cluster provider: %v", rmapping, c.providerName, err)
+	}
+	if err := c.ensureClusterRBACRoleBindingForEtcdLauncher(ctx, cluster.Name, kubermaticv1.ClusterKindName, cluster.Status.NamespaceName, projectName, metaObject); err != nil {
+		return fmt.Errorf("failed to sync RBAC ClusterRoleBinding for %s resource for %s cluster provider: %v", rmapping, c.providerName, err)
+	}
+	if err := c.ensureClusterRBACRoleBindingForEtcdLauncher(ctx, fmt.Sprintf("cluster-%s-ca-bundle", cluster.Name), "Configmap", cluster.Status.NamespaceName, projectName, metaObject); err != nil {
+		return fmt.Errorf("failed to sync RBAC ClusterRoleBinding for %s resource for %s cluster provider: %v", rmapping, c.providerName, err)
+	}
+	if err := c.ensureRBACRoleForEtcdLauncher(ctx, metaObject, kubermaticv1.EtcdRestoreResourceName, kubermaticv1.GroupName, kubermaticv1.EtcdRestoreKindName); err != nil {
+		return fmt.Errorf("failed to sync etcd restore RBAC Role for %s resource for %s cluster provider in namespace %s, due to = %v", rmapping, c.providerName, metaObject.GetNamespace(), err)
+	}
+	if err := c.ensureRBACRoleBindingForEtcdLauncher(ctx, metaObject, kubermaticv1.EtcdRestoreKindName); err != nil {
+		return fmt.Errorf("failed to sync etcd restore RBAC ClusterRoleBinding for %s resource for %s cluster provider: %v", rmapping, c.providerName, err)
+	}
+	if err := c.ensureRBACRoleForEtcdLauncher(ctx, metaObject, "secrets", "", "Secret"); err != nil {
+		return fmt.Errorf("failed to sync etcd restore RBAC Role for %s resource for %s cluster provider in namespace %s, due to = %v", rmapping, c.providerName, metaObject.GetNamespace(), err)
+	}
+	if err := c.ensureRBACRoleBindingForEtcdLauncher(ctx, metaObject, "Secret"); err != nil {
+		return fmt.Errorf("failed to sync etcd restore RBAC ClusterRoleBinding for %s resource for %s cluster provider: %v", rmapping, c.providerName, err)
+	}
+	if err := c.ensureRBACRoleForEtcdLauncher(ctx, metaObject, "statefulsets", "apps", "StatefulSet"); err != nil {
+		return fmt.Errorf("failed to sync etcd launcher RBAC Role for %s resource for %s cluster provider in namespace %s, due to = %v", rmapping, c.providerName, metaObject.GetNamespace(), err)
+	}
+	if err := c.ensureRBACRoleBindingForEtcdLauncher(ctx, metaObject, "StatefulSet"); err != nil {
+		return fmt.Errorf("failed to sync etcd launcher RBAC CluclustersterRoleBinding for %s resource for %s cluster provider: %v", rmapping, c.providerName, err)
+	}
+	return nil
+}
+
+func (c *resourcesController) ensureRBACRoleForEtcdBackupConfigs(ctx context.Context, projectName string, object metav1.Object) error {
+	cluster, ok := object.(*kubermaticv1.Cluster)
+	if !ok {
+		return fmt.Errorf("ensureRBACRoleForEtcdBackupConfigs called with non-cluster: %+v", object)
+	}
+
+	var roleList rbacv1.RoleList
+	opts := &ctrlruntimeclient.ListOptions{Namespace: cluster.Status.NamespaceName}
+	if err := c.client.List(ctx, &roleList, opts); err != nil {
+		return err
+	}
+
+	for _, groupPrefix := range AllGroupsPrefixes {
+		skip, generatedRole, err := shouldSkipRBACRoleForClusterNamespaceResource(
+			projectName,
+			cluster,
+			kubermaticv1.EtcdBackupConfigResourceName,
+			kubermaticv1.GroupName,
+			kubermaticv1.EtcdBackupConfigKindName,
+			groupPrefix)
+		if err != nil {
+			return err
+		}
+		if skip {
+			klog.V(4).Infof("skipping Role generation for cluster etcdBackupConfigs for group %q and cluster namespace %q", groupPrefix, cluster.Status.NamespaceName)
+			continue
+		}
+
+		var sharedExistingRole rbacv1.Role
+		key := ctrlruntimeclient.ObjectKey{Name: generatedRole.Name, Namespace: cluster.Status.NamespaceName}
+		if err := c.client.Get(ctx, key, &sharedExistingRole); err != nil {
+			if kerrors.IsNotFound(err) {
+				if err := c.client.Create(ctx, generatedRole); err != nil {
+					return err
+				}
+				continue
+			}
+			return err
+		}
+
+		// make sure that existing rbac role has appropriate rules/policies
+
+		if equality.Semantic.DeepEqual(sharedExistingRole.Rules, generatedRole.Rules) {
+			continue
+		}
+		existingRole := sharedExistingRole.DeepCopy()
+		existingRole.Rules = generatedRole.Rules
+		if err := c.client.Update(ctx, existingRole); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *resourcesController) ensureRBACRoleBindingForEtcdBackupConfigs(ctx context.Context, projectName string, object metav1.Object) error {
+	cluster, ok := object.(*kubermaticv1.Cluster)
+	if !ok {
+		return fmt.Errorf("ensureRBACRoleBindingForEtcdBackupConfigs called with non-cluster: %+v", object)
+	}
+
+	for _, groupPrefix := range AllGroupsPrefixes {
+		skip, _, err := shouldSkipRBACRoleForClusterNamespaceResource(
+			projectName,
+			cluster,
+			kubermaticv1.EtcdBackupConfigResourceName,
+			kubermaticv1.GroupName,
+			kubermaticv1.EtcdBackupConfigKindName,
+			groupPrefix)
+		if err != nil {
+			return err
+		}
+		if skip {
+			klog.V(4).Infof("skipping RoleBinding generation for cluster etcdBackupConfigs for group %q and cluster namespace %q", groupPrefix, cluster.Status.NamespaceName)
+			continue
+		}
+
+		generatedRoleBinding := generateRBACRoleBindingForClusterNamespaceResource(
+			cluster,
+			GenerateActualGroupNameFor(projectName, groupPrefix),
+			kubermaticv1.EtcdBackupConfigKindName,
+		)
+
+		var sharedExistingRoleBinding rbacv1.RoleBinding
+		key := ctrlruntimeclient.ObjectKey{Name: generatedRoleBinding.Name, Namespace: cluster.Status.NamespaceName}
+		if err := c.client.Get(ctx, key, &sharedExistingRoleBinding); err != nil {
+			if kerrors.IsNotFound(err) {
+				if err := c.client.Create(ctx, generatedRoleBinding); err != nil {
+					return err
+				}
+				continue
+			}
+			return err
+		}
+
+		// sharedExistingRoleBinding found
+		if equality.Semantic.DeepEqual(sharedExistingRoleBinding.Subjects, generatedRoleBinding.Subjects) {
+			continue
+		}
+		existingRoleBinding := sharedExistingRoleBinding.DeepCopy()
+		existingRoleBinding.Subjects = generatedRoleBinding.Subjects
+		if err := c.client.Update(ctx, existingRoleBinding); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *resourcesController) ensureRBACRoleForEtcdRestores(ctx context.Context, projectName string, object metav1.Object) error {
+	cluster, ok := object.(*kubermaticv1.Cluster)
+	if !ok {
+		return fmt.Errorf("ensureRBACRoleForEtcdRestores called with non-cluster: %+v", object)
+	}
+
+	var roleList rbacv1.RoleList
+	opts := &ctrlruntimeclient.ListOptions{Namespace: cluster.Status.NamespaceName}
+	if err := c.client.List(ctx, &roleList, opts); err != nil {
+		return err
+	}
+
+	for _, groupPrefix := range AllGroupsPrefixes {
+		skip, generatedRole, err := shouldSkipRBACRoleForClusterNamespaceResource(
+			projectName,
+			cluster,
+			kubermaticv1.EtcdRestoreResourceName,
+			kubermaticv1.GroupName,
+			kubermaticv1.EtcdRestoreKindName,
+			groupPrefix)
+		if err != nil {
+			return err
+		}
+		if skip {
+			klog.V(4).Infof("skipping Role generation for cluster etcdRestores for group %q and cluster namespace %q", groupPrefix, cluster.Status.NamespaceName)
+			continue
+		}
+
+		var sharedExistingRole rbacv1.Role
+		key := ctrlruntimeclient.ObjectKey{Name: generatedRole.Name, Namespace: cluster.Status.NamespaceName}
+		if err := c.client.Get(ctx, key, &sharedExistingRole); err != nil {
+			if kerrors.IsNotFound(err) {
+				if err := c.client.Create(ctx, generatedRole); err != nil {
+					return err
+				}
+				continue
+			}
+			return err
+		}
+
+		// make sure that existing rbac role has appropriate rules/policies
+
+		if equality.Semantic.DeepEqual(sharedExistingRole.Rules, generatedRole.Rules) {
+			continue
+		}
+		existingRole := sharedExistingRole.DeepCopy()
+		existingRole.Rules = generatedRole.Rules
+		if err := c.client.Update(ctx, existingRole); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *resourcesController) ensureRBACRoleBindingForEtcdRestores(ctx context.Context, projectName string, object metav1.Object) error {
+	cluster, ok := object.(*kubermaticv1.Cluster)
+	if !ok {
+		return fmt.Errorf("ensureRBACRoleBindingForEtcdRestores called with non-cluster: %+v", object)
+	}
+
+	for _, groupPrefix := range AllGroupsPrefixes {
+		skip, _, err := shouldSkipRBACRoleForClusterNamespaceResource(
+			projectName,
+			cluster,
+			kubermaticv1.EtcdRestoreResourceName,
+			kubermaticv1.GroupName,
+			kubermaticv1.EtcdRestoreKindName,
+			groupPrefix)
+		if err != nil {
+			return err
+		}
+		if skip {
+			klog.V(4).Infof("skipping RoleBinding generation for cluster etcdRestores for group %q and cluster namespace %q", groupPrefix, cluster.Status.NamespaceName)
+			continue
+		}
+
+		generatedRoleBinding := generateRBACRoleBindingForClusterNamespaceResource(
+			cluster,
+			GenerateActualGroupNameFor(projectName, groupPrefix),
+			kubermaticv1.EtcdRestoreKindName,
+		)
+
+		var sharedExistingRoleBinding rbacv1.RoleBinding
+		key := ctrlruntimeclient.ObjectKey{Name: generatedRoleBinding.Name, Namespace: cluster.Status.NamespaceName}
+		if err := c.client.Get(ctx, key, &sharedExistingRoleBinding); err != nil {
+			if kerrors.IsNotFound(err) {
+				if err := c.client.Create(ctx, generatedRoleBinding); err != nil {
+					return err
+				}
+				continue
+			}
+			return err
+		}
+
+		// sharedExistingRoleBinding found
+		if equality.Semantic.DeepEqual(sharedExistingRoleBinding.Subjects, generatedRoleBinding.Subjects) {
+			continue
+		}
+		existingRoleBinding := sharedExistingRoleBinding.DeepCopy()
+		existingRoleBinding.Subjects = generatedRoleBinding.Subjects
+		if err := c.client.Update(ctx, existingRoleBinding); err != nil {
+			return err
+		}
 	}
 	return nil
 }

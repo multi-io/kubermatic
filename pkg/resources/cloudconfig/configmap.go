@@ -27,13 +27,15 @@ import (
 	aws "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/aws/types"
 	azure "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/azure/types"
 	gce "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/gce/types"
+	kubevirt "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/kubevirt/types"
 	openstack "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/openstack/types"
 	vsphere "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/vsphere/types"
 	"github.com/kubermatic/machine-controller/pkg/ini"
 	providerconfig "github.com/kubermatic/machine-controller/pkg/providerconfig/types"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
-	gcp "k8c.io/kubermatic/v2/pkg/provider/cloud/gcp"
+	"k8c.io/kubermatic/v2/pkg/provider/cloud/gcp"
 	"k8c.io/kubermatic/v2/pkg/resources"
+	vspherecloudconfig "k8c.io/kubermatic/v2/pkg/resources/cloudconfig/vsphere"
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 
 	corev1 "k8s.io/api/core/v1"
@@ -65,6 +67,36 @@ func ConfigMapCreator(data configMapCreatorData) reconciling.NamedConfigMapCreat
 			cloudConfig, err := CloudConfig(data.Cluster(), data.DC(), credentials)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create cloud-config: %v", err)
+			}
+
+			cm.Labels = resources.BaseAppLabels(name, nil)
+			cm.Data[resources.CloudConfigConfigMapKey] = cloudConfig
+			cm.Data[FakeVMWareUUIDKeyName] = fakeVMWareUUID
+
+			return cm, nil
+		}
+	}
+}
+
+func ConfigmapVsphereCSICreator(data configMapCreatorData) reconciling.NamedConfigMapCreatorGetter {
+	return func() (string, reconciling.ConfigMapCreator) {
+		return resources.CSICloudConfigConfigMapName, func(cm *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+			if cm.Data == nil {
+				cm.Data = map[string]string{}
+			}
+
+			credentials, err := resources.GetCredentials(data)
+			if err != nil {
+				return nil, err
+			}
+
+			vsphereCloudConfig, err := getVsphereCloudConfig(data.Cluster(), data.DC(), credentials)
+			if err != nil {
+				return nil, err
+			}
+			cloudConfig, err := vspherecloudconfig.CloudConfigCSIToString(vsphereCloudConfig)
+			if err != nil {
+				return nil, err
 			}
 
 			cm.Labels = resources.BaseAppLabels(name, nil)
@@ -140,8 +172,8 @@ func CloudConfig(
 				Username:                    credentials.Openstack.Username,
 				Password:                    credentials.Openstack.Password,
 				DomainName:                  credentials.Openstack.Domain,
-				TenantName:                  credentials.Openstack.Tenant,
-				TenantID:                    credentials.Openstack.TenantID,
+				ProjectName:                 credentials.Openstack.Tenant,
+				ProjectID:                   credentials.Openstack.TenantID,
 				Region:                      dc.Spec.Openstack.Region,
 				ApplicationCredentialSecret: credentials.Openstack.ApplicationCredentialSecret,
 				ApplicationCredentialID:     credentials.Openstack.ApplicationCredentialID,
@@ -241,6 +273,12 @@ func CloudConfig(
 		if err != nil {
 			return cloudConfig, err
 		}
+
+	case cloud.Kubevirt != nil:
+		cc := kubevirt.CloudConfig{
+			Kubeconfig: credentials.Kubevirt.KubeConfig,
+		}
+		return cc.String()
 	}
 
 	return cloudConfig, err
@@ -277,9 +315,10 @@ func getVsphereCloudConfig(
 			Datacenter:       dc.Spec.VSphere.Datacenter,
 			DefaultDatastore: datastore,
 			WorkingDir:       cluster.Name,
+			ClusterID:        dc.Spec.VSphere.Cluster,
 		},
 		Workspace: vsphere.WorkspaceOpts{
-			// This is redudant with what the Vsphere cloud provider itself does:
+			// This is redundant with what the Vsphere cloud provider itself does:
 			// https://github.com/kubernetes/kubernetes/blob/9d80e7522ab7fc977e40dd6f3b5b16d8ebfdc435/pkg/cloudprovider/providers/vsphere/vsphere.go#L346
 			// We do it here because the fields in the "Global" object
 			// are marked as deprecated even thought the code checks
@@ -292,6 +331,14 @@ func getVsphereCloudConfig(
 		},
 		Disk: vsphere.DiskOpts{
 			SCSIControllerType: "pvscsi",
+		},
+		VirtualCenter: map[string]*vsphere.VirtualCenterConfig{
+			vspherURL.Hostname(): {
+				User:        credentials.VSphere.Username,
+				Password:    credentials.VSphere.Password,
+				VCenterPort: port,
+				Datacenters: dc.Spec.VSphere.Datacenter,
+			},
 		},
 	}, nil
 }

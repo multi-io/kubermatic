@@ -39,7 +39,6 @@ import (
 	"github.com/kubermatic/machine-controller/pkg/userdata/rhel"
 	"github.com/kubermatic/machine-controller/pkg/userdata/sles"
 	"github.com/kubermatic/machine-controller/pkg/userdata/ubuntu"
-
 	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 
@@ -78,20 +77,36 @@ func getAWSProviderSpec(c *kubermaticv1.Cluster, nodeSpec apiv1.NodeSpec, dc *ku
 		ami = nodeSpec.Cloud.AWS.AMI
 	}
 
+	spotConfig := &aws.SpotInstanceConfig{}
+	if nodeSpec.Cloud.AWS.IsSpotInstance != nil && *nodeSpec.Cloud.AWS.IsSpotInstance {
+		if nodeSpec.Cloud.AWS.SpotInstanceMaxPrice != nil {
+			spotConfig.MaxPrice = providerconfig.ConfigVarString{Value: *nodeSpec.Cloud.AWS.SpotInstanceMaxPrice}
+		}
+
+		if nodeSpec.Cloud.AWS.SpotInstancePersistentRequest != nil {
+			spotConfig.PersistentRequest = providerconfig.ConfigVarBool{Value: *nodeSpec.Cloud.AWS.SpotInstancePersistentRequest}
+		}
+
+		if nodeSpec.Cloud.AWS.SpotInstanceInterruptionBehavior != nil {
+			spotConfig.InterruptionBehavior = providerconfig.ConfigVarString{Value: *nodeSpec.Cloud.AWS.SpotInstanceInterruptionBehavior}
+		}
+	}
+
 	config := aws.RawConfig{
 		// If the node spec doesn't provide a subnet ID, AWS will just pick the AZ's default subnet.
-		SubnetID:         providerconfig.ConfigVarString{Value: nodeSpec.Cloud.AWS.SubnetID},
-		VpcID:            providerconfig.ConfigVarString{Value: c.Spec.Cloud.AWS.VPCID},
-		SecurityGroupIDs: []providerconfig.ConfigVarString{{Value: c.Spec.Cloud.AWS.SecurityGroupID}},
-		Region:           providerconfig.ConfigVarString{Value: dc.Spec.AWS.Region},
-		AvailabilityZone: providerconfig.ConfigVarString{Value: nodeSpec.Cloud.AWS.AvailabilityZone},
-		InstanceProfile:  providerconfig.ConfigVarString{Value: c.Spec.Cloud.AWS.InstanceProfileName},
-		InstanceType:     providerconfig.ConfigVarString{Value: nodeSpec.Cloud.AWS.InstanceType},
-		DiskType:         providerconfig.ConfigVarString{Value: nodeSpec.Cloud.AWS.VolumeType},
-		DiskSize:         nodeSpec.Cloud.AWS.VolumeSize,
-		AMI:              providerconfig.ConfigVarString{Value: ami},
-		AssignPublicIP:   nodeSpec.Cloud.AWS.AssignPublicIP,
-		IsSpotInstance:   nodeSpec.Cloud.AWS.IsSpotInstance,
+		SubnetID:           providerconfig.ConfigVarString{Value: nodeSpec.Cloud.AWS.SubnetID},
+		VpcID:              providerconfig.ConfigVarString{Value: c.Spec.Cloud.AWS.VPCID},
+		SecurityGroupIDs:   []providerconfig.ConfigVarString{{Value: c.Spec.Cloud.AWS.SecurityGroupID}},
+		Region:             providerconfig.ConfigVarString{Value: dc.Spec.AWS.Region},
+		AvailabilityZone:   providerconfig.ConfigVarString{Value: nodeSpec.Cloud.AWS.AvailabilityZone},
+		InstanceProfile:    providerconfig.ConfigVarString{Value: c.Spec.Cloud.AWS.InstanceProfileName},
+		InstanceType:       providerconfig.ConfigVarString{Value: nodeSpec.Cloud.AWS.InstanceType},
+		DiskType:           providerconfig.ConfigVarString{Value: nodeSpec.Cloud.AWS.VolumeType},
+		DiskSize:           nodeSpec.Cloud.AWS.VolumeSize,
+		AMI:                providerconfig.ConfigVarString{Value: ami},
+		AssignPublicIP:     nodeSpec.Cloud.AWS.AssignPublicIP,
+		IsSpotInstance:     nodeSpec.Cloud.AWS.IsSpotInstance,
+		SpotInstanceConfig: spotConfig,
 	}
 	if config.DiskType.Value == "" {
 		config.DiskType.Value = ec2.VolumeTypeGp2
@@ -123,19 +138,20 @@ func getAWSProviderSpec(c *kubermaticv1.Cluster, nodeSpec apiv1.NodeSpec, dc *ku
 
 func getAzureProviderSpec(c *kubermaticv1.Cluster, nodeSpec apiv1.NodeSpec, dc *kubermaticv1.Datacenter) (*runtime.RawExtension, error) {
 	config := azure.RawConfig{
-		Location:          providerconfig.ConfigVarString{Value: dc.Spec.Azure.Location},
-		ResourceGroup:     providerconfig.ConfigVarString{Value: c.Spec.Cloud.Azure.ResourceGroup},
-		VNetResourceGroup: providerconfig.ConfigVarString{Value: c.Spec.Cloud.Azure.VNetResourceGroup},
-		VMSize:            providerconfig.ConfigVarString{Value: nodeSpec.Cloud.Azure.Size},
-		OSDiskSize:        nodeSpec.Cloud.Azure.OSDiskSize,
-		DataDiskSize:      nodeSpec.Cloud.Azure.DataDiskSize,
-		VNetName:          providerconfig.ConfigVarString{Value: c.Spec.Cloud.Azure.VNetName},
-		SubnetName:        providerconfig.ConfigVarString{Value: c.Spec.Cloud.Azure.SubnetName},
-		RouteTableName:    providerconfig.ConfigVarString{Value: c.Spec.Cloud.Azure.RouteTableName},
-		AvailabilitySet:   providerconfig.ConfigVarString{Value: c.Spec.Cloud.Azure.AvailabilitySet},
-		SecurityGroupName: providerconfig.ConfigVarString{Value: c.Spec.Cloud.Azure.SecurityGroup},
-		Zones:             nodeSpec.Cloud.Azure.Zones,
-		ImageID:           providerconfig.ConfigVarString{Value: nodeSpec.Cloud.Azure.ImageID},
+		Location:              providerconfig.ConfigVarString{Value: dc.Spec.Azure.Location},
+		ResourceGroup:         providerconfig.ConfigVarString{Value: c.Spec.Cloud.Azure.ResourceGroup},
+		VNetResourceGroup:     providerconfig.ConfigVarString{Value: c.Spec.Cloud.Azure.VNetResourceGroup},
+		VMSize:                providerconfig.ConfigVarString{Value: nodeSpec.Cloud.Azure.Size},
+		OSDiskSize:            nodeSpec.Cloud.Azure.OSDiskSize,
+		DataDiskSize:          nodeSpec.Cloud.Azure.DataDiskSize,
+		VNetName:              providerconfig.ConfigVarString{Value: c.Spec.Cloud.Azure.VNetName},
+		SubnetName:            providerconfig.ConfigVarString{Value: c.Spec.Cloud.Azure.SubnetName},
+		RouteTableName:        providerconfig.ConfigVarString{Value: c.Spec.Cloud.Azure.RouteTableName},
+		AvailabilitySet:       providerconfig.ConfigVarString{Value: c.Spec.Cloud.Azure.AvailabilitySet},
+		AssignAvailabilitySet: c.Spec.Cloud.Azure.AssignAvailabilitySet,
+		SecurityGroupName:     providerconfig.ConfigVarString{Value: c.Spec.Cloud.Azure.SecurityGroup},
+		Zones:                 nodeSpec.Cloud.Azure.Zones,
+		ImageID:               providerconfig.ConfigVarString{Value: nodeSpec.Cloud.Azure.ImageID},
 
 		// https://github.com/kubermatic/kubermatic/issues/5013#issuecomment-580357280
 		AssignPublicIP: providerconfig.ConfigVarBool{Value: nodeSpec.Cloud.Azure.AssignPublicIP},
@@ -168,6 +184,7 @@ func getVSphereProviderSpec(c *kubermaticv1.Cluster, nodeSpec apiv1.NodeSpec, dc
 	if c.Spec.Cloud.VSphere.DatastoreCluster == "" {
 		datastore = defaultIfEmpty(c.Spec.Cloud.VSphere.Datastore, dc.Spec.VSphere.DefaultDatastore)
 	}
+
 	config := vsphere.RawConfig{
 		TemplateVMName:   providerconfig.ConfigVarString{Value: nodeSpec.Cloud.VSphere.Template},
 		VMNetName:        providerconfig.ConfigVarString{Value: c.Spec.Cloud.VSphere.VMNetName},
@@ -180,6 +197,7 @@ func getVSphereProviderSpec(c *kubermaticv1.Cluster, nodeSpec apiv1.NodeSpec, dc
 		Cluster:          providerconfig.ConfigVarString{Value: dc.Spec.VSphere.Cluster},
 		Folder:           providerconfig.ConfigVarString{Value: c.Spec.Cloud.VSphere.Folder},
 		AllowInsecure:    providerconfig.ConfigVarBool{Value: dc.Spec.VSphere.AllowInsecure},
+		ResourcePool:     providerconfig.ConfigVarString{Value: c.Spec.Cloud.VSphere.ResourcePool},
 	}
 
 	ext := &runtime.RawExtension{}

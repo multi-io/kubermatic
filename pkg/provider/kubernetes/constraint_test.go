@@ -35,8 +35,9 @@ import (
 )
 
 const (
-	testClusterName = "test-constraints"
-	testNamespace   = "cluster-test-constraints"
+	testClusterName         = "test-constraints"
+	testNamespace           = "cluster-test-constraints"
+	testKubermaticNamespace = "kubermatic"
 )
 
 func TestListConstraints(t *testing.T) {
@@ -323,9 +324,262 @@ func genConstraint(name, namespace string) *kubermaticv1.Constraint {
 			},
 		},
 		Parameters: kubermaticv1.Parameters{
-			RawJSON: `{"labels":[ "gatekeeper", "opa"]}`,
+			"rawJSON": `{"labels":[ "gatekeeper", "opa"]}`,
 		},
 	}
 
 	return ct
+}
+
+func TestCreateDefaultConstraint(t *testing.T) {
+
+	testCases := []struct {
+		name       string
+		ctToCreate *kubermaticv1.Constraint
+		expectedCT *kubermaticv1.Constraint
+	}{
+		{
+			name:       "scenario 1: create constraint",
+			ctToCreate: genConstraint("ct", testKubermaticNamespace),
+			expectedCT: genConstraint("ct", testKubermaticNamespace),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			client := fakectrlruntimeclient.NewClientBuilder().WithScheme(scheme.Scheme).Build()
+			fakeImpersonationClient := func(impCfg restclient.ImpersonationConfig) (ctrlruntimeclient.Client, error) {
+				return client, nil
+			}
+			defaultConstraintProvider, err := kubernetes.NewDefaultConstraintProvider(fakeImpersonationClient, client, testKubermaticNamespace)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			constraint, err := defaultConstraintProvider.Create(tc.ctToCreate)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// set the RV because it gets set when created
+			tc.expectedCT.ResourceVersion = "1"
+			if !reflect.DeepEqual(constraint, tc.expectedCT) {
+				t.Fatalf(" diff: %s", diff.ObjectGoPrintSideBySide(constraint, tc.expectedCT))
+			}
+		})
+	}
+}
+
+func TestListDefaultConstraints(t *testing.T) {
+
+	testCases := []struct {
+		name                string
+		existingObjects     []ctrlruntimeclient.Object
+		expectedConstraints []*kubermaticv1.Constraint
+	}{
+		{
+			name: "scenario 1: list constraints",
+			existingObjects: []ctrlruntimeclient.Object{
+				genConstraint("ct1", testKubermaticNamespace),
+				genConstraint("ct2", testKubermaticNamespace),
+				genConstraint("ct3", "other-ns"),
+			},
+			expectedConstraints: []*kubermaticv1.Constraint{genConstraint("ct1", testKubermaticNamespace), genConstraint("ct2", testKubermaticNamespace)},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			client := fakectrlruntimeclient.
+				NewClientBuilder().
+				WithScheme(scheme.Scheme).
+				WithObjects(tc.existingObjects...).
+				Build()
+
+			fakeImpersonationClient := func(impCfg restclient.ImpersonationConfig) (ctrlruntimeclient.Client, error) {
+				return client, nil
+			}
+			defaultConstraintProvider, err := kubernetes.NewDefaultConstraintProvider(fakeImpersonationClient, client, testKubermaticNamespace)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			constraintList, err := defaultConstraintProvider.List()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(tc.expectedConstraints) != len(constraintList.Items) {
+				t.Fatalf("expected to get %d constraints, but got %d", len(tc.expectedConstraints), len(constraintList.Items))
+			}
+
+			for _, returnedConstraint := range constraintList.Items {
+				returnedConstraint.ResourceVersion = ""
+				cFound := false
+				for _, expectedCT := range tc.expectedConstraints {
+					expectedCT.ResourceVersion = ""
+					if dif := deep.Equal(returnedConstraint, *expectedCT); dif == nil {
+						cFound = true
+						break
+					}
+				}
+				if !cFound {
+					t.Fatalf("returned default constraint was not found on the list of expected ones, ct = %#v", returnedConstraint)
+				}
+			}
+		})
+	}
+}
+
+func TestGetDefaultConstraint(t *testing.T) {
+
+	testCases := []struct {
+		name               string
+		existingObjects    []ctrlruntimeclient.Object
+		expectedConstraint *kubermaticv1.Constraint
+	}{
+		{
+			name: "scenario 1: get constraint",
+			existingObjects: []ctrlruntimeclient.Object{
+				genConstraint("ct1", testKubermaticNamespace),
+				genConstraint("ct2", testKubermaticNamespace),
+				genConstraint("ct3", "other-ns"),
+			},
+			expectedConstraint: genConstraint("ct1", testKubermaticNamespace),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			client := fakectrlruntimeclient.
+				NewClientBuilder().
+				WithScheme(scheme.Scheme).
+				WithObjects(tc.existingObjects...).
+				Build()
+
+			fakeImpersonationClient := func(impCfg restclient.ImpersonationConfig) (ctrlruntimeclient.Client, error) {
+				return client, nil
+			}
+			defaultConstraintProvider, err := kubernetes.NewDefaultConstraintProvider(fakeImpersonationClient, client, testKubermaticNamespace)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			constraint, err := defaultConstraintProvider.Get(tc.expectedConstraint.Name)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			tc.expectedConstraint.ResourceVersion = constraint.ResourceVersion
+
+			if !reflect.DeepEqual(constraint, tc.expectedConstraint) {
+				t.Fatalf(" diff: %s", diff.ObjectGoPrintSideBySide(constraint, tc.expectedConstraint))
+			}
+		})
+	}
+}
+
+func TestDeleteDefaultConstraint(t *testing.T) {
+	testCases := []struct {
+		name            string
+		existingObjects []ctrlruntimeclient.Object
+		CTtoDelete      *kubermaticv1.Constraint
+	}{
+		{
+			name:            "test: delete default constraint",
+			existingObjects: []ctrlruntimeclient.Object{genConstraint("ct", testKubermaticNamespace)},
+			CTtoDelete:      genConstraint("ct", testKubermaticNamespace),
+		},
+	}
+
+	for idx := range testCases {
+		tc := testCases[idx]
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			client := fakectrlruntimeclient.
+				NewClientBuilder().
+				WithScheme(scheme.Scheme).
+				WithObjects(tc.existingObjects...).
+				Build()
+
+			fakeImpersonationClient := func(impCfg restclient.ImpersonationConfig) (ctrlruntimeclient.Client, error) {
+				return client, nil
+			}
+			provider, err := kubernetes.NewDefaultConstraintProvider(fakeImpersonationClient, client, testKubermaticNamespace)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			err = provider.Delete(tc.CTtoDelete.Name)
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestUpdateDefaultConstraint(t *testing.T) {
+	testCases := []struct {
+		name             string
+		updateConstraint func(*kubermaticv1.Constraint)
+		existingObjects  []ctrlruntimeclient.Object
+		expectedCT       *kubermaticv1.Constraint
+	}{
+		{
+			name: "scenario 1: update default constraint",
+			updateConstraint: func(ct *kubermaticv1.Constraint) {
+				ct.Spec.Match.Kinds = append(ct.Spec.Match.Kinds, kubermaticv1.Kind{Kinds: []string{"pod"}, APIGroups: []string{"v1"}})
+				ct.Spec.Match.Scope = "*"
+			},
+			existingObjects: []ctrlruntimeclient.Object{
+				genConstraint("ct1", testKubermaticNamespace),
+			},
+		},
+	}
+
+	for idx := range testCases {
+		tc := testCases[idx]
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+			client := fakectrlruntimeclient.
+				NewClientBuilder().
+				WithScheme(scheme.Scheme).
+				WithObjects(tc.existingObjects...).
+				Build()
+
+			fakeImpersonationClient := func(impCfg restclient.ImpersonationConfig) (ctrlruntimeclient.Client, error) {
+				return client, nil
+			}
+			provider, err := kubernetes.NewDefaultConstraintProvider(fakeImpersonationClient, client, testKubermaticNamespace)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// fetch default constraint to get the ResourceVersion
+			constraint := &kubermaticv1.Constraint{}
+			if err := client.Get(ctx, ctrlruntimeclient.ObjectKeyFromObject(tc.existingObjects[0]), constraint); err != nil {
+				t.Fatal(err)
+			}
+
+			updatedCT := constraint.DeepCopy()
+			tc.updateConstraint(updatedCT)
+
+			constraint, err = provider.Update(updatedCT)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if !reflect.DeepEqual(constraint, updatedCT) {
+				t.Fatalf(" diff: %s", diff.ObjectGoPrintSideBySide(constraint, updatedCT))
+			}
+		})
+	}
 }

@@ -112,10 +112,10 @@ beforeDockerBuild=$(nowms)
 (
   echodate "Building user-ssh-keys-agent image"
   TEST_NAME="Build user-ssh-keys-agent Docker image"
+  retry 5 docker login -u "$QUAY_IO_USERNAME" -p "$QUAY_IO_PASSWORD" quay.io
   cd cmd/user-ssh-keys-agent
   make build
-  retry 5 docker login -u "$QUAY_IO_USERNAME" -p "$QUAY_IO_PASSWORD" quay.io
-  IMAGE_NAME=quay.io/kubermatic/user-ssh-keys-agent:$KUBERMATIC_VERSION
+  IMAGE_NAME="quay.io/kubermatic/user-ssh-keys-agent:$KUBERMATIC_VERSION"
   time retry 5 docker build -t "${IMAGE_NAME}" .
   time retry 5 docker push "${IMAGE_NAME}"
 )
@@ -153,7 +153,7 @@ EOF
 cat hack/ci/testdata/oauth_values.yaml >> $HELM_VALUES_FILE
 
 # install dependencies and Kubermatic Operator into cluster
-./_build/kubermatic-installer deploy \
+./_build/kubermatic-installer deploy --disable-telemetry \
   --storageclass copy-default \
   --config "$KUBERMATIC_CONFIG" \
   --helm-values "$HELM_VALUES_FILE" \

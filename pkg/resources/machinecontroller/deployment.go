@@ -21,7 +21,6 @@ import (
 	"strings"
 
 	providerconfig "github.com/kubermatic/machine-controller/pkg/providerconfig/types"
-
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/resources"
 	"k8c.io/kubermatic/v2/pkg/resources/apiserver"
@@ -52,7 +51,7 @@ var (
 
 const (
 	Name = "machine-controller"
-	Tag  = "v1.27.11-sys11-4"
+	Tag  = "v1.36.2-sys11-3"
 
 	NodeLocalDNSCacheAddress = "169.254.20.10"
 )
@@ -67,6 +66,8 @@ type machinecontrollerData interface {
 	NodeLocalDNSCacheEnabled() bool
 	Seed() *kubermaticv1.Seed
 	GetCSIMigrationFeatureGates() []string
+	MachineControllerImageTag() string
+	MachineControllerImageRepository() string
 }
 
 // DeploymentCreator returns the function to create and update the machine controller deployment
@@ -89,7 +90,7 @@ func DeploymentCreator(data machinecontrollerData) reconciling.NamedDeploymentCr
 	}
 }
 
-// DeploymentCreator returns the function to create and update the machine controller deployment without the
+// DeploymentCreatorWithoutInitWrapper returns the function to create and update the machine controller deployment without the
 // wrapper that checks for apiserver availabiltiy. This allows to adjust the command.
 func DeploymentCreatorWithoutInitWrapper(data machinecontrollerData) reconciling.NamedDeploymentCreatorGetter {
 	return func() (string, reconciling.DeploymentCreator) {
@@ -134,12 +135,21 @@ func DeploymentCreatorWithoutInitWrapper(data machinecontrollerData) reconciling
 			}
 
 			dep.Spec.Template.Spec.InitContainers = []corev1.Container{}
+
+			repository := data.ImageRegistry(resources.RegistryDocker) + "/syseleven/machine-controller"
+			if r := data.MachineControllerImageRepository(); r != "" {
+				repository = r
+			}
+			tag := Tag
+			if t := data.MachineControllerImageTag(); t != "" {
+				tag = t
+			}
 			dep.Spec.Template.Spec.Containers = []corev1.Container{
 				{
 					Name:    Name,
-					Image:   data.ImageRegistry(resources.RegistryDocker) + "/syseleven/machine-controller:" + Tag,
+					Image:   repository + ":" + tag,
 					Command: []string{"/usr/local/bin/machine-controller"},
-					Args:    getFlags(clusterDNSIP, data.DC().Node),
+					Args:    getFlags(clusterDNSIP, data.DC().Node, data.Cluster().Spec.ContainerRuntime),
 					Env: append(envVars, corev1.EnvVar{
 						Name:  "KUBECONFIG",
 						Value: "/etc/kubernetes/kubeconfig/kubeconfig",
@@ -180,6 +190,21 @@ func DeploymentCreatorWithoutInitWrapper(data machinecontrollerData) reconciling
 			return dep, nil
 		}
 	}
+}
+
+// sanitizeEnvVar will take the value of a environment variable and sanatises it.
+// the need for this comes from github.com/kubermatic/kubermatic/issues/7960
+func sanitizeEnvVars(envVars []corev1.EnvVar) []corev1.EnvVar {
+	sanitizedEnvVars := make([]corev1.EnvVar, len(envVars))
+
+	for idx, envVar := range envVars {
+		sanitizedEnvVars[idx] = corev1.EnvVar{
+			Name:  envVar.Name,
+			Value: strings.ReplaceAll(envVar.Value, "$", "$$"),
+		}
+	}
+
+	return sanitizedEnvVars
 }
 
 func getEnvVars(data machinecontrollerData) ([]corev1.EnvVar, error) {
@@ -238,10 +263,11 @@ func getEnvVars(data machinecontrollerData) ([]corev1.EnvVar, error) {
 		vars = append(vars, corev1.EnvVar{Name: "ANEXIA_TOKEN", Value: credentials.Anexia.Token})
 	}
 	vars = append(vars, resources.GetHTTPProxyEnvVarsFromSeed(data.Seed(), data.Cluster().Address.InternalName)...)
-	return vars, nil
+
+	return sanitizeEnvVars(vars), nil
 }
 
-func getFlags(clusterDNSIP string, nodeSettings *kubermaticv1.NodeSettings) []string {
+func getFlags(clusterDNSIP string, nodeSettings *kubermaticv1.NodeSettings, cri string) []string {
 	flags := []string{
 		"-kubeconfig", "/etc/kubernetes/kubeconfig/kubeconfig",
 		"-logtostderr",
@@ -251,6 +277,7 @@ func getFlags(clusterDNSIP string, nodeSettings *kubermaticv1.NodeSettings) []st
 		"-health-probe-address", "0.0.0.0:8085",
 		"-metrics-address", "0.0.0.0:8080",
 		"-ca-bundle", "/etc/kubernetes/pki/ca-bundle/ca-bundle.pem",
+		"-node-csr-approver",
 	}
 
 	if nodeSettings != nil {
@@ -269,11 +296,14 @@ func getFlags(clusterDNSIP string, nodeSettings *kubermaticv1.NodeSettings) []st
 		if nodeSettings.PauseImage != "" {
 			flags = append(flags, "-node-pause-image", nodeSettings.PauseImage)
 		}
-
 		// TODO(kron4eg): deprecate and remove this
 		if nodeSettings.HyperkubeImage != "" {
 			flags = append(flags, "-node-hyperkube-image", nodeSettings.HyperkubeImage)
 		}
+	}
+
+	if cri != "" {
+		flags = append(flags, "-node-container-runtime", cri)
 	}
 
 	return flags

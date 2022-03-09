@@ -60,11 +60,11 @@ type controllerRunOptions struct {
 	workerName                                       string
 	versionsFile                                     string
 	updatesFile                                      string
+	providerIncompatibilitiesFile                    string
 	workerCount                                      int
 	overwriteRegistry                                string
 	nodePortRange                                    string
 	nodeAccessNetwork                                string
-	enableNodeLocalDNSCache                          bool
 	kubernetesAddonsPath                             string
 	kubernetesAddons                                 kubermaticv1.AddonList
 	backupContainerFile                              string
@@ -94,7 +94,6 @@ type controllerRunOptions struct {
 	admissionWebhook                                 webhook.Options
 	concurrentClusterUpdate                          int
 	addonEnforceInterval                             int
-	defaultComponentSettings                         string
 	caBundle                                         *certificates.CABundle
 
 	// OIDC configuration
@@ -108,9 +107,18 @@ type controllerRunOptions struct {
 	featureGates features.FeatureGate
 
 	// MLA configuration
-	grafanaURL        string
-	grafanaHeaderName string
-	grafanaSecret     string
+	enableUserClusterMLA  bool
+	mlaNamespace          string
+	grafanaURL            string
+	grafanaHeaderName     string
+	grafanaSecret         string
+	cortexAlertmanagerURL string
+	cortexRulerURL        string
+	lokiRulerURL          string
+
+	// Machine Controller configuration
+	machineControllerImageTag        string
+	machineControllerImageRepository string
 }
 
 func newControllerRunOptions() (controllerRunOptions, error) {
@@ -136,11 +144,11 @@ func newControllerRunOptions() (controllerRunOptions, error) {
 	flag.StringVar(&c.workerName, "worker-name", "", "The name of the worker that will only processes resources with label=worker-name.")
 	flag.StringVar(&c.versionsFile, "versions", "versions.yaml", "The versions.yaml file path")
 	flag.StringVar(&c.updatesFile, "updates", "updates.yaml", "The updates.yaml file path")
+	flag.StringVar(&c.providerIncompatibilitiesFile, "provider-incompatibilities", "provider-incompatibilities.yaml", "The provider-incompatibilities.yaml file path")
 	flag.IntVar(&c.workerCount, "worker-count", 4, "Number of workers which process the clusters in parallel.")
 	flag.StringVar(&c.overwriteRegistry, "overwrite-registry", "", "registry to use for all images")
-	flag.StringVar(&c.nodePortRange, "nodeport-range", resources.DefaultNodePortRange, "NodePort range to use for new clusters. It must be within the NodePort range of the seed-cluster")
+	flag.StringVar(&c.nodePortRange, "nodeport-range", resources.DefaultNodePortRange, "Deprecated: configure defaultComponentSettings on Seed resource. NodePort range to use for new clusters. It must be within the NodePort range of the seed-cluster")
 	flag.StringVar(&c.nodeAccessNetwork, "node-access-network", kubermaticv1.DefaultNodeAccessNetwork, "A network which allows direct access to nodes via VPN. Uses CIDR notation.")
-	flag.BoolVar(&c.enableNodeLocalDNSCache, "enable-nodelocal-dns-cache", true, "Enable NodeLocal DNS Cache in user clusters.")
 	flag.StringVar(&c.kubernetesAddonsPath, "kubernetes-addons-path", "/opt/addons/kubernetes", "Path to addon manifests. Should contain sub-folders for each addon")
 	flag.StringVar(&defaultKubernetesAddonsList, "kubernetes-addons-list", "", "Comma separated list of Addons to install into every user-cluster. Mutually exclusive with `--kubernetes-addons-file`")
 	flag.StringVar(&defaultKubernetesAddonsFile, "kubernetes-addons-file", "", "File that contains a list of default kubernetes addons. Mutually exclusive with `--kubernetes-addons-list`")
@@ -168,18 +176,24 @@ func newControllerRunOptions() (controllerRunOptions, error) {
 	flag.BoolVar(&c.enableEtcdBackupRestoreController, "enable-etcd-backups-restores", false, "Whether to enable the new etcd backup and restore controllers")
 	flag.StringVar(&c.dnatControllerImage, "dnatcontroller-image", resources.DefaultDNATControllerImage, "The location of the dnatcontroller-image")
 	flag.StringVar(&c.namespace, "namespace", "kubermatic", "The namespace kubermatic runs in, uses to determine where to look for datacenter custom resources")
-	flag.IntVar(&c.apiServerDefaultReplicas, "apiserver-default-replicas", 2, "The default number of replicas for usercluster api servers")
-	flag.BoolVar(&c.apiServerEndpointReconcilingDisabled, "apiserver-reconciling-disabled-by-default", false, "Whether to disable reconciling for the apiserver endpoints by default")
-	flag.IntVar(&c.controllerManagerDefaultReplicas, "controller-manager-default-replicas", 1, "The default number of replicas for usercluster controller managers")
-	flag.IntVar(&c.schedulerDefaultReplicas, "scheduler-default-replicas", 1, "The default number of replicas for usercluster schedulers")
+	flag.IntVar(&c.apiServerDefaultReplicas, "apiserver-default-replicas", 2, "Deprecated: configure defaultComponentSettings on Seed resource. The default number of replicas for usercluster api servers")
+	flag.BoolVar(&c.apiServerEndpointReconcilingDisabled, "apiserver-reconciling-disabled-by-default", false, "Deprecated: configure defaultComponentSettings on Seed resource. Whether to disable reconciling for the apiserver endpoints by default")
+	flag.IntVar(&c.controllerManagerDefaultReplicas, "controller-manager-default-replicas", 1, "Deprecated: configure defaultComponentSettings on Seed resource. The default number of replicas for usercluster controller managers")
+	flag.IntVar(&c.schedulerDefaultReplicas, "scheduler-default-replicas", 1, "Deprecated: configure defaultComponentSettings on Seed resource. The default number of replicas for usercluster schedulers")
 	flag.IntVar(&c.concurrentClusterUpdate, "max-parallel-reconcile", 10, "The default number of resources updates per cluster")
 	flag.IntVar(&c.addonEnforceInterval, "addon-enforce-interval", 5, "Check and ensure default usercluster addons are deployed every interval in minutes. Set to 0 to disable.")
-	flag.StringVar(&c.defaultComponentSettings, "default-component-settings", "", "YAML file with default cluster component settings")
 	flag.StringVar(&caBundleFile, "ca-bundle", "", "File containing the PEM-encoded CA bundle for all userclusters")
 	flag.Var(&c.tunnelingAgentIP, "tunneling-agent-ip", "The address used by the tunneling agents.")
+	flag.BoolVar(&c.enableUserClusterMLA, "enable-user-cluster-mla", false, "Enables user cluster MLA (Monitoring, Logging & Alerting) stack in the seed.")
+	flag.StringVar(&c.mlaNamespace, "mla-namespace", "mla", "The namespace in which the user cluster MLA stack is running.")
 	flag.StringVar(&c.grafanaURL, "grafana-url", "http://grafana.mla.svc.cluster.local", "The URL of Grafana instance which in running for MLA stack.")
-	flag.StringVar(&c.grafanaHeaderName, "grafana-header-name", "X-WEBAUTH-USER", "Grafana Auth Proxy HTTP Header that will contain the username or email")
-	flag.StringVar(&c.grafanaSecret, "grafana-secret-name", "mla/secret", "Grafana secret name in format namespace/secretname, that contains basic auth info")
+	flag.StringVar(&c.grafanaHeaderName, "grafana-header-name", "X-Forwarded-Email", "Grafana Auth Proxy HTTP Header that will contain the username or email")
+	flag.StringVar(&c.grafanaSecret, "grafana-secret-name", "mla/grafana", "Grafana secret name in format namespace/secretname, that contains basic auth info")
+	flag.StringVar(&c.cortexAlertmanagerURL, "cortex-alertmanager-url", "http://cortex-alertmanager.mla.svc.cluster.local:8080", "The URL of cortex alertmanager which is running for MLA stack.")
+	flag.StringVar(&c.cortexRulerURL, "cortex-ruler-url", "http://cortex-ruler.mla.svc.cluster.local:8080", "The URL of cortex ruler which is running for MLA stack.")
+	flag.StringVar(&c.lokiRulerURL, "loki-ruler-url", "http://loki-distributed-ruler.mla.svc.cluster.local:3100", "The URL of loki ruler which is running for MLA stack.")
+	flag.StringVar(&c.machineControllerImageTag, "machine-controller-image-tag", "", "The Machine Controller image tag.")
+	flag.StringVar(&c.machineControllerImageRepository, "machine-controller-image-repository", "", "The Machine Controller image repository.")
 	c.admissionWebhook.AddFlags(flag.CommandLine, true)
 	addFlags(flag.CommandLine)
 	flag.Parse()

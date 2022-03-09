@@ -54,6 +54,11 @@ const (
 	// UserClusterMLA if enabled MonitoringLoggingAlerting stack will be deployed with corresponding controller
 	UserClusterMLA = "UserClusterMLA"
 
+	// KonnectivityService enables the deployment of Konnectivity proxy for the
+	// control plane to cluster communication, instead of relying on the legacy
+	// solution based on OpenVPN.
+	KonnectivityService = "KonnectivityService"
+
 	// PriorityClasses if enabled will apply priority classes to all managed seed infrastructure
 	// with levels depending on criticality
 	PriorityClasses = "PriorityClasses"

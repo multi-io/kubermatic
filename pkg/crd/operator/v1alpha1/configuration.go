@@ -19,11 +19,12 @@ package v1alpha1
 import (
 	"github.com/Masterminds/semver/v3"
 
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/version"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-
-	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -134,9 +135,8 @@ type KubermaticSeedControllerConfiguration struct {
 	// BackupCleanupContainer is the container used for removing expired backups from the storage location.
 	BackupCleanupContainer string `json:"backupCleanupContainer,omitempty"`
 	// BackupRestore contains the setup of the new backup and restore controllers.
-	// Deprecated: use Seed.Spec.BackupRestore.
-	// Moved to allow custom backup and restore configuration (like different s3 endpoints) for each Seed.
-	BackupRestore kubermaticv1.SeedBackupRestoreConfiguration `json:"backupRestore,omitempty"`
+	// Deprecated: Use Seed.Spec.BackupRestore. This is legacy field to support old configurations.
+	BackupRestore LegacyKubermaticBackupRestoreConfiguration `json:"backupRestore,omitempty"`
 	// MaximumParallelReconciles limits the number of cluster reconciliations
 	// that are active at any given time.
 	MaximumParallelReconciles int `json:"maximumParallelReconciles,omitempty"`
@@ -157,6 +157,17 @@ type KubermaticSeedControllerConfiguration struct {
 	MonitoringEnvironmentLabel string `json:"monitoringEnvironmentLabel,omitempty"`
 	// EnvFromSecretsNames secrets to source environment variables from
 	EnvFromSecretsNames []string `json:"envFromSecretsNames"`
+}
+
+// Deprecated: Use SeedBackupRestoreConfiguration.
+// LegacyKubermaticBackupRestoreConfiguration are s3 settings used for backups and restores of user cluster etcds.
+type LegacyKubermaticBackupRestoreConfiguration struct {
+	// Enabled enables the new etcd backup and restore controllers.
+	Enabled bool `json:"enabled,omitempty"`
+	// S3Endpoint is the S3 API endpoint to use for backup and restore. Defaults to s3.amazonaws.com.
+	S3Endpoint string `json:"s3Endpoint,omitempty"`
+	// S3BucketName is the S3 bucket name to use for backup and restore.
+	S3BucketName string `json:"s3BucketName,omitempty"`
 }
 
 // KubermaticUserClusterConfiguration controls various aspects of the user-created clusters.
@@ -187,6 +198,8 @@ type KubermaticUserClusterConfiguration struct {
 	EtcdVolumeSize string `json:"etcdVolumeSize,omitempty"`
 	// APIServerReplicas configures the replica count for the API-Server deployment inside user clusters.
 	APIServerReplicas *int32 `json:"apiserverReplicas,omitempty"`
+	// MachineController configures the Machine Controller
+	MachineController MachineControllerConfiguration `json:"machineController,omitempty"`
 }
 
 // KubermaticAddonsConfiguration controls the optional additions installed into each user cluster.
@@ -216,6 +229,16 @@ type KubermaticUserClusterMonitoringConfiguration struct {
 	// ScrapeAnnotationPrefix (if set) is used to make the in-cluster Prometheus scrape pods
 	// inside the user clusters.
 	ScrapeAnnotationPrefix string `json:"scrapeAnnotationPrefix,omitempty"`
+}
+
+// MachineControllerConfiguration configures Machine Controller
+type MachineControllerConfiguration struct {
+	// ImageRepository is used to override the Machine Controller image repository.
+	// It is only for development, tests and PoC purposes. This field must not be set in production environments.
+	ImageRepository string `json:"imageRepository,omitempty"`
+	// ImageTag is used to override the Machine Controller image.
+	// It is only for development, tests and PoC purposes. This field must not be set in production environments.
+	ImageTag string `json:"imageTag,omitempty"`
 }
 
 // KubermaticAddonConfiguration describes the addons for a given cluster runtime.
@@ -304,6 +327,9 @@ type KubermaticVersioningConfiguration struct {
 	// updates as well. 'automaticNodeUpdate: true' implies 'automatic: true' as well,
 	// because Nodes may not have a newer version than the controlplane.
 	Updates []Update `json:"updates,omitempty"`
+
+	// ProviderIncompatibilities lists all the Kubernetes version incompatibilities
+	ProviderIncompatibilities []Incompatibility `json:"providerIncompatibilities,omitempty"`
 }
 
 // Update represents an update option for a user cluster.
@@ -324,6 +350,18 @@ type Update struct {
 	//nolint:staticcheck
 	//lint:ignore SA5008 omitgenyaml is used by the example-yaml-generator
 	AutomaticNodeUpdate *bool `json:"automaticNodeUpdate,omitempty,omitgenyaml"`
+}
+
+// Incompatibility represents a version incompatibility for a user cluster
+type Incompatibility struct {
+	// Provider to which to apply the compatibility check
+	Provider kubermaticv1.ProviderType `json:"provider,omitempty"`
+	// Version is the Kubernetes version that must be checked. Wildcards are allowed, e.g. "1.22.*".
+	Version string `json:"version,omitempty"`
+	// Condition is the cluster or datacenter condition that must be met to block a specific version
+	Condition version.ConditionType `json:"condition,omitempty"`
+	// Operation is the operation triggering the compatibility check (CREATE or UPDATE)
+	Operation version.OperationType `json:"operation,omitempty"`
 }
 
 // KubermaticVPAConfiguration configures the Kubernetes VPA.

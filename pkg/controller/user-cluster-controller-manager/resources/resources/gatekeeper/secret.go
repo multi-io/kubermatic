@@ -17,20 +17,16 @@ limitations under the License.
 package gatekeeper
 
 import (
-	corev1 "k8s.io/api/core/v1"
-
 	"k8c.io/kubermatic/v2/pkg/resources"
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
+
+	corev1 "k8s.io/api/core/v1"
 )
 
 // SecretCreator creates the secret for gatekeeper webhook controller
 func SecretCreator() reconciling.NamedSecretCreatorGetter {
 	return func() (string, reconciling.SecretCreator) {
 		return resources.GatekeeperWebhookServerCertSecretName, func(secret *corev1.Secret) (*corev1.Secret, error) {
-			if secret.Data == nil {
-				secret.Data = map[string][]byte{}
-			}
-
 			secret.Labels = resources.BaseAppLabels(resources.GatekeeperControllerDeploymentName, map[string]string{"gatekeeper.sh/system": "yes"})
 			return secret, nil
 		}

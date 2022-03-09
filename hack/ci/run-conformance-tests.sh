@@ -24,11 +24,7 @@ source hack/lib.sh
 
 if [ -z "${E2E_SSH_PUBKEY:-}" ]; then
   echodate "Getting default SSH pubkey for machines from Vault"
-  export VAULT_ADDR=https://vault.loodse.com/
-  retry 5 vault write \
-    --format=json auth/approle/login \
-    role_id=${VAULT_ROLE_ID} secret_id=${VAULT_SECRET_ID} > /tmp/vault-token-response.json
-
+  retry 5 vault_ci_login
   E2E_SSH_PUBKEY="$(mktemp)"
   vault kv get -field=pubkey dev/e2e-machine-controller-ssh-key > "${E2E_SSH_PUBKEY}"
 else
@@ -67,7 +63,9 @@ elif [[ $provider == "vsphere" ]]; then
   EXTRA_ARGS="-vsphere-username=${VSPHERE_E2E_USERNAME}
     -vsphere-password=${VSPHERE_E2E_PASSWORD}"
 elif [[ $provider == "kubevirt" ]]; then
-  EXTRA_ARGS="-kubevirt-kubeconfig=${KUBEVIRT_E2E_TESTS_KUBECONFIG}"
+  tmpFile="$(mktemp)"
+  echo "$KUBEVIRT_E2E_TESTS_KUBECONFIG" > "$tmpFile"
+  EXTRA_ARGS="-kubevirt-kubeconfig=$tmpFile"
 elif [[ $provider == "alibaba" ]]; then
   EXTRA_ARGS="-alibaba-access-key-id=${ALIBABA_E2E_TESTS_KEY_ID}
     -alibaba-secret-access-key=${ALIBABA_E2E_TESTS_SECRET}"

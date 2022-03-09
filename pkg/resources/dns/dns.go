@@ -47,12 +47,13 @@ var (
 	}
 )
 
-const DefaultCoreDNSVesion = "1.7.1"
+const DefaultCoreDNSVesion = "1.8.4"
 
 // original source: https://github.com/kubernetes/kubernetes/blob/vX.YY.0/cmd/kubeadm/app/constants/constants.go
 // CoreDNSVersion constant
 // 1.6.7 and lower may be problematic; see https://github.com/coredns/coredns/issues/3860#issuecomment-628012938
 var kubernetesTocorednsVersionsMapping = map[string]string{
+	"1.22": "1.8.4",
 	"1.21": "1.8.0",
 	"1.20": "1.8.0",
 	"1.19": "1.8.0",

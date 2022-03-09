@@ -17,22 +17,29 @@ limitations under the License.
 package mla
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
+	"io"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
+	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/gorilla/mux"
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/yaml.v2"
 
 	grafanasdk "github.com/kubermatic/grafanasdk"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/kubernetes"
 	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -43,32 +50,43 @@ import (
 
 type request struct {
 	name     string
-	code     int
-	method   string
-	path     string
-	body     string
-	response string
+	request  *http.Request
+	response *http.Response
 }
 
-func newTestProjectReconciler(t *testing.T, objects []ctrlruntimeclient.Object, handler http.Handler) (*orgGrafanaReconciler, *httptest.Server) {
+func newTestOrgGrafanaReconciler(t *testing.T, objects []ctrlruntimeclient.Object, handler http.Handler) (*orgGrafanaReconciler, *httptest.Server) {
 	dynamicClient := ctrlruntimefakeclient.
 		NewClientBuilder().
 		WithObjects(objects...).
 		Build()
 	ts := httptest.NewServer(handler)
 
-	grafanaClient := grafanasdk.NewClient(ts.URL, "admin:admin", ts.Client())
+	grafanaClient, err := grafanasdk.NewClient(ts.URL, "admin:admin", ts.Client())
+	assert.Nil(t, err)
 
+	orgGrafanaController := newOrgGrafanaController(dynamicClient, kubermaticlog.Logger, "mla", grafanaClient)
 	reconciler := orgGrafanaReconciler{
-		Client:        dynamicClient,
-		grafanaClient: grafanaClient,
-		log:           kubermaticlog.Logger,
-		recorder:      record.NewFakeRecorder(10),
+		Client:               dynamicClient,
+		log:                  kubermaticlog.Logger,
+		recorder:             record.NewFakeRecorder(10),
+		orgGrafanaController: orgGrafanaController,
 	}
 	return &reconciler, ts
 }
 
-func TestProjectReconcile(t *testing.T) {
+func TestOrgGrafanaReconcile(t *testing.T) {
+
+	var board struct {
+		Dashboard grafanasdk.Board `json:"dashboard"`
+		FolderID  int              `json:"folderId"`
+		Overwrite bool             `json:"overwrite"`
+	}
+
+	board.Overwrite = true
+	board.Dashboard.Title = "dashboard"
+	board.Dashboard.UID = "unique"
+	boardData, err := json.Marshal(board)
+	assert.Nil(t, err)
 	testCases := []struct {
 		name         string
 		requestName  string
@@ -81,39 +99,112 @@ func TestProjectReconcile(t *testing.T) {
 		{
 			name:        "create org for project",
 			requestName: "create",
-			objects: []ctrlruntimeclient.Object{&kubermaticv1.Project{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "create",
+			objects: []ctrlruntimeclient.Object{
+				&kubermaticv1.Project{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "create",
+					},
+					Spec: kubermaticv1.ProjectSpec{
+						Name: "projectName",
+					},
 				},
-				Spec: kubermaticv1.ProjectSpec{
-					Name: "projectName",
-				},
-			}},
+			},
 			hasFinalizer: true,
 			requests: []request{
 				{
 					name:     "create",
-					code:     200,
-					method:   "POST",
-					path:     "/api/orgs",
-					body:     `{"id":0,"name":"projectName-create","address":{"address1":"","address2":"","city":"","zipCode":"","state":"","country":""}}`,
-					response: `{"message": "org created", "OrgID": 1}`,
+					request:  httptest.NewRequest(http.MethodPost, "/api/orgs", strings.NewReader(`{"id":0,"name":"projectName-create","address":{"address1":"","address2":"","city":"","zipCode":"","state":"","country":""}}`)),
+					response: &http.Response{Body: ioutil.NopCloser(strings.NewReader(`{"message": "org created", "OrgID": 1}`)), StatusCode: http.StatusOK},
 				},
 			},
 		},
 		{
-			name:        "create org for project - failed",
+			name:        "create org for project with dashboards",
 			requestName: "create",
-			objects: []ctrlruntimeclient.Object{&kubermaticv1.Project{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "create",
+			objects: []ctrlruntimeclient.Object{
+				&kubermaticv1.Project{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "create",
+					},
+					Spec: kubermaticv1.ProjectSpec{
+						Name: "projectName",
+					},
 				},
-				Spec: kubermaticv1.ProjectSpec{
-					Name: "projectName",
+
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      grafanaDashboardsConfigmapNamePrefix + "-defaults",
+						Namespace: "mla",
+					},
+					Data: map[string]string{"first": `{"title": "dashboard", "uid":"unique"}`},
 				},
-			}},
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "wrong-prefix-defaults",
+						Namespace: "mla",
+					},
+					Data: map[string]string{"second": "not dashboard data"},
+				},
+			},
 			hasFinalizer: true,
-			err:          true,
+			requests: []request{
+				{
+					name:     "create",
+					request:  httptest.NewRequest(http.MethodPost, "/api/orgs", strings.NewReader(`{"id":0,"name":"projectName-create","address":{"address1":"","address2":"","city":"","zipCode":"","state":"","country":""}}`)),
+					response: &http.Response{Body: ioutil.NopCloser(strings.NewReader(`{"message": "org created", "OrgID": 1}`)), StatusCode: http.StatusOK},
+				},
+				{
+					name:     "set dashboard",
+					request:  httptest.NewRequest(http.MethodPost, "/api/dashboards/db", strings.NewReader(string(boardData))),
+					response: &http.Response{Body: ioutil.NopCloser(strings.NewReader(`{"message": "dashboard set"}`)), StatusCode: http.StatusOK},
+				},
+			},
+		},
+		{
+			name:        "create org for project with admins",
+			requestName: "create",
+			objects: []ctrlruntimeclient.Object{
+				&kubermaticv1.Project{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "create",
+					},
+					Spec: kubermaticv1.ProjectSpec{
+						Name: "projectName",
+					},
+				},
+				&kubermaticv1.User{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "update",
+					},
+					Spec: kubermaticv1.UserSpec{
+						Email:   "user@email.com",
+						IsAdmin: true,
+					},
+				},
+			},
+			hasFinalizer: true,
+			requests: []request{
+				{
+					name:     "create",
+					request:  httptest.NewRequest(http.MethodPost, "/api/orgs", strings.NewReader(`{"id":0,"name":"projectName-create","address":{"address1":"","address2":"","city":"","zipCode":"","state":"","country":""}}`)),
+					response: &http.Response{Body: ioutil.NopCloser(strings.NewReader(`{"message": "org created", "OrgID": 1}`)), StatusCode: http.StatusOK},
+				},
+				{
+					name:     "lookup user",
+					request:  httptest.NewRequest(http.MethodGet, "/api/users/lookup?loginOrEmail=user@email.com", nil),
+					response: &http.Response{Body: ioutil.NopCloser(strings.NewReader(`{"id":1,"email":"user@email.com","login":"admin"}`)), StatusCode: http.StatusOK},
+				},
+				{
+					name:     "get org users",
+					request:  httptest.NewRequest(http.MethodGet, "/api/orgs/1/users", nil),
+					response: &http.Response{Body: ioutil.NopCloser(strings.NewReader(`[]`)), StatusCode: http.StatusOK},
+				},
+				{
+					name:     "add org user",
+					request:  httptest.NewRequest(http.MethodPost, "/api/orgs/1/users", strings.NewReader(`{"loginOrEmail":"user@email.com","role":"Editor"}`)),
+					response: &http.Response{Body: ioutil.NopCloser(strings.NewReader(`{"message": "User added to organization"}`)), StatusCode: http.StatusOK},
+				},
+			},
 		},
 		{
 			name:        "create org for project - org already exists",
@@ -129,19 +220,19 @@ func TestProjectReconcile(t *testing.T) {
 			}},
 			requests: []request{
 				{
-					name:     "get org by name",
-					code:     200,
-					method:   "GET",
-					path:     "/api/orgs/name/projectName-create",
-					response: `{"id":1,"name":"projectName-create","address":{"address1":"","address2":"","city":"","zipCode":"","state":"","country":""}}`,
+					name:     "get org by id",
+					request:  httptest.NewRequest(http.MethodGet, "/api/orgs/1", nil),
+					response: &http.Response{StatusCode: http.StatusNotFound},
 				},
 				{
 					name:     "create",
-					code:     409,
-					method:   "POST",
-					path:     "/api/orgs",
-					body:     `{"id":0,"name":"projectName-create","address":{"address1":"","address2":"","city":"","zipCode":"","state":"","country":""}}`,
-					response: `{"message": "name already taken"}`,
+					request:  httptest.NewRequest(http.MethodPost, "/api/orgs", strings.NewReader(`{"id":0,"name":"projectName-create","address":{"address1":"","address2":"","city":"","zipCode":"","state":"","country":""}}`)),
+					response: &http.Response{Body: ioutil.NopCloser(strings.NewReader(`{"message": "name already taken"}`)), StatusCode: http.StatusConflict},
+				},
+				{
+					name:     "get org by name",
+					request:  httptest.NewRequest(http.MethodGet, "/api/orgs/name/projectName-create", nil),
+					response: &http.Response{Body: ioutil.NopCloser(strings.NewReader(`{"id":1,"name":"projectName-create","address":{"address1":"","address2":"","city":"","zipCode":"","state":"","country":""}}`)), StatusCode: http.StatusOK},
 				},
 			},
 			hasFinalizer: true,
@@ -162,18 +253,13 @@ func TestProjectReconcile(t *testing.T) {
 			requests: []request{
 				{
 					name:     "get org by id",
-					code:     200,
-					method:   "GET",
-					path:     "/api/orgs/1",
-					response: `{"id":1,"name":"projectName-oldname","address":{"address1":"","address2":"","city":"","zipCode":"","state":"","country":""}}`,
+					request:  httptest.NewRequest(http.MethodGet, "/api/orgs/1", nil),
+					response: &http.Response{Body: ioutil.NopCloser(strings.NewReader(`{"id":1,"name":"projectName-oldname","address":{"address1":"","address2":"","city":"","zipCode":"","state":"","country":""}}`)), StatusCode: http.StatusOK},
 				},
 				{
 					name:     "update",
-					code:     200,
-					method:   "PUT",
-					path:     "/api/orgs/1",
-					body:     `{"id":1,"name":"projectName-create","address":{"address1":"","address2":"","city":"","zipCode":"","state":"","country":""}}`,
-					response: `{"message": "name already taken"}`,
+					request:  httptest.NewRequest(http.MethodPut, "/api/orgs/1", strings.NewReader(`{"id":1,"name":"projectName-create","address":{"address1":"","address2":"","city":"","zipCode":"","state":"","country":""}}`)),
+					response: &http.Response{Body: ioutil.NopCloser(strings.NewReader(`{"message": "name already taken"}`)), StatusCode: http.StatusOK},
 				},
 			},
 			hasFinalizer: true,
@@ -187,6 +273,7 @@ func TestProjectReconcile(t *testing.T) {
 					Name:              "delete",
 					DeletionTimestamp: &metav1.Time{Time: time.Now()},
 					Annotations:       map[string]string{grafanaOrgAnnotationKey: "1"},
+					Finalizers:        []string{"just-a-test-do-not-delete-thanks"},
 				},
 				Spec: kubermaticv1.ProjectSpec{
 					Name: "projectName",
@@ -196,10 +283,8 @@ func TestProjectReconcile(t *testing.T) {
 			requests: []request{
 				{
 					name:     "delete org by id",
-					code:     200,
-					method:   "DELETE",
-					path:     "/api/orgs/1",
-					response: `{}`,
+					request:  httptest.NewRequest(http.MethodDelete, "/api/orgs/1", nil),
+					response: &http.Response{Body: ioutil.NopCloser(strings.NewReader(`{}`)), StatusCode: http.StatusOK},
 				},
 			},
 		},
@@ -210,7 +295,7 @@ func TestProjectReconcile(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "delete",
 					DeletionTimestamp: &metav1.Time{Time: time.Now()},
-					Finalizers:        []string{mlaFinalizer},
+					Finalizers:        []string{mlaFinalizer, "just-a-test-do-not-delete-thanks"},
 				},
 				Spec: kubermaticv1.ProjectSpec{
 					Name: "projectName",
@@ -227,8 +312,8 @@ func TestProjectReconcile(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			ctx := context.Background()
-			r, assertExpectation := buildTestServer(t, tc.requests)
-			controller, server := newTestProjectReconciler(t, tc.objects, r)
+			r, assertExpectation := buildTestServer(t, tc.requests...)
+			controller, server := newTestOrgGrafanaReconciler(t, tc.objects, r)
 			request := reconcile.Request{NamespacedName: types.NamespacedName{Name: tc.requestName}}
 			_, err := controller.Reconcile(ctx, request)
 			if err != nil && !tc.err {
@@ -247,32 +332,74 @@ func TestProjectReconcile(t *testing.T) {
 
 }
 
-func buildTestServer(t *testing.T, requests []request) (http.Handler, func() bool) {
-	handled := 0
+func buildTestServer(t *testing.T, requests ...request) (http.Handler, func() bool) {
+	var counter int64 = -1
 	assertExpectation := func() bool {
-		return assert.Equal(t, handled, len(requests))
+		return assert.Equal(t, len(requests), int(counter+1))
 	}
-	r := mux.NewRouter()
-	for _, request := range requests {
-		request := request
-		r.HandleFunc(request.path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if request.body != "" {
-				defer r.Body.Close()
-				decoder := json.NewDecoder(r.Body)
-				reqMap := map[string]interface{}{}
-				if err := decoder.Decode(&reqMap); err != nil {
-					t.Fatalf("%s: unmarshal request failed: %v", request.name, err)
-				}
-				tcMap := map[string]interface{}{}
-				if err := json.Unmarshal([]byte(request.body), &tcMap); err != nil {
-					t.Fatalf("%s: unmarshal expected map failed: %v", request.name, err)
-				}
-				assert.Equal(t, reqMap, tcMap)
-			}
-			w.WriteHeader(request.code)
-			fmt.Fprint(w, request.response)
-			handled++
-		})).Methods(request.method)
-	}
+	r := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		c := atomic.AddInt64(&counter, 1)
+		if int(c) >= len(requests) {
+			assert.Failf(t, "unexpected request", "%v", r)
+		}
+		req := requests[c]
+		t.Logf("checking request: %s", req.name)
+		for key := range req.request.Header {
+			assert.Equal(t, req.request.Header.Get(key), r.Header.Get(key), "header %s not found", key)
+		}
+		assert.Equal(t, req.request.URL.Path, r.URL.Path)
+		assert.Equal(t, req.request.URL.Query(), r.URL.Query())
+		assert.Equal(t, req.request.Method, r.Method)
+		if req.request.ContentLength > 0 {
+			assert.True(t, bodyEqual(t, req.request, r))
+		}
+		w.WriteHeader(req.response.StatusCode)
+		if req.response.Body != nil {
+			defer req.response.Body.Close()
+			_, err := io.Copy(w, req.response.Body)
+			assert.Nil(t, err)
+		}
+	})
 	return r, assertExpectation
+}
+
+func bodyEqual(t *testing.T, expectedRequest, request *http.Request) bool {
+	defer expectedRequest.Body.Close()
+	defer request.Body.Close()
+	expectedBody, err := ioutil.ReadAll(expectedRequest.Body)
+	assert.Nil(t, err)
+	body, err := ioutil.ReadAll(request.Body)
+	assert.Nil(t, err)
+	if bytes.Equal(expectedBody, body) {
+		return true
+	}
+	if jsonEqual(expectedBody, body) || yamlEqual(expectedBody, body) {
+		return true
+	}
+	assert.Fail(t, "body not equal", cmp.Diff(string(expectedBody), string(body)))
+	return false
+}
+
+func jsonEqual(expectedBody, body []byte) bool {
+	expectedBodyMap := map[string]interface{}{}
+	bodyMap := map[string]interface{}{}
+	if err := json.Unmarshal(expectedBody, &expectedBodyMap); err != nil {
+		return false
+	}
+	if err := json.Unmarshal(body, &bodyMap); err != nil {
+		return false
+	}
+	return reflect.DeepEqual(expectedBodyMap, bodyMap)
+}
+
+func yamlEqual(expectedBody, body []byte) bool {
+	expectedBodyMap := map[string]interface{}{}
+	bodyMap := map[string]interface{}{}
+	if err := yaml.Unmarshal(expectedBody, &expectedBodyMap); err != nil {
+		return false
+	}
+	if err := yaml.Unmarshal(body, &bodyMap); err != nil {
+		return false
+	}
+	return reflect.DeepEqual(expectedBodyMap, bodyMap)
 }

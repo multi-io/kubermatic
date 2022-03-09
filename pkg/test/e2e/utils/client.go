@@ -28,18 +28,16 @@ import (
 	semver "github.com/Masterminds/semver/v3"
 	"github.com/go-openapi/runtime"
 	httptransport "github.com/go-openapi/runtime/client"
-	"k8s.io/client-go/tools/clientcmd"
-	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/kubermatic/machine-controller/pkg/apis/cluster/v1alpha1"
-
-	"k8s.io/client-go/kubernetes/scheme"
-
 	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
 	apiv2 "k8c.io/kubermatic/v2/pkg/api/v2"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	apiclient "k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/admin"
+	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/constraint"
+	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/constraints"
+	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/constrainttemplates"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/credentials"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/datacenter"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/gcp"
@@ -51,6 +49,9 @@ import (
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/clientcmd"
+	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // TestClient wraps the Swagger-generated API client with some more
@@ -86,7 +87,46 @@ func (r *TestClient) CreateProject(name string) (*apiv1.Project, error) {
 	timeout := 30 * time.Second
 
 	params := &project.CreateProjectParams{Body: project.CreateProjectBody{Name: name}}
-	SetupParams(r.test, params, 1*time.Second, timeout)
+	SetupRetryParams(r.test, params, Backoff{
+		Duration: 1 * time.Second,
+		Steps:    4,
+		Factor:   1.5,
+	})
+
+	r.test.Logf("Creating project %s...", name)
+
+	response, err := r.client.Project.CreateProject(params, r.bearerToken)
+	if err != nil {
+		return nil, err
+	}
+
+	var apiProject *apiv1.Project
+	if !WaitFor(1*time.Second, timeout, func() bool {
+		apiProject, _ = r.GetProject(response.Payload.ID)
+		return apiProject != nil && apiProject.Status == kubermaticv1.ProjectActive
+	}) {
+		// best effort cleanup of a failed cluster
+		_ = r.DeleteProject(name)
+
+		return nil, fmt.Errorf("project is not ready after %s", timeout)
+	}
+
+	r.test.Logf("Created project and it became ready after %v", time.Since(before))
+
+	return apiProject, nil
+}
+
+// CreateProjectBySA creates a new project and waits for it to become active (ready).
+func (r *TestClient) CreateProjectBySA(name string, users []string) (*apiv1.Project, error) {
+	before := time.Now()
+	timeout := 30 * time.Second
+
+	params := &project.CreateProjectParams{Body: project.CreateProjectBody{Name: name, Users: users}}
+	SetupRetryParams(r.test, params, Backoff{
+		Duration: 1 * time.Second,
+		Steps:    4,
+		Factor:   1.5,
+	})
 
 	r.test.Logf("Creating project %s...", name)
 
@@ -901,6 +941,14 @@ func convertGlobalSettings(gSettings *models.GlobalSettings) *apiv1.GlobalSettin
 			Enabled:  gSettings.OpaOptions.Enabled,
 			Enforced: gSettings.OpaOptions.Enforced,
 		},
+		MlaOptions: kubermaticv1.MlaOptions{
+			LoggingEnabled:     gSettings.MlaOptions.LoggingEnabled,
+			LoggingEnforced:    gSettings.MlaOptions.LoggingEnforced,
+			MonitoringEnabled:  gSettings.MlaOptions.MonitoringEnabled,
+			MonitoringEnforced: gSettings.MlaOptions.MonitoringEnforced,
+		},
+		MlaAlertmanagerPrefix: gSettings.MlaAlertmanagerPrefix,
+		MlaGrafanaPrefix:      gSettings.MlaGrafanaPrefix,
 	}
 }
 
@@ -946,7 +994,12 @@ func (r *TestClient) BindUserToRole(projectID, dc, clusterID, roleName, namespac
 		ProjectID: projectID,
 		RoleID:    roleName,
 	}
-	SetupParams(r.test, params, 1*time.Second, 3*time.Minute)
+	SetupRetryParams(r.test, params, Backoff{
+		Steps:    4,
+		Duration: 10 * time.Millisecond,
+		Factor:   5.0,
+		Jitter:   0.1,
+	})
 
 	response, err := r.client.Project.BindUserToRole(params, r.bearerToken)
 	if err != nil {
@@ -961,7 +1014,12 @@ func (r *TestClient) BindUserToRole(projectID, dc, clusterID, roleName, namespac
 
 func (r *TestClient) GetClusterRoles(projectID, dc, clusterID string) ([]apiv1.ClusterRoleName, error) {
 	params := &project.ListClusterRoleNamesParams{DC: dc, ProjectID: projectID, ClusterID: clusterID}
-	SetupParams(r.test, params, 1*time.Second, 3*time.Minute)
+	SetupRetryParams(r.test, params, Backoff{
+		Steps:    4,
+		Duration: 10 * time.Millisecond,
+		Factor:   5.0,
+		Jitter:   0.1,
+	})
 
 	response, err := r.client.Project.ListClusterRoleNames(params, r.bearerToken)
 	if err != nil {
@@ -987,7 +1045,12 @@ func (r *TestClient) BindUserToClusterRole(projectID, dc, clusterID, roleName, u
 		ProjectID: projectID,
 		RoleID:    roleName,
 	}
-	SetupParams(r.test, params, 1*time.Second, 3*time.Minute)
+	SetupRetryParams(r.test, params, Backoff{
+		Steps:    4,
+		Duration: 10 * time.Millisecond,
+		Factor:   5.0,
+		Jitter:   0.1,
+	})
 
 	response, err := r.client.Project.BindUserToClusterRole(params, r.bearerToken)
 	if err != nil {
@@ -999,9 +1062,48 @@ func (r *TestClient) BindUserToClusterRole(projectID, dc, clusterID, roleName, u
 	}, nil
 }
 
+func (r *TestClient) GetRoleBindings(projectID, dc, clusterID string) ([]apiv1.RoleBinding, error) {
+	params := &project.ListRoleBindingParams{DC: dc, ProjectID: projectID, ClusterID: clusterID}
+	SetupRetryParams(r.test, params, Backoff{
+		Steps:    4,
+		Duration: 10 * time.Millisecond,
+		Factor:   5.0,
+		Jitter:   0.1,
+	})
+
+	response, err := r.client.Project.ListRoleBinding(params, r.bearerToken)
+	if err != nil {
+		return nil, err
+	}
+
+	roleBindings := []apiv1.RoleBinding{}
+	for _, roleBinding := range response.Payload {
+		subjects := []rbacv1.Subject{}
+		for _, subject := range roleBinding.Subjects {
+			subjects = append(subjects, rbacv1.Subject{
+				Kind:     subject.Kind,
+				APIGroup: subject.APIGroup,
+				Name:     subject.Name,
+			})
+		}
+
+		roleBindings = append(roleBindings, apiv1.RoleBinding{
+			RoleRefName: roleBinding.RoleRefName,
+			Subjects:    subjects,
+		})
+	}
+
+	return roleBindings, nil
+}
+
 func (r *TestClient) GetClusterBindings(projectID, dc, clusterID string) ([]apiv1.ClusterRoleBinding, error) {
 	params := &project.ListClusterRoleBindingParams{DC: dc, ProjectID: projectID, ClusterID: clusterID}
-	SetupParams(r.test, params, 1*time.Second, 3*time.Minute)
+	SetupRetryParams(r.test, params, Backoff{
+		Steps:    4,
+		Duration: 10 * time.Millisecond,
+		Factor:   5.0,
+		Jitter:   0.1,
+	})
 
 	response, err := r.client.Project.ListClusterRoleBinding(params, r.bearerToken)
 	if err != nil {
@@ -1356,6 +1458,42 @@ func (r *TestClient) GetConstraint(projectID, clusterID, name string) (*apiv2.Co
 	return convertConstraint(project.Payload)
 }
 
+func (r *TestClient) CreateConstraint(name, ctKind string) (*kubermaticv1.Constraint, error) {
+
+	kind := &models.Kind{
+		Kinds: []string{"ConfigMap"}, APIGroups: []string{""},
+	}
+	spec := &models.ConstraintSpec{
+		ConstraintType: ctKind,
+		Match: &models.Match{
+			Kinds: []*models.Kind{kind},
+		},
+		Parameters: models.Parameters{
+			"rawJSON": `{"labels":["gatekeeper"]}`,
+		},
+	}
+
+	params := &constraint.CreateDefaultConstraintParams{
+		Body: &models.ConstraintBody{
+			Name: name,
+			Spec: spec,
+		},
+	}
+	SetupRetryParams(r.test, params, Backoff{
+		Duration: 1 * time.Second,
+		Steps:    4,
+		Factor:   1.5,
+	})
+
+	constraint, err := r.client.Constraint.CreateDefaultConstraint(params, r.bearerToken)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return convertDefaultConstraint(constraint.Payload)
+}
+
 func convertConstraint(constraint *models.Constraint) (*apiv2.Constraint, error) {
 	apiConstraint := &apiv2.Constraint{}
 	apiConstraint.Name = constraint.Name
@@ -1364,4 +1502,224 @@ func convertConstraint(constraint *models.Constraint) (*apiv2.Constraint, error)
 	}
 
 	return apiConstraint, nil
+}
+
+func convertDefaultConstraint(constraint *models.Constraint) (*kubermaticv1.Constraint, error) {
+	Constraint := &kubermaticv1.Constraint{}
+	Constraint.Name = constraint.Name
+	return Constraint, nil
+}
+
+func (r *TestClient) CreateCT(name, ctKind string) (*kubermaticv1.ConstraintTemplate, error) {
+
+	spec := models.ConstraintTemplateSpec{
+		Crd: &models.CRD{
+			Spec: &models.CRDSpec{
+				Names: &models.Names{
+					Kind: ctKind,
+				},
+				Validation: &models.Validation{
+					OpenAPIV3Schema: &models.JSONSchemaProps{
+						Properties: map[string]models.JSONSchemaProps{
+							"labels": {
+								Type: "array",
+								Items: &models.JSONSchemaPropsOrArray{
+									Schema: &models.JSONSchemaProps{
+										Type: "string",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Targets: []*models.Target{
+			{
+				Target: "admission.k8s.gatekeeper.sh",
+				Rego:   "package requiredlabels\nviolation[{\"msg\": msg, \"details\": {\"missing_labels\": missing}}] {\n  provided := {label | input.review.object.metadata.labels[label]}\n  required := {label | label := input.parameters.labels[_]}\n  missing := required - provided\n  count(missing) > 0\n  msg := sprintf(\"you must provide labels: %v\", [missing])\n}",
+			},
+		},
+	}
+	params := &constrainttemplates.CreateConstraintTemplateParams{
+		Body: &models.CtBody{
+			Name: name,
+			Spec: &spec,
+		},
+	}
+	SetupRetryParams(r.test, params, Backoff{
+		Duration: 1 * time.Second,
+		Steps:    4,
+		Factor:   1.5,
+	})
+
+	r.test.Logf("Creating constraint template %s...", name)
+	ct, err := r.client.Constrainttemplates.CreateConstraintTemplate(params, r.bearerToken)
+	if err != nil {
+		return nil, err
+	}
+	return convertDefaultConstraintTemplate(ct.Payload)
+}
+
+func convertDefaultConstraintTemplate(constraintTemplate *models.ConstraintTemplate) (*kubermaticv1.ConstraintTemplate, error) {
+	Constraint := &kubermaticv1.ConstraintTemplate{}
+	Constraint.Name = constraintTemplate.Name
+	return Constraint, nil
+}
+
+func (r *TestClient) DeleteConstraintTemplate(name string) error {
+	r.test.Log("Deleting constraint template...")
+
+	params := &constrainttemplates.DeleteConstraintTemplateParams{
+		Name: name,
+	}
+	SetupParams(r.test, params, 1*time.Second, 3*time.Minute, http.StatusConflict)
+
+	_, err := r.client.Constrainttemplates.DeleteConstraintTemplate(params, r.bearerToken)
+	if err != nil {
+		return err
+	}
+
+	r.test.Log("Constraint template deleted successfully")
+	return nil
+}
+
+func (r *TestClient) DeleteConstraint(name string) error {
+	r.test.Log("Deleting constraint...")
+
+	params := &constraints.DeleteDefaultConstraintParams{
+		Name: name,
+	}
+	SetupParams(r.test, params, 1*time.Second, 3*time.Minute, http.StatusConflict)
+
+	_, err := r.client.Constraints.DeleteDefaultConstraint(params, r.bearerToken)
+	if err != nil {
+		return err
+	}
+
+	r.test.Log("Constraint deleted successfully")
+	return nil
+}
+
+// CreateClusterTemplate method creates cluster template object
+func (r *TestClient) CreateClusterTemplate(projectID, name, scope, credential, version, location string) (*apiv2.ClusterTemplate, error) {
+
+	vr, err := semver.NewVersion(version)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse version %s: %v", version, err)
+	}
+	params := &project.CreateClusterTemplateParams{
+		Body: project.CreateClusterTemplateBody{
+			Name:  name,
+			Scope: scope,
+			Cluster: &models.Cluster{
+				Type:       "kubernetes",
+				Name:       name,
+				Credential: credential,
+				Spec: &models.ClusterSpec{
+					Cloud: &models.CloudSpec{
+						DatacenterName: location,
+						Digitalocean:   &models.DigitaloceanCloudSpec{},
+					},
+					Version: vr,
+				},
+			},
+			NodeDeployment: nil,
+		},
+		ProjectID: projectID,
+	}
+
+	SetupRetryParams(r.test, params, Backoff{
+		Duration: 1 * time.Second,
+		Steps:    4,
+		Factor:   1.5,
+	})
+
+	template, err := r.client.Project.CreateClusterTemplate(params, r.bearerToken)
+	if err != nil {
+		return nil, err
+	}
+
+	return &apiv2.ClusterTemplate{
+		Name:      template.Payload.Name,
+		ID:        template.Payload.ID,
+		ProjectID: template.Payload.ProjectID,
+		User:      template.Payload.User,
+		Scope:     template.Payload.Scope,
+		Cluster: &apiv1.Cluster{
+			ObjectMeta: apiv1.ObjectMeta{
+				Name: template.Payload.Cluster.Name,
+			},
+			Labels:          template.Payload.Cluster.Labels,
+			InheritedLabels: template.Payload.Cluster.InheritedLabels,
+			Type:            template.Payload.Cluster.Type,
+			Credential:      template.Payload.Cluster.Credential,
+
+			Status: apiv1.ClusterStatus{},
+		},
+	}, nil
+}
+
+// CreateClusterTemplate method creates cluster template instance object
+func (r *TestClient) CreateClusterTemplateInstance(projectID, templateID string, replicas int64) (*apiv2.ClusterTemplateInstance, error) {
+
+	params := &project.CreateClusterTemplateInstanceParams{
+		Body: project.CreateClusterTemplateInstanceBody{
+			Replicas: replicas,
+		},
+		ProjectID:         projectID,
+		ClusterTemplateID: templateID,
+	}
+
+	SetupRetryParams(r.test, params, Backoff{
+		Duration: 1 * time.Second,
+		Steps:    4,
+		Factor:   1.5,
+	})
+
+	instance, err := r.client.Project.CreateClusterTemplateInstance(params, r.bearerToken)
+	if err != nil {
+		return nil, err
+	}
+
+	return &apiv2.ClusterTemplateInstance{
+		Name: instance.Payload.Name,
+		Spec: kubermaticv1.ClusterTemplateInstanceSpec{
+			ProjectID:           instance.Payload.Spec.ProjectID,
+			ClusterTemplateID:   instance.Payload.Spec.ClusterTemplateID,
+			ClusterTemplateName: instance.Payload.Spec.ClusterTemplateName,
+			Replicas:            instance.Payload.Spec.Replicas,
+		},
+	}, nil
+}
+
+// ListClusters method lists user clusters
+func (r *TestClient) ListClusters(projectID string) ([]*apiv1.Cluster, error) {
+
+	params := &project.ListClustersV2Params{
+		ProjectID: projectID,
+	}
+
+	SetupRetryParams(r.test, params, Backoff{
+		Duration: 1 * time.Second,
+		Steps:    4,
+		Factor:   1.5,
+	})
+
+	clusterList := []*apiv1.Cluster{}
+
+	clusters, err := r.client.Project.ListClustersV2(params, r.bearerToken)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, cluster := range clusters.Payload {
+		apiCluster, err := convertCluster(cluster)
+		if err != nil {
+			return nil, err
+		}
+		clusterList = append(clusterList, apiCluster)
+	}
+
+	return clusterList, nil
 }

@@ -158,7 +158,7 @@ func DeploymentCreator(data openVPNDeploymentCreatorData) reconciling.NamedDeplo
 			dep.Spec.Template.Spec.InitContainers = []corev1.Container{
 				{
 					Name:    containerIPTablesInitName,
-					Image:   data.ImageRegistry(resources.RegistryQuay) + "/kubermatic/openvpn:v2.5.0-r1",
+					Image:   data.ImageRegistry(resources.RegistryQuay) + "/kubermatic/openvpn:v2.5.2-r0",
 					Command: []string{"/bin/bash"},
 					Args: []string{
 						"-c", `# do not give a 10.20.0.0/24 route to clients (nodes) but
@@ -179,7 +179,10 @@ iptables -A INPUT -i tun0 -j DROP
 					},
 					SecurityContext: &corev1.SecurityContext{
 						Capabilities: &corev1.Capabilities{
-							Add: []corev1.Capability{"NET_ADMIN"},
+							Add: []corev1.Capability{
+								"NET_ADMIN",
+								"NET_RAW",
+							},
 						},
 						ProcMount: &procMountType,
 					},
@@ -215,7 +218,7 @@ iptables -A INPUT -i tun0 -j DROP
 			dep.Spec.Template.Spec.Containers = []corev1.Container{
 				{
 					Name:    containerServerName,
-					Image:   data.ImageRegistry(resources.RegistryQuay) + "/kubermatic/openvpn:v2.5.0-r1",
+					Image:   data.ImageRegistry(resources.RegistryQuay) + "/kubermatic/openvpn:v2.5.2-r0",
 					Command: []string{"/usr/sbin/openvpn"},
 					Args:    vpnArgs,
 					Ports: []corev1.ContainerPort{
@@ -268,7 +271,7 @@ iptables -A INPUT -i tun0 -j DROP
 				},
 				{
 					Name:    containerIPFixupName,
-					Image:   data.ImageRegistry(resources.RegistryQuay) + "/kubermatic/openvpn:v2.5.0-r1",
+					Image:   data.ImageRegistry(resources.RegistryQuay) + "/kubermatic/openvpn:v2.5.2-r0",
 					Command: []string{"/bin/bash"},
 					Args: []string{
 						"-c",

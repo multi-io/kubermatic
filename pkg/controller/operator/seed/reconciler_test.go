@@ -32,7 +32,6 @@ import (
 	"k8c.io/kubermatic/v2/pkg/resources/certificates"
 	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 
-	certmanagerv1alpha2 "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1alpha2"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -54,7 +53,6 @@ const (
 func init() {
 	utilruntime.Must(kubermaticv1.AddToScheme(scheme.Scheme))
 	utilruntime.Must(operatorv1alpha1.AddToScheme(scheme.Scheme))
-	utilruntime.Must(certmanagerv1alpha2.AddToScheme(scheme.Scheme))
 }
 
 func must(t *testing.T, err error) {

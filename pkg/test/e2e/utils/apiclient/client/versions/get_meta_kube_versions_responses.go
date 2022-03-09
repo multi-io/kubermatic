@@ -46,7 +46,7 @@ func NewGetMetaKubeVersionsOK() *GetMetaKubeVersionsOK {
 	return &GetMetaKubeVersionsOK{}
 }
 
-/*GetMetaKubeVersionsOK handles this case with default header values.
+/* GetMetaKubeVersionsOK describes a response with status code 200, with default header values.
 
 MetaKubeVersions
 */
@@ -57,7 +57,6 @@ type GetMetaKubeVersionsOK struct {
 func (o *GetMetaKubeVersionsOK) Error() string {
 	return fmt.Sprintf("[GET /api/v1/version][%d] getMetaKubeVersionsOK  %+v", 200, o.Payload)
 }
-
 func (o *GetMetaKubeVersionsOK) GetPayload() *models.KubermaticVersions {
 	return o.Payload
 }
@@ -81,7 +80,7 @@ func NewGetMetaKubeVersionsDefault(code int) *GetMetaKubeVersionsDefault {
 	}
 }
 
-/*GetMetaKubeVersionsDefault handles this case with default header values.
+/* GetMetaKubeVersionsDefault describes a response with status code -1, with default header values.
 
 errorResponse
 */
@@ -99,7 +98,6 @@ func (o *GetMetaKubeVersionsDefault) Code() int {
 func (o *GetMetaKubeVersionsDefault) Error() string {
 	return fmt.Sprintf("[GET /api/v1/version][%d] getMetaKubeVersions default  %+v", o._statusCode, o.Payload)
 }
-
 func (o *GetMetaKubeVersionsDefault) GetPayload() *models.ErrorResponse {
 	return o.Payload
 }

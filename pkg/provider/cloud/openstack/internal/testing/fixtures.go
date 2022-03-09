@@ -55,5 +55,5 @@ var ExternalNetwork = Network{
 }
 
 var InternalNetwork = Network{
-	Network: networks.Network{Name: "metakube-cluster-xyz", ID: NetworkID},
+	Network: networks.Network{Name: "kubernetes-cluster-xyz", ID: NetworkID},
 }

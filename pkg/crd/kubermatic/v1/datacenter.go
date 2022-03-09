@@ -17,10 +17,10 @@ limitations under the License.
 package v1
 
 import (
+	providerconfig "github.com/kubermatic/machine-controller/pkg/providerconfig/types"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	providerconfig "github.com/kubermatic/machine-controller/pkg/providerconfig/types"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -40,7 +40,7 @@ type SeedList struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// SeedDatacenter is the type representing a SeedDatacenter
+// Seed is the type representing a SeedDatacenter
 type Seed struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -89,16 +89,18 @@ type SeedSpec struct {
 	ProxySettings *ProxySettings `json:"proxy_settings,omitempty"`
 	// Optional: ExposeStrategy explicitly sets the expose strategy for this seed cluster, if not set, the default provided by the master is used.
 	ExposeStrategy ExposeStrategy `json:"expose_strategy,omitempty"`
-	// DefaultClusterComponentSettingsYAML is a YAML file with default cluster component settings
-	DefaultClusterComponentSettingsYAML string `json:"defaultClusterComponentSettingsYAML,omitempty"`
-	// BackupRestore contains the setup of the new backup and restore controllers.
-	BackupRestore SeedBackupRestoreConfiguration `json:"backupRestore,omitempty"`
+	// Optional: MLA allows configuring seed level MLA (Monitoring, Logging & Alerting) stack settings.
+	MLA *SeedMLASettings `json:"mla,omitempty"`
+	// DefaultComponentSettings are default values to set for newly created clusters.
+	DefaultComponentSettings ComponentSettings `json:"defaultComponentSettings,omitempty"`
+	// Metering configures the metering tool on user clusters across the seed.
+	Metering *MeteringConfigurations `json:"metering,omitempty"`
+	// BackupRestore when set, enables backup and restore controllers with given configuration.
+	BackupRestore *SeedBackupRestoreConfiguration `json:"backupRestore,omitempty"`
 }
 
-// SeedBackupRestoreConfiguration are s3 settings used in backups and restores of user cluster etcds.
+// SeedBackupRestoreConfiguration are s3 settings used for backups and restores of user cluster etcds.
 type SeedBackupRestoreConfiguration struct {
-	// Enabled enables the new etcd backup and restore controllers.
-	Enabled bool `json:"enabled,omitempty"`
 	// S3Endpoint is the S3 API endpoint to use for backup and restore. Defaults to s3.amazonaws.com.
 	S3Endpoint string `json:"s3Endpoint,omitempty"`
 	// S3BucketName is the S3 bucket name to use for backup and restore.
@@ -270,6 +272,8 @@ type DatacenterSpecVSphere struct {
 	// The cluster hosting the VMs will be the same VM used as a template is
 	// located.
 	Cluster string `json:"cluster"`
+	// The name of the storage policy to use for the storage class created in the user cluster.
+	DefaultStoragePolicy string `json:"storage_policy"`
 	// Optional: The root path for cluster specific VM folders. Each cluster gets its own
 	// folder below the root folder. Must be the FQDN (for example
 	// "/datacenter-1/vm/all-kubermatic-vms-in-here") and defaults to the root VM
@@ -279,7 +283,6 @@ type DatacenterSpecVSphere struct {
 	// define at least one template.
 	// See: https://github.com/kubermatic/machine-controller/blob/master/docs/vsphere.md#template-vms-preparation
 	Templates ImageList `json:"templates"`
-
 	// Optional: Infra management user is the user that will be used for everything
 	// except the cloud provider functionality, which will still use the credentials
 	// passed in via the Kubermatic dashboard/API.
@@ -333,7 +336,7 @@ type DatacenterSpecFake struct {
 // DatacenterSpecKubevirt describes a kubevirt datacenter.
 type DatacenterSpecKubevirt struct {
 	// DNSPolicy represents the dns policy for the pod. Valid values are 'ClusterFirstWithHostNet', 'ClusterFirst',
-	//'Default' or 'None'. Defaults to "ClusterFirst". DNS parameters given in DNSConfig will be merged with the
+	// 'Default' or 'None'. Defaults to "ClusterFirst". DNS parameters given in DNSConfig will be merged with the
 	// policy selected with DNSPolicy.
 	DNSPolicy string `json:"dns_policy,omitempty"`
 
@@ -420,4 +423,20 @@ type NodeSettings struct {
 	// Optional: The hyperkube image to use. Currently only Flatcar
 	// makes use of this option.
 	HyperkubeImage string `json:"hyperkube_image,omitempty"`
+}
+
+// SeedMLASettings allow configuring seed level MLA (Monitoring, Logging & Alerting) stack settings.
+type SeedMLASettings struct {
+	// Optional: UserClusterMLAEnabled controls whether the user cluster MLA (Monitoring, Logging & Alerting) stack is enabled in the seed.
+	UserClusterMLAEnabled bool `json:"user_cluster_mla_enabled,omitempty"`
+}
+
+// MeteringConfigurations contains all the configurations for the metering tool.
+type MeteringConfigurations struct {
+	Enabled bool `json:"enabled"`
+	// StorageClassName is the name of the storage class that the metering tool uses to save processed files before
+	// exporting it to s3 bucket. Default value is kubermatic-fast.
+	StorageClassName string `json:"storageClassName"`
+	// StorageSize is the size of the storage class. Default value is 100Gi.
+	StorageSize string `json:"storageSize"`
 }

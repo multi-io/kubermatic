@@ -78,7 +78,6 @@ func SeedControllerManagerDeploymentCreator(workerName string, versions kubermat
 				fmt.Sprintf("-admissionwebhook-key-name=%s", resources.ServingCertKeySecretKey),
 				fmt.Sprintf("-keycloak-cache-expiry=%s", cfg.Spec.SeedController.KeycloakCacheExpiry),
 				fmt.Sprintf("-monitoring-environment-label=%s", cfg.Spec.SeedController.MonitoringEnvironmentLabel),
-				fmt.Sprintf("-default-component-settings=/opt/cluster-default-component-settings/%s", defaultComponentSettingsConfigKey),
 				fmt.Sprintf("-namespace=%s", cfg.Namespace),
 				fmt.Sprintf("-external-url=%s", cfg.Spec.Ingress.Domain),
 				fmt.Sprintf("-datacenter-name=%s", seed.Name),
@@ -102,11 +101,13 @@ func SeedControllerManagerDeploymentCreator(workerName string, versions kubermat
 			}
 			args = append(args, leaderElectionArgs...)
 
-			if !cfg.Spec.SeedController.BackupRestore.Enabled || cfg.Spec.SeedController.BackupCleanupContainer != "" || seed.Spec.BackupRestore.Enabled {
+			if seed.Spec.BackupRestore == nil {
+				args = append(args, fmt.Sprintf("-cleanup-container=/opt/backup/%s", cleanupContainerKey))
+			} else if !cfg.Spec.SeedController.BackupRestore.Enabled || cfg.Spec.SeedController.BackupCleanupContainer != "" {
 				args = append(args, fmt.Sprintf("-cleanup-container=/opt/backup/%s", cleanupContainerKey))
 			}
 
-			if cfg.Spec.SeedController.BackupRestore.Enabled || seed.Spec.BackupRestore.Enabled {
+			if cfg.Spec.SeedController.BackupRestore.Enabled || seed.Spec.BackupRestore != nil {
 				args = append(args, "-enable-etcd-backups-restores")
 				args = append(args, fmt.Sprintf("-backup-delete-container=/opt/backup/%s", deleteContainerKey))
 			}
@@ -124,10 +125,22 @@ func SeedControllerManagerDeploymentCreator(workerName string, versions kubermat
 				args = append(args, fmt.Sprintf("-monitoring-scrape-annotation-prefix=%s", cfg.Spec.UserCluster.Monitoring.ScrapeAnnotationPrefix))
 			}
 
+			if seed.Spec.MLA != nil && seed.Spec.MLA.UserClusterMLAEnabled {
+				args = append(args, "-enable-user-cluster-mla")
+			}
+
 			if cfg.Spec.SeedController.DebugLog {
 				args = append(args, "-v=4", "-log-debug=true")
 			} else {
 				args = append(args, "-v=2")
+			}
+
+			mcCfg := cfg.Spec.UserCluster.MachineController
+			if mcCfg.ImageTag != "" {
+				args = append(args, fmt.Sprintf("-machine-controller-image-tag=%s", mcCfg.ImageTag))
+			}
+			if mcCfg.ImageRepository != "" {
+				args = append(args, fmt.Sprintf("-machine-controller-image-repository=%s", mcCfg.ImageRepository))
 			}
 
 			sharedAddonVolume := "addons"
@@ -166,16 +179,6 @@ func SeedControllerManagerDeploymentCreator(workerName string, versions kubermat
 						},
 					},
 				},
-				{
-					Name: "default-cluster-component-settings",
-					VolumeSource: corev1.VolumeSource{
-						ConfigMap: &corev1.ConfigMapVolumeSource{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: defaultComponentSettingsConfigMapName,
-							},
-						},
-					},
-				},
 			}
 
 			volumeMounts := []corev1.VolumeMount{
@@ -197,11 +200,6 @@ func SeedControllerManagerDeploymentCreator(workerName string, versions kubermat
 				{
 					Name:      "webhook-serving-cert",
 					MountPath: "/opt/webhook-serving-cert/",
-					ReadOnly:  true,
-				},
-				{
-					Name:      "default-cluster-component-settings",
-					MountPath: "/opt/cluster-default-component-settings/",
 					ReadOnly:  true,
 				},
 			}
@@ -226,6 +224,7 @@ func SeedControllerManagerDeploymentCreator(workerName string, versions kubermat
 				args,
 				"-versions=/opt/extra-files/versions.yaml",
 				"-updates=/opt/extra-files/updates.yaml",
+				"-provider-incompatibilities=/opt/extra-files/provider-incompatibilities.yaml",
 			)
 
 			if cfg.Spec.UserCluster.Addons.Kubernetes.DefaultManifests != "" {
@@ -383,7 +382,13 @@ func SeedControllerManagerPDBCreator(cfg *operatorv1alpha1.KubermaticConfigurati
 
 	return func() (string, reconciling.PodDisruptionBudgetCreator) {
 		return name, func(pdb *policyv1beta1.PodDisruptionBudget) (*policyv1beta1.PodDisruptionBudget, error) {
+			// To prevent the PDB from blocking node rotations, we accept
+			// 0 minAvailable if the replica count is only 1.
+			// NB: The cfg is defaulted, so Replicas==nil cannot happen.
 			min := intstr.FromInt(1)
+			if cfg.Spec.SeedController.Replicas != nil && *cfg.Spec.SeedController.Replicas < 2 {
+				min = intstr.FromInt(0)
+			}
 
 			pdb.Spec.MinAvailable = &min
 			pdb.Spec.Selector = &metav1.LabelSelector{

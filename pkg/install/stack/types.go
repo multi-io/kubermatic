@@ -30,20 +30,23 @@ import (
 )
 
 type DeployOptions struct {
-	HelmClient                   helm.Client
-	HelmValues                   *yamled.Document
-	KubeClient                   ctrlruntimeclient.Client
-	StorageClassProvider         string
-	KubermaticConfiguration      *operatorv1alpha1.KubermaticConfiguration
-	RawKubermaticConfiguration   *unstructured.Unstructured
-	ForceHelmReleaseUpgrade      bool
-	ChartsDirectory              string
-	Logger                       *logrus.Entry
-	EnableCertManagerV2Migration bool
+	HelmClient                        helm.Client
+	HelmValues                        *yamled.Document
+	KubeClient                        ctrlruntimeclient.Client
+	StorageClassProvider              string
+	KubermaticConfiguration           *operatorv1alpha1.KubermaticConfiguration
+	RawKubermaticConfiguration        *unstructured.Unstructured
+	ForceHelmReleaseUpgrade           bool
+	ChartsDirectory                   string
+	Logger                            *logrus.Entry
+	EnableCertManagerV2Migration      bool
+	EnableOpenstackCSIDriverMigration bool
+	EnableLogrotateMigration          bool
+	DisableTelemetry                  bool
 }
 
 type Stack interface {
 	Name() string
-	ValidateConfiguration(config *operatorv1alpha1.KubermaticConfiguration, helmValues *yamled.Document, logger logrus.FieldLogger) (*operatorv1alpha1.KubermaticConfiguration, *yamled.Document, []error)
+	ValidateConfiguration(config *operatorv1alpha1.KubermaticConfiguration, helmValues *yamled.Document, opt DeployOptions, logger logrus.FieldLogger) (*operatorv1alpha1.KubermaticConfiguration, *yamled.Document, []error)
 	Deploy(ctx context.Context, opt DeployOptions) error
 }

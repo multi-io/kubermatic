@@ -1,0 +1,161 @@
+# This file has been generated, DO NOT EDIT.
+
+metadata:
+  creationTimestamp: null
+  labels:
+    app: clusterproxy
+  name: clusterproxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: clusterproxy
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: clusterproxy
+        cluster: de-test-01
+        clusterproxy-configmap-revision: "123456"
+        openvpn-client-certificates-secret-revision: "123456"
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: clusterproxy
+                  cluster: de-test-01
+              topologyKey: kubernetes.io/hostname
+            weight: 100
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: clusterproxy
+              topologyKey: kubernetes.io/hostname
+            weight: 10
+      containers:
+      - args:
+        - --client
+        - --proto
+        - tcp
+        - --dev
+        - tun
+        - --auth-nocache
+        - --remote
+        - openvpn-server.cluster-de-test-01.svc.cluster.local.
+        - "1194"
+        - --nobind
+        - --connect-timeout
+        - "5"
+        - --connect-retry
+        - "1"
+        - --ca
+        - /etc/openvpn/pki/client/ca.crt
+        - --cert
+        - /etc/openvpn/pki/client/client.crt
+        - --key
+        - /etc/openvpn/pki/client/client.key
+        - --remote-cert-tls
+        - server
+        - --mssfix
+        - "1300"
+        - --cipher
+        - AES-256-GCM
+        - --auth
+        - SHA1
+        - --keysize
+        - "256"
+        - --script-security
+        - "2"
+        - --status
+        - /run/openvpn-status
+        - --log
+        - /dev/stdout
+        command:
+        - /usr/sbin/openvpn
+        image: quay.io/kubermatic/openvpn:v2.5.2-r0
+        name: openvpn-client
+        resources:
+          limits:
+            cpu: 100m
+            memory: 32Mi
+          requests:
+            cpu: 5m
+            memory: 5Mi
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - mountPath: /etc/openvpn/pki/client
+          name: openvpn-client-certificates
+          readOnly: true
+      - image: docker.io/nginxinc/nginx-unprivileged:1.17.2-alpine
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /healthz
+            port: 3000
+            scheme: HTTP
+          initialDelaySeconds: 3
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 3
+        name: clusterproxy
+        ports:
+        - containerPort: 3000
+          protocol: TCP
+        - containerPort: 3001
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /healthz
+            port: 3000
+            scheme: HTTP
+          initialDelaySeconds: 3
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 3
+        resources:
+          limits:
+            cpu: 250m
+            memory: 64Mi
+          requests:
+            cpu: 20m
+            memory: 32Mi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /etc/nginx/conf.d/
+          name: clusterproxy
+          readOnly: true
+      dnsConfig:
+        nameservers:
+        - 192.0.2.14
+        options:
+        - name: ndots
+          value: "5"
+        searches:
+        - kube-system.svc.cluster.local
+        - svc.cluster.local
+        - cluster.local
+      dnsPolicy: None
+      imagePullSecrets:
+      - name: dockercfg
+      volumes:
+      - name: openvpn-client-certificates
+        secret:
+          defaultMode: 256
+          secretName: openvpn-client-certificates
+      - configMap:
+          defaultMode: 292
+          name: clusterproxy
+        name: clusterproxy
+status: {}

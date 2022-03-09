@@ -49,6 +49,7 @@ type controllerRunOptions struct {
 	enableLeaderElection bool
 }
 
+//nolint:gocritic,exitAfterDefer
 func main() {
 	ctx := context.Background()
 
@@ -96,7 +97,7 @@ func main() {
 		LeaderElectionID:   "operator.kubermatic.io",
 	})
 	if err != nil {
-		log.Panicw("Failed to create Controller Manager instance: %v", err)
+		log.Panicw("Failed to create Controller Manager instance", err)
 	}
 
 	if err := mgr.Add(pprofOpts); err != nil {
@@ -123,6 +124,7 @@ func main() {
 
 	seedOperatorControllerFactory := func(ctx context.Context, mgr manager.Manager, seedManagerMap map[string]manager.Manager) (string, error) {
 		return seedctrl.ControllerName, seedctrl.Add(
+			ctx,
 			log,
 			opt.namespace,
 			mgr,

@@ -57,9 +57,17 @@ type ClusterData struct {
 	Network ClusterNetwork
 	// Features is a set of enabled features for this cluster.
 	Features sets.String
-	// CloudSpec contains the complete access data to the cluster's cloud provider.
+	// CloudSpec (sys11 field) contains the complete access data to the cluster's cloud provider.
 	// CAUTION: This is internal information and subject to change; using it is not recommended!
 	CloudSpec kubermaticv1.CloudSpec
+	// CNIPlugin contains the CNIPlugin settings
+	CNIPlugin CNIPlugin
+	// MLA contains monitoring, logging and alerting related settings for the user cluster.
+	MLA MLASettings
+	// StoragePolicy is the storage policy to use for vsphere csi addon
+	StoragePolicy string
+	// CSIMigration indicates if the cluster needed the CSIMigration
+	CSIMigration bool
 }
 
 type ClusterNetwork struct {
@@ -69,6 +77,7 @@ type ClusterNetwork struct {
 	PodCIDRBlocks     []string
 	ServiceCIDRBlocks []string
 	ProxyMode         string
+	StrictArp         bool
 }
 
 // CloudSpec mutually stores access data to a cloud provider.
@@ -89,6 +98,18 @@ type CloudSpec struct {
 	Kubevirt     *KubevirtCloudSpec     `json:"kubevirt,omitempty"`
 	Alibaba      *AlibabaCloudSpec      `json:"alibaba,omitempty"`
 	Anexia       *AnexiaCloudSpec       `json:"anexia,omitempty"`
+}
+
+type CNIPlugin struct {
+	Type    string
+	Version string
+}
+
+type MLASettings struct {
+	// MonitoringEnabled is the flag for enabling monitoring in user cluster.
+	MonitoringEnabled bool
+	// LoggingEnabled is the flag for enabling logging in user cluster.
+	LoggingEnabled bool
 }
 
 type Credentials struct {

@@ -34,7 +34,7 @@ LDFLAGS += -extldflags '-static' \
 LDFLAGS_EXTRA?=-w
 BUILD_DEST ?= _build
 GOTOOLFLAGS ?= $(GOBUILDFLAGS) -ldflags '$(LDFLAGS_EXTRA) $(LDFLAGS)' $(GOTOOLFLAGS_EXTRA)
-GOBUILDIMAGE ?= golang:1.16.1
+GOBUILDIMAGE ?= golang:1.16.12
 DOCKER_BIN := $(shell which docker)
 
 .PHONY: all
@@ -156,14 +156,6 @@ run-operator:
 .PHONY: run-master-controller-manager
 run-master-controller-manager:
 	./hack/run-master-controller-manager.sh
-
-.PHONY: run-nodeport-proxy-e2e-test-in-kind
-run-nodeport-proxy-e2e-test-in-kind:
-	./hack/run-nodeport-proxy-e2e-test-in-kind.sh
-
-.PHONY: run-expose-strategy-e2e-test-in-kind
-run-expose-strategy-e2e-test-in-kind:
-	./hack/run-expose-strategy-e2e-test-in-kind.sh
 
 .PHONY: verify
 verify:

@@ -119,7 +119,7 @@ kubermatic:
     #   If enabled will apply priority classes to all managed seed infrastructure with levels depending on criticality
     # For example:
     # featureGates: "OpenIDAuthPlugin=true,VerticalPodAutoscaler=true"
-    featureGates: ""
+    featureGates: "EtcdLauncher=true"
     datacenterName: ""
     # Specifies the NodePort range for customer clusters - this must match the NodePort range of the seed cluster.
     nodeportRange: "30000-32767"
@@ -287,9 +287,8 @@ kubermatic:
   storeContainer: null
   deleteContainer: null
   cleanupContainer: null
-  # Settings for the the controllers for EtcdBackupConfig and EtcdRestore CRDs,
-  # which allow dynamically creating multiple arbitrary backup schedules for each
-  # cluster, as well as restoring a cluster's etcd from any of the created backups
+  # Deprecated use the BackupRestore field to configure the etcd backup and restore
+  # feature in the seed object.
   etcdBackupsRestores:
     enabled: false
     s3:

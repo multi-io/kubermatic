@@ -22,6 +22,12 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-07-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-03-01/network"
+	"github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2020-10-01/resources"
+	"github.com/Azure/go-autorest/autorest"
+	"github.com/Azure/go-autorest/autorest/azure/auth"
+	"github.com/Azure/go-autorest/autorest/to"
 	"go.uber.org/zap"
 
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
@@ -29,13 +35,6 @@ import (
 	"k8c.io/kubermatic/v2/pkg/log"
 	"k8c.io/kubermatic/v2/pkg/provider"
 	kubermaticresources "k8c.io/kubermatic/v2/pkg/resources"
-
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-06-01/compute"
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-06-01/network"
-	"github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2018-02-01/resources"
-	"github.com/Azure/go-autorest/autorest"
-	"github.com/Azure/go-autorest/autorest/azure/auth"
-	"github.com/Azure/go-autorest/autorest/to"
 )
 
 const (
@@ -120,7 +119,11 @@ func deleteSubnet(ctx context.Context, cloud kubermaticv1.CloudSpec, credentials
 		return err
 	}
 
-	deleteSubnetFuture, err := subnetsClient.Delete(ctx, cloud.Azure.ResourceGroup, cloud.Azure.VNetName, cloud.Azure.SubnetName)
+	var resourceGroup = cloud.Azure.ResourceGroup
+	if cloud.Azure.VNetResourceGroup != "" {
+		resourceGroup = cloud.Azure.VNetResourceGroup
+	}
+	deleteSubnetFuture, err := subnetsClient.Delete(ctx, resourceGroup, cloud.Azure.VNetName, cloud.Azure.SubnetName)
 	if err != nil {
 		return err
 	}
@@ -148,7 +151,11 @@ func deleteVNet(ctx context.Context, cloud kubermaticv1.CloudSpec, credentials C
 		return err
 	}
 
-	deleteVNetFuture, err := networksClient.Delete(ctx, cloud.Azure.ResourceGroup, cloud.Azure.VNetName)
+	var resourceGroup = cloud.Azure.ResourceGroup
+	if cloud.Azure.VNetResourceGroup != "" {
+		resourceGroup = cloud.Azure.VNetResourceGroup
+	}
+	deleteVNetFuture, err := networksClient.Delete(ctx, resourceGroup, cloud.Azure.VNetName)
 	if err != nil {
 		return err
 	}
@@ -425,10 +432,10 @@ func (a *Azure) ensureSecurityGroup(cloud kubermaticv1.CloudSpec, location strin
 			},
 		},
 	}
-	updatedRules := append(*parameters.SecurityRules, tcpDenyAllRule())
-	updatedRules = append(*parameters.SecurityRules, udpDenyAllRule())
-	updatedRules = append(*parameters.SecurityRules, icmpAllowAllRule())
+
+	updatedRules := append(*parameters.SecurityRules, tcpDenyAllRule(), udpDenyAllRule(), icmpAllowAllRule())
 	parameters.SecurityRules = &updatedRules
+
 	if _, err = sgClient.CreateOrUpdate(a.ctx, cloud.Azure.ResourceGroup, cloud.Azure.SecurityGroup, parameters); err != nil {
 		return fmt.Errorf("failed to create or update resource group %q: %v", cloud.Azure.ResourceGroup, err)
 	}
@@ -628,19 +635,22 @@ func (a *Azure) InitializeCloudProvider(cluster *kubermaticv1.Cluster, update pr
 	}
 
 	if cluster.Spec.Cloud.Azure.AvailabilitySet == "" {
-		asName := resourceNamePrefix + cluster.Name
-		logger.Infow("ensuring AvailabilitySet", "availabilitySet", asName)
+		if cluster.Spec.Cloud.Azure.AssignAvailabilitySet == nil ||
+			*cluster.Spec.Cloud.Azure.AssignAvailabilitySet {
+			asName := resourceNamePrefix + cluster.Name
+			logger.Infow("ensuring AvailabilitySet", "availabilitySet", asName)
 
-		if err := ensureAvailabilitySet(a.ctx, asName, location, cluster.Spec.Cloud, credentials); err != nil {
-			return nil, fmt.Errorf("failed to ensure AvailabilitySet exists: %v", err)
-		}
+			if err := ensureAvailabilitySet(a.ctx, asName, location, cluster.Spec.Cloud, credentials); err != nil {
+				return nil, fmt.Errorf("failed to ensure AvailabilitySet exists: %v", err)
+			}
 
-		cluster, err = update(cluster.Name, func(updatedCluster *kubermaticv1.Cluster) {
-			updatedCluster.Spec.Cloud.Azure.AvailabilitySet = asName
-			kuberneteshelper.AddFinalizer(updatedCluster, FinalizerAvailabilitySet)
-		})
-		if err != nil {
-			return nil, err
+			cluster, err = update(cluster.Name, func(updatedCluster *kubermaticv1.Cluster) {
+				updatedCluster.Spec.Cloud.Azure.AvailabilitySet = asName
+				kuberneteshelper.AddFinalizer(updatedCluster, FinalizerAvailabilitySet)
+			})
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 

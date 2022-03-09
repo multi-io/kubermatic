@@ -23,51 +23,54 @@ type Client struct {
 	formats   strfmt.Registry
 }
 
+// ClientOption is the option for Client methods
+type ClientOption func(*runtime.ClientOperation)
+
 // ClientService is the interface for Client methods
 type ClientService interface {
-	ListOpenstackAvailabilityZones(params *ListOpenstackAvailabilityZonesParams, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackAvailabilityZonesOK, error)
+	ListOpenstackAvailabilityZones(params *ListOpenstackAvailabilityZonesParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackAvailabilityZonesOK, error)
 
-	ListOpenstackAvailabilityZonesNoCredentials(params *ListOpenstackAvailabilityZonesNoCredentialsParams, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackAvailabilityZonesNoCredentialsOK, error)
+	ListOpenstackAvailabilityZonesNoCredentials(params *ListOpenstackAvailabilityZonesNoCredentialsParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackAvailabilityZonesNoCredentialsOK, error)
 
-	ListOpenstackAvailabilityZonesNoCredentialsV2(params *ListOpenstackAvailabilityZonesNoCredentialsV2Params, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackAvailabilityZonesNoCredentialsV2OK, error)
+	ListOpenstackAvailabilityZonesNoCredentialsV2(params *ListOpenstackAvailabilityZonesNoCredentialsV2Params, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackAvailabilityZonesNoCredentialsV2OK, error)
 
-	ListOpenstackImages(params *ListOpenstackImagesParams, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackImagesOK, error)
+	ListOpenstackImages(params *ListOpenstackImagesParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackImagesOK, error)
 
-	ListOpenstackImagesNoCredentials(params *ListOpenstackImagesNoCredentialsParams, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackImagesNoCredentialsOK, error)
+	ListOpenstackImagesNoCredentials(params *ListOpenstackImagesNoCredentialsParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackImagesNoCredentialsOK, error)
 
-	ListOpenstackNetworks(params *ListOpenstackNetworksParams, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackNetworksOK, error)
+	ListOpenstackNetworks(params *ListOpenstackNetworksParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackNetworksOK, error)
 
-	ListOpenstackNetworksNoCredentials(params *ListOpenstackNetworksNoCredentialsParams, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackNetworksNoCredentialsOK, error)
+	ListOpenstackNetworksNoCredentials(params *ListOpenstackNetworksNoCredentialsParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackNetworksNoCredentialsOK, error)
 
-	ListOpenstackNetworksNoCredentialsV2(params *ListOpenstackNetworksNoCredentialsV2Params, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackNetworksNoCredentialsV2OK, error)
+	ListOpenstackNetworksNoCredentialsV2(params *ListOpenstackNetworksNoCredentialsV2Params, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackNetworksNoCredentialsV2OK, error)
 
-	ListOpenstackQuotaLimits(params *ListOpenstackQuotaLimitsParams, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackQuotaLimitsOK, error)
+	ListOpenstackQuotaLimits(params *ListOpenstackQuotaLimitsParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackQuotaLimitsOK, error)
 
-	ListOpenstackQuotaLimitsNoCredentials(params *ListOpenstackQuotaLimitsNoCredentialsParams, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackQuotaLimitsNoCredentialsOK, error)
+	ListOpenstackQuotaLimitsNoCredentials(params *ListOpenstackQuotaLimitsNoCredentialsParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackQuotaLimitsNoCredentialsOK, error)
 
-	ListOpenstackSecurityGroups(params *ListOpenstackSecurityGroupsParams, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackSecurityGroupsOK, error)
+	ListOpenstackSecurityGroups(params *ListOpenstackSecurityGroupsParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackSecurityGroupsOK, error)
 
-	ListOpenstackSecurityGroupsNoCredentials(params *ListOpenstackSecurityGroupsNoCredentialsParams, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackSecurityGroupsNoCredentialsOK, error)
+	ListOpenstackSecurityGroupsNoCredentials(params *ListOpenstackSecurityGroupsNoCredentialsParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackSecurityGroupsNoCredentialsOK, error)
 
-	ListOpenstackSecurityGroupsNoCredentialsV2(params *ListOpenstackSecurityGroupsNoCredentialsV2Params, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackSecurityGroupsNoCredentialsV2OK, error)
+	ListOpenstackSecurityGroupsNoCredentialsV2(params *ListOpenstackSecurityGroupsNoCredentialsV2Params, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackSecurityGroupsNoCredentialsV2OK, error)
 
-	ListOpenstackSizes(params *ListOpenstackSizesParams, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackSizesOK, error)
+	ListOpenstackSizes(params *ListOpenstackSizesParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackSizesOK, error)
 
-	ListOpenstackSizesNoCredentials(params *ListOpenstackSizesNoCredentialsParams, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackSizesNoCredentialsOK, error)
+	ListOpenstackSizesNoCredentials(params *ListOpenstackSizesNoCredentialsParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackSizesNoCredentialsOK, error)
 
-	ListOpenstackSizesNoCredentialsV2(params *ListOpenstackSizesNoCredentialsV2Params, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackSizesNoCredentialsV2OK, error)
+	ListOpenstackSizesNoCredentialsV2(params *ListOpenstackSizesNoCredentialsV2Params, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackSizesNoCredentialsV2OK, error)
 
-	ListOpenstackSubnets(params *ListOpenstackSubnetsParams, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackSubnetsOK, error)
+	ListOpenstackSubnets(params *ListOpenstackSubnetsParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackSubnetsOK, error)
 
-	ListOpenstackSubnetsNoCredentials(params *ListOpenstackSubnetsNoCredentialsParams, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackSubnetsNoCredentialsOK, error)
+	ListOpenstackSubnetsNoCredentials(params *ListOpenstackSubnetsNoCredentialsParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackSubnetsNoCredentialsOK, error)
 
-	ListOpenstackSubnetsNoCredentialsV2(params *ListOpenstackSubnetsNoCredentialsV2Params, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackSubnetsNoCredentialsV2OK, error)
+	ListOpenstackSubnetsNoCredentialsV2(params *ListOpenstackSubnetsNoCredentialsV2Params, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackSubnetsNoCredentialsV2OK, error)
 
-	ListOpenstackTenants(params *ListOpenstackTenantsParams, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackTenantsOK, error)
+	ListOpenstackTenants(params *ListOpenstackTenantsParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackTenantsOK, error)
 
-	ListOpenstackTenantsNoCredentials(params *ListOpenstackTenantsNoCredentialsParams, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackTenantsNoCredentialsOK, error)
+	ListOpenstackTenantsNoCredentials(params *ListOpenstackTenantsNoCredentialsParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackTenantsNoCredentialsOK, error)
 
-	ListOpenstackTenantsNoCredentialsV2(params *ListOpenstackTenantsNoCredentialsV2Params, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackTenantsNoCredentialsV2OK, error)
+	ListOpenstackTenantsNoCredentialsV2(params *ListOpenstackTenantsNoCredentialsV2Params, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackTenantsNoCredentialsV2OK, error)
 
 	SetTransport(transport runtime.ClientTransport)
 }
@@ -75,13 +78,12 @@ type ClientService interface {
 /*
   ListOpenstackAvailabilityZones Lists availability zones from openstack
 */
-func (a *Client) ListOpenstackAvailabilityZones(params *ListOpenstackAvailabilityZonesParams, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackAvailabilityZonesOK, error) {
+func (a *Client) ListOpenstackAvailabilityZones(params *ListOpenstackAvailabilityZonesParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackAvailabilityZonesOK, error) {
 	// TODO: Validate the params before sending
 	if params == nil {
 		params = NewListOpenstackAvailabilityZonesParams()
 	}
-
-	result, err := a.transport.Submit(&runtime.ClientOperation{
+	op := &runtime.ClientOperation{
 		ID:                 "listOpenstackAvailabilityZones",
 		Method:             "GET",
 		PathPattern:        "/api/v1/providers/openstack/availabilityzones",
@@ -93,7 +95,12 @@ func (a *Client) ListOpenstackAvailabilityZones(params *ListOpenstackAvailabilit
 		AuthInfo:           authInfo,
 		Context:            params.Context,
 		Client:             params.HTTPClient,
-	})
+	}
+	for _, opt := range opts {
+		opt(op)
+	}
+
+	result, err := a.transport.Submit(op)
 	if err != nil {
 		return nil, err
 	}
@@ -109,13 +116,12 @@ func (a *Client) ListOpenstackAvailabilityZones(params *ListOpenstackAvailabilit
 /*
   ListOpenstackAvailabilityZonesNoCredentials Lists availability zones from openstack
 */
-func (a *Client) ListOpenstackAvailabilityZonesNoCredentials(params *ListOpenstackAvailabilityZonesNoCredentialsParams, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackAvailabilityZonesNoCredentialsOK, error) {
+func (a *Client) ListOpenstackAvailabilityZonesNoCredentials(params *ListOpenstackAvailabilityZonesNoCredentialsParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackAvailabilityZonesNoCredentialsOK, error) {
 	// TODO: Validate the params before sending
 	if params == nil {
 		params = NewListOpenstackAvailabilityZonesNoCredentialsParams()
 	}
-
-	result, err := a.transport.Submit(&runtime.ClientOperation{
+	op := &runtime.ClientOperation{
 		ID:                 "listOpenstackAvailabilityZonesNoCredentials",
 		Method:             "GET",
 		PathPattern:        "/api/v1/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/providers/openstack/availabilityzones",
@@ -127,7 +133,12 @@ func (a *Client) ListOpenstackAvailabilityZonesNoCredentials(params *ListOpensta
 		AuthInfo:           authInfo,
 		Context:            params.Context,
 		Client:             params.HTTPClient,
-	})
+	}
+	for _, opt := range opts {
+		opt(op)
+	}
+
+	result, err := a.transport.Submit(op)
 	if err != nil {
 		return nil, err
 	}
@@ -143,13 +154,12 @@ func (a *Client) ListOpenstackAvailabilityZonesNoCredentials(params *ListOpensta
 /*
   ListOpenstackAvailabilityZonesNoCredentialsV2 Lists availability zones from openstack
 */
-func (a *Client) ListOpenstackAvailabilityZonesNoCredentialsV2(params *ListOpenstackAvailabilityZonesNoCredentialsV2Params, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackAvailabilityZonesNoCredentialsV2OK, error) {
+func (a *Client) ListOpenstackAvailabilityZonesNoCredentialsV2(params *ListOpenstackAvailabilityZonesNoCredentialsV2Params, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackAvailabilityZonesNoCredentialsV2OK, error) {
 	// TODO: Validate the params before sending
 	if params == nil {
 		params = NewListOpenstackAvailabilityZonesNoCredentialsV2Params()
 	}
-
-	result, err := a.transport.Submit(&runtime.ClientOperation{
+	op := &runtime.ClientOperation{
 		ID:                 "listOpenstackAvailabilityZonesNoCredentialsV2",
 		Method:             "GET",
 		PathPattern:        "/api/v2/projects/{project_id}/clusters/{cluster_id}/providers/openstack/availabilityzones",
@@ -161,7 +171,12 @@ func (a *Client) ListOpenstackAvailabilityZonesNoCredentialsV2(params *ListOpens
 		AuthInfo:           authInfo,
 		Context:            params.Context,
 		Client:             params.HTTPClient,
-	})
+	}
+	for _, opt := range opts {
+		opt(op)
+	}
+
+	result, err := a.transport.Submit(op)
 	if err != nil {
 		return nil, err
 	}
@@ -177,13 +192,12 @@ func (a *Client) ListOpenstackAvailabilityZonesNoCredentialsV2(params *ListOpens
 /*
   ListOpenstackImages Lists images from openstack
 */
-func (a *Client) ListOpenstackImages(params *ListOpenstackImagesParams, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackImagesOK, error) {
+func (a *Client) ListOpenstackImages(params *ListOpenstackImagesParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackImagesOK, error) {
 	// TODO: Validate the params before sending
 	if params == nil {
 		params = NewListOpenstackImagesParams()
 	}
-
-	result, err := a.transport.Submit(&runtime.ClientOperation{
+	op := &runtime.ClientOperation{
 		ID:                 "listOpenstackImages",
 		Method:             "GET",
 		PathPattern:        "/api/v1/providers/openstack/images",
@@ -195,7 +209,12 @@ func (a *Client) ListOpenstackImages(params *ListOpenstackImagesParams, authInfo
 		AuthInfo:           authInfo,
 		Context:            params.Context,
 		Client:             params.HTTPClient,
-	})
+	}
+	for _, opt := range opts {
+		opt(op)
+	}
+
+	result, err := a.transport.Submit(op)
 	if err != nil {
 		return nil, err
 	}
@@ -211,13 +230,12 @@ func (a *Client) ListOpenstackImages(params *ListOpenstackImagesParams, authInfo
 /*
   ListOpenstackImagesNoCredentials Lists images from openstack
 */
-func (a *Client) ListOpenstackImagesNoCredentials(params *ListOpenstackImagesNoCredentialsParams, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackImagesNoCredentialsOK, error) {
+func (a *Client) ListOpenstackImagesNoCredentials(params *ListOpenstackImagesNoCredentialsParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackImagesNoCredentialsOK, error) {
 	// TODO: Validate the params before sending
 	if params == nil {
 		params = NewListOpenstackImagesNoCredentialsParams()
 	}
-
-	result, err := a.transport.Submit(&runtime.ClientOperation{
+	op := &runtime.ClientOperation{
 		ID:                 "listOpenstackImagesNoCredentials",
 		Method:             "GET",
 		PathPattern:        "/api/v1/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/providers/openstack/images",
@@ -229,7 +247,12 @@ func (a *Client) ListOpenstackImagesNoCredentials(params *ListOpenstackImagesNoC
 		AuthInfo:           authInfo,
 		Context:            params.Context,
 		Client:             params.HTTPClient,
-	})
+	}
+	for _, opt := range opts {
+		opt(op)
+	}
+
+	result, err := a.transport.Submit(op)
 	if err != nil {
 		return nil, err
 	}
@@ -245,13 +268,12 @@ func (a *Client) ListOpenstackImagesNoCredentials(params *ListOpenstackImagesNoC
 /*
   ListOpenstackNetworks Lists networks from openstack
 */
-func (a *Client) ListOpenstackNetworks(params *ListOpenstackNetworksParams, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackNetworksOK, error) {
+func (a *Client) ListOpenstackNetworks(params *ListOpenstackNetworksParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackNetworksOK, error) {
 	// TODO: Validate the params before sending
 	if params == nil {
 		params = NewListOpenstackNetworksParams()
 	}
-
-	result, err := a.transport.Submit(&runtime.ClientOperation{
+	op := &runtime.ClientOperation{
 		ID:                 "listOpenstackNetworks",
 		Method:             "GET",
 		PathPattern:        "/api/v1/providers/openstack/networks",
@@ -263,7 +285,12 @@ func (a *Client) ListOpenstackNetworks(params *ListOpenstackNetworksParams, auth
 		AuthInfo:           authInfo,
 		Context:            params.Context,
 		Client:             params.HTTPClient,
-	})
+	}
+	for _, opt := range opts {
+		opt(op)
+	}
+
+	result, err := a.transport.Submit(op)
 	if err != nil {
 		return nil, err
 	}
@@ -279,13 +306,12 @@ func (a *Client) ListOpenstackNetworks(params *ListOpenstackNetworksParams, auth
 /*
   ListOpenstackNetworksNoCredentials Lists networks from openstack
 */
-func (a *Client) ListOpenstackNetworksNoCredentials(params *ListOpenstackNetworksNoCredentialsParams, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackNetworksNoCredentialsOK, error) {
+func (a *Client) ListOpenstackNetworksNoCredentials(params *ListOpenstackNetworksNoCredentialsParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackNetworksNoCredentialsOK, error) {
 	// TODO: Validate the params before sending
 	if params == nil {
 		params = NewListOpenstackNetworksNoCredentialsParams()
 	}
-
-	result, err := a.transport.Submit(&runtime.ClientOperation{
+	op := &runtime.ClientOperation{
 		ID:                 "listOpenstackNetworksNoCredentials",
 		Method:             "GET",
 		PathPattern:        "/api/v1/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/providers/openstack/networks",
@@ -297,7 +323,12 @@ func (a *Client) ListOpenstackNetworksNoCredentials(params *ListOpenstackNetwork
 		AuthInfo:           authInfo,
 		Context:            params.Context,
 		Client:             params.HTTPClient,
-	})
+	}
+	for _, opt := range opts {
+		opt(op)
+	}
+
+	result, err := a.transport.Submit(op)
 	if err != nil {
 		return nil, err
 	}
@@ -313,13 +344,12 @@ func (a *Client) ListOpenstackNetworksNoCredentials(params *ListOpenstackNetwork
 /*
   ListOpenstackNetworksNoCredentialsV2 Lists networks from openstack
 */
-func (a *Client) ListOpenstackNetworksNoCredentialsV2(params *ListOpenstackNetworksNoCredentialsV2Params, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackNetworksNoCredentialsV2OK, error) {
+func (a *Client) ListOpenstackNetworksNoCredentialsV2(params *ListOpenstackNetworksNoCredentialsV2Params, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackNetworksNoCredentialsV2OK, error) {
 	// TODO: Validate the params before sending
 	if params == nil {
 		params = NewListOpenstackNetworksNoCredentialsV2Params()
 	}
-
-	result, err := a.transport.Submit(&runtime.ClientOperation{
+	op := &runtime.ClientOperation{
 		ID:                 "listOpenstackNetworksNoCredentialsV2",
 		Method:             "GET",
 		PathPattern:        "/api/v2/projects/{project_id}/clusters/{cluster_id}/providers/openstack/networks",
@@ -331,7 +361,12 @@ func (a *Client) ListOpenstackNetworksNoCredentialsV2(params *ListOpenstackNetwo
 		AuthInfo:           authInfo,
 		Context:            params.Context,
 		Client:             params.HTTPClient,
-	})
+	}
+	for _, opt := range opts {
+		opt(op)
+	}
+
+	result, err := a.transport.Submit(op)
 	if err != nil {
 		return nil, err
 	}
@@ -347,13 +382,12 @@ func (a *Client) ListOpenstackNetworksNoCredentialsV2(params *ListOpenstackNetwo
 /*
   ListOpenstackQuotaLimits Lists quotalimits for tenant from openstack
 */
-func (a *Client) ListOpenstackQuotaLimits(params *ListOpenstackQuotaLimitsParams, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackQuotaLimitsOK, error) {
+func (a *Client) ListOpenstackQuotaLimits(params *ListOpenstackQuotaLimitsParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackQuotaLimitsOK, error) {
 	// TODO: Validate the params before sending
 	if params == nil {
 		params = NewListOpenstackQuotaLimitsParams()
 	}
-
-	result, err := a.transport.Submit(&runtime.ClientOperation{
+	op := &runtime.ClientOperation{
 		ID:                 "listOpenstackQuotaLimits",
 		Method:             "GET",
 		PathPattern:        "/api/v1/providers/openstack/quotalimits",
@@ -365,7 +399,12 @@ func (a *Client) ListOpenstackQuotaLimits(params *ListOpenstackQuotaLimitsParams
 		AuthInfo:           authInfo,
 		Context:            params.Context,
 		Client:             params.HTTPClient,
-	})
+	}
+	for _, opt := range opts {
+		opt(op)
+	}
+
+	result, err := a.transport.Submit(op)
 	if err != nil {
 		return nil, err
 	}
@@ -381,13 +420,12 @@ func (a *Client) ListOpenstackQuotaLimits(params *ListOpenstackQuotaLimitsParams
 /*
   ListOpenstackQuotaLimitsNoCredentials Lists quotalimits for tenant from openstack
 */
-func (a *Client) ListOpenstackQuotaLimitsNoCredentials(params *ListOpenstackQuotaLimitsNoCredentialsParams, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackQuotaLimitsNoCredentialsOK, error) {
+func (a *Client) ListOpenstackQuotaLimitsNoCredentials(params *ListOpenstackQuotaLimitsNoCredentialsParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackQuotaLimitsNoCredentialsOK, error) {
 	// TODO: Validate the params before sending
 	if params == nil {
 		params = NewListOpenstackQuotaLimitsNoCredentialsParams()
 	}
-
-	result, err := a.transport.Submit(&runtime.ClientOperation{
+	op := &runtime.ClientOperation{
 		ID:                 "listOpenstackQuotaLimitsNoCredentials",
 		Method:             "GET",
 		PathPattern:        "/api/v1/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/providers/openstack/quotalimits",
@@ -399,7 +437,12 @@ func (a *Client) ListOpenstackQuotaLimitsNoCredentials(params *ListOpenstackQuot
 		AuthInfo:           authInfo,
 		Context:            params.Context,
 		Client:             params.HTTPClient,
-	})
+	}
+	for _, opt := range opts {
+		opt(op)
+	}
+
+	result, err := a.transport.Submit(op)
 	if err != nil {
 		return nil, err
 	}
@@ -415,13 +458,12 @@ func (a *Client) ListOpenstackQuotaLimitsNoCredentials(params *ListOpenstackQuot
 /*
   ListOpenstackSecurityGroups Lists security groups from openstack
 */
-func (a *Client) ListOpenstackSecurityGroups(params *ListOpenstackSecurityGroupsParams, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackSecurityGroupsOK, error) {
+func (a *Client) ListOpenstackSecurityGroups(params *ListOpenstackSecurityGroupsParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackSecurityGroupsOK, error) {
 	// TODO: Validate the params before sending
 	if params == nil {
 		params = NewListOpenstackSecurityGroupsParams()
 	}
-
-	result, err := a.transport.Submit(&runtime.ClientOperation{
+	op := &runtime.ClientOperation{
 		ID:                 "listOpenstackSecurityGroups",
 		Method:             "GET",
 		PathPattern:        "/api/v1/providers/openstack/securitygroups",
@@ -433,7 +475,12 @@ func (a *Client) ListOpenstackSecurityGroups(params *ListOpenstackSecurityGroups
 		AuthInfo:           authInfo,
 		Context:            params.Context,
 		Client:             params.HTTPClient,
-	})
+	}
+	for _, opt := range opts {
+		opt(op)
+	}
+
+	result, err := a.transport.Submit(op)
 	if err != nil {
 		return nil, err
 	}
@@ -449,13 +496,12 @@ func (a *Client) ListOpenstackSecurityGroups(params *ListOpenstackSecurityGroups
 /*
   ListOpenstackSecurityGroupsNoCredentials Lists security groups from openstack
 */
-func (a *Client) ListOpenstackSecurityGroupsNoCredentials(params *ListOpenstackSecurityGroupsNoCredentialsParams, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackSecurityGroupsNoCredentialsOK, error) {
+func (a *Client) ListOpenstackSecurityGroupsNoCredentials(params *ListOpenstackSecurityGroupsNoCredentialsParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackSecurityGroupsNoCredentialsOK, error) {
 	// TODO: Validate the params before sending
 	if params == nil {
 		params = NewListOpenstackSecurityGroupsNoCredentialsParams()
 	}
-
-	result, err := a.transport.Submit(&runtime.ClientOperation{
+	op := &runtime.ClientOperation{
 		ID:                 "listOpenstackSecurityGroupsNoCredentials",
 		Method:             "GET",
 		PathPattern:        "/api/v1/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/providers/openstack/securitygroups",
@@ -467,7 +513,12 @@ func (a *Client) ListOpenstackSecurityGroupsNoCredentials(params *ListOpenstackS
 		AuthInfo:           authInfo,
 		Context:            params.Context,
 		Client:             params.HTTPClient,
-	})
+	}
+	for _, opt := range opts {
+		opt(op)
+	}
+
+	result, err := a.transport.Submit(op)
 	if err != nil {
 		return nil, err
 	}
@@ -483,13 +534,12 @@ func (a *Client) ListOpenstackSecurityGroupsNoCredentials(params *ListOpenstackS
 /*
   ListOpenstackSecurityGroupsNoCredentialsV2 Lists security groups from openstack
 */
-func (a *Client) ListOpenstackSecurityGroupsNoCredentialsV2(params *ListOpenstackSecurityGroupsNoCredentialsV2Params, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackSecurityGroupsNoCredentialsV2OK, error) {
+func (a *Client) ListOpenstackSecurityGroupsNoCredentialsV2(params *ListOpenstackSecurityGroupsNoCredentialsV2Params, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackSecurityGroupsNoCredentialsV2OK, error) {
 	// TODO: Validate the params before sending
 	if params == nil {
 		params = NewListOpenstackSecurityGroupsNoCredentialsV2Params()
 	}
-
-	result, err := a.transport.Submit(&runtime.ClientOperation{
+	op := &runtime.ClientOperation{
 		ID:                 "listOpenstackSecurityGroupsNoCredentialsV2",
 		Method:             "GET",
 		PathPattern:        "/api/v2/projects/{project_id}/clusters/{cluster_id}/providers/openstack/securitygroups",
@@ -501,7 +551,12 @@ func (a *Client) ListOpenstackSecurityGroupsNoCredentialsV2(params *ListOpenstac
 		AuthInfo:           authInfo,
 		Context:            params.Context,
 		Client:             params.HTTPClient,
-	})
+	}
+	for _, opt := range opts {
+		opt(op)
+	}
+
+	result, err := a.transport.Submit(op)
 	if err != nil {
 		return nil, err
 	}
@@ -517,13 +572,12 @@ func (a *Client) ListOpenstackSecurityGroupsNoCredentialsV2(params *ListOpenstac
 /*
   ListOpenstackSizes Lists sizes from openstack
 */
-func (a *Client) ListOpenstackSizes(params *ListOpenstackSizesParams, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackSizesOK, error) {
+func (a *Client) ListOpenstackSizes(params *ListOpenstackSizesParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackSizesOK, error) {
 	// TODO: Validate the params before sending
 	if params == nil {
 		params = NewListOpenstackSizesParams()
 	}
-
-	result, err := a.transport.Submit(&runtime.ClientOperation{
+	op := &runtime.ClientOperation{
 		ID:                 "listOpenstackSizes",
 		Method:             "GET",
 		PathPattern:        "/api/v1/providers/openstack/sizes",
@@ -535,7 +589,12 @@ func (a *Client) ListOpenstackSizes(params *ListOpenstackSizesParams, authInfo r
 		AuthInfo:           authInfo,
 		Context:            params.Context,
 		Client:             params.HTTPClient,
-	})
+	}
+	for _, opt := range opts {
+		opt(op)
+	}
+
+	result, err := a.transport.Submit(op)
 	if err != nil {
 		return nil, err
 	}
@@ -551,13 +610,12 @@ func (a *Client) ListOpenstackSizes(params *ListOpenstackSizesParams, authInfo r
 /*
   ListOpenstackSizesNoCredentials Lists sizes from openstack
 */
-func (a *Client) ListOpenstackSizesNoCredentials(params *ListOpenstackSizesNoCredentialsParams, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackSizesNoCredentialsOK, error) {
+func (a *Client) ListOpenstackSizesNoCredentials(params *ListOpenstackSizesNoCredentialsParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackSizesNoCredentialsOK, error) {
 	// TODO: Validate the params before sending
 	if params == nil {
 		params = NewListOpenstackSizesNoCredentialsParams()
 	}
-
-	result, err := a.transport.Submit(&runtime.ClientOperation{
+	op := &runtime.ClientOperation{
 		ID:                 "listOpenstackSizesNoCredentials",
 		Method:             "GET",
 		PathPattern:        "/api/v1/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/providers/openstack/sizes",
@@ -569,7 +627,12 @@ func (a *Client) ListOpenstackSizesNoCredentials(params *ListOpenstackSizesNoCre
 		AuthInfo:           authInfo,
 		Context:            params.Context,
 		Client:             params.HTTPClient,
-	})
+	}
+	for _, opt := range opts {
+		opt(op)
+	}
+
+	result, err := a.transport.Submit(op)
 	if err != nil {
 		return nil, err
 	}
@@ -585,13 +648,12 @@ func (a *Client) ListOpenstackSizesNoCredentials(params *ListOpenstackSizesNoCre
 /*
   ListOpenstackSizesNoCredentialsV2 Lists sizes from openstack
 */
-func (a *Client) ListOpenstackSizesNoCredentialsV2(params *ListOpenstackSizesNoCredentialsV2Params, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackSizesNoCredentialsV2OK, error) {
+func (a *Client) ListOpenstackSizesNoCredentialsV2(params *ListOpenstackSizesNoCredentialsV2Params, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackSizesNoCredentialsV2OK, error) {
 	// TODO: Validate the params before sending
 	if params == nil {
 		params = NewListOpenstackSizesNoCredentialsV2Params()
 	}
-
-	result, err := a.transport.Submit(&runtime.ClientOperation{
+	op := &runtime.ClientOperation{
 		ID:                 "listOpenstackSizesNoCredentialsV2",
 		Method:             "GET",
 		PathPattern:        "/api/v2/projects/{project_id}/clusters/{cluster_id}/providers/openstack/sizes",
@@ -603,7 +665,12 @@ func (a *Client) ListOpenstackSizesNoCredentialsV2(params *ListOpenstackSizesNoC
 		AuthInfo:           authInfo,
 		Context:            params.Context,
 		Client:             params.HTTPClient,
-	})
+	}
+	for _, opt := range opts {
+		opt(op)
+	}
+
+	result, err := a.transport.Submit(op)
 	if err != nil {
 		return nil, err
 	}
@@ -619,13 +686,12 @@ func (a *Client) ListOpenstackSizesNoCredentialsV2(params *ListOpenstackSizesNoC
 /*
   ListOpenstackSubnets Lists subnets from openstack
 */
-func (a *Client) ListOpenstackSubnets(params *ListOpenstackSubnetsParams, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackSubnetsOK, error) {
+func (a *Client) ListOpenstackSubnets(params *ListOpenstackSubnetsParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackSubnetsOK, error) {
 	// TODO: Validate the params before sending
 	if params == nil {
 		params = NewListOpenstackSubnetsParams()
 	}
-
-	result, err := a.transport.Submit(&runtime.ClientOperation{
+	op := &runtime.ClientOperation{
 		ID:                 "listOpenstackSubnets",
 		Method:             "GET",
 		PathPattern:        "/api/v1/providers/openstack/subnets",
@@ -637,7 +703,12 @@ func (a *Client) ListOpenstackSubnets(params *ListOpenstackSubnetsParams, authIn
 		AuthInfo:           authInfo,
 		Context:            params.Context,
 		Client:             params.HTTPClient,
-	})
+	}
+	for _, opt := range opts {
+		opt(op)
+	}
+
+	result, err := a.transport.Submit(op)
 	if err != nil {
 		return nil, err
 	}
@@ -653,13 +724,12 @@ func (a *Client) ListOpenstackSubnets(params *ListOpenstackSubnetsParams, authIn
 /*
   ListOpenstackSubnetsNoCredentials Lists subnets from openstack
 */
-func (a *Client) ListOpenstackSubnetsNoCredentials(params *ListOpenstackSubnetsNoCredentialsParams, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackSubnetsNoCredentialsOK, error) {
+func (a *Client) ListOpenstackSubnetsNoCredentials(params *ListOpenstackSubnetsNoCredentialsParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackSubnetsNoCredentialsOK, error) {
 	// TODO: Validate the params before sending
 	if params == nil {
 		params = NewListOpenstackSubnetsNoCredentialsParams()
 	}
-
-	result, err := a.transport.Submit(&runtime.ClientOperation{
+	op := &runtime.ClientOperation{
 		ID:                 "listOpenstackSubnetsNoCredentials",
 		Method:             "GET",
 		PathPattern:        "/api/v1/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/providers/openstack/subnets",
@@ -671,7 +741,12 @@ func (a *Client) ListOpenstackSubnetsNoCredentials(params *ListOpenstackSubnetsN
 		AuthInfo:           authInfo,
 		Context:            params.Context,
 		Client:             params.HTTPClient,
-	})
+	}
+	for _, opt := range opts {
+		opt(op)
+	}
+
+	result, err := a.transport.Submit(op)
 	if err != nil {
 		return nil, err
 	}
@@ -687,13 +762,12 @@ func (a *Client) ListOpenstackSubnetsNoCredentials(params *ListOpenstackSubnetsN
 /*
   ListOpenstackSubnetsNoCredentialsV2 Lists subnets from openstack
 */
-func (a *Client) ListOpenstackSubnetsNoCredentialsV2(params *ListOpenstackSubnetsNoCredentialsV2Params, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackSubnetsNoCredentialsV2OK, error) {
+func (a *Client) ListOpenstackSubnetsNoCredentialsV2(params *ListOpenstackSubnetsNoCredentialsV2Params, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackSubnetsNoCredentialsV2OK, error) {
 	// TODO: Validate the params before sending
 	if params == nil {
 		params = NewListOpenstackSubnetsNoCredentialsV2Params()
 	}
-
-	result, err := a.transport.Submit(&runtime.ClientOperation{
+	op := &runtime.ClientOperation{
 		ID:                 "listOpenstackSubnetsNoCredentialsV2",
 		Method:             "GET",
 		PathPattern:        "/api/v2/projects/{project_id}/clusters/{cluster_id}/providers/openstack/subnets",
@@ -705,7 +779,12 @@ func (a *Client) ListOpenstackSubnetsNoCredentialsV2(params *ListOpenstackSubnet
 		AuthInfo:           authInfo,
 		Context:            params.Context,
 		Client:             params.HTTPClient,
-	})
+	}
+	for _, opt := range opts {
+		opt(op)
+	}
+
+	result, err := a.transport.Submit(op)
 	if err != nil {
 		return nil, err
 	}
@@ -721,13 +800,12 @@ func (a *Client) ListOpenstackSubnetsNoCredentialsV2(params *ListOpenstackSubnet
 /*
   ListOpenstackTenants Lists tenants from openstack
 */
-func (a *Client) ListOpenstackTenants(params *ListOpenstackTenantsParams, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackTenantsOK, error) {
+func (a *Client) ListOpenstackTenants(params *ListOpenstackTenantsParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackTenantsOK, error) {
 	// TODO: Validate the params before sending
 	if params == nil {
 		params = NewListOpenstackTenantsParams()
 	}
-
-	result, err := a.transport.Submit(&runtime.ClientOperation{
+	op := &runtime.ClientOperation{
 		ID:                 "listOpenstackTenants",
 		Method:             "GET",
 		PathPattern:        "/api/v1/providers/openstack/tenants",
@@ -739,7 +817,12 @@ func (a *Client) ListOpenstackTenants(params *ListOpenstackTenantsParams, authIn
 		AuthInfo:           authInfo,
 		Context:            params.Context,
 		Client:             params.HTTPClient,
-	})
+	}
+	for _, opt := range opts {
+		opt(op)
+	}
+
+	result, err := a.transport.Submit(op)
 	if err != nil {
 		return nil, err
 	}
@@ -755,13 +838,12 @@ func (a *Client) ListOpenstackTenants(params *ListOpenstackTenantsParams, authIn
 /*
   ListOpenstackTenantsNoCredentials Lists tenants from openstack
 */
-func (a *Client) ListOpenstackTenantsNoCredentials(params *ListOpenstackTenantsNoCredentialsParams, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackTenantsNoCredentialsOK, error) {
+func (a *Client) ListOpenstackTenantsNoCredentials(params *ListOpenstackTenantsNoCredentialsParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackTenantsNoCredentialsOK, error) {
 	// TODO: Validate the params before sending
 	if params == nil {
 		params = NewListOpenstackTenantsNoCredentialsParams()
 	}
-
-	result, err := a.transport.Submit(&runtime.ClientOperation{
+	op := &runtime.ClientOperation{
 		ID:                 "listOpenstackTenantsNoCredentials",
 		Method:             "GET",
 		PathPattern:        "/api/v1/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/providers/openstack/tenants",
@@ -773,7 +855,12 @@ func (a *Client) ListOpenstackTenantsNoCredentials(params *ListOpenstackTenantsN
 		AuthInfo:           authInfo,
 		Context:            params.Context,
 		Client:             params.HTTPClient,
-	})
+	}
+	for _, opt := range opts {
+		opt(op)
+	}
+
+	result, err := a.transport.Submit(op)
 	if err != nil {
 		return nil, err
 	}
@@ -789,13 +876,12 @@ func (a *Client) ListOpenstackTenantsNoCredentials(params *ListOpenstackTenantsN
 /*
   ListOpenstackTenantsNoCredentialsV2 Lists tenants from openstack
 */
-func (a *Client) ListOpenstackTenantsNoCredentialsV2(params *ListOpenstackTenantsNoCredentialsV2Params, authInfo runtime.ClientAuthInfoWriter) (*ListOpenstackTenantsNoCredentialsV2OK, error) {
+func (a *Client) ListOpenstackTenantsNoCredentialsV2(params *ListOpenstackTenantsNoCredentialsV2Params, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListOpenstackTenantsNoCredentialsV2OK, error) {
 	// TODO: Validate the params before sending
 	if params == nil {
 		params = NewListOpenstackTenantsNoCredentialsV2Params()
 	}
-
-	result, err := a.transport.Submit(&runtime.ClientOperation{
+	op := &runtime.ClientOperation{
 		ID:                 "listOpenstackTenantsNoCredentialsV2",
 		Method:             "GET",
 		PathPattern:        "/api/v2/projects/{project_id}/clusters/{cluster_id}/providers/openstack/tenants",
@@ -807,7 +893,12 @@ func (a *Client) ListOpenstackTenantsNoCredentialsV2(params *ListOpenstackTenant
 		AuthInfo:           authInfo,
 		Context:            params.Context,
 		Client:             params.HTTPClient,
-	})
+	}
+	for _, opt := range opts {
+		opt(op)
+	}
+
+	result, err := a.transport.Submit(op)
 	if err != nil {
 		return nil, err
 	}

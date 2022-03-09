@@ -45,10 +45,10 @@ type Resource interface {
 	GetPath() string
 	GetID() string
 	GetName() string
-	CreateSuccessCode() int
 	FromCreateRequest([]byte) (Resource, error)
 	CreateResponse() ([]byte, error)
 	SubResources() []ResourceBuilder
+	CreateSuccessCode() int
 }
 
 type ResourceBuilder func() Resource
@@ -168,10 +168,6 @@ func (s SecGroup) GetName() string {
 	return s.Name
 }
 
-func (SecGroup) CreateSuccessCode() int {
-	return http.StatusCreated
-}
-
 func (s SecGroup) GetType() string {
 	return "security_groups"
 }
@@ -197,6 +193,10 @@ func (s *SecGroup) FromCreateRequest(c []byte) (Resource, error) {
 	return s, nil
 }
 
+func (SecGroup) CreateSuccessCode() int {
+	return http.StatusCreated
+}
+
 func (s *SecGroup) CreateResponse() ([]byte, error) {
 	res := struct {
 		SecGroup *SecGroup `json:"security_group"`
@@ -212,10 +212,6 @@ func (s *SecGroup) SubResources() []ResourceBuilder {
 
 type SecGroupRule rules.SecGroupRule
 
-func (SecGroupRule) CreateSuccessCode() int {
-	return http.StatusCreated
-}
-
 func (s SecGroupRule) GetID() string {
 	return s.ID
 }
@@ -230,6 +226,10 @@ func (s SecGroupRule) GetType() string {
 
 func (s SecGroupRule) GetPath() string {
 	return "/security-group-rules"
+}
+
+func (SecGroupRule) CreateSuccessCode() int {
+	return http.StatusCreated
 }
 
 func (s *SecGroupRule) FromCreateRequest(c []byte) (Resource, error) {
@@ -264,10 +264,6 @@ func (s *SecGroupRule) SubResources() []ResourceBuilder {
 }
 
 type Subnet subnets.Subnet
-
-func (Subnet) CreateSuccessCode() int {
-	return http.StatusCreated
-}
 
 func (s Subnet) GetID() string {
 	return s.ID
@@ -308,6 +304,10 @@ func (s *Subnet) FromCreateRequest(c []byte) (Resource, error) {
 	return s, nil
 }
 
+func (Subnet) CreateSuccessCode() int {
+	return http.StatusCreated
+}
+
 func (s *Subnet) CreateResponse() ([]byte, error) {
 	res := struct {
 		Subnet *Subnet `json:"subnet"`
@@ -322,10 +322,6 @@ func (s *Subnet) SubResources() []ResourceBuilder {
 }
 
 type Port ports.Port
-
-func (Port) CreateSuccessCode() int {
-	return http.StatusCreated
-}
 
 func (p Port) GetID() string {
 	return p.ID
@@ -361,6 +357,10 @@ func (p *Port) FromCreateRequest(c []byte) (Resource, error) {
 	return p, nil
 }
 
+func (Port) CreateSuccessCode() int {
+	return http.StatusCreated
+}
+
 func (p *Port) CreateResponse() ([]byte, error) {
 	res := struct {
 		*Port `json:"subnet"`
@@ -375,10 +375,6 @@ func (p *Port) SubResources() []ResourceBuilder {
 }
 
 type Router routers.Router
-
-func (Router) CreateSuccessCode() int {
-	return http.StatusCreated
-}
 
 func (r Router) GetID() string {
 	return r.ID
@@ -419,6 +415,10 @@ func (r *Router) FromCreateRequest(c []byte) (Resource, error) {
 	return r, nil
 }
 
+func (Router) CreateSuccessCode() int {
+	return http.StatusCreated
+}
+
 func (r *Router) CreateResponse() ([]byte, error) {
 	res := struct {
 		Router *Router `json:"router"`
@@ -441,16 +441,16 @@ type InterfaceInfo struct {
 	routerID string
 }
 
-func (InterfaceInfo) CreateSuccessCode() int {
-	return http.StatusCreated
-}
-
 func (i InterfaceInfo) GetID() string {
 	return i.ID
 }
 
 func (i InterfaceInfo) GetName() string {
 	return ""
+}
+
+func (InterfaceInfo) CreateSuccessCode() int {
+	return http.StatusCreated
 }
 
 func (i InterfaceInfo) GetType() string {

@@ -24,6 +24,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/docker/distribution/reference"
 	"github.com/ghodss/yaml"
+	certmanagerv1 "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1"
 	"go.uber.org/zap"
 
 	kubermaticapiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
@@ -32,7 +33,6 @@ import (
 	"k8c.io/kubermatic/v2/pkg/resources"
 	"k8c.io/kubermatic/v2/pkg/version"
 
-	certmanagerv1alpha2 "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1alpha2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/pointer"
@@ -68,8 +68,8 @@ var (
 	DefaultAccessibleAddons = []string{
 		"cluster-autoscaler",
 		"node-exporter",
+		"kube-state-metrics",
 		"multus",
-		"gatekeeper",
 	}
 
 	DefaultUIResources = corev1.ResourceRequirements{
@@ -155,8 +155,8 @@ var (
 			corev1.ResourceMemory: resource.MustParse("32Mi"),
 		},
 		Limits: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse("200m"),
-			corev1.ResourceMemory: resource.MustParse("64Mi"),
+			corev1.ResourceCPU:    resource.MustParse("1"),
+			corev1.ResourceMemory: resource.MustParse("128Mi"),
 		},
 	}
 
@@ -191,53 +191,25 @@ var (
 	}
 
 	DefaultKubernetesVersioning = operatorv1alpha1.KubermaticVersioningConfiguration{
-		Default: semver.MustParse("v1.19.9"),
+		Default: semver.MustParse("v1.21.8"),
 		Versions: []*semver.Version{
-			// Kubernetes 1.18
-			semver.MustParse("v1.18.6"),
-			semver.MustParse("v1.18.8"),
-			semver.MustParse("v1.18.10"),
-			semver.MustParse("v1.18.14"),
-			semver.MustParse("v1.18.17"),
 			// Kubernetes 1.19
-			semver.MustParse("v1.19.0"),
-			semver.MustParse("v1.19.2"),
-			semver.MustParse("v1.19.3"),
-			semver.MustParse("v1.19.8"),
-			semver.MustParse("v1.19.9"),
+			semver.MustParse("v1.19.15"),
 			// Kubernetes 1.20
-			semver.MustParse("v1.20.2"),
-			semver.MustParse("v1.20.5"),
+			semver.MustParse("v1.20.13"),
+			semver.MustParse("v1.20.14"),
 			// Kubernetes 1.21
-			semver.MustParse("v1.21.0"),
+			semver.MustParse("v1.21.8"),
+			// Kubernetes 1.22
+			semver.MustParse("v1.22.5"),
 		},
 		Updates: []operatorv1alpha1.Update{
-			// ======= 1.17 =======
-			{
-				// Auto-upgrade unsupported clusters
-				From:      "1.17.*",
-				To:        "1.18.17",
-				Automatic: pointer.BoolPtr(true),
-			},
-
 			// ======= 1.18 =======
 			{
-				// Allow to change to any patch version
-				From: "1.18.*",
-				To:   "1.18.*",
-			},
-			{
-				// CVE-2020-8559
-				// Releases from 1.18.0 to 1.18.2 also do not work with CentOS7
-				// https://github.com/kubernetes/kubernetes/pull/90678
-				From:      "<= 1.18.5, >= 1.18.0",
-				To:        "1.18.6",
+				// Auto-upgrade unsupported clusters
+				From:      "1.18.*",
+				To:        "1.19.*",
 				Automatic: pointer.BoolPtr(true),
-			},
-			{
-				// Allow to next minor release
-				From: "1.18.*",
-				To:   "1.19.*",
 			},
 
 			// ======= 1.19 =======
@@ -245,6 +217,12 @@ var (
 				// Allow to change to any patch version
 				From: "1.19.*",
 				To:   "1.19.*",
+			},
+			{
+				// Auto-upgrade because of CVE-2021-25741
+				From:      ">= 1.19.0, < 1.19.15",
+				To:        "1.19.15",
+				Automatic: pointer.BoolPtr(true),
 			},
 			{
 				// Allow to next minor release
@@ -259,6 +237,16 @@ var (
 				To:   "1.20.*",
 			},
 			{
+				// Auto-upgrade because of CVEs:
+				// - CVE-2021-25741 (fixed >= 1.20.11)
+				// - CVE-2021-3711 (fixed >= 1.20.13)
+				// - CVE-2021-3712 (fixed >= 1.20.13)
+				// - CVE-2021-33910 (fixed >= 1.20.13)
+				From:      ">= 1.20.0, < 1.20.13",
+				To:        "1.20.13",
+				Automatic: pointer.BoolPtr(true),
+			},
+			{
 				// Allow to next minor release
 				From: "1.20.*",
 				To:   "1.21.*",
@@ -269,6 +257,61 @@ var (
 				// Allow to change to any patch version
 				From: "1.21.*",
 				To:   "1.21.*",
+			},
+			{
+				// Auto-upgrade because of CVEs:
+				// - CVE-2021-25741 (fixed >= 1.21.5)
+				// - CVE-2021-3711 (fixed >= 1.21.7)
+				// - CVE-2021-3712 (fixed >= 1.21.7)
+				// - CVE-2021-33910 (fixed >= 1.21.7)
+				// - CVE-2021-44716 (fixed >= 1.21.8)
+				// - CVE-2021-44717 (fixed >= 1.21.8)
+				From:      ">= 1.21.0, < 1.21.8",
+				To:        "1.21.8",
+				Automatic: pointer.BoolPtr(true),
+			},
+			{
+				// Allow to next minor release
+				From: "1.21.*",
+				To:   "1.22.*",
+			},
+
+			// ======= 1.22 =======
+			{
+				// Allow to change to any patch version
+				From: "1.22.*",
+				To:   "1.22.*",
+			},
+			{
+				// Auto-upgrade because of CVEs:
+				// - CVE-2021-3711 (fixed >= 1.22.4)
+				// - CVE-2021-3712 (fixed >= 1.22.4)
+				// - CVE-2021-33910 (fixed >= 1.22.4)
+				// - CVE-2021-44716 (fixed >= 1.22.5)
+				// - CVE-2021-44717 (fixed >= 1.22.5)
+				From:      ">= 1.22.0, < 1.22.5",
+				To:        "1.22.5",
+				Automatic: pointer.BoolPtr(true),
+			},
+		},
+		ProviderIncompatibilities: []operatorv1alpha1.Incompatibility{
+			{
+				Provider:  kubermaticv1.ProviderVSphere,
+				Version:   "1.22.*",
+				Condition: version.AlwaysCondition,
+				Operation: version.CreateOperation,
+			},
+			{
+				Provider:  kubermaticv1.ProviderVSphere,
+				Version:   "1.22.*",
+				Condition: version.ExternalCloudProviderCondition,
+				Operation: version.UpdateOperation,
+			},
+			{
+				Provider:  kubermaticv1.ProviderVSphere,
+				Version:   "1.22.*",
+				Condition: version.ExternalCloudProviderCondition,
+				Operation: version.SupportOperation,
 			},
 		},
 	}
@@ -385,7 +428,7 @@ func DefaultConfiguration(config *operatorv1alpha1.KubermaticConfiguration, logg
 	// it does not make sense to force to change the configuration for the
 	// default case
 	if copy.Spec.Ingress.CertificateIssuer.Kind == "" {
-		copy.Spec.Ingress.CertificateIssuer.Kind = certmanagerv1alpha2.ClusterIssuerKind
+		copy.Spec.Ingress.CertificateIssuer.Kind = certmanagerv1.ClusterIssuerKind
 		logger.Debugw("Defaulting field", "field", "ingress.certificateIssuer.kind", "value", copy.Spec.Ingress.CertificateIssuer.Kind)
 	}
 
@@ -618,6 +661,10 @@ func defaultVersioning(settings *operatorv1alpha1.KubermaticVersioningConfigurat
 		settings.Updates = defaults.Updates
 	}
 
+	if len(settings.ProviderIncompatibilities) == 0 {
+		settings.ProviderIncompatibilities = defaults.ProviderIncompatibilities
+	}
+
 	return nil
 }
 
@@ -682,12 +729,12 @@ env:
 - name: ACCESS_KEY_ID
   valueFrom:
     secretKeyRef:
-      name: s3-credentials
+      name: backup-s3
       key: ACCESS_KEY_ID
 - name: SECRET_ACCESS_KEY
   valueFrom:
     secretKeyRef:
-      name: s3-credentials
+      name: backup-s3
       key: SECRET_ACCESS_KEY
 - name: BUCKET_NAME
   valueFrom:
@@ -735,12 +782,12 @@ env:
 - name: ACCESS_KEY_ID
   valueFrom:
     secretKeyRef:
-      name: s3-credentials
+      name: backup-s3
       key: ACCESS_KEY_ID
 - name: SECRET_ACCESS_KEY
   valueFrom:
     secretKeyRef:
-      name: s3-credentials
+      name: backup-s3
       key: SECRET_ACCESS_KEY
 - name: BUCKET_NAME
   valueFrom:
@@ -835,6 +882,12 @@ items:
 - apiVersion: kubermatic.k8s.io/v1
   kind: Addon
   metadata:
+    name: kubeadm-configmap
+    labels:
+      addons.kubermatic.io/ensure: true
+- apiVersion: kubermatic.k8s.io/v1
+  kind: Addon
+  metadata:
     name: kubelet-configmap
 - apiVersion: kubermatic.k8s.io/v1
   kind: Addon
@@ -849,7 +902,7 @@ items:
 - apiVersion: kubermatic.k8s.io/v1
   kind: Addon
   metadata:
-    name: logrotate
+    name: aws-node-termination-handler
     labels:
       addons.kubermatic.io/ensure: true
 - apiVersion: kubermatic.k8s.io/v1
@@ -947,6 +1000,31 @@ func CreateUpdatesYAML(config *operatorv1alpha1.KubermaticVersionsConfiguration)
 				Automatic:           automatic,
 				AutomaticNodeUpdate: automaticNodeUpdate,
 				Type:                kind,
+			})
+		}
+	}
+
+	appendOrchestrator(&config.Kubernetes, kubermaticapiv1.KubernetesClusterType)
+	return toYAML(output)
+}
+
+type providerIncompatibilitiesYAML struct {
+	ProviderIncompatibilities []*version.ProviderIncompatibility `json:"ProviderIncompatibilities"`
+}
+
+func CreateProviderIncompatibilitiesYAML(config *operatorv1alpha1.KubermaticVersionsConfiguration) (string, error) {
+	output := providerIncompatibilitiesYAML{
+		ProviderIncompatibilities: make([]*version.ProviderIncompatibility, 0),
+	}
+
+	appendOrchestrator := func(cfg *operatorv1alpha1.KubermaticVersioningConfiguration, kind string) {
+		for _, i := range cfg.ProviderIncompatibilities {
+			output.ProviderIncompatibilities = append(output.ProviderIncompatibilities, &version.ProviderIncompatibility{
+				Provider:  i.Provider,
+				Version:   i.Version,
+				Condition: i.Condition,
+				Operation: i.Operation,
+				Type:      kind,
 			})
 		}
 	}

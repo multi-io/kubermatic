@@ -6,6 +6,8 @@ package models
 // Editing this file might prove futile when you re-run the swagger generate command
 
 import (
+	"context"
+
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/swag"
 )
@@ -31,16 +33,21 @@ type PolicyRule struct {
 	// +optional
 	ResourceNames []string `json:"resourceNames"`
 
-	// Resources is a list of resources this rule applies to.  ResourceAll represents all resources.
+	// Resources is a list of resources this rule applies to. '*' represents all resources.
 	// +optional
 	Resources []string `json:"resources"`
 
-	// Verbs is a list of Verbs that apply to ALL the ResourceKinds and AttributeRestrictions contained in this rule.  VerbAll represents all kinds.
+	// Verbs is a list of Verbs that apply to ALL the ResourceKinds and AttributeRestrictions contained in this rule. '*' represents all verbs.
 	Verbs []string `json:"verbs"`
 }
 
 // Validate validates this policy rule
 func (m *PolicyRule) Validate(formats strfmt.Registry) error {
+	return nil
+}
+
+// ContextValidate validates this policy rule based on context it is used
+func (m *PolicyRule) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
 	return nil
 }
 

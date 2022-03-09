@@ -88,12 +88,11 @@ func NewCloudProvider(
 		return nil, errors.New("datacenter is not an Openstack datacenter")
 	}
 	return &Provider{
-		dc:                dc.Spec.Openstack,
-		secretKeySelector: secretKeyGetter,
-		caBundle:          caBundle,
-		nodePortsRange:    nodePortsRange,
-		getClientFunc:     getNetClientForCluster,
-
+		dc:                   dc.Spec.Openstack,
+		secretKeySelector:    secretKeyGetter,
+		caBundle:             caBundle,
+		nodePortsRange:       nodePortsRange,
+		getClientFunc:        getNetClientForCluster,
 		getComputeClientFunc: getComputeClientForCluster,
 	}, nil
 }
@@ -171,6 +170,28 @@ func validateExistingSubnetOverlap(networkID string, netClient *gophercloud.Serv
 	})
 }
 
+// We start by adding the finalizers, note that this is safe because the
+// clean-up is idempotent, if the cluster is deleted when resources associated
+// to the finalizer are not created yet, it does not fail.
+// The reason behind is that we have several controllers adding finalizers
+// to the Cluster resource at the moment, and to avoid race conditions we
+// need to use optimistic locking and return immediately in case of
+// conflicts to retry later.
+func ensureFinalizers(cluster *kubermaticv1.Cluster, finalizers []string, update provider.ClusterUpdater) (*kubermaticv1.Cluster, error) {
+	var err error
+
+	if len(finalizers) > 0 {
+		cluster, err = update(cluster.Name, func(cluster *kubermaticv1.Cluster) {
+			kubernetes.AddFinalizer(cluster, finalizers...)
+		}, provider.UpdaterOptionOptimisticLock)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return cluster, nil
+}
+
 //nolint:golint,cyclomatic
 // InitializeCloudProvider initializes a cluster, in particular
 // creates security group and network configuration
@@ -191,6 +212,9 @@ func (os *Provider) InitializeCloudProvider(cluster *kubermaticv1.Cluster, updat
 	if cluster.Spec.Cloud.Openstack.Network == "" {
 		finalizers = append(finalizers, NetworkCleanupFinalizer)
 	}
+	if cluster.Spec.Cloud.Openstack.ServerGroupID == "" {
+		finalizers = append(finalizers, ServerGroupCleanupFinalizer)
+	}
 	// If subnet has to be created, router and router port should be
 	// created too thus we add the finalizers.
 	if cluster.Spec.Cloud.Openstack.SubnetID == "" {
@@ -207,24 +231,9 @@ func (os *Provider) InitializeCloudProvider(cluster *kubermaticv1.Cluster, updat
 		}
 	}
 
-	if cluster.Spec.Cloud.Openstack.ServerGroupID == "" {
-		finalizers = append(finalizers, ServerGroupCleanupFinalizer)
-	}
-
-	// We start by adding the finalizers, note that this is safe because the
-	// clean-up is idempotent, if the cluster is deleted when resources associated
-	// to the finalizer are not created yet, it does not fail.
-	// The reason behind is that we have several controllers adding finalizers
-	// to the Cluster resource at the moment, and to avoid race conditions we
-	// need to use optimistic locking and return immediately in case of
-	// conflicts to retry later.
-	if len(finalizers) > 0 {
-		cluster, err = update(cluster.Name, func(cluster *kubermaticv1.Cluster) {
-			kubernetes.AddFinalizer(cluster, finalizers...)
-		}, provider.UpdaterOptionOptimisticLock)
-		if err != nil {
-			return nil, fmt.Errorf("failed to add finalizers: %w", err)
-		}
+	cluster, err = ensureFinalizers(cluster, finalizers, update)
+	if err != nil {
+		return nil, fmt.Errorf("failed to ensure finalizers: %v", err)
 	}
 
 	if cluster.Spec.Cloud.Openstack.FloatingIPPool == "" {
@@ -350,8 +359,9 @@ func (os *Provider) InitializeCloudProvider(cluster *kubermaticv1.Cluster, updat
 	// health status is not up, meaning that there was no successful
 	// reconciliations so far. This is to avoid hitting OpenStack API at each
 	// iteration.
-	// TODO(irozzo): this is terrible, find a better way.
-	if cluster.Status.ExtendedHealth.CloudProviderInfrastructure != kubermaticv1.HealthStatusUp {
+	// TODO: this is terrible, find a better way.
+	if cluster.Status.ExtendedHealth.CloudProviderInfrastructure != kubermaticv1.HealthStatusUp &&
+		kubernetes.HasFinalizer(cluster, RouterSubnetLinkCleanupFinalizer) {
 		if _, err = attachSubnetToRouter(netClient, cluster.Spec.Cloud.Openstack.SubnetID, cluster.Spec.Cloud.Openstack.RouterID); err != nil {
 			return nil, fmt.Errorf("failed to attach subnet to router: %v", err)
 		}
@@ -360,9 +370,9 @@ func (os *Provider) InitializeCloudProvider(cluster *kubermaticv1.Cluster, updat
 	return cluster, nil
 }
 
+//nolint:golint,cyclomatic
 // CleanUpCloudProvider does the clean-up in particular:
 // removes security group and network configuration
-//nolint:golint,cyclomatic
 func (os *Provider) CleanUpCloudProvider(cluster *kubermaticv1.Cluster, update provider.ClusterUpdater) (*kubermaticv1.Cluster, error) {
 	netClient, err := os.getClientFunc(cluster.Spec.Cloud, os.dc, os.secretKeySelector, os.caBundle)
 	if err != nil {
@@ -421,9 +431,17 @@ func (os *Provider) CleanUpCloudProvider(cluster *kubermaticv1.Cluster, update p
 		id := resources.ServerGroupID
 		if err := deleteServerGroup(computeClient, id); err != nil {
 			if !isNotFoundErr(err) {
-				return cluster, fmt.Errorf("delete server group for cluster '%s': %v", cluster.Name, err)
+				return nil, fmt.Errorf("delete server group for cluster '%s': %v", cluster.Name, err)
 			}
 			return cluster, fmt.Errorf("delete server group for cluster '%s': %v", cluster.Name, err)
+		}
+	}
+
+	if kubernetes.HasFinalizer(cluster, RouterCleanupFinalizer) || kubernetes.HasFinalizer(cluster, OldNetworkCleanupFinalizer) {
+		if err = deleteRouter(netClient, cluster.Spec.Cloud.Openstack.RouterID); err != nil {
+			if !isNotFoundErr(err) {
+				return nil, fmt.Errorf("failed to delete router '%s': %v", cluster.Spec.Cloud.Openstack.RouterID, err)
+			}
 		}
 	}
 
@@ -582,6 +600,29 @@ func getNetClient(authURL, region string, credentials *resources.OpenstackCreden
 		//lint:ignore S1020 false positive, we must do the errcheck regardless of if its an ErrEndpointNotFound
 		if _, ok := err.(*gophercloud.ErrEndpointNotFound); ok {
 			serviceClient, err = goopenstack.NewNetworkV2(authClient, gophercloud.EndpointOpts{})
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			return nil, err
+		}
+	}
+	return serviceClient, err
+}
+
+func getComputeClient(authURL, region string, credentials *resources.OpenstackCredentials, caBundle *x509.CertPool) (*gophercloud.ServiceClient, error) {
+	authClient, err := getAuthClient(authURL, credentials, caBundle)
+	if err != nil {
+		return nil, err
+	}
+
+	serviceClient, err := goopenstack.NewComputeV2(authClient, gophercloud.EndpointOpts{Region: region})
+	if err != nil {
+		// this is special case for  services that span only one region.
+		//nolint:gosimple
+		//lint:ignore S1020 false positive, we must do the errcheck regardless of if its an ErrEndpointNotFound
+		if _, ok := err.(*gophercloud.ErrEndpointNotFound); ok {
+			serviceClient, err = goopenstack.NewComputeV2(authClient, gophercloud.EndpointOpts{})
 			if err != nil {
 				return nil, err
 			}

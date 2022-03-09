@@ -12,15 +12,21 @@ type KubermaticV1Interface interface {
 	RESTClient() rest.Interface
 	AddonsGetter
 	AddonConfigsGetter
+	AlertmanagersGetter
+	AllowedRegistriesGetter
 	ClustersGetter
+	ClusterTemplatesGetter
+	ClusterTemplateInstancesGetter
 	ConstraintsGetter
 	ConstraintTemplatesGetter
 	EtcdBackupConfigsGetter
 	EtcdRestoresGetter
 	ExternalClustersGetter
 	KubermaticSettingsGetter
+	MLAAdminSettingsGetter
 	MachineDeploymentRequestsGetter
 	ProjectsGetter
+	RuleGroupsGetter
 	UsersGetter
 	UserProjectBindingsGetter
 	UserSSHKeysGetter
@@ -39,8 +45,24 @@ func (c *KubermaticV1Client) AddonConfigs() AddonConfigInterface {
 	return newAddonConfigs(c)
 }
 
+func (c *KubermaticV1Client) Alertmanagers(namespace string) AlertmanagerInterface {
+	return newAlertmanagers(c, namespace)
+}
+
+func (c *KubermaticV1Client) AllowedRegistries() AllowedRegistryInterface {
+	return newAllowedRegistries(c)
+}
+
 func (c *KubermaticV1Client) Clusters() ClusterInterface {
 	return newClusters(c)
+}
+
+func (c *KubermaticV1Client) ClusterTemplates() ClusterTemplateInterface {
+	return newClusterTemplates(c)
+}
+
+func (c *KubermaticV1Client) ClusterTemplateInstances() ClusterTemplateInstanceInterface {
+	return newClusterTemplateInstances(c)
 }
 
 func (c *KubermaticV1Client) Constraints(namespace string) ConstraintInterface {
@@ -67,12 +89,20 @@ func (c *KubermaticV1Client) KubermaticSettings() KubermaticSettingInterface {
 	return newKubermaticSettings(c)
 }
 
+func (c *KubermaticV1Client) MLAAdminSettings(namespace string) MLAAdminSettingInterface {
+	return newMLAAdminSettings(c, namespace)
+}
+
 func (c *KubermaticV1Client) MachineDeploymentRequests(namespace string) MachineDeploymentRequestInterface {
 	return newMachineDeploymentRequests(c, namespace)
 }
 
 func (c *KubermaticV1Client) Projects() ProjectInterface {
 	return newProjects(c)
+}
+
+func (c *KubermaticV1Client) RuleGroups(namespace string) RuleGroupInterface {
+	return newRuleGroups(c, namespace)
 }
 
 func (c *KubermaticV1Client) Users() UserInterface {

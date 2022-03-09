@@ -391,3 +391,153 @@ func (k NodeDeploymentSliceWrapper) EqualOrDie(expected NodeDeploymentSliceWrapp
 		t.Errorf("actual slice is different that the expected one. Diff: %v", diff)
 	}
 }
+
+// NewClusterTemplateSliceWrapper wraps []apiv2.ClusterTemplate
+// to provide convenient methods for tests
+type NewClusterTemplateSliceWrapper []apiv2.ClusterTemplate
+
+// Sort sorts the collection by Name
+func (k NewClusterTemplateSliceWrapper) Sort() {
+	sort.Slice(k, func(i, j int) bool {
+		return k[i].Name < k[j].Name
+	})
+}
+
+// DecodeOrDie reads and decodes json data from the reader
+func (k *NewClusterTemplateSliceWrapper) DecodeOrDie(r io.Reader, t *testing.T) *NewClusterTemplateSliceWrapper {
+	t.Helper()
+	dec := json.NewDecoder(r)
+	err := dec.Decode(k)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return k
+}
+
+// EqualOrDie compares whether expected collection is equal to the actual one
+func (k NewClusterTemplateSliceWrapper) EqualOrDie(expected NewClusterTemplateSliceWrapper, t *testing.T) {
+	t.Helper()
+	if diff := deep.Equal(k, expected); diff != nil {
+		t.Errorf("actual slice is different that the expected one. Diff: %v", diff)
+	}
+}
+
+// NewRuleGroupSliceWrapper wraps []apiv2.RuleGroup
+// to provide convenient methods for tests
+type NewRuleGroupSliceWrapper []*apiv2.RuleGroup
+
+// DecodeOrDie reads and decodes json data from the reader
+func (k *NewRuleGroupSliceWrapper) DecodeOrDie(r io.Reader, t *testing.T) *NewRuleGroupSliceWrapper {
+	t.Helper()
+	dec := json.NewDecoder(r)
+	err := dec.Decode(k)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return k
+}
+
+// Sort sorts the collection by Name
+func (k NewRuleGroupSliceWrapper) Sort() {
+	sort.Slice(k, func(i, j int) bool {
+		return string(k[i].Data) < string(k[j].Data)
+	})
+}
+
+// EqualOrDie compares whether expected collection is equal to the actual one
+func (k NewRuleGroupSliceWrapper) EqualOrDie(expected NewRuleGroupSliceWrapper, t *testing.T) {
+	t.Helper()
+	if diff := deep.Equal(k, expected); diff != nil {
+		t.Errorf("actual slice is different that the expected one. Diff: %v", diff)
+	}
+}
+
+// NewAllowedRegistrySliceWrapper wraps []apiv2.AllowedRegistry
+// to provide convenient methods for tests
+type NewAllowedRegistrySliceWrapper []*apiv2.AllowedRegistry
+
+// DecodeOrDie reads and decodes json data from the reader
+func (k *NewAllowedRegistrySliceWrapper) DecodeOrDie(r io.Reader, t *testing.T) *NewAllowedRegistrySliceWrapper {
+	t.Helper()
+	dec := json.NewDecoder(r)
+	err := dec.Decode(k)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return k
+}
+
+// Sort sorts the collection by Name
+func (k NewAllowedRegistrySliceWrapper) Sort() {
+	sort.Slice(k, func(i, j int) bool {
+		return k[i].Name < k[j].Name
+	})
+}
+
+// EqualOrDie compares whether expected collection is equal to the actual one
+func (k NewAllowedRegistrySliceWrapper) EqualOrDie(expected NewAllowedRegistrySliceWrapper, t *testing.T) {
+	t.Helper()
+	if diff := deep.Equal(k, expected); diff != nil {
+		t.Errorf("actual slice is different that the expected one. Diff: %v", diff)
+	}
+}
+
+// NewEtcdBackupConfigSliceWrapper wraps []apiv2.EtcdBackupConfig
+// to provide convenient methods for tests
+type NewEtcdBackupConfigSliceWrapper []*apiv2.EtcdBackupConfig
+
+// DecodeOrDie reads and decodes json data from the reader
+func (k *NewEtcdBackupConfigSliceWrapper) DecodeOrDie(r io.Reader, t *testing.T) *NewEtcdBackupConfigSliceWrapper {
+	t.Helper()
+	dec := json.NewDecoder(r)
+	err := dec.Decode(k)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return k
+}
+
+// Sort sorts the collection by Name
+func (k NewEtcdBackupConfigSliceWrapper) Sort() {
+	sort.Slice(k, func(i, j int) bool {
+		return k[i].ObjectMeta.Name < k[j].ObjectMeta.Name
+	})
+}
+
+// EqualOrDie compares whether expected collection is equal to the actual one
+func (k NewEtcdBackupConfigSliceWrapper) EqualOrDie(expected NewEtcdBackupConfigSliceWrapper, t *testing.T) {
+	t.Helper()
+	if diff := deep.Equal(k, expected); diff != nil {
+		t.Errorf("actual slice is different that the expected one. Diff: %v", diff)
+	}
+}
+
+// NewEtcdRestoreSliceWrapper wraps []apiv2.EtcdRestore
+// to provide convenient methods for tests
+type NewEtcdRestoreSliceWrapper []*apiv2.EtcdRestore
+
+// DecodeOrDie reads and decodes json data from the reader
+func (k *NewEtcdRestoreSliceWrapper) DecodeOrDie(r io.Reader, t *testing.T) *NewEtcdRestoreSliceWrapper {
+	t.Helper()
+	dec := json.NewDecoder(r)
+	err := dec.Decode(k)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return k
+}
+
+// Sort sorts the collection by Name
+func (k NewEtcdRestoreSliceWrapper) Sort() {
+	sort.Slice(k, func(i, j int) bool {
+		return k[i].Name < k[j].Name
+	})
+}
+
+// EqualOrDie compares whether expected collection is equal to the actual one
+func (k NewEtcdRestoreSliceWrapper) EqualOrDie(expected NewEtcdRestoreSliceWrapper, t *testing.T) {
+	t.Helper()
+	if diff := deep.Equal(k, expected); diff != nil {
+		t.Errorf("actual slice is different that the expected one. Diff: %v", diff)
+	}
+}

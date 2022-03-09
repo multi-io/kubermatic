@@ -20,6 +20,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"k8c.io/kubermatic/v2/pkg/watcher"
 	"strings"
 
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
@@ -29,28 +30,28 @@ import (
 	"k8c.io/kubermatic/v2/pkg/resources/certificates"
 	"k8c.io/kubermatic/v2/pkg/serviceaccount"
 	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
-	"k8c.io/kubermatic/v2/pkg/watcher"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 type serverRunOptions struct {
-	listenAddress    string
-	internalAddr     string
-	prometheusURL    string
-	masterResources  string
-	workerName       string
-	versionsFile     string
-	updatesFile      string
-	presetsFile      string
-	swaggerFile      string
-	domain           string
-	exposeStrategy   kubermaticv1.ExposeStrategy
-	dynamicPresets   bool
-	namespace        string
-	log              kubermaticlog.Options
-	accessibleAddons sets.String
-	caBundle         *certificates.CABundle
+	listenAddress                 string
+	internalAddr                  string
+	prometheusURL                 string
+	masterResources               string
+	workerName                    string
+	versionsFile                  string
+	updatesFile                   string
+	providerIncompatibilitiesFile string
+	presetsFile                   string
+	swaggerFile                   string
+	domain                        string
+	exposeStrategy                kubermaticv1.ExposeStrategy
+	dynamicPresets                bool
+	namespace                     string
+	log                           kubermaticlog.Options
+	accessibleAddons              sets.String
+	caBundle                      *certificates.CABundle
 
 	// OIDC configuration
 	oidcURL                        string
@@ -88,6 +89,7 @@ func newServerRunOptions() (serverRunOptions, error) {
 	flag.StringVar(&s.workerName, "worker-name", "", "Create clusters only processed by worker-name cluster controller")
 	flag.StringVar(&s.versionsFile, "versions", "versions.yaml", "The versions.yaml file path")
 	flag.StringVar(&s.updatesFile, "updates", "updates.yaml", "The updates.yaml file path")
+	flag.StringVar(&s.providerIncompatibilitiesFile, "provider-incompatibilities", "provider-incompatibilities.yaml", "The provider-incompatibilities.yaml file path")
 	flag.StringVar(&s.presetsFile, "presets", "", "The optional file path for a file containing presets")
 	flag.StringVar(&s.swaggerFile, "swagger", "./cmd/kubermatic-api/swagger.json", "The swagger.json file path")
 	flag.StringVar(&rawAccessibleAddons, "accessible-addons", "", "Comma-separated list of user cluster addons to expose via the API")
@@ -143,34 +145,46 @@ func (o serverRunOptions) validate() error {
 }
 
 type providers struct {
-	sshKey                                provider.SSHKeyProvider
-	privilegedSSHKeyProvider              provider.PrivilegedSSHKeyProvider
-	user                                  provider.UserProvider
-	serviceAccountProvider                provider.ServiceAccountProvider
-	privilegedServiceAccountProvider      provider.PrivilegedServiceAccountProvider
-	serviceAccountTokenProvider           provider.ServiceAccountTokenProvider
-	privilegedServiceAccountTokenProvider provider.PrivilegedServiceAccountTokenProvider
-	project                               provider.ProjectProvider
-	privilegedProject                     provider.PrivilegedProjectProvider
-	projectMember                         provider.ProjectMemberProvider
-	privilegedProjectMemberProvider       provider.PrivilegedProjectMemberProvider
-	memberMapper                          provider.ProjectMemberMapper
-	eventRecorderProvider                 provider.EventRecorderProvider
-	clusterProviderGetter                 provider.ClusterProviderGetter
-	mdRequestProviderGetter               provider.MachineDeploymentRequestProviderGetter
-	seedsGetter                           provider.SeedsGetter
-	seedClientGetter                      provider.SeedClientGetter
-	addons                                provider.AddonProviderGetter
-	addonConfigProvider                   provider.AddonConfigProvider
-	userInfoGetter                        provider.UserInfoGetter
-	settingsProvider                      provider.SettingsProvider
-	adminProvider                         provider.AdminProvider
-	presetProvider                        provider.PresetProvider
-	admissionPluginProvider               provider.AdmissionPluginsProvider
-	settingsWatcher                       watcher.SettingsWatcher
-	userWatcher                           watcher.UserWatcher
-	externalClusterProvider               provider.ExternalClusterProvider
-	privilegedExternalClusterProvider     provider.PrivilegedExternalClusterProvider
-	constraintTemplateProvider            provider.ConstraintTemplateProvider
-	constraintProviderGetter              provider.ConstraintProviderGetter
+	mdRequestProviderGetter                 provider.MachineDeploymentRequestProviderGetter
+	sshKey                                  provider.SSHKeyProvider
+	privilegedSSHKeyProvider                provider.PrivilegedSSHKeyProvider
+	user                                    provider.UserProvider
+	serviceAccountProvider                  provider.ServiceAccountProvider
+	privilegedServiceAccountProvider        provider.PrivilegedServiceAccountProvider
+	serviceAccountTokenProvider             provider.ServiceAccountTokenProvider
+	privilegedServiceAccountTokenProvider   provider.PrivilegedServiceAccountTokenProvider
+	project                                 provider.ProjectProvider
+	privilegedProject                       provider.PrivilegedProjectProvider
+	projectMember                           provider.ProjectMemberProvider
+	privilegedProjectMemberProvider         provider.PrivilegedProjectMemberProvider
+	memberMapper                            provider.ProjectMemberMapper
+	eventRecorderProvider                   provider.EventRecorderProvider
+	clusterProviderGetter                   provider.ClusterProviderGetter
+	seedsGetter                             provider.SeedsGetter
+	seedClientGetter                        provider.SeedClientGetter
+	addons                                  provider.AddonProviderGetter
+	addonConfigProvider                     provider.AddonConfigProvider
+	userInfoGetter                          provider.UserInfoGetter
+	settingsProvider                        provider.SettingsProvider
+	adminProvider                           provider.AdminProvider
+	presetProvider                          provider.PresetProvider
+	admissionPluginProvider                 provider.AdmissionPluginsProvider
+	settingsWatcher                         watcher.SettingsWatcher
+	userWatcher                             watcher.UserWatcher
+	externalClusterProvider                 provider.ExternalClusterProvider
+	privilegedExternalClusterProvider       provider.PrivilegedExternalClusterProvider
+	constraintTemplateProvider              provider.ConstraintTemplateProvider
+	defaultConstraintProvider               provider.DefaultConstraintProvider
+	constraintProviderGetter                provider.ConstraintProviderGetter
+	alertmanagerProviderGetter              provider.AlertmanagerProviderGetter
+	clusterTemplateProvider                 provider.ClusterTemplateProvider
+	clusterTemplateInstanceProviderGetter   provider.ClusterTemplateInstanceProviderGetter
+	ruleGroupProviderGetter                 provider.RuleGroupProviderGetter
+	privilegedAllowedRegistryProvider       provider.PrivilegedAllowedRegistryProvider
+	etcdBackupConfigProviderGetter          provider.EtcdBackupConfigProviderGetter
+	etcdRestoreProviderGetter               provider.EtcdRestoreProviderGetter
+	etcdBackupConfigProjectProviderGetter   provider.EtcdBackupConfigProjectProviderGetter
+	etcdRestoreProjectProviderGetter        provider.EtcdRestoreProjectProviderGetter
+	backupCredentialsProviderGetter         provider.BackupCredentialsProviderGetter
+	privilegedMLAAdminSettingProviderGetter provider.PrivilegedMLAAdminSettingProviderGetter
 }

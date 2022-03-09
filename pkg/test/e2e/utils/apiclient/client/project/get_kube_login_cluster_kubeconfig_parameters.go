@@ -16,60 +16,76 @@ import (
 	"github.com/go-openapi/strfmt"
 )
 
-// NewGetKubeLoginClusterKubeconfigParams creates a new GetKubeLoginClusterKubeconfigParams object
-// with the default values initialized.
+// NewGetKubeLoginClusterKubeconfigParams creates a new GetKubeLoginClusterKubeconfigParams object,
+// with the default timeout for this client.
+//
+// Default values are not hydrated, since defaults are normally applied by the API server side.
+//
+// To enforce default values in parameter, use SetDefaults or WithDefaults.
 func NewGetKubeLoginClusterKubeconfigParams() *GetKubeLoginClusterKubeconfigParams {
-	var ()
 	return &GetKubeLoginClusterKubeconfigParams{
-
 		timeout: cr.DefaultTimeout,
 	}
 }
 
 // NewGetKubeLoginClusterKubeconfigParamsWithTimeout creates a new GetKubeLoginClusterKubeconfigParams object
-// with the default values initialized, and the ability to set a timeout on a request
+// with the ability to set a timeout on a request.
 func NewGetKubeLoginClusterKubeconfigParamsWithTimeout(timeout time.Duration) *GetKubeLoginClusterKubeconfigParams {
-	var ()
 	return &GetKubeLoginClusterKubeconfigParams{
-
 		timeout: timeout,
 	}
 }
 
 // NewGetKubeLoginClusterKubeconfigParamsWithContext creates a new GetKubeLoginClusterKubeconfigParams object
-// with the default values initialized, and the ability to set a context for a request
+// with the ability to set a context for a request.
 func NewGetKubeLoginClusterKubeconfigParamsWithContext(ctx context.Context) *GetKubeLoginClusterKubeconfigParams {
-	var ()
 	return &GetKubeLoginClusterKubeconfigParams{
-
 		Context: ctx,
 	}
 }
 
 // NewGetKubeLoginClusterKubeconfigParamsWithHTTPClient creates a new GetKubeLoginClusterKubeconfigParams object
-// with the default values initialized, and the ability to set a custom HTTPClient for a request
+// with the ability to set a custom HTTPClient for a request.
 func NewGetKubeLoginClusterKubeconfigParamsWithHTTPClient(client *http.Client) *GetKubeLoginClusterKubeconfigParams {
-	var ()
 	return &GetKubeLoginClusterKubeconfigParams{
 		HTTPClient: client,
 	}
 }
 
-/*GetKubeLoginClusterKubeconfigParams contains all the parameters to send to the API endpoint
-for the get kube login cluster kubeconfig operation typically these are written to a http.Request
+/* GetKubeLoginClusterKubeconfigParams contains all the parameters to send to the API endpoint
+   for the get kube login cluster kubeconfig operation.
+
+   Typically these are written to a http.Request.
 */
 type GetKubeLoginClusterKubeconfigParams struct {
 
-	/*ClusterID*/
+	// ClusterID.
 	ClusterID string
-	/*Dc*/
+
+	// Dc.
 	DC string
-	/*ProjectID*/
+
+	// ProjectID.
 	ProjectID string
 
 	timeout    time.Duration
 	Context    context.Context
 	HTTPClient *http.Client
+}
+
+// WithDefaults hydrates default values in the get kube login cluster kubeconfig params (not the query body).
+//
+// All values with no default are reset to their zero value.
+func (o *GetKubeLoginClusterKubeconfigParams) WithDefaults() *GetKubeLoginClusterKubeconfigParams {
+	o.SetDefaults()
+	return o
+}
+
+// SetDefaults hydrates default values in the get kube login cluster kubeconfig params (not the query body).
+//
+// All values with no default are reset to their zero value.
+func (o *GetKubeLoginClusterKubeconfigParams) SetDefaults() {
+	// no default values defined for this parameter
 }
 
 // WithTimeout adds the timeout to the get kube login cluster kubeconfig params

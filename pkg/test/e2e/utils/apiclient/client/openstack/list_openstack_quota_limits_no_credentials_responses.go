@@ -46,7 +46,7 @@ func NewListOpenstackQuotaLimitsNoCredentialsOK() *ListOpenstackQuotaLimitsNoCre
 	return &ListOpenstackQuotaLimitsNoCredentialsOK{}
 }
 
-/*ListOpenstackQuotaLimitsNoCredentialsOK handles this case with default header values.
+/* ListOpenstackQuotaLimitsNoCredentialsOK describes a response with status code 200, with default header values.
 
 Quotas
 */
@@ -57,7 +57,6 @@ type ListOpenstackQuotaLimitsNoCredentialsOK struct {
 func (o *ListOpenstackQuotaLimitsNoCredentialsOK) Error() string {
 	return fmt.Sprintf("[GET /api/v1/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/providers/openstack/quotalimits][%d] listOpenstackQuotaLimitsNoCredentialsOK  %+v", 200, o.Payload)
 }
-
 func (o *ListOpenstackQuotaLimitsNoCredentialsOK) GetPayload() *models.Quotas {
 	return o.Payload
 }
@@ -81,7 +80,7 @@ func NewListOpenstackQuotaLimitsNoCredentialsDefault(code int) *ListOpenstackQuo
 	}
 }
 
-/*ListOpenstackQuotaLimitsNoCredentialsDefault handles this case with default header values.
+/* ListOpenstackQuotaLimitsNoCredentialsDefault describes a response with status code -1, with default header values.
 
 errorResponse
 */
@@ -99,7 +98,6 @@ func (o *ListOpenstackQuotaLimitsNoCredentialsDefault) Code() int {
 func (o *ListOpenstackQuotaLimitsNoCredentialsDefault) Error() string {
 	return fmt.Sprintf("[GET /api/v1/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/providers/openstack/quotalimits][%d] listOpenstackQuotaLimitsNoCredentials default  %+v", o._statusCode, o.Payload)
 }
-
 func (o *ListOpenstackQuotaLimitsNoCredentialsDefault) GetPayload() *models.ErrorResponse {
 	return o.Payload
 }

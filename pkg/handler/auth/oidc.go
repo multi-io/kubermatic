@@ -26,10 +26,10 @@ import (
 	"net/http"
 	"time"
 
-	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
-
 	"github.com/coreos/go-oidc"
 	"golang.org/x/oauth2"
+
+	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
 )
 
 // OIDCToken represents the credentials used to authorize
@@ -239,7 +239,7 @@ func (e headerBearerTokenExtractor) Extract(r *http.Request) (string, error) {
 	if len(header) < 7 {
 		return "", fmt.Errorf("haven't found a Bearer token in the %s header", e.name)
 	}
-	//strip BEARER/bearer/Bearer prefix
+	// strip BEARER/bearer/Bearer prefix
 	return header[7:], nil
 }
 

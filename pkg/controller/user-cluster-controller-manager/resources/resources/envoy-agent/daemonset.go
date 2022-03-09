@@ -26,10 +26,9 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	utilpointer "k8s.io/utils/pointer"
-
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 var (
@@ -71,6 +70,16 @@ func DaemonSetCreator(agentIP net.IP, versions kubermatic.Versions) reconciling.
 			}
 
 			ds.Spec.Template.Spec = getAgentPodSpec(agentIP, versions)
+			ds.Spec.Template.Spec.Tolerations = []corev1.Toleration{
+				{
+					Effect:   corev1.TaintEffectNoSchedule,
+					Operator: corev1.TolerationOpExists,
+				},
+				{
+					Effect:   corev1.TaintEffectNoExecute,
+					Operator: corev1.TolerationOpExists,
+				},
+			}
 			if err := resources.SetResourceRequirements(ds.Spec.Template.Spec.Containers, ds.Annotations, defaultResourceRequirements, nil); err != nil {
 				return nil, fmt.Errorf("failed to set resource requirements: %v", err)
 			}
@@ -84,7 +93,7 @@ func getAgentPodSpec(agentIP net.IP, versions kubermatic.Versions) corev1.PodSpe
 	return corev1.PodSpec{
 		InitContainers: getInitContainers(agentIP, versions),
 		Containers:     getContainers(versions),
-		//TODO(youssefazrak) needed?
+		// TODO(youssefazrak) needed?
 		PriorityClassName:             "system-cluster-critical",
 		DNSPolicy:                     corev1.DNSClusterFirst,
 		HostNetwork:                   true,
@@ -97,7 +106,7 @@ func getAgentPodSpec(agentIP net.IP, versions kubermatic.Versions) corev1.PodSpe
 }
 
 func getInitContainers(ip net.IP, v kubermatic.Versions) []corev1.Container {
-	// TODO(irozzo): we are creating and configuring the a dummy interface
+	// TODO: we are creating and configuring the a dummy interface
 	// using init containers. This approach is good enough for the tech preview
 	// but it is definitely not production ready. This should be replaced with
 	// a binary that properly handles error conditions and reconciles the
@@ -105,7 +114,7 @@ func getInitContainers(ip net.IP, v kubermatic.Versions) []corev1.Container {
 	return []corev1.Container{
 		{
 			Name: resources.EnvoyAgentCreateInterfaceInitContainerName,
-			// TODO(irozzo): the registry should be overridable.
+			// TODO: the registry should be overridable.
 			Image:   fmt.Sprintf("%s/%s:%s", resources.RegistryQuay, resources.EnvoyAgentDeviceSetupImage, v.Kubermatic),
 			Command: []string{"sh", "-c", "ip link add envoyagent type dummy || true"},
 			SecurityContext: &corev1.SecurityContext{

@@ -33,15 +33,32 @@ import (
 type ConstraintProvider struct {
 	// createSeedImpersonatedClient is used as a ground for impersonation
 	// whenever a connection to Seed API server is required
-	createSeedImpersonatedClient impersonationClient
+	createSeedImpersonatedClient ImpersonationClient
 	clientPrivileged             ctrlruntimeclient.Client
 }
 
+// DefaultConstraintProvider struct that holds required components in order manage constraints
+type DefaultConstraintProvider struct {
+	// createMasterImpersonatedClient is used as a ground for impersonation
+	createMasterImpersonatedClient ImpersonationClient
+	clientPrivileged               ctrlruntimeclient.Client
+	kubermaticNamespace            string
+}
+
 // NewConstraintProvider returns a constraint provider
-func NewConstraintProvider(createSeedImpersonatedClient impersonationClient, client ctrlruntimeclient.Client) (*ConstraintProvider, error) {
+func NewConstraintProvider(createSeedImpersonatedClient ImpersonationClient, client ctrlruntimeclient.Client) (*ConstraintProvider, error) {
 	return &ConstraintProvider{
 		clientPrivileged:             client,
 		createSeedImpersonatedClient: createSeedImpersonatedClient,
+	}, nil
+}
+
+// NewDefaultConstraintProvider returns a default constraint provider
+func NewDefaultConstraintProvider(createMasterImpersonatedClient ImpersonationClient, client ctrlruntimeclient.Client, namespace string) (*DefaultConstraintProvider, error) {
+	return &DefaultConstraintProvider{
+		createMasterImpersonatedClient: createMasterImpersonatedClient,
+		clientPrivileged:               client,
+		kubermaticNamespace:            namespace,
 	}, nil
 }
 
@@ -142,4 +159,50 @@ func (p *ConstraintProvider) UpdateUnsecured(constraint *kubermaticv1.Constraint
 
 	err := p.clientPrivileged.Update(context.Background(), constraint)
 	return constraint, err
+}
+
+func (p *DefaultConstraintProvider) Create(constraint *kubermaticv1.Constraint) (*kubermaticv1.Constraint, error) {
+	constraint.Namespace = p.kubermaticNamespace
+	err := p.clientPrivileged.Create(context.Background(), constraint)
+	return constraint, err
+}
+
+func (p *DefaultConstraintProvider) List() (*kubermaticv1.ConstraintList, error) {
+
+	constraints := &kubermaticv1.ConstraintList{}
+	if err := p.clientPrivileged.List(context.Background(), constraints, ctrlruntimeclient.InNamespace(p.kubermaticNamespace)); err != nil {
+		return nil, fmt.Errorf("failed to list default constraints: %v", err)
+	}
+
+	return constraints, nil
+}
+
+func (p *DefaultConstraintProvider) Get(name string) (*kubermaticv1.Constraint, error) {
+
+	constraint := &kubermaticv1.Constraint{}
+	if err := p.clientPrivileged.Get(context.Background(), types.NamespacedName{Namespace: p.kubermaticNamespace, Name: name}, constraint); err != nil {
+		return nil, err
+	}
+
+	return constraint, nil
+}
+
+func (p *DefaultConstraintProvider) Delete(name string) error {
+
+	return p.clientPrivileged.Delete(context.Background(), &kubermaticv1.Constraint{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: p.kubermaticNamespace,
+		},
+	})
+}
+
+func (p *DefaultConstraintProvider) Update(constraint *kubermaticv1.Constraint) (*kubermaticv1.Constraint, error) {
+	constraint.Namespace = p.kubermaticNamespace
+
+	if err := p.clientPrivileged.Update(context.Background(), constraint); err != nil {
+		return nil, err
+	}
+
+	return constraint, nil
 }

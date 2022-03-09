@@ -238,23 +238,23 @@ for buildTarget in $RELEASE_PLATFORMS; do
   tar czf "$archive" \
     --transform='flags=r;s|_build/||' \
     --transform='flags=r;s|charts/values.example.ce.yaml|examples/values.example.yaml|' \
-    --transform='flags=r;s|charts/test/|examples/|' \
+    --transform='flags=r;s|charts/kubermatic.example.ce.yaml|examples/kubermatic.example.yaml|' \
+    --transform='flags=r;s|charts/seed.example.yaml|examples/seed.example.yaml|' \
     _build/kubermatic-installer* \
     charts/backup \
     charts/cert-manager \
     charts/iap \
     charts/kubermatic-operator \
-    charts/kubermatic/crd \
     charts/logging \
     charts/minio \
     charts/monitoring \
     charts/nginx-ingress-controller \
-    charts/nodeport-proxy \
     charts/oauth \
     charts/s3-exporter \
+    charts/telemetry \
     charts/values.example.ce.yaml \
-    charts/test/kubermatic.example.ce.yaml \
-    charts/test/seed.example.yaml \
+    charts/kubermatic.example.ce.yaml \
+    charts/seed.example.yaml \
     LICENSE \
     CHANGELOG.md
 
@@ -273,24 +273,24 @@ for buildTarget in $RELEASE_PLATFORMS; do
   tar czf "$archive" \
     --transform='flags=r;s|_build/||' \
     --transform='flags=r;s|charts/values.example.ee.yaml|examples/values.example.yaml|' \
-    --transform='flags=r;s|charts/test/|examples/|' \
+    --transform='flags=r;s|charts/kubermatic.example.ee.yaml|examples/kubermatic.example.yaml|' \
+    --transform='flags=r;s|charts/seed.example.yaml|examples/seed.example.yaml|' \
     --transform='flags=r;s|pkg/ee/LICENSE|LICENSE.ee|' \
     _build/kubermatic-installer* \
     charts/backup \
     charts/cert-manager \
     charts/iap \
     charts/kubermatic-operator \
-    charts/kubermatic \
     charts/logging \
     charts/minio \
     charts/monitoring \
     charts/nginx-ingress-controller \
-    charts/nodeport-proxy \
     charts/oauth \
     charts/s3-exporter \
+    charts/telemetry \
     charts/values.example.ee.yaml \
-    charts/test/kubermatic.example.ee.yaml \
-    charts/test/seed.example.yaml \
+    charts/kubermatic.example.ee.yaml \
+    charts/seed.example.yaml \
     LICENSE \
     pkg/ee/LICENSE \
     CHANGELOG.md

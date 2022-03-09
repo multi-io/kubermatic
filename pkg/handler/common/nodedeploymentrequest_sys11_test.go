@@ -42,7 +42,7 @@ func TestGetNodeDeploymentRequest(t *testing.T) {
 			Name:                   "scenario 1: get NDR for MDR for the given cluster",
 			ClusterIDToSync:        test.GenDefaultCluster().Name,
 			ProjectIDToSync:        test.GenDefaultProject().Name,
-			ExistingKubermaticObjs: test.GenDefaultKubermaticObjects(test.GenDefaultCluster()),
+			ExistingKubermaticObjs: test.GenDefaultKubermaticObjects(test.GenTestSeed(), test.GenDefaultCluster()),
 			ExistingAPIUser:        test.GenDefaultAPIUser(),
 			ExistingMdrs: []*kubermaticv1.MachineDeploymentRequest{
 				test.GenTestMachineDeploymentRequest(test.GenDefaultCluster(), "venus", `{"cloudProvider":"digitalocean","cloudProviderSpec":{"token":"dummy-token","region":"fra1","size":"2GB"}, "operatingSystem":"ubuntu", "operatingSystemSpec":{"distUpgradeOnBoot":true}}`, nil),
@@ -98,7 +98,7 @@ func TestGetNodeDeploymentRequest(t *testing.T) {
 			for _, existingMdr := range tc.ExistingMdrs {
 				kubermaticObj = append(kubermaticObj, existingMdr)
 			}
-			ep, _, err := test.CreateTestEndpointAndGetClients(*tc.ExistingAPIUser, nil, kubernetesObj, machineObj, kubermaticObj, nil, nil, hack.NewTestRouting)
+			ep, _, err := test.CreateTestEndpointAndGetClients(*tc.ExistingAPIUser, nil, kubernetesObj, machineObj, kubermaticObj, nil, nil, nil, hack.NewTestRouting)
 			if err != nil {
 				t.Fatalf("failed to create test endpoint due to %v", err)
 			}
@@ -144,7 +144,7 @@ func TestCreateNodeDeploymentRequest(t *testing.T) {
 			HTTPStatus:             http.StatusCreated,
 			ProjectID:              test.GenDefaultProject().Name,
 			ClusterID:              genNdrTestCluster().Name,
-			ExistingKubermaticObjs: test.GenDefaultKubermaticObjects(genNdrTestCluster()),
+			ExistingKubermaticObjs: test.GenDefaultKubermaticObjects(test.GenTestSeed(), genNdrTestCluster()),
 			ExistingAPIUser:        test.GenDefaultAPIUser(),
 		},
 	}
@@ -155,7 +155,7 @@ func TestCreateNodeDeploymentRequest(t *testing.T) {
 			res := httptest.NewRecorder()
 			kubermaticObj := []ctrlruntimeclient.Object{}
 			kubermaticObj = append(kubermaticObj, tc.ExistingKubermaticObjs...)
-			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, []ctrlruntimeclient.Object{}, kubermaticObj, nil, nil, hack.NewTestRouting)
+			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, []ctrlruntimeclient.Object{}, kubermaticObj, nil, nil, nil, hack.NewTestRouting)
 			if err != nil {
 				t.Fatalf("failed to create test endpoint due to %v", err)
 			}

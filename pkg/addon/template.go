@@ -36,6 +36,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/pointer"
 )
 
 const (
@@ -83,9 +84,38 @@ func NewTemplateData(
 		return nil, fmt.Errorf("failed to determine cloud provider name: %v", err)
 	}
 
+	// Ensure IPVS configuration is set
+	if cluster.Spec.ClusterNetwork.IPVS == nil {
+		cluster.Spec.ClusterNetwork.IPVS = &kubermaticv1.IPVSConfiguration{StrictArp: pointer.BoolPtr(resources.IPVSStrictArp)}
+	} else if cluster.Spec.ClusterNetwork.IPVS.StrictArp == nil {
+		cluster.Spec.ClusterNetwork.IPVS.StrictArp = pointer.BoolPtr(resources.IPVSStrictArp)
+	}
+
 	if variables == nil {
 		variables = make(map[string]interface{})
 	}
+
+	var cniPlugin CNIPlugin
+	if cluster.Spec.CNIPlugin == nil {
+		cniPlugin = CNIPlugin{
+			Type: kubermaticv1.CNIPluginTypeCanal.String(),
+			// This is to keep backward compatibility with clusters created before
+			// those settings were introduced.
+			Version: "v3.8",
+		}
+	} else {
+		cniPlugin = CNIPlugin{
+			Type:    cluster.Spec.CNIPlugin.Type.String(),
+			Version: cluster.Spec.CNIPlugin.Version,
+		}
+	}
+
+	var storagePolicy string
+	if cluster.Spec.Cloud.VSphere != nil {
+		storagePolicy = cluster.Spec.Cloud.VSphere.StoragePolicy
+	}
+
+	_, csiMigration := cluster.Annotations[kubermaticv1.CSIMigrationNeededAnnotation]
 
 	return &TemplateData{
 		DatacenterName: cluster.Spec.Cloud.DatacenterName,
@@ -117,7 +147,15 @@ func NewTemplateData(
 				PodCIDRBlocks:     cluster.Spec.ClusterNetwork.Pods.CIDRBlocks,
 				ServiceCIDRBlocks: cluster.Spec.ClusterNetwork.Services.CIDRBlocks,
 				ProxyMode:         cluster.Spec.ClusterNetwork.ProxyMode,
+				StrictArp:         *cluster.Spec.ClusterNetwork.IPVS.StrictArp,
 			},
+			CNIPlugin: cniPlugin,
+			MLA: MLASettings{
+				MonitoringEnabled: cluster.Spec.MLA != nil && cluster.Spec.MLA.MonitoringEnabled,
+				LoggingEnabled:    cluster.Spec.MLA != nil && cluster.Spec.MLA.LoggingEnabled,
+			},
+			StoragePolicy: storagePolicy,
+			CSIMigration:  csiMigration,
 		},
 	}, nil
 }
@@ -169,9 +207,17 @@ type ClusterData struct {
 	Network ClusterNetwork
 	// Features is a set of enabled features for this cluster.
 	Features sets.String
-	// CloudSpec contains the complete access data to the cluster's cloud provider.
+	// CloudSpec (sys11 field) contains the complete access data to the cluster's cloud provider.
 	// CAUTION: This is internal information and subject to change; using it is not recommended!
 	CloudSpec kubermaticv1.CloudSpec
+	// CNIPlugin contains the CNIPlugin settings
+	CNIPlugin CNIPlugin
+	// MLA contains monitoring, logging and alerting related settings for the user cluster.
+	MLA MLASettings
+	// StoragePolicy is the storage policy to use for vsphere csi addon
+	StoragePolicy string
+	// CSIMigration indicates if the cluster needed the CSIMigration
+	CSIMigration bool
 
 	ComponentsOverride kubermaticv1.ComponentSettings
 }
@@ -183,6 +229,19 @@ type ClusterNetwork struct {
 	PodCIDRBlocks     []string
 	ServiceCIDRBlocks []string
 	ProxyMode         string
+	StrictArp         bool
+}
+
+type CNIPlugin struct {
+	Type    string
+	Version string
+}
+
+type MLASettings struct {
+	// MonitoringEnabled is the flag for enabling monitoring in user cluster.
+	MonitoringEnabled bool
+	// LoggingEnabled is the flag for enabling logging in user cluster.
+	LoggingEnabled bool
 }
 
 func ParseFromFolder(log *zap.SugaredLogger, overwriteRegistry string, manifestPath string, data *TemplateData) ([]runtime.RawExtension, error) {

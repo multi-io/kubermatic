@@ -6,6 +6,8 @@ package models
 // Editing this file might prove futile when you re-run the swagger generate command
 
 import (
+	"context"
+
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/swag"
 )
@@ -13,6 +15,7 @@ import (
 // Subject Subject contains a reference to the object or user identities a role binding applies to.  This can either hold a direct API object reference,
 //
 // or a value for non-objects such as user and group names.
+// +structType=atomic
 //
 // swagger:model Subject
 type Subject struct {
@@ -38,6 +41,11 @@ type Subject struct {
 
 // Validate validates this subject
 func (m *Subject) Validate(formats strfmt.Registry) error {
+	return nil
+}
+
+// ContextValidate validates this subject based on context it is used
+func (m *Subject) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
 	return nil
 }
 

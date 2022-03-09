@@ -13,7 +13,7 @@
     "description": "This describes possible operations which can be made against the MetaKube API.",
     "title": "MetaKube API.",
     "termsOfService": "https://www.syseleven.de/agb-sla-metakube",
-    "version": "2.11"
+    "version": "2.18"
   },
   "host": "metakube.syseleven.de",
   "paths": {
@@ -392,6 +392,157 @@
             "description": "AdmissionPlugin",
             "schema": {
               "$ref": "#/definitions/AdmissionPlugin"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/metering/configurations": {
+      "put": {
+        "description": "Configures KKP metering tool. Only available in Kubermatic Enterprise Edition",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "admin"
+        ],
+        "operationId": "createOrUpdateMeteringConfigurations",
+        "responses": {
+          "200": {
+            "$ref": "#/responses/empty"
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/metering/credentials": {
+      "put": {
+        "description": "Creates or updates the metering tool credentials. Only available in Kubermatic Enterprise Edition",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "admin"
+        ],
+        "operationId": "createOrUpdateMeteringCredentials",
+        "responses": {
+          "200": {
+            "$ref": "#/responses/empty"
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/metering/reports": {
+      "get": {
+        "description": "List metering reports. Only available in Kubermatic Enterprise Edition",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "metering",
+          "reports"
+        ],
+        "operationId": "listMeteringReports",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "StartAfter",
+            "name": "start_after",
+            "in": "query"
+          },
+          {
+            "type": "integer",
+            "format": "int64",
+            "x-go-name": "MaxKeys",
+            "name": "max_keys",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "MeteringReport",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/MeteringReport"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/metering/reports/{report_name}": {
+      "get": {
+        "description": "Download a specific metering report. Provides an S3 pre signed URL valid for 1 hour. Only available in Kubermatic Enterprise Edition",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "metering",
+          "report"
+        ],
+        "operationId": "getMeteringReport",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ReportName",
+            "name": "report_name",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "MeteringReportURL",
+            "schema": {
+              "$ref": "#/definitions/MeteringReportURL"
             }
           },
           "401": {
@@ -7029,6 +7180,13 @@
             "type": "string",
             "name": "Region",
             "in": "header"
+          },
+          {
+            "type": "string",
+            "x-go-name": "Architecture",
+            "description": "architecture query parameter. Supports: arm64 and x64 types.",
+            "name": "architecture",
+            "in": "query"
           }
         ],
         "responses": {
@@ -8834,6 +8992,410 @@
         }
       }
     },
+    "/api/v2/allowedregistries": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "allowedregistry"
+        ],
+        "summary": "List allowed registries.",
+        "operationId": "listAllowedRegistries",
+        "responses": {
+          "200": {
+            "description": "AllowedRegistry",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/AllowedRegistry"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "Creates a allowed registry",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "allowedregistry"
+        ],
+        "operationId": "createAllowedRegistry",
+        "parameters": [
+          {
+            "name": "Body",
+            "in": "body",
+            "schema": {
+              "$ref": "#/definitions/wrBody"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "AllowedRegistry",
+            "schema": {
+              "$ref": "#/definitions/AllowedRegistry"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/allowedregistries/{allowed_registry}": {
+      "get": {
+        "description": "Get allowed registries specified by name",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "allowedregistries"
+        ],
+        "operationId": "getAllowedRegistry",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "AllowedRegistryName",
+            "name": "allowed_registry",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "AllowedRegistry",
+            "schema": {
+              "$ref": "#/definitions/AllowedRegistry"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "delete": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "allowedregistries"
+        ],
+        "summary": "Deletes the given allowed registry.",
+        "operationId": "deleteAllowedRegistry",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "AllowedRegistryName",
+            "name": "allowed_registry",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/empty"
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "patch": {
+        "description": "Patch a specified allowed registry",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "allowedregistries"
+        ],
+        "operationId": "patchAllowedRegistry",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "AllowedRegistryName",
+            "name": "allowed_registry",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "Patch",
+            "in": "body",
+            "schema": {
+              "type": "object"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ConstraintTemplate",
+            "schema": {
+              "$ref": "#/definitions/ConstraintTemplate"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/constraints": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "constraint"
+        ],
+        "summary": "List default constraint.",
+        "operationId": "listDefaultConstraint",
+        "responses": {
+          "200": {
+            "description": "Constraint",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Constraint"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "Creates default constraint",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "constraint"
+        ],
+        "operationId": "createDefaultConstraint",
+        "parameters": [
+          {
+            "name": "Body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/constraintBody"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Constraint",
+            "schema": {
+              "$ref": "#/definitions/Constraint"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/constraints/{constraint_name}": {
+      "get": {
+        "description": "Gets an specified default constraint",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "constraint"
+        ],
+        "operationId": "getDefaultConstraint",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "Name",
+            "name": "constraint_name",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Constraint",
+            "schema": {
+              "$ref": "#/definitions/Constraint"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "delete": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "constraints"
+        ],
+        "summary": "Deletes a specified default constraint.",
+        "operationId": "deleteDefaultConstraint",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "Name",
+            "name": "constraint_name",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/empty"
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "patch": {
+        "description": "Patch a specified default constraint",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "constraint"
+        ],
+        "operationId": "patchDefaultConstraint",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "Name",
+            "name": "constraint_name",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "Patch",
+            "in": "body",
+            "schema": {
+              "type": "object"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Constraint",
+            "schema": {
+              "$ref": "#/definitions/Constraint"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
     "/api/v2/constrainttemplates": {
       "get": {
         "produces": [
@@ -9657,6 +10219,154 @@
         }
       }
     },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/alertmanager/config": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "summary": "Gets the alertmanager configuration for the specified cluster.",
+        "operationId": "getAlertmanager",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Alertmanager",
+            "schema": {
+              "$ref": "#/definitions/Alertmanager"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "put": {
+        "description": "Updates an alertmanager configuration for the given cluster",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "operationId": "updateAlertmanager",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "Body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/Alertmanager"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Alertmanager",
+            "schema": {
+              "$ref": "#/definitions/Alertmanager"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "delete": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "summary": "Resets the alertmanager configuration to default for the specified cluster.",
+        "operationId": "resetAlertmanager",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/empty"
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
     "/api/v2/projects/{project_id}/clusters/{cluster_id}/bindings": {
       "get": {
         "description": "List role binding",
@@ -10259,6 +10969,494 @@
         }
       }
     },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/etcdbackupconfigs": {
+      "get": {
+        "description": "List etcd backup configs for a given cluster",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "etcdbackupconfig"
+        ],
+        "operationId": "listEtcdBackupConfig",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "EtcdBackupConfig",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/EtcdBackupConfig"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "Creates a etcd backup config that will belong to the given cluster",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "etcdbackupconfig"
+        ],
+        "operationId": "createEtcdBackupConfig",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "Body",
+            "in": "body",
+            "schema": {
+              "$ref": "#/definitions/ebcBody"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "EtcdBackupConfig",
+            "schema": {
+              "$ref": "#/definitions/EtcdBackupConfig"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/etcdbackupconfigs/{ebc_id}": {
+      "get": {
+        "description": "Gets a etcd backup config for a given cluster based on its id",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "etcdbackupconfig"
+        ],
+        "operationId": "getEtcdBackupConfig",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "EtcdBackupConfigID",
+            "name": "ebc_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "EtcdBackupConfig",
+            "schema": {
+              "$ref": "#/definitions/EtcdBackupConfig"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "delete": {
+        "description": "Deletes a etcd backup config for a given cluster based on its id",
+        "tags": [
+          "etcdbackupconfig"
+        ],
+        "operationId": "deleteEtcdBackupConfig",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "EtcdBackupConfigID",
+            "name": "ebc_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/empty"
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "patch": {
+        "description": "Patches a etcd backup config for a given cluster based on its id",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "etcdbackupconfig"
+        ],
+        "operationId": "patchEtcdBackupConfig",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "EtcdBackupConfigID",
+            "name": "ebc_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "Body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/EtcdBackupConfigSpec"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "EtcdBackupConfig",
+            "schema": {
+              "$ref": "#/definitions/EtcdBackupConfig"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/etcdrestores": {
+      "get": {
+        "description": "List etcd backup restores for a given cluster",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "etcdrestore"
+        ],
+        "operationId": "listEtcdRestore",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "EtcdRestore",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/EtcdRestore"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "Creates a etcd backup restore for a given cluster",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "etcdrestore"
+        ],
+        "operationId": "createEtcdRestore",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "Body",
+            "in": "body",
+            "schema": {
+              "$ref": "#/definitions/erBody"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "EtcdBackupConfig",
+            "schema": {
+              "$ref": "#/definitions/EtcdBackupConfig"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/etcdrestores/{er_name}": {
+      "get": {
+        "description": "Gets a etcd backup restore for a given cluster based on its name",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "etcdrestore"
+        ],
+        "operationId": "getEtcdRestore",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "EtcdRestoreName",
+            "name": "er_name",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "EtcdRestore",
+            "schema": {
+              "$ref": "#/definitions/EtcdRestore"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "delete": {
+        "description": "Deletes a etcd restore config for a given cluster based on its name",
+        "tags": [
+          "etcdrestore"
+        ],
+        "operationId": "deleteEtcdRestore",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "EtcdRestoreName",
+            "name": "er_name",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/empty"
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "409": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
     "/api/v2/projects/{project_id}/clusters/{cluster_id}/events": {
       "get": {
         "produces": [
@@ -10300,6 +11498,48 @@
                 "$ref": "#/definitions/Event"
               }
             }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/externalccmmigration": {
+      "post": {
+        "description": "Enable the migration to the external CCM for the given cluster",
+        "produces": [
+          "application/json"
+        ],
+        "operationId": "migrateClusterToExternalCCM",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/empty"
           },
           "401": {
             "$ref": "#/responses/empty"
@@ -10871,6 +12111,62 @@
           }
         }
       },
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "summary": "Schedules rolling restart of a machine deployment that is assigned to the given cluster.",
+        "operationId": "restartMachineDeployment",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "MachineDeploymentID",
+            "name": "machinedeployment_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "NodeDeployment",
+            "schema": {
+              "$ref": "#/definitions/NodeDeployment"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
       "delete": {
         "produces": [
           "application/json"
@@ -11220,6 +12516,211 @@
         }
       }
     },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/mlaadminsetting": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "mlaadminsetting"
+        ],
+        "summary": "Gets MLA Admin settings for the given cluster.",
+        "operationId": "getMLAAdminSetting",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "MLAAdminSetting",
+            "schema": {
+              "$ref": "#/definitions/MLAAdminSetting"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "put": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "mlaadminsetting"
+        ],
+        "summary": "Updates the MLA admin setting for the given cluster.",
+        "operationId": "updateMLAAdminSetting",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "Body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/MLAAdminSetting"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "MLAAdminSetting",
+            "schema": {
+              "$ref": "#/definitions/MLAAdminSetting"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "Creates MLA admin setting that will belong to the given cluster",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "mlaadminsetting"
+        ],
+        "operationId": "createMLAAdminSetting",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "Body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/MLAAdminSetting"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "MLAAdminSetting",
+            "schema": {
+              "$ref": "#/definitions/MLAAdminSetting"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "delete": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "mlaadminsetting"
+        ],
+        "summary": "Deletes the MLA admin setting that belongs to the cluster.",
+        "operationId": "deleteMLAAdminSetting",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/empty"
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
     "/api/v2/projects/{project_id}/clusters/{cluster_id}/namespaces": {
       "get": {
         "description": "Lists all namespaces in the cluster",
@@ -11364,6 +12865,54 @@
         "responses": {
           "200": {
             "$ref": "#/responses/empty"
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/oidc": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "summary": "Gets the OIDC params for the specified cluster with OIDC authentication.",
+        "operationId": "getClusterOidc",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OIDCSpec",
+            "schema": {
+              "$ref": "#/definitions/OIDCSpec"
+            }
           },
           "401": {
             "$ref": "#/responses/empty"
@@ -11674,6 +13223,13 @@
             "name": "cluster_id",
             "in": "path",
             "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "Architecture",
+            "description": "architecture query parameter. Supports: arm64 and x64 types.",
+            "name": "architecture",
+            "in": "query"
           }
         ],
         "responses": {
@@ -12787,6 +14343,289 @@
         }
       }
     },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/rulegroups": {
+      "get": {
+        "description": "Lists rule groups that belong to the given cluster",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "rulegroup"
+        ],
+        "operationId": "listRuleGroups",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "Type",
+            "name": "type",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "RuleGroup",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/RuleGroup"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "Creates a rule group that will belong to the given cluster",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "rulegroup"
+        ],
+        "operationId": "createRuleGroup",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "Body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/RuleGroup"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "RuleGroup",
+            "schema": {
+              "$ref": "#/definitions/RuleGroup"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clusters/{cluster_id}/rulegroups/{rulegroup_id}": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "rulegroup"
+        ],
+        "summary": "Gets a specified rule group for the given cluster.",
+        "operationId": "getRuleGroup",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "RuleGroupID",
+            "name": "rulegroup_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "RuleGroup",
+            "schema": {
+              "$ref": "#/definitions/RuleGroup"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "put": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "rulegroup"
+        ],
+        "summary": "Updates the specified rule group for the given cluster.",
+        "operationId": "updateRuleGroup",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "RuleGroupID",
+            "name": "rulegroup_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "Body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/RuleGroup"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "RuleGroup",
+            "schema": {
+              "$ref": "#/definitions/RuleGroup"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "delete": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "rulegroup"
+        ],
+        "summary": "Deletes the given rule group that belongs to the cluster.",
+        "operationId": "deleteRuleGroup",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterID",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "RuleGroupID",
+            "name": "rulegroup_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/empty"
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
     "/api/v2/projects/{project_id}/clusters/{cluster_id}/sshkeys": {
       "get": {
         "description": "Lists ssh keys that are assigned to the cluster\nThe returned collection is sorted by creation timestamp.",
@@ -13024,6 +14863,390 @@
         "responses": {
           "200": {
             "$ref": "#/responses/empty"
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clustertemplates": {
+      "get": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "summary": "List cluster templates for the given project.",
+        "operationId": "listClusterTemplates",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ClusterTemplateList",
+            "schema": {
+              "$ref": "#/definitions/ClusterTemplateList"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "summary": "Creates a cluster templates for the given project.",
+        "operationId": "createClusterTemplate",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "Body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "cluster": {
+                  "$ref": "#/definitions/Cluster"
+                },
+                "dnsDomain": {
+                  "type": "string",
+                  "x-go-name": "DNSDomain"
+                },
+                "name": {
+                  "type": "string",
+                  "x-go-name": "Name"
+                },
+                "nodeDeployment": {
+                  "$ref": "#/definitions/NodeDeployment"
+                },
+                "podsCIDR": {
+                  "type": "string",
+                  "x-go-name": "PodsCIDR"
+                },
+                "scope": {
+                  "type": "string",
+                  "x-go-name": "Scope"
+                },
+                "servicesCIDR": {
+                  "type": "string",
+                  "x-go-name": "ServicesCIDR"
+                },
+                "userSshKeys": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/ClusterTemplateSSHKey"
+                  },
+                  "x-go-name": "UserSSHKeys"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "ClusterTemplate",
+            "schema": {
+              "$ref": "#/definitions/ClusterTemplate"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clustertemplates/{template_id}": {
+      "get": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "summary": "Get cluster template.",
+        "operationId": "getClusterTemplate",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterTemplateID",
+            "name": "template_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ClusterTemplate",
+            "schema": {
+              "$ref": "#/definitions/ClusterTemplate"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      },
+      "delete": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "summary": "Delete cluster template.",
+        "operationId": "deleteClusterTemplate",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterTemplateID",
+            "name": "template_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/empty"
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/clustertemplates/{template_id}/instances": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "project"
+        ],
+        "summary": "Create cluster template instance.",
+        "operationId": "createClusterTemplateInstance",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "ClusterTemplateID",
+            "name": "template_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "Body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "replicas": {
+                  "type": "integer",
+                  "format": "int64",
+                  "x-go-name": "Replicas"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "ClusterTemplateInstance",
+            "schema": {
+              "$ref": "#/definitions/ClusterTemplateInstance"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/etcdbackupconfigs": {
+      "get": {
+        "description": "List etcd backup configs for a given project",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "etcdbackupconfig"
+        ],
+        "operationId": "listProjectEtcdBackupConfig",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "Type",
+            "name": "type",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "EtcdBackupConfig",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/EtcdBackupConfig"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/projects/{project_id}/etcdrestores": {
+      "get": {
+        "description": "List etcd backup restores for a given project",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "etcdrestore"
+        ],
+        "operationId": "listProjectEtcdRestore",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProjectID",
+            "name": "project_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "EtcdRestore",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/EtcdRestore"
+              }
+            }
           },
           "401": {
             "$ref": "#/responses/empty"
@@ -14049,6 +16272,145 @@
           }
         }
       }
+    },
+    "/api/v2/providers/{provider_name}/versions": {
+      "get": {
+        "description": "Lists all versions which don't result in automatic updates for a given provider",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "version"
+        ],
+        "operationId": "listVersionsByProvider",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "ProviderName",
+            "name": "provider_name",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "Type",
+            "name": "type",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "VersionList",
+            "schema": {
+              "$ref": "#/definitions/VersionList"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/seeds/{seed_name}/backupcredentials": {
+      "put": {
+        "description": "Creates or updates backup credentials for a given seed",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "backupcredentials"
+        ],
+        "operationId": "createOrUpdateBackupCredentials",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "SeedName",
+            "name": "seed_name",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "Body",
+            "in": "body",
+            "schema": {
+              "$ref": "#/definitions/bcBody"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/empty"
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/seeds/{seed_name}/settings": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "seed"
+        ],
+        "summary": "Gets the seed settings.",
+        "operationId": "getSeedSettings",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "Name",
+            "name": "seed_name",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SeedSettings",
+            "schema": {
+              "$ref": "#/definitions/SeedSettings"
+            }
+          },
+          "401": {
+            "$ref": "#/responses/empty"
+          },
+          "403": {
+            "$ref": "#/responses/empty"
+          },
+          "default": {
+            "description": "errorResponse",
+            "schema": {
+              "$ref": "#/definitions/errorResponse"
+            }
+          }
+        }
+      }
     }
   },
   "definitions": {
@@ -14140,6 +16502,21 @@
           "type": "boolean",
           "x-go-name": "IsSpotInstance"
         },
+        "spotInstanceInterruptionBehavior": {
+          "description": "SpotInstanceInterruptionBehavior sets the interruption behavior for the spot instance when capacity is no longer\navailable at the price you specified, if there is no capacity, or if a constraint cannot be met. Charges for EBS\nvolume storage apply when an instance is stopped.",
+          "type": "string",
+          "x-go-name": "SpotInstanceInterruptionBehavior"
+        },
+        "spotInstanceMaxPrice": {
+          "description": "SpotInstanceMaxPrice is the maximum price you are willing to pay per instance hour. Your instance runs when\nyour maximum price is greater than the Spot Price.",
+          "type": "string",
+          "x-go-name": "SpotInstanceMaxPrice"
+        },
+        "spotInstancePersistentRequest": {
+          "description": "SpotInstancePersistentRequest ensures that your request will be submitted every time your Spot Instance is terminated.",
+          "type": "boolean",
+          "x-go-name": "SpotInstancePersistentRequest"
+        },
         "subnetID": {
           "description": "The VPC subnet to which the node shall be connected.",
           "type": "string",
@@ -14179,6 +16556,10 @@
       "type": "object",
       "title": "AWSSize represents a object of AWS size.",
       "properties": {
+        "architecture": {
+          "type": "string",
+          "x-go-name": "Architecture"
+        },
         "gpus": {
           "type": "integer",
           "format": "int64",
@@ -14561,6 +16942,14 @@
       "description": "Addon represents a predefined addon that users may install into their cluster",
       "type": "object",
       "properties": {
+        "annotations": {
+          "description": "Annotations that can be added to the resource",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "x-go-name": "Annotations"
+        },
         "creationTimestamp": {
           "description": "CreationTimestamp is a timestamp representing the server time when this object was created.",
           "type": "string",
@@ -14593,6 +16982,14 @@
       "description": "AddonConfig represents a addon configuration",
       "type": "object",
       "properties": {
+        "annotations": {
+          "description": "Annotations that can be added to the resource",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "x-go-name": "Annotations"
+        },
         "creationTimestamp": {
           "description": "CreationTimestamp is a timestamp representing the server time when this object was created.",
           "type": "string",
@@ -14761,6 +17158,31 @@
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
     },
+    "Alertmanager": {
+      "description": "Alertmanager represents an Alertmanager Configuration",
+      "type": "object",
+      "properties": {
+        "spec": {
+          "$ref": "#/definitions/AlertmanagerSpec"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
+    },
+    "AlertmanagerSpec": {
+      "type": "object",
+      "properties": {
+        "config": {
+          "description": "Config contains the alertmanager configuration in YAML",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "x-go-name": "Config"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
+    },
     "AlibabaCloudSpec": {
       "type": "object",
       "title": "AlibabaCloudSpec specifies the access data to Alibaba.",
@@ -14889,6 +17311,32 @@
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
     },
+    "AllowedRegistry": {
+      "description": "AllowedRegistry represents a object containing a allowed image registry prefix",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "x-go-name": "Name"
+        },
+        "spec": {
+          "$ref": "#/definitions/AllowedRegistrySpec"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
+    },
+    "AllowedRegistrySpec": {
+      "type": "object",
+      "title": "AllowedRegistrySpec specifies the data for allowed registry spec.",
+      "properties": {
+        "registryPrefix": {
+          "description": "RegistryPrefix contains the prefix of the registry which will be allowed. User clusters will be able to deploy\nonly images which are prefixed with one of the allowed image registry prefixes.",
+          "type": "string",
+          "x-go-name": "RegistryPrefix"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+    },
     "AnexiaCloudSpec": {
       "type": "object",
       "title": "AnexiaCloudSpec specifies the access data to Anexia.",
@@ -15011,6 +17459,10 @@
       "type": "object",
       "title": "AzureCloudSpec specifies access credentials to Azure cloud.",
       "properties": {
+        "assignAvailabilitySet": {
+          "type": "boolean",
+          "x-go-name": "AssignAvailabilitySet"
+        },
         "availabilitySet": {
           "type": "string",
           "x-go-name": "AvailabilitySet"
@@ -15075,6 +17527,11 @@
         "size"
       ],
       "properties": {
+        "assignAvailabilitySet": {
+          "description": "AssignAvailabilitySet is used to check if an availability set should be created and assigned to the cluster.",
+          "type": "boolean",
+          "x-go-name": "AssignAvailabilitySet"
+        },
         "assignPublicIP": {
           "description": "should the machine have a publicly accessible IP address",
           "type": "boolean",
@@ -15240,13 +17697,74 @@
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
     },
+    "BackupCredentials": {
+      "description": "BackupCredentials contains credentials for etcd backups",
+      "type": "object",
+      "properties": {
+        "s3": {
+          "$ref": "#/definitions/S3BackupCredentials"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
+    },
+    "BackupStatus": {
+      "type": "object",
+      "properties": {
+        "backupFinishedTime": {
+          "$ref": "#/definitions/Time"
+        },
+        "backupMessage": {
+          "type": "string",
+          "x-go-name": "BackupMessage"
+        },
+        "backupName": {
+          "type": "string",
+          "x-go-name": "BackupName"
+        },
+        "backupPhase": {
+          "$ref": "#/definitions/BackupStatusPhase"
+        },
+        "backupStartTime": {
+          "$ref": "#/definitions/Time"
+        },
+        "deleteFinishedTime": {
+          "$ref": "#/definitions/Time"
+        },
+        "deleteJobName": {
+          "type": "string",
+          "x-go-name": "DeleteJobName"
+        },
+        "deleteMessage": {
+          "type": "string",
+          "x-go-name": "DeleteMessage"
+        },
+        "deletePhase": {
+          "$ref": "#/definitions/BackupStatusPhase"
+        },
+        "deleteStartTime": {
+          "$ref": "#/definitions/Time"
+        },
+        "jobName": {
+          "type": "string",
+          "x-go-name": "JobName"
+        },
+        "scheduledTime": {
+          "$ref": "#/definitions/Time"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
+    },
+    "BackupStatusPhase": {
+      "type": "string",
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+    },
     "BringYourOwnCloudSpec": {
       "type": "object",
       "title": "BringYourOwnCloudSpec specifies access data for a bring your own cluster.",
       "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
     },
     "ByPodStatus": {
-      "description": "ByPodStatus defines the observed state of ConstraintTemplate as seen by\nan individual controller",
+      "description": "ByPodStatus defines the observed state of ConstraintTemplate as seen by\nan individual controller\n+kubebuilder:pruning:PreserveUnknownFields",
       "type": "object",
       "properties": {
         "errors": {
@@ -15370,6 +17888,14 @@
       "type": "object",
       "title": "Cluster defines the cluster resource",
       "properties": {
+        "annotations": {
+          "description": "Annotations that can be added to the resource",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "x-go-name": "Annotations"
+        },
         "creationTimestamp": {
           "description": "CreationTimestamp is a timestamp representing the server time when this object was created.",
           "type": "string",
@@ -15491,6 +18017,19 @@
           "type": "string",
           "x-go-name": "DNSDomain"
         },
+        "ipvs": {
+          "$ref": "#/definitions/IPVSConfiguration"
+        },
+        "konnectivityEnabled": {
+          "description": "KonnectivityEnabled enables konnectivity for controlplane to node network communication.",
+          "type": "boolean",
+          "x-go-name": "KonnectivityEnabled"
+        },
+        "nodeLocalDNSCacheEnabled": {
+          "description": "NodeLocalDNSCacheEnabled controls whether the NodeLocal DNS Cache feature is enabled.\nDefaults to true.",
+          "type": "boolean",
+          "x-go-name": "NodeLocalDNSCacheEnabled"
+        },
         "pods": {
           "$ref": "#/definitions/NetworkRanges"
         },
@@ -15509,6 +18048,14 @@
       "description": "ClusterRole defines cluster RBAC role for the user cluster",
       "type": "object",
       "properties": {
+        "annotations": {
+          "description": "Annotations that can be added to the resource",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "x-go-name": "Annotations"
+        },
         "creationTimestamp": {
           "description": "CreationTimestamp is a timestamp representing the server time when this object was created.",
           "type": "string",
@@ -15609,6 +18156,11 @@
         "clusterNetwork": {
           "$ref": "#/definitions/ClusterNetworkingConfig"
         },
+        "containerRuntime": {
+          "description": "ContainerRuntime to use, i.e. Docker or containerd. By default containerd will be used.",
+          "type": "string",
+          "x-go-name": "ContainerRuntime"
+        },
         "enableUserSSHKeyAgent": {
           "description": "EnableUserSSHKeyAgent control whether the UserSSHKeyAgent will be deployed in the user cluster or not.\nIf it was enabled, the agent will be deployed and used to sync the user ssh keys, that the user attach\nto the created cluster. If the agent was disabled, it won't be deployed in the user cluster, thus after\nthe cluster creation any attached ssh keys won't be synced to the worker nodes. Once the agent is enabled/disabled\nit cannot be changed after the cluster is being created.",
           "type": "boolean",
@@ -15668,6 +18220,9 @@
       "description": "ClusterStatus defines the cluster status",
       "type": "object",
       "properties": {
+        "externalCCMMigration": {
+          "$ref": "#/definitions/ExternalCCMMigrationStatus"
+        },
         "url": {
           "description": "URL specifies the address at which the cluster is available",
           "type": "string",
@@ -15679,15 +18234,127 @@
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
     },
+    "ClusterTemplate": {
+      "description": "ClusterTemplate represents a ClusterTemplate object",
+      "type": "object",
+      "properties": {
+        "cluster": {
+          "$ref": "#/definitions/Cluster"
+        },
+        "id": {
+          "type": "string",
+          "x-go-name": "ID"
+        },
+        "name": {
+          "type": "string",
+          "x-go-name": "Name"
+        },
+        "nodeDeployment": {
+          "$ref": "#/definitions/NodeDeployment"
+        },
+        "projectID": {
+          "type": "string",
+          "x-go-name": "ProjectID"
+        },
+        "scope": {
+          "type": "string",
+          "x-go-name": "Scope"
+        },
+        "user": {
+          "type": "string",
+          "x-go-name": "User"
+        },
+        "userSshKeys": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ClusterTemplateSSHKey"
+          },
+          "x-go-name": "UserSSHKeys"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
+    },
+    "ClusterTemplateInstance": {
+      "description": "ClusterTemplateInstance represents a ClusterTemplateInstance object",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "x-go-name": "Name"
+        },
+        "spec": {
+          "$ref": "#/definitions/ClusterTemplateInstanceSpec"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
+    },
+    "ClusterTemplateInstanceSpec": {
+      "type": "object",
+      "title": "ClusterTemplateInstanceSpec specifies the data for cluster instances.",
+      "properties": {
+        "clusterTemplateID": {
+          "type": "string",
+          "x-go-name": "ClusterTemplateID"
+        },
+        "clusterTemplateName": {
+          "type": "string",
+          "x-go-name": "ClusterTemplateName"
+        },
+        "projectID": {
+          "type": "string",
+          "x-go-name": "ProjectID"
+        },
+        "replicas": {
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "Replicas"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+    },
+    "ClusterTemplateList": {
+      "description": "ClusterTemplateList represents a ClusterTemplate list",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ClusterTemplate"
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
+    },
+    "ClusterTemplateSSHKey": {
+      "description": "ClusterTemplateSSHKey represents SSH Key object for Cluster Template",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "x-go-name": "ID"
+        },
+        "name": {
+          "type": "string",
+          "x-go-name": "Name"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
+    },
     "ClusterType": {
       "type": "integer",
       "format": "int8",
       "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
     },
+    "ConditionStatus": {
+      "type": "string",
+      "x-go-package": "k8s.io/api/core/v1"
+    },
     "Constraint": {
       "description": "Constraint represents a gatekeeper Constraint",
       "type": "object",
       "properties": {
+        "labels": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "x-go-name": "Labels"
+        },
         "name": {
           "type": "string",
           "x-go-name": "Name"
@@ -15701,6 +18368,24 @@
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
     },
+    "ConstraintSelector": {
+      "description": "ConstraintSelector is the object holding the cluster selection filters",
+      "type": "object",
+      "properties": {
+        "labelSelector": {
+          "$ref": "#/definitions/LabelSelector"
+        },
+        "providers": {
+          "description": "Providers is a list of cloud providers to which the Constraint applies to. Empty means all providers are selected.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-go-name": "Providers"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+    },
     "ConstraintSpec": {
       "type": "object",
       "title": "ConstraintSpec specifies the data for the constraint.",
@@ -15710,11 +18395,19 @@
           "type": "string",
           "x-go-name": "ConstraintType"
         },
+        "disabled": {
+          "description": "Disabled  is the flag for disabling OPA constraints",
+          "type": "boolean",
+          "x-go-name": "Disabled"
+        },
         "match": {
           "$ref": "#/definitions/Match"
         },
         "parameters": {
           "$ref": "#/definitions/Parameters"
+        },
+        "selector": {
+          "$ref": "#/definitions/ConstraintSelector"
         }
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
@@ -16311,6 +19004,11 @@
           "type": "string",
           "x-go-name": "RootPath"
         },
+        "storage_policy": {
+          "description": "The name of the storage policy to use for the storage class created in the user cluster.",
+          "type": "string",
+          "x-go-name": "DefaultStoragePolicy"
+        },
         "templates": {
           "$ref": "#/definitions/ImageList"
         }
@@ -16472,10 +19170,200 @@
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/handler"
     },
+    "EtcdBackupConfig": {
+      "description": "EtcdBackupConfig represents an object holding the configuration for etcd backups",
+      "type": "object",
+      "properties": {
+        "annotations": {
+          "description": "Annotations that can be added to the resource",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "x-go-name": "Annotations"
+        },
+        "creationTimestamp": {
+          "description": "CreationTimestamp is a timestamp representing the server time when this object was created.",
+          "type": "string",
+          "format": "date-time",
+          "x-go-name": "CreationTimestamp"
+        },
+        "deletionTimestamp": {
+          "description": "DeletionTimestamp is a timestamp representing the server time when this object was deleted.",
+          "type": "string",
+          "format": "date-time",
+          "x-go-name": "DeletionTimestamp"
+        },
+        "id": {
+          "description": "ID unique value that identifies the resource generated by the server. Read-Only.",
+          "type": "string",
+          "x-go-name": "ID"
+        },
+        "name": {
+          "description": "Name represents human readable name for the resource",
+          "type": "string",
+          "x-go-name": "Name"
+        },
+        "spec": {
+          "$ref": "#/definitions/EtcdBackupConfigSpec"
+        },
+        "status": {
+          "$ref": "#/definitions/EtcdBackupConfigStatus"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
+    },
+    "EtcdBackupConfigCondition": {
+      "type": "object",
+      "properties": {
+        "lastHeartbeatTime": {
+          "$ref": "#/definitions/Time"
+        },
+        "lastTransitionTime": {
+          "$ref": "#/definitions/Time"
+        },
+        "message": {
+          "description": "Human readable message indicating details about last transition.\n+optional",
+          "type": "string",
+          "x-go-name": "Message"
+        },
+        "reason": {
+          "description": "(brief) reason for the condition's last transition.\n+optional",
+          "type": "string",
+          "x-go-name": "Reason"
+        },
+        "status": {
+          "$ref": "#/definitions/ConditionStatus"
+        },
+        "type": {
+          "$ref": "#/definitions/EtcdBackupConfigConditionType"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
+    },
+    "EtcdBackupConfigConditionType": {
+      "description": "EtcdBackupConfigConditionType is used to indicate the type of a EtcdBackupConfig condition. For all condition\ntypes, the `true` value must indicate success. All condition types must be registered within\nthe `AllClusterConditionTypes` variable.",
+      "type": "string",
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+    },
+    "EtcdBackupConfigSpec": {
+      "description": "EtcdBackupConfigSpec represents an object holding the etcd backup configuration specification",
+      "type": "object",
+      "properties": {
+        "clusterId": {
+          "description": "ClusterID is the id of the cluster which will be backed up",
+          "type": "string",
+          "x-go-name": "ClusterID"
+        },
+        "keep": {
+          "description": "Keep is the number of backups to keep around before deleting the oldest one\nIf not set, defaults to DefaultKeptBackupsCount. Only used if Schedule is set.",
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "Keep"
+        },
+        "schedule": {
+          "description": "Schedule is a cron expression defining when to perform\nthe backup. If not set, the backup is performed exactly\nonce, immediately.",
+          "type": "string",
+          "x-go-name": "Schedule"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
+    },
+    "EtcdBackupConfigStatus": {
+      "type": "object",
+      "properties": {
+        "cleanupRunning": {
+          "description": "If the controller was configured with a cleanupContainer, CleanupRunning keeps track of the corresponding job",
+          "type": "boolean",
+          "x-go-name": "CleanupRunning"
+        },
+        "conditions": {
+          "description": "Conditions contains conditions of the EtcdBackupConfig",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/EtcdBackupConfigCondition"
+          },
+          "x-go-name": "Conditions"
+        },
+        "lastBackups": {
+          "description": "CurrentBackups tracks the creation and deletion progress if all backups managed by the EtcdBackupConfig",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BackupStatus"
+          },
+          "x-go-name": "CurrentBackups"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
+    },
+    "EtcdRestore": {
+      "description": "EtcdRestore represents an object holding the configuration for etcd backup restore",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "x-go-name": "Name"
+        },
+        "spec": {
+          "$ref": "#/definitions/EtcdRestoreSpec"
+        },
+        "status": {
+          "$ref": "#/definitions/EtcdRestoreStatus"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
+    },
+    "EtcdRestorePhase": {
+      "type": "string",
+      "title": "EtcdRestorePhase represents the lifecycle phase of an EtcdRestore.",
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+    },
+    "EtcdRestoreSpec": {
+      "description": "EtcdRestoreSpec represents an object holding the etcd backup restore configuration specification",
+      "type": "object",
+      "properties": {
+        "backupDownloadCredentialsSecret": {
+          "description": "BackupDownloadCredentialsSecret is the name of a secret in the cluster-xxx namespace containing\ncredentials needed to download the backup",
+          "type": "string",
+          "x-go-name": "BackupDownloadCredentialsSecret"
+        },
+        "backupName": {
+          "description": "BackupName is the name of the backup to restore from",
+          "type": "string",
+          "x-go-name": "BackupName"
+        },
+        "clusterId": {
+          "description": "ClusterID is the id of the cluster which will be restored from the backup",
+          "type": "string",
+          "x-go-name": "ClusterID"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
+    },
+    "EtcdRestoreStatus": {
+      "type": "object",
+      "properties": {
+        "phase": {
+          "$ref": "#/definitions/EtcdRestorePhase"
+        },
+        "restoreTime": {
+          "$ref": "#/definitions/Time"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
+    },
     "Event": {
       "type": "object",
       "title": "Event is a report of an event somewhere in the cluster.",
       "properties": {
+        "annotations": {
+          "description": "Annotations that can be added to the resource",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "x-go-name": "Annotations"
+        },
         "count": {
           "description": "The number of times this event has occurred.",
           "type": "integer",
@@ -16531,6 +19419,10 @@
       "title": "ExposeStrategy is the strategy to expose the cluster with.",
       "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
     },
+    "ExternalCCMMigrationStatus": {
+      "type": "string",
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
+    },
     "ExternalDocumentation": {
       "type": "object",
       "title": "ExternalDocumentation allows referencing an external resource for extended documentation.",
@@ -16544,7 +19436,7 @@
           "x-go-name": "URL"
         }
       },
-      "x-go-package": "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+      "x-go-package": "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
     },
     "FakeCloudSpec": {
       "type": "object",
@@ -17023,6 +19915,18 @@
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
     },
+    "IPVSConfiguration": {
+      "type": "object",
+      "title": "IPVSConfiguration contains ipvs-related configuration details for kube-proxy.",
+      "properties": {
+        "strictArp": {
+          "description": "StrictArp configure arp_ignore and arp_announce to avoid answering ARP queries from kube-ipvs0 interface.\ndefaults to true.",
+          "type": "boolean",
+          "x-go-name": "StrictArp"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+    },
     "Image": {
       "type": "object",
       "title": "Image represents an Image returned by the Compute API.",
@@ -17093,7 +19997,7 @@
           }
         }
       },
-      "x-go-package": "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+      "x-go-package": "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
     },
     "JSONSchemaDefinitions": {
       "type": "object",
@@ -17101,7 +20005,7 @@
       "additionalProperties": {
         "$ref": "#/definitions/JSONSchemaProps"
       },
-      "x-go-package": "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+      "x-go-package": "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
     },
     "JSONSchemaDependencies": {
       "type": "object",
@@ -17109,7 +20013,7 @@
       "additionalProperties": {
         "$ref": "#/definitions/JSONSchemaPropsOrStringArray"
       },
-      "x-go-package": "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+      "x-go-package": "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
     },
     "JSONSchemaProps": {
       "type": "object",
@@ -17318,7 +20222,7 @@
           "x-go-name": "XPreserveUnknownFields"
         }
       },
-      "x-go-package": "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+      "x-go-package": "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
     },
     "JSONSchemaPropsOrArray": {
       "description": "JSONSchemaPropsOrArray represents a value that can either be a JSONSchemaProps\nor an array of JSONSchemaProps. Mainly here for serialization purposes.",
@@ -17334,7 +20238,7 @@
           "$ref": "#/definitions/JSONSchemaProps"
         }
       },
-      "x-go-package": "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+      "x-go-package": "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
     },
     "JSONSchemaPropsOrBool": {
       "description": "Defaults to true for the boolean property.",
@@ -17348,7 +20252,7 @@
           "$ref": "#/definitions/JSONSchemaProps"
         }
       },
-      "x-go-package": "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+      "x-go-package": "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
     },
     "JSONSchemaPropsOrStringArray": {
       "type": "object",
@@ -17364,12 +20268,12 @@
           "$ref": "#/definitions/JSONSchemaProps"
         }
       },
-      "x-go-package": "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+      "x-go-package": "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
     },
     "JSONSchemaURL": {
       "type": "string",
       "title": "JSONSchemaURL represents a schema url.",
-      "x-go-package": "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+      "x-go-package": "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
     },
     "Kind": {
       "description": "Kind specifies the resource Kind and APIGroup",
@@ -17465,7 +20369,7 @@
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
     },
     "LabelSelector": {
-      "description": "A label selector is a label query over a set of resources. The result of matchLabels and\nmatchExpressions are ANDed. An empty label selector matches all objects. A null\nlabel selector matches no objects.",
+      "description": "A label selector is a label query over a set of resources. The result of matchLabels and\nmatchExpressions are ANDed. An empty label selector matches all objects. A null\nlabel selector matches no objects.\n+structType=atomic",
       "type": "object",
       "properties": {
         "matchExpressions": {
@@ -17525,6 +20429,61 @@
       },
       "x-go-package": "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/limits"
     },
+    "LoggingRateLimitSettings": {
+      "type": "object",
+      "title": "LoggingRateLimitSettings contains rate-limiting configuration for logging in the user cluster.",
+      "properties": {
+        "ingestionBurstSize": {
+          "description": "IngestionBurstSize represents ingestion burst size in number of requests (nginx `burst`).",
+          "type": "integer",
+          "format": "int32",
+          "x-go-name": "IngestionBurstSize"
+        },
+        "ingestionRate": {
+          "description": "IngestionRate represents ingestion rate limit in requests per second (nginx `rate` in `r/s`).",
+          "type": "integer",
+          "format": "int32",
+          "x-go-name": "IngestionRate"
+        },
+        "queryBurstSize": {
+          "description": "QueryBurstSize represents query burst size in number of requests (nginx `burst`).",
+          "type": "integer",
+          "format": "int32",
+          "x-go-name": "QueryBurstSize"
+        },
+        "queryRate": {
+          "description": "QueryRate represents query request rate limit per second (nginx `rate` in `r/s`).",
+          "type": "integer",
+          "format": "int32",
+          "x-go-name": "QueryRate"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+    },
+    "MLA": {
+      "type": "object",
+      "properties": {
+        "user_cluster_mla_enabled": {
+          "description": "whether the user cluster MLA (Monitoring, Logging \u0026 Alerting) stack is enabled in the seed",
+          "type": "boolean",
+          "x-go-name": "UserClusterMLAEnabled"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
+    },
+    "MLAAdminSetting": {
+      "type": "object",
+      "title": "MLAAdminSetting represents an object holding admin setting options for user cluster MLA (Monitoring, Logging and Alerting).",
+      "properties": {
+        "loggingRateLimits": {
+          "$ref": "#/definitions/LoggingRateLimitSettings"
+        },
+        "monitoringRateLimits": {
+          "$ref": "#/definitions/MonitoringRateLimitSettings"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
+    },
     "MLASettings": {
       "type": "object",
       "properties": {
@@ -17533,10 +20492,16 @@
           "type": "boolean",
           "x-go-name": "LoggingEnabled"
         },
+        "loggingResources": {
+          "$ref": "#/definitions/ResourceRequirements"
+        },
         "monitoringEnabled": {
           "description": "MonitoringEnabled is the flag for enabling monitoring in user cluster.",
           "type": "boolean",
           "x-go-name": "MonitoringEnabled"
+        },
+        "monitoringResources": {
+          "$ref": "#/definitions/ResourceRequirements"
         }
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
@@ -17736,6 +20701,131 @@
       "x-go-name": "KubermaticVersions",
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
     },
+    "MeteringConfigurations": {
+      "type": "object",
+      "title": "MeteringConfigurations contains all the configurations for the metering tool.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "x-go-name": "Enabled"
+        },
+        "storageClassName": {
+          "description": "StorageClassName is the name of the storage class that the metering tool uses to save processed files before\nexporting it to s3 bucket. Default value is kubermatic-fast.",
+          "type": "string",
+          "x-go-name": "StorageClassName"
+        },
+        "storageSize": {
+          "description": "StorageSize is the size of the storage class. Default value is 100Gi.",
+          "type": "string",
+          "x-go-name": "StorageSize"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+    },
+    "MeteringReport": {
+      "description": "MeteringReport holds objects names and metadata for available reports",
+      "type": "object",
+      "properties": {
+        "lastModified": {
+          "type": "string",
+          "format": "date-time",
+          "x-go-name": "LastModified"
+        },
+        "name": {
+          "type": "string",
+          "x-go-name": "Name"
+        },
+        "size": {
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "Size"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
+    },
+    "MeteringReportURL": {
+      "description": "ReportURL represent an S3 pre signed URL to download a report",
+      "type": "string",
+      "x-go-name": "ReportURL",
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
+    },
+    "MlaOptions": {
+      "type": "object",
+      "properties": {
+        "loggingEnabled": {
+          "type": "boolean",
+          "x-go-name": "LoggingEnabled"
+        },
+        "loggingEnforced": {
+          "type": "boolean",
+          "x-go-name": "LoggingEnforced"
+        },
+        "monitoringEnabled": {
+          "type": "boolean",
+          "x-go-name": "MonitoringEnabled"
+        },
+        "monitoringEnforced": {
+          "type": "boolean",
+          "x-go-name": "MonitoringEnforced"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+    },
+    "MonitoringRateLimitSettings": {
+      "type": "object",
+      "title": "MonitoringRateLimitSettings contains rate-limiting configuration for monitoring in the user cluster.",
+      "properties": {
+        "ingestionBurstSize": {
+          "description": "IngestionBurstSize represents ingestion burst size in samples per second (Cortex `ingestion_burst_size`).",
+          "type": "integer",
+          "format": "int32",
+          "x-go-name": "IngestionBurstSize"
+        },
+        "ingestionRate": {
+          "description": "IngestionRate represents the ingestion rate limit in samples per second (Cortex `ingestion_rate`).",
+          "type": "integer",
+          "format": "int32",
+          "x-go-name": "IngestionRate"
+        },
+        "maxSamplesPerQuery": {
+          "description": "MaxSamplesPerQuery represents maximum number of samples during a query (Cortex `max_samples_per_query`).",
+          "type": "integer",
+          "format": "int32",
+          "x-go-name": "MaxSamplesPerQuery"
+        },
+        "maxSeriesPerMetric": {
+          "description": "MaxSeriesPerMetric represents maximum number of series per metric (Cortex `max_series_per_metric`).",
+          "type": "integer",
+          "format": "int32",
+          "x-go-name": "MaxSeriesPerMetric"
+        },
+        "maxSeriesPerQuery": {
+          "description": "MaxSeriesPerQuery represents maximum number of timeseries during a query (Cortex `max_series_per_query`).",
+          "type": "integer",
+          "format": "int32",
+          "x-go-name": "MaxSeriesPerQuery"
+        },
+        "maxSeriesTotal": {
+          "description": "MaxSeriesTotal represents maximum number of series per this user cluster (Cortex `max_series_per_user`).",
+          "type": "integer",
+          "format": "int32",
+          "x-go-name": "MaxSeriesTotal"
+        },
+        "queryBurstSize": {
+          "description": "QueryBurstSize represents query burst size in number of requests (nginx `burst`).",
+          "type": "integer",
+          "format": "int32",
+          "x-go-name": "QueryBurstSize"
+        },
+        "queryRate": {
+          "description": "QueryRate represents  query request rate limit per second (nginx `rate` in `r/s`).",
+          "type": "integer",
+          "format": "int32",
+          "x-go-name": "QueryRate"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+    },
     "Names": {
       "type": "object",
       "properties": {
@@ -17782,6 +20872,14 @@
       "description": "Node represents a worker node that is part of a cluster",
       "type": "object",
       "properties": {
+        "annotations": {
+          "description": "Annotations that can be added to the resource",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "x-go-name": "Annotations"
+        },
         "creationTimestamp": {
           "description": "CreationTimestamp is a timestamp representing the server time when this object was created.",
           "type": "string",
@@ -17874,6 +20972,14 @@
       "description": "NodeDeployment represents a set of worker nodes that is part of a cluster",
       "type": "object",
       "properties": {
+        "annotations": {
+          "description": "Annotations that can be added to the resource",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "x-go-name": "Annotations"
+        },
         "creationTimestamp": {
           "description": "CreationTimestamp is a timestamp representing the server time when this object was created.",
           "type": "string",
@@ -17909,6 +21015,14 @@
       "description": "NodeDeploymentRequest represents an asynchronous request to create a NodeDeployment in a user cluster",
       "type": "object",
       "properties": {
+        "annotations": {
+          "description": "Annotations that can be added to the resource",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "x-go-name": "Annotations"
+        },
         "creationTimestamp": {
           "description": "CreationTimestamp is a timestamp representing the server time when this object was created.",
           "type": "string",
@@ -18282,6 +21396,25 @@
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
     },
+    "OIDCSpec": {
+      "type": "object",
+      "title": "OIDCSpec contains OIDC params that can be used to access user cluster.",
+      "properties": {
+        "clientId": {
+          "type": "string",
+          "x-go-name": "ClientID"
+        },
+        "clientSecret": {
+          "type": "string",
+          "x-go-name": "ClientSecret"
+        },
+        "issuerUrl": {
+          "type": "string",
+          "x-go-name": "IssuerURL"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
+    },
     "OPAIntegrationSettings": {
       "type": "object",
       "properties": {
@@ -18289,6 +21422,11 @@
           "description": "Enabled is the flag for enabling OPA integration",
           "type": "boolean",
           "x-go-name": "Enabled"
+        },
+        "experimentalEnableMutation": {
+          "description": "Enable mutation",
+          "type": "boolean",
+          "x-go-name": "ExperimentalEnableMutation"
         },
         "webhookTimeoutSeconds": {
           "description": "WebhookTimeout is the timeout that is set for the gatekeeper validating webhook admission review calls.\nBy default 10 seconds.",
@@ -18303,6 +21441,14 @@
       "description": "ObjectMeta defines the set of fields that objects returned from the API have",
       "type": "object",
       "properties": {
+        "annotations": {
+          "description": "Annotations that can be added to the resource",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "x-go-name": "Annotations"
+        },
         "creationTimestamp": {
           "description": "CreationTimestamp is a timestamp representing the server time when this object was created.",
           "type": "string",
@@ -18329,7 +21475,7 @@
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
     },
     "ObjectReference": {
-      "description": "New uses of this type are discouraged because of difficulty describing its usage when embedded in APIs.\n1. Ignored fields.  It includes many fields which are not generally honored.  For instance, ResourceVersion and FieldPath are both very rarely valid in actual usage.\n2. Invalid usage help.  It is impossible to add specific help for individual usage.  In most embedded usages, there are particular\nrestrictions like, \"must refer only to types A and B\" or \"UID not honored\" or \"name must be restricted\".\nThose cannot be well described when embedded.\n3. Inconsistent validation.  Because the usages are different, the validation rules are different by usage, which makes it hard for users to predict what will happen.\n4. The fields are both imprecise and overly precise.  Kind is not a precise mapping to a URL. This can produce ambiguity\nduring interpretation and require a REST mapping.  In most cases, the dependency is on the group,resource tuple\nand the version of the actual struct is irrelevant.\n5. We cannot easily change it.  Because this type is embedded in many locations, updates to this type\nwill affect numerous schemas.  Don't make new APIs embed an underspecified API type they do not control.\nInstead of using this type, create a locally provided and used type that is well-focused on your reference.\nFor example, ServiceReferences for admission registration: https://github.com/kubernetes/api/blob/release-1.17/admissionregistration/v1/types.go#L533 .\n+k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object",
+      "description": "New uses of this type are discouraged because of difficulty describing its usage when embedded in APIs.\n1. Ignored fields.  It includes many fields which are not generally honored.  For instance, ResourceVersion and FieldPath are both very rarely valid in actual usage.\n2. Invalid usage help.  It is impossible to add specific help for individual usage.  In most embedded usages, there are particular\nrestrictions like, \"must refer only to types A and B\" or \"UID not honored\" or \"name must be restricted\".\nThose cannot be well described when embedded.\n3. Inconsistent validation.  Because the usages are different, the validation rules are different by usage, which makes it hard for users to predict what will happen.\n4. The fields are both imprecise and overly precise.  Kind is not a precise mapping to a URL. This can produce ambiguity\nduring interpretation and require a REST mapping.  In most cases, the dependency is on the group,resource tuple\nand the version of the actual struct is irrelevant.\n5. We cannot easily change it.  Because this type is embedded in many locations, updates to this type\nwill affect numerous schemas.  Don't make new APIs embed an underspecified API type they do not control.\nInstead of using this type, create a locally provided and used type that is well-focused on your reference.\nFor example, ServiceReferences for admission registration: https://github.com/kubernetes/api/blob/release-1.17/admissionregistration/v1/types.go#L533 .\n+k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object\n+structType=atomic",
       "type": "object",
       "title": "ObjectReference contains enough information to let you inspect or modify the referred object.",
       "properties": {
@@ -18833,14 +21979,9 @@
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
     },
     "Parameters": {
-      "description": "Parameters specifies the parameters used by the constraint template REGO",
       "type": "object",
-      "properties": {
-        "rawJSON": {
-          "description": "RawJSON contains the raw JSON parameters used by REGO",
-          "type": "string",
-          "x-go-name": "RawJSON"
-        }
+      "additionalProperties": {
+        "type": "object"
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
     },
@@ -18921,7 +22062,7 @@
           "x-go-name": "ResourceNames"
         },
         "resources": {
-          "description": "Resources is a list of resources this rule applies to.  ResourceAll represents all resources.\n+optional",
+          "description": "Resources is a list of resources this rule applies to. '*' represents all resources.\n+optional",
           "type": "array",
           "items": {
             "type": "string"
@@ -18929,7 +22070,7 @@
           "x-go-name": "Resources"
         },
         "verbs": {
-          "description": "Verbs is a list of Verbs that apply to ALL the ResourceKinds and AttributeRestrictions contained in this rule.  VerbAll represents all kinds.",
+          "description": "Verbs is a list of Verbs that apply to ALL the ResourceKinds and AttributeRestrictions contained in this rule. '*' represents all verbs.",
           "type": "array",
           "items": {
             "type": "string"
@@ -18993,6 +22134,14 @@
       "description": "Project is a top-level container for a set of resources",
       "type": "object",
       "properties": {
+        "annotations": {
+          "description": "Annotations that can be added to the resource",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "x-go-name": "Annotations"
+        },
         "clustersNumber": {
           "type": "integer",
           "format": "int64",
@@ -19096,6 +22245,12 @@
     "PublicAzureCloudSpec": {
       "type": "object",
       "title": "PublicAzureCloudSpec is a public counterpart of apiv1.AzureCloudSpec.",
+      "properties": {
+        "assignAvailabilitySet": {
+          "type": "boolean",
+          "x-go-name": "AssignAvailabilitySet"
+        }
+      },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
     },
     "PublicBringYourOwnCloudSpec": {
@@ -19230,6 +22385,14 @@
       "description": "PublicServiceAccountToken represent an API service account token without secret fields",
       "type": "object",
       "properties": {
+        "annotations": {
+          "description": "Annotations that can be added to the resource",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "x-go-name": "Annotations"
+        },
         "creationTimestamp": {
           "description": "CreationTimestamp is a timestamp representing the server time when this object was created.",
           "type": "string",
@@ -19265,6 +22428,12 @@
       "type": "object",
       "title": "PublicVSphereCloudSpec is a public counterpart of apiv1.VSphereCloudSpec.",
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
+    },
+    "Quantity": {
+      "description": "The serialization format is:\n\n\u003cquantity\u003e        ::= \u003csignedNumber\u003e\u003csuffix\u003e\n(Note that \u003csuffix\u003e may be empty, from the \"\" case in \u003cdecimalSI\u003e.)\n\u003cdigit\u003e           ::= 0 | 1 | ... | 9\n\u003cdigits\u003e          ::= \u003cdigit\u003e | \u003cdigit\u003e\u003cdigits\u003e\n\u003cnumber\u003e          ::= \u003cdigits\u003e | \u003cdigits\u003e.\u003cdigits\u003e | \u003cdigits\u003e. | .\u003cdigits\u003e\n\u003csign\u003e            ::= \"+\" | \"-\"\n\u003csignedNumber\u003e    ::= \u003cnumber\u003e | \u003csign\u003e\u003cnumber\u003e\n\u003csuffix\u003e          ::= \u003cbinarySI\u003e | \u003cdecimalExponent\u003e | \u003cdecimalSI\u003e\n\u003cbinarySI\u003e        ::= Ki | Mi | Gi | Ti | Pi | Ei\n(International System of units; See: http://physics.nist.gov/cuu/Units/binary.html)\n\u003cdecimalSI\u003e       ::= m | \"\" | k | M | G | T | P | E\n(Note that 1024 = 1Ki but 1000 = 1k; I didn't choose the capitalization.)\n\u003cdecimalExponent\u003e ::= \"e\" \u003csignedNumber\u003e | \"E\" \u003csignedNumber\u003e\n\nNo matter which of the three exponent forms is used, no quantity may represent\na number greater than 2^63-1 in magnitude, nor may it have more than 3 decimal\nplaces. Numbers larger or more precise will be capped or rounded up.\n(E.g.: 0.1m will rounded up to 1m.)\nThis may be extended in the future if we require larger or smaller quantities.\n\nWhen a Quantity is parsed from a string, it will remember the type of suffix\nit had, and will use the same type again when it is serialized.\n\nBefore serializing, Quantity will be put in \"canonical form\".\nThis means that Exponent/suffix will be adjusted up or down (with a\ncorresponding increase or decrease in Mantissa) such that:\na. No precision is lost\nb. No fractional digits will be emitted\nc. The exponent (or suffix) is as large as possible.\nThe sign will be omitted unless the number is negative.\n\nExamples:\n1.5 will be serialized as \"1500m\"\n1.5Gi will be serialized as \"1536Mi\"\n\nNote that the quantity will NEVER be internally represented by a\nfloating point number. That is the whole point of this exercise.\n\nNon-canonical values will still parse as long as they are well formed,\nbut will be re-emitted in their canonical form. (So always use canonical\nform, or don't diff.)\n\nThis format is intended to make it difficult to use these numbers without\nwriting some sort of special handling code in the hopes that that will\ncause implementors to also use a fixed point implementation.\n\n+protobuf=true\n+protobuf.embed=string\n+protobuf.options.marshal=false\n+protobuf.options.(gogoproto.goproto_stringer)=false\n+k8s:deepcopy-gen=true\n+k8s:openapi-gen=true",
+      "type": "object",
+      "title": "Quantity is a fixed-point representation of a number.\nIt provides convenient marshaling/unmarshaling in JSON and YAML,\nin addition to String() and AsInt64() accessors.",
+      "x-go-package": "k8s.io/apimachinery/pkg/api/resource"
     },
     "Quotas": {
       "type": "object",
@@ -19331,6 +22500,27 @@
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
     },
+    "ResourceList": {
+      "type": "object",
+      "title": "ResourceList is a set of (resource name, quantity) pairs.",
+      "additionalProperties": {
+        "$ref": "#/definitions/Quantity"
+      },
+      "x-go-package": "k8s.io/api/core/v1"
+    },
+    "ResourceRequirements": {
+      "type": "object",
+      "title": "ResourceRequirements describes the compute resource requirements.",
+      "properties": {
+        "limits": {
+          "$ref": "#/definitions/ResourceList"
+        },
+        "requests": {
+          "$ref": "#/definitions/ResourceList"
+        }
+      },
+      "x-go-package": "k8s.io/api/core/v1"
+    },
     "ResourceType": {
       "type": "string",
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
@@ -19339,6 +22529,14 @@
       "description": "Role defines RBAC role for the user cluster",
       "type": "object",
       "properties": {
+        "annotations": {
+          "description": "Annotations that can be added to the resource",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "x-go-name": "Annotations"
+        },
         "creationTimestamp": {
           "description": "CreationTimestamp is a timestamp representing the server time when this object was created.",
           "type": "string",
@@ -19436,6 +22634,44 @@
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
     },
+    "RuleGroup": {
+      "type": "object",
+      "title": "RuleGroup represents a rule group of recording and alerting rules.",
+      "properties": {
+        "data": {
+          "description": "contains the RuleGroup data. Ref: https://prometheus.io/docs/prometheus/latest/configuration/recording_rules/#rule_group",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "x-go-name": "Data"
+        },
+        "type": {
+          "$ref": "#/definitions/RuleGroupType"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
+    },
+    "RuleGroupType": {
+      "type": "string",
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+    },
+    "S3BackupCredentials": {
+      "description": "S3BackupCredentials contains credentials for S3 etcd backups",
+      "type": "object",
+      "properties": {
+        "accessKeyId": {
+          "type": "string",
+          "x-go-name": "AccessKeyID"
+        },
+        "secretAccessKey": {
+          "type": "string",
+          "x-go-name": "SecretAccessKey"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
+    },
     "SLESSpec": {
       "description": "SLESSpec contains SLES specific settings",
       "type": "object",
@@ -19452,6 +22688,14 @@
       "description": "SSHKey represents a ssh key",
       "type": "object",
       "properties": {
+        "annotations": {
+          "description": "Annotations that can be added to the resource",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "x-go-name": "Annotations"
+        },
         "creationTimestamp": {
           "description": "CreationTimestamp is a timestamp representing the server time when this object was created.",
           "type": "string",
@@ -19499,6 +22743,9 @@
       "description": "Seed represents a seed object",
       "type": "object",
       "properties": {
+        "backupRestore": {
+          "$ref": "#/definitions/SeedBackupRestoreConfiguration"
+        },
         "country": {
           "description": "Optional: Country of the seed as ISO-3166 two-letter code, e.g. DE or UK.\nFor informational purposes in the Kubermatic dashboard only.",
           "type": "string",
@@ -19522,6 +22769,9 @@
           "description": "Optional: Detailed location of the cluster, like \"Hamburg\" or \"Datacenter 7\".\nFor informational purposes in the Kubermatic dashboard only.",
           "type": "string",
           "x-go-name": "Location"
+        },
+        "mla": {
+          "$ref": "#/definitions/SeedMLASettings"
         },
         "name": {
           "description": "Name represents human readable name for the resource",
@@ -19539,6 +22789,35 @@
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
     },
+    "SeedBackupRestoreConfiguration": {
+      "type": "object",
+      "title": "SeedBackupRestoreConfiguration are s3 settings used for backups and restores of user cluster etcds.",
+      "properties": {
+        "s3BucketName": {
+          "description": "S3BucketName is the S3 bucket name to use for backup and restore.",
+          "type": "string",
+          "x-go-name": "S3BucketName"
+        },
+        "s3Endpoint": {
+          "description": "S3Endpoint is the S3 API endpoint to use for backup and restore. Defaults to s3.amazonaws.com.",
+          "type": "string",
+          "x-go-name": "S3Endpoint"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+    },
+    "SeedMLASettings": {
+      "type": "object",
+      "title": "SeedMLASettings allow configuring seed level MLA (Monitoring, Logging \u0026 Alerting) stack settings.",
+      "properties": {
+        "user_cluster_mla_enabled": {
+          "description": "Optional: UserClusterMLAEnabled controls whether the user cluster MLA (Monitoring, Logging \u0026 Alerting) stack is enabled in the seed.",
+          "type": "boolean",
+          "x-go-name": "UserClusterMLAEnabled"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+    },
     "SeedNamesList": {
       "type": "array",
       "items": {
@@ -19546,10 +22825,31 @@
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
     },
+    "SeedSettings": {
+      "description": "SeedSettings represents settings for a Seed cluster",
+      "type": "object",
+      "properties": {
+        "metering": {
+          "$ref": "#/definitions/MeteringConfigurations"
+        },
+        "mla": {
+          "$ref": "#/definitions/MLA"
+        },
+        "seedDNSOverwrite": {
+          "description": "the Seed level seed dns overwrite",
+          "type": "string",
+          "x-go-name": "SeedDNSOverwrite"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
+    },
     "SeedSpec": {
       "description": "The spec for a seed data",
       "type": "object",
       "properties": {
+        "backupRestore": {
+          "$ref": "#/definitions/SeedBackupRestoreConfiguration"
+        },
         "country": {
           "description": "Optional: Country of the seed as ISO-3166 two-letter code, e.g. DE or UK.\nFor informational purposes in the Kubermatic dashboard only.",
           "type": "string",
@@ -19573,6 +22873,9 @@
           "description": "Optional: Detailed location of the cluster, like \"Hamburg\" or \"Datacenter 7\".\nFor informational purposes in the Kubermatic dashboard only.",
           "type": "string",
           "x-go-name": "Location"
+        },
+        "mla": {
+          "$ref": "#/definitions/SeedMLASettings"
         },
         "proxy_settings": {
           "$ref": "#/definitions/ProxySettings"
@@ -19594,6 +22897,14 @@
       "description": "ServiceAccount represent an API service account",
       "type": "object",
       "properties": {
+        "annotations": {
+          "description": "Annotations that can be added to the resource",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "x-go-name": "Annotations"
+        },
         "creationTimestamp": {
           "description": "CreationTimestamp is a timestamp representing the server time when this object was created.",
           "type": "string",
@@ -19656,6 +22967,14 @@
       "description": "ServiceAccountToken represent an API service account token",
       "type": "object",
       "properties": {
+        "annotations": {
+          "description": "Annotations that can be added to the resource",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "x-go-name": "Annotations"
+        },
         "creationTimestamp": {
           "description": "CreationTimestamp is a timestamp representing the server time when this object was created.",
           "type": "string",
@@ -19736,6 +23055,17 @@
         "machineDeploymentVMResourceQuota": {
           "$ref": "#/definitions/MachineDeploymentVMResourceQuota"
         },
+        "mlaAlertmanagerPrefix": {
+          "type": "string",
+          "x-go-name": "MlaAlertmanagerPrefix"
+        },
+        "mlaGrafanaPrefix": {
+          "type": "string",
+          "x-go-name": "MlaGrafanaPrefix"
+        },
+        "mlaOptions": {
+          "$ref": "#/definitions/MlaOptions"
+        },
         "opaOptions": {
           "$ref": "#/definitions/OpaOptions"
         },
@@ -19752,7 +23082,7 @@
       "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
     },
     "Subject": {
-      "description": "or a value for non-objects such as user and group names.",
+      "description": "or a value for non-objects such as user and group names.\n+structType=atomic",
       "type": "object",
       "title": "Subject contains a reference to the object or user identities a role binding applies to.  This can either hold a direct API object reference,",
       "properties": {
@@ -19918,6 +23248,14 @@
       "description": "User represent an API user",
       "type": "object",
       "properties": {
+        "annotations": {
+          "description": "Annotations that can be added to the resource",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "x-go-name": "Annotations"
+        },
         "creationTimestamp": {
           "description": "CreationTimestamp is a timestamp representing the server time when this object was created.",
           "type": "string",
@@ -20030,6 +23368,16 @@
           "type": "string",
           "x-go-name": "Password"
         },
+        "resourcePool": {
+          "description": "ResourcePool is used to manage resources such as cpu and memory for vSphere virtual machines. The resource pool\nshould be defined on vSphere cluster level.\n+optional",
+          "type": "string",
+          "x-go-name": "ResourcePool"
+        },
+        "storagePolicy": {
+          "description": "StoragePolicy to be used for storage provisioning",
+          "type": "string",
+          "x-go-name": "StoragePolicy"
+        },
         "username": {
           "description": "Username is the vSphere user name.\n+optional",
           "type": "string",
@@ -20140,6 +23488,11 @@
     "Validation": {
       "type": "object",
       "properties": {
+        "legacySchema": {
+          "description": "+kubebuilder:default=true",
+          "type": "boolean",
+          "x-go-name": "LegacySchema"
+        },
         "openAPIV3Schema": {
           "$ref": "#/definitions/JSONSchemaProps"
         }
@@ -20150,6 +23503,14 @@
       "type": "object",
       "title": "Version represents a single semantic version.",
       "x-go-package": "github.com/Masterminds/semver/v3"
+    },
+    "VersionList": {
+      "description": "VersionList represents a list of versions",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/MasterVersion"
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
     },
     "Violation": {
       "description": "Violation represents a gatekeeper constraint violation",
@@ -20177,6 +23538,15 @@
         }
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
+    },
+    "bcBody": {
+      "type": "object",
+      "properties": {
+        "backup_credentials": {
+          "$ref": "#/definitions/BackupCredentials"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/handler/v2/backupcredentials"
     },
     "body": {
       "type": "object",
@@ -20222,6 +23592,34 @@
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/handler/v2/constraint_template"
     },
+    "ebcBody": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "Name of the etcd backup config",
+          "type": "string",
+          "x-go-name": "Name"
+        },
+        "spec": {
+          "$ref": "#/definitions/EtcdBackupConfigSpec"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/handler/v2/etcdbackupconfig"
+    },
+    "erBody": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "Name of the etcd backup restore. If not set, it will be generated",
+          "type": "string",
+          "x-go-name": "Name"
+        },
+        "spec": {
+          "$ref": "#/definitions/EtcdRestoreSpec"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/handler/v2/etcdrestore"
+    },
     "errorResponse": {
       "description": "ErrorResponse is the default representation of an error",
       "type": "object",
@@ -20232,6 +23630,20 @@
       },
       "x-go-name": "ErrorResponse",
       "x-go-package": "k8c.io/kubermatic/v2/pkg/handler"
+    },
+    "wrBody": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "Name of the allowed registry",
+          "type": "string",
+          "x-go-name": "Name"
+        },
+        "spec": {
+          "$ref": "#/definitions/AllowedRegistrySpec"
+        }
+      },
+      "x-go-package": "k8c.io/kubermatic/v2/pkg/handler/v2/allowed_registry"
     }
   },
   "responses": {
@@ -20248,5 +23660,17 @@
     "empty": {
       "description": "EmptyResponse is a empty response"
     }
-  }
+  },
+  "securityDefinitions": {
+    "api_key": {
+      "type": "apiKey",
+      "name": "Authorization",
+      "in": "header"
+    }
+  },
+  "security": [
+    {
+      "api_key": []
+    }
+  ]
 }

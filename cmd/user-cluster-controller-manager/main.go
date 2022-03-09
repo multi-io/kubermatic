@@ -19,6 +19,7 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
 	"net/url"
 	"strings"
 
@@ -27,6 +28,7 @@ import (
 
 	clusterv1alpha1 "github.com/kubermatic/machine-controller/pkg/apis/cluster/v1alpha1"
 	userclustercontrollermanager "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager"
+	ccmcsimigrator "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/ccm-csi-migrator"
 
 	sys11nodereadiness "k8c.io/kubermatic/v2/pkg/controller/sys11-node-readiness"
 
@@ -35,7 +37,6 @@ import (
 	"k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/flatcar"
 	"k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/ipam"
 	nodelabeler "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/node-labeler"
-	"k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/nodecsrapprover"
 	ownerbindingcreator "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/owner-binding-creator"
 	rbacusercluster "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/rbac"
 	usercluster "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources"
@@ -44,18 +45,19 @@ import (
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
 	"k8c.io/kubermatic/v2/pkg/pprof"
+	"k8c.io/kubermatic/v2/pkg/resources"
 	"k8c.io/kubermatic/v2/pkg/resources/certificates"
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 	"k8c.io/kubermatic/v2/pkg/util/cli"
 	"k8c.io/kubermatic/v2/pkg/util/flagopts"
 	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
-	apiregistrationv1beta1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
+	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	ctrlruntimelog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -67,31 +69,38 @@ const (
 )
 
 type controllerRunOptions struct {
-	metricsListenAddr     string
-	healthListenAddr      string
-	version               string
-	networks              networkFlags
-	namespace             string
-	clusterURL            string
-	clusterDNSDomain      string
-	openvpnServerPort     int
-	kasSecurePort         int
-	tunnelingAgentIP      flagopts.IPValue
-	overwriteRegistry     string
-	cloudProviderName     string
-	nodelabels            string
-	seedKubeconfig        string
-	ownerEmail            string
-	updateWindowStart     string
-	updateWindowLength    string
-	dnsClusterIP          string
-	opaIntegration        bool
-	opaWebhookTimeout     int
-	useSSHKeyAgent        bool
-	caBundleFile          string
-	mlaGatewayPort        int
-	userClusterLogging    bool
-	userClusterMonitoring bool
+	clusterDNSDomain             string
+	metricsListenAddr            string
+	healthListenAddr             string
+	version                      string
+	networks                     networkFlags
+	namespace                    string
+	clusterURL                   string
+	clusterName                  string
+	openvpnServerPort            int
+	kasSecurePort                int
+	tunnelingAgentIP             flagopts.IPValue
+	overwriteRegistry            string
+	cloudProviderName            string
+	nodelabels                   string
+	seedKubeconfig               string
+	ownerEmail                   string
+	updateWindowStart            string
+	updateWindowLength           string
+	dnsClusterIP                 string
+	nodeLocalDNSCache            bool
+	opaIntegration               bool
+	opaEnableMutation            bool
+	opaWebhookTimeout            int
+	useSSHKeyAgent               bool
+	caBundleFile                 string
+	mlaGatewayURL                string
+	userClusterLogging           bool
+	userClusterMonitoring        bool
+	prometheusScrapeConfigPrefix string
+	ccmMigration                 bool
+	ccmMigrationCompleted        bool
+	isKonnectivityEnabled        bool
 }
 
 func main() {
@@ -108,8 +117,10 @@ func main() {
 	flag.Var(&runOp.networks, "ipam-controller-network", "The networks from which the ipam controller should allocate IPs for machines (e.g.: .--ipam-controller-network=10.0.0.0/16,10.0.0.1,8.8.8.8 --ipam-controller-network=192.168.5.0/24,192.168.5.1,1.1.1.1,8.8.4.4)")
 	flag.StringVar(&runOp.namespace, "namespace", "", "Namespace in which the cluster is running in")
 	flag.StringVar(&runOp.clusterURL, "cluster-url", "", "Cluster URL")
+	flag.StringVar(&runOp.clusterName, "cluster-name", "", "Cluster name")
 	flag.StringVar(&runOp.clusterDNSDomain, "cluster-dns-domain", "", "Cluster DNS domain")
 	flag.StringVar(&runOp.dnsClusterIP, "dns-cluster-ip", "", "KubeDNS service IP for the cluster")
+	flag.BoolVar(&runOp.nodeLocalDNSCache, "node-local-dns-cache", false, "Enable NodeLocal DNS Cache in user cluster")
 	flag.IntVar(&runOp.openvpnServerPort, "openvpn-server-port", 0, "OpenVPN server port")
 	flag.IntVar(&runOp.kasSecurePort, "kas-secure-port", 6443, "Secure KAS port")
 	flag.Var(&runOp.tunnelingAgentIP, "tunneling-agent-ip", "If specified the tunneling agent will bind to this IP address, otherwise it will not be deployed.")
@@ -121,16 +132,25 @@ func main() {
 	flag.StringVar(&runOp.updateWindowStart, "update-window-start", "", "The start time of the update window, e.g. 02:00")
 	flag.StringVar(&runOp.updateWindowLength, "update-window-length", "", "The length of the update window, e.g. 1h")
 	flag.BoolVar(&runOp.opaIntegration, "opa-integration", false, "Enable OPA integration in user cluster")
-	flag.IntVar(&runOp.opaWebhookTimeout, "opa-webhook-timeout", 3, "Timeout for OPA Integration validating webhook, in seconds")
+	flag.BoolVar(&runOp.opaEnableMutation, "enable-mutation", false, "Enable OPA experimental mutation in user cluster")
+	flag.IntVar(&runOp.opaWebhookTimeout, "opa-webhook-timeout", 1, "Timeout for OPA Integration validating webhook, in seconds")
 	flag.BoolVar(&runOp.useSSHKeyAgent, "enable-ssh-key-agent", false, "Enable UserSSHKeyAgent integration in user cluster")
 	flag.StringVar(&runOp.caBundleFile, "ca-bundle", "", "The path to the cluster's CA bundle (PEM-encoded).")
-	flag.IntVar(&runOp.mlaGatewayPort, "mla-gateway-port", 0, "The port of MLA(Monitoring, Logging, and Alerting) gateway.")
+	flag.StringVar(&runOp.mlaGatewayURL, "mla-gateway-url", "", "The URL of MLA (Monitoring, Logging, and Alerting) gateway endpoint.")
 	flag.BoolVar(&runOp.userClusterLogging, "user-cluster-logging", false, "Enable logging in user cluster.")
 	flag.BoolVar(&runOp.userClusterMonitoring, "user-cluster-monitoring", false, "Enable monitoring in user cluster.")
+	flag.StringVar(&runOp.prometheusScrapeConfigPrefix, "prometheus-scrape-config-prefix", "prometheus-scraping", fmt.Sprintf("The name prefix of ConfigMaps in namespace %s, which will be used to add customized scrape configs for user cluster Prometheus.", resources.UserClusterMLANamespace))
+	flag.BoolVar(&runOp.ccmMigration, "ccm-migration", false, "Enable ccm migration in user cluster.")
+	flag.BoolVar(&runOp.ccmMigrationCompleted, "ccm-migration-completed", false, "cluster has been successfully migrated.")
+	flag.BoolVar(&runOp.isKonnectivityEnabled, "konnectivity-enabled", false, "Enable Konnectivity.")
+
 	flag.Parse()
 
 	rawLog := kubermaticlog.New(logOpts.Debug, logOpts.Format)
 	log := rawLog.Sugar()
+
+	// make sure the logging flags actually affect the global (deprecated) logger instance
+	kubermaticlog.Logger = log
 
 	versions := kubermatic.NewDefaultVersions()
 	cli.Hello(log, "User-Cluster Controller-Manager", logOpts.Debug, &versions)
@@ -143,6 +163,9 @@ func main() {
 	}
 	if runOp.clusterURL == "" {
 		log.Fatal("-cluster-url must be set")
+	}
+	if runOp.clusterName == "" {
+		log.Fatal("-cluster-name must be set")
 	}
 	if runOp.dnsClusterIP == "" {
 		log.Fatal("-dns-cluster-ip must be set")
@@ -161,8 +184,8 @@ func main() {
 		log.Fatal("-ca-bundle must be set")
 	}
 	if runOp.userClusterLogging || runOp.userClusterMonitoring {
-		if runOp.mlaGatewayPort == 0 {
-			log.Fatal("-mla-gateway-port must be set when enabling user cluster logging or monitoring")
+		if runOp.mlaGatewayURL == "" {
+			log.Fatal("-mla-gateway-url must be set when enabling user cluster logging or monitoring")
 		}
 	}
 
@@ -185,7 +208,6 @@ func main() {
 
 	rootCtx := signals.SetupSignalHandler()
 
-	// Create Context
 	ctrlruntimelog.Log = ctrlruntimelog.NewDelegatingLogger(zapr.NewLogger(rawLog).WithName("controller_runtime"))
 
 	mgr, err := manager.New(cfg, manager.Options{
@@ -226,19 +248,17 @@ func main() {
 	}
 
 	log.Info("registering components")
-	if err := apiextensionsv1beta1.AddToScheme(mgr.GetScheme()); err != nil {
-		log.Fatalw("Failed to register scheme", zap.Stringer("api", apiextensionsv1beta1.SchemeGroupVersion), zap.Error(err))
+	if err := apiextensionsv1.AddToScheme(mgr.GetScheme()); err != nil {
+		log.Fatalw("Failed to register scheme", zap.Stringer("api", apiextensionsv1.SchemeGroupVersion), zap.Error(err))
 	}
-	if err := apiregistrationv1beta1.AddToScheme(mgr.GetScheme()); err != nil {
-		log.Fatalw("Failed to register scheme", zap.Stringer("api", apiregistrationv1beta1.SchemeGroupVersion), zap.Error(err))
+	if err := apiregistrationv1.AddToScheme(mgr.GetScheme()); err != nil {
+		log.Fatalw("Failed to register scheme", zap.Stringer("api", apiregistrationv1.SchemeGroupVersion), zap.Error(err))
 	}
-
-	parts := strings.SplitN(runOp.namespace, "-", 2)
-	if len(parts) < 2 {
-		log.Fatal("Invalid cluster namespace given, must be `cluster-....`.")
+	if err := clusterv1alpha1.AddToScheme(mgr.GetScheme()); err != nil {
+		log.Fatalw("Failed to register scheme", zap.Stringer("api", clusterv1alpha1.SchemeGroupVersion), zap.Error(err))
 	}
 
-	isPausedChecker := userclustercontrollermanager.NewClusterPausedChecker(seedMgr.GetClient(), parts[1])
+	isPausedChecker := userclustercontrollermanager.NewClusterPausedChecker(seedMgr.GetClient(), runOp.clusterName)
 
 	// Setup all Controllers
 	log.Info("registering controllers")
@@ -255,16 +275,23 @@ func main() {
 		runOp.tunnelingAgentIP.IP,
 		mgr.AddReadyzCheck,
 		runOp.dnsClusterIP,
+		runOp.nodeLocalDNSCache,
 		runOp.opaIntegration,
+		runOp.opaEnableMutation,
 		versions,
 		runOp.useSSHKeyAgent,
 		runOp.opaWebhookTimeout,
 		caBundle,
 		usercluster.UserClusterMLA{
-			Logging:        runOp.userClusterLogging,
-			Monitoring:     runOp.userClusterMonitoring,
-			MLAGatewayPort: runOp.mlaGatewayPort,
+			Logging:                      runOp.userClusterLogging,
+			Monitoring:                   runOp.userClusterMonitoring,
+			MLAGatewayURL:                runOp.mlaGatewayURL,
+			PrometheusScrapeConfigPrefix: runOp.prometheusScrapeConfigPrefix,
 		},
+		runOp.clusterName,
+		runOp.isKonnectivityEnabled,
+		runOp.ccmMigration,
+		runOp.ccmMigrationCompleted,
 		log,
 	); err != nil {
 		log.Fatalw("Failed to register user cluster controller", zap.Error(err))
@@ -272,9 +299,6 @@ func main() {
 	log.Info("Registered usercluster controller")
 
 	if len(runOp.networks) > 0 {
-		if err := clusterv1alpha1.AddToScheme(mgr.GetScheme()); err != nil {
-			log.Fatalw("Failed to add clusterv1alpha1 scheme", zap.Error(err))
-		}
 		// We need to add the machine CRDs once here, because otherwise the IPAM
 		// controller keeps the manager from starting as it can not establish a
 		// watch for machine CRs, keeping us from creating them
@@ -299,12 +323,6 @@ func main() {
 		log.Fatalw("Failed to add user RBAC controller to mgr", zap.Error(err))
 	}
 	log.Info("Registered user RBAC controller")
-
-	// CSRs are critical for a cluster, so the isPauseChecker is not used in this controller
-	if err := nodecsrapprover.Add(mgr, 4, cfg, log); err != nil {
-		log.Fatalw("Failed to add nodecsrapprover controller", zap.Error(err))
-	}
-	log.Info("Registered nodecsrapprover controller")
 
 	updateWindow := kubermaticv1.UpdateWindow{
 		Start:  runOp.updateWindowStart,
@@ -338,10 +356,18 @@ func main() {
 		log.Fatalw("Failed to register rolecloner controller", zap.Error(err))
 	}
 	log.Info("Registered rolecloner controller")
+
 	if err := ownerbindingcreator.Add(rootCtx, log, mgr, runOp.ownerEmail, isPausedChecker); err != nil {
 		log.Fatalw("Failed to register ownerbindingcreator controller", zap.Error(err))
 	}
 	log.Info("Registered ownerbindingcreator controller")
+
+	if runOp.ccmMigration {
+		if err := ccmcsimigrator.Add(rootCtx, log, seedMgr, mgr, versions, runOp.clusterName, isPausedChecker); err != nil {
+			log.Fatalw("failed to register ccm-csi-migrator controller", zap.Error(err))
+		}
+		log.Info("registered ccm-csi-migrator controller")
+	}
 
 	if runOp.opaIntegration {
 		if err := constraintsyncer.Add(rootCtx, log, seedMgr, mgr, runOp.namespace, isPausedChecker); err != nil {

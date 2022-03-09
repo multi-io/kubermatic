@@ -44,6 +44,9 @@ const (
 
 	// CredentialPrefix is the prefix used for the secrets containing cloud provider crednentials.
 	CredentialPrefix = "credential"
+
+	// ForceRestartAnnotation is key of the annotation used to restart machine deployments.
+	ForceRestartAnnotation = "forceRestart"
 )
 
 const (
@@ -120,6 +123,9 @@ type ClusterSpec struct {
 	// PauseReason is the reason why the cluster is no being managed.
 	PauseReason string `json:"pauseReason,omitempty"`
 
+	// DebugLog enables more verbose logging by KKP's usercluster-controller-manager.
+	DebugLog bool `json:"debugLog,omitempty"`
+
 	// Optional component specific overrides
 	ComponentsOverride ComponentSettings `json:"componentsOverride"`
 
@@ -165,9 +171,34 @@ type ClusterSpec struct {
 	// ServiceAccount contains service account related settings for the kube-apiserver of user cluster.
 	ServiceAccount *ServiceAccountSettings `json:"serviceAccount,omitempty"`
 
-	//MLA contains monitoring, logging and alerting related settings for the user cluster.
+	// MLA contains monitoring, logging and alerting related settings for the user cluster.
 	MLA *MLASettings `json:"mla,omitempty"`
+
+	// ContainerRuntime to use, i.e. Docker or containerd. By default containerd will be used.
+	ContainerRuntime string `json:"containerRuntime,omitempty"`
+
+	// CNIPlugin contains the spec of the CNI plugin to be installed in the cluster.
+	CNIPlugin *CNIPluginSettings `json:"cniPlugin,omitempty"`
 }
+
+// CNIPluginSettings contains the spec of the CNI plugin used by the Cluster.
+type CNIPluginSettings struct {
+	Type    CNIPluginType `json:"type"`
+	Version string        `json:"version"`
+}
+
+// CNIPluginType define the type of CNI plugin installed. e.g. Canal
+type CNIPluginType string
+
+func (c CNIPluginType) String() string {
+	return string(c)
+}
+
+const (
+	// CNIPluginTypeCanal corresponds to Canal CNI plugin (i.e. Flannel +
+	// Calico for policy enforcement).
+	CNIPluginTypeCanal CNIPluginType = "canal"
+)
 
 type Sys11AuthSettings struct {
 	Realm string `json:"realm,omitempty"`
@@ -190,6 +221,10 @@ const (
 	// ClusterFeatureEtcdLauncher enables features related to the experimental etcd-launcher. This includes user-cluster
 	// etcd scaling, automatic volume recovery and new backup/restore contorllers.
 	ClusterFeatureEtcdLauncher = "etcdLauncher"
+
+	// ApiserverNetworkPolicy enables the deployment of network policies that
+	// restrict the egress traffic from Apiserver pods.
+	ApiserverNetworkPolicy = "apiserverNetworkPolicy"
 )
 
 // ClusterConditionType is used to indicate the type of a cluster condition. For all condition
@@ -353,6 +388,8 @@ type OPAIntegrationSettings struct {
 	// WebhookTimeout is the timeout that is set for the gatekeeper validating webhook admission review calls.
 	// By default 10 seconds.
 	WebhookTimeoutSeconds *int32 `json:"webhookTimeoutSeconds,omitempty"`
+	// Enable mutation
+	ExperimentalEnableMutation bool `json:"experimentalEnableMutation,omitempty"`
 }
 
 type ServiceAccountSettings struct {
@@ -370,6 +407,10 @@ type MLASettings struct {
 	MonitoringEnabled bool `json:"monitoringEnabled,omitempty"`
 	// LoggingEnabled is the flag for enabling logging in user cluster.
 	LoggingEnabled bool `json:"loggingEnabled,omitempty"`
+	// MonitoringResources is the resource requirements for user cluster prometheus.
+	MonitoringResources *corev1.ResourceRequirements `json:"monitoringResources,omitempty"`
+	// LoggingResources is the resource requirements for user cluster promtail.
+	LoggingResources *corev1.ResourceRequirements `json:"loggingResources,omitempty"`
 }
 
 type ComponentSettings struct {
@@ -469,11 +510,21 @@ type ClusterNetworkingConfig struct {
 	Pods NetworkRanges `json:"pods,omitempty"`
 
 	// Domain name for services.
-	DNSDomain string `json:"dnsDomain,omitempty"`
+	DNSDomain string `json:"dnsDomain"`
 
 	// ProxyMode defines the kube-proxy mode (ipvs/iptables).
 	// Defaults to ipvs.
-	ProxyMode string `json:"proxyMode,omitempty"`
+	ProxyMode string `json:"proxyMode"`
+
+	// IPVS defines kube-proxy ipvs configuration options
+	IPVS *IPVSConfiguration `json:"ipvs,omitempty"`
+
+	// NodeLocalDNSCacheEnabled controls whether the NodeLocal DNS Cache feature is enabled.
+	// Defaults to true.
+	NodeLocalDNSCacheEnabled *bool `json:"nodeLocalDNSCacheEnabled,omitempty"`
+
+	// KonnectivityEnabled enables konnectivity for controlplane to node network communication.
+	KonnectivityEnabled bool `json:"konnectivityEnabled,omitempty"`
 }
 
 // MachineNetworkingConfig specifies the networking parameters used for IPAM.
@@ -485,7 +536,7 @@ type MachineNetworkingConfig struct {
 
 // NetworkRanges represents ranges of network addresses.
 type NetworkRanges struct {
-	CIDRBlocks []string `json:"cidrBlocks,omitempty"`
+	CIDRBlocks []string `json:"cidrBlocks"`
 }
 
 // ClusterAddress stores access and address information of a cluster.
@@ -502,6 +553,13 @@ type ClusterAddress struct {
 	AdminToken string `json:"adminToken"`
 	// IP is the external IP under which the apiserver is available
 	IP string `json:"ip"`
+}
+
+// IPVSConfiguration contains ipvs-related configuration details for kube-proxy.
+type IPVSConfiguration struct {
+	// StrictArp configure arp_ignore and arp_announce to avoid answering ARP queries from kube-ipvs0 interface.
+	// defaults to true.
+	StrictArp *bool `json:"strictArp,omitempty"`
 }
 
 // CloudSpec mutually stores access data to a cloud provider.
@@ -574,13 +632,14 @@ type AzureCloudSpec struct {
 
 	OpenstackBillingTenant string `json:"openstackBillingTenant,omitempty"`
 
-	ResourceGroup     string `json:"resourceGroup"`
-	VNetResourceGroup string `json:"vnetResourceGroup"`
-	VNetName          string `json:"vnet"`
-	SubnetName        string `json:"subnet"`
-	RouteTableName    string `json:"routeTable"`
-	SecurityGroup     string `json:"securityGroup"`
-	AvailabilitySet   string `json:"availabilitySet"`
+	ResourceGroup         string `json:"resourceGroup"`
+	VNetResourceGroup     string `json:"vnetResourceGroup"`
+	VNetName              string `json:"vnet"`
+	SubnetName            string `json:"subnet"`
+	RouteTableName        string `json:"routeTable"`
+	SecurityGroup         string `json:"securityGroup"`
+	AssignAvailabilitySet *bool  `json:"assignAvailabilitySet"`
+	AvailabilitySet       string `json:"availabilitySet"`
 	// LoadBalancerSKU sets the LB type that will be used for the Azure cluster, possible values are "basic" and "standard", if empty, "basic" will be used
 	LoadBalancerSKU LBSKU `json:"loadBalancerSKU"`
 }
@@ -621,6 +680,14 @@ type VSphereCloudSpec struct {
 	// +optional
 	DatastoreCluster string `json:"datastoreCluster,omitempty"`
 
+	// StoragePolicy to be used for storage provisioning
+	StoragePolicy string `json:"storagePolicy"`
+
+	// ResourcePool is used to manage resources such as cpu and memory for vSphere virtual machines. The resource pool
+	// should be defined on vSphere cluster level.
+	// +optional
+	ResourcePool string `json:"resourcePool,omitempty"`
+
 	// This user will be used for everything except cloud provider functionality
 	InfraManagementUser VSphereCredentials `json:"infraManagementUser"`
 }
@@ -660,7 +727,7 @@ type OpenstackCloudSpec struct {
 	Domain                      string `json:"domain,omitempty"`
 	ApplicationCredentialID     string `json:"applicationCredentialID,omitempty"`
 	ApplicationCredentialSecret string `json:"applicationCredentialSecret,omitempty"`
-	UseToken                    bool   `json:"useToken,omitempty"`
+	UseToken                    bool   `json:"useToken"`
 	// Used internally during cluster creation
 	Token string `json:"token,omitempty"`
 
@@ -692,7 +759,7 @@ type OpenstackCloudSpec struct {
 	// Takes precedence over the 'use_octavia' flag provided at datacenter
 	// level if both are specified.
 	// +optional
-	UseOctavia *bool `json:"useOctavia,omitempty"`
+	UseOctavia *bool `json:"useOctavia"`
 }
 
 // PacketCloudSpec specifies access data to a Packet cloud.
@@ -846,4 +913,14 @@ func (cluster *Cluster) GetSecretName() string {
 		return fmt.Sprintf("%s-anexia-%s", CredentialPrefix, cluster.Name)
 	}
 	return ""
+}
+
+func (cluster *Cluster) GetUserClusterMLAResourceRequirements() map[string]*corev1.ResourceRequirements {
+	if cluster.Spec.MLA == nil {
+		return nil
+	}
+	return map[string]*corev1.ResourceRequirements{
+		"monitoring": cluster.Spec.MLA.MonitoringResources,
+		"logging":    cluster.Spec.MLA.LoggingResources,
+	}
 }

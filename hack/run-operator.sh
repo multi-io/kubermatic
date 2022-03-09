@@ -22,6 +22,7 @@ source hack/lib.sh
 KUBERMATIC_EDITION="${KUBERMATIC_EDITION:-ce}"
 NAMESPACE="${NAMESPACE:-}"
 KUBERMATIC_DEBUG=${KUBERMATIC_DEBUG:-true}
+PPROF_PORT=${PPROF_PORT:-6602}
 
 if [ -z "$NAMESPACE" ]; then
   echo "You must specify a NAMESPACE environment variable to run the operator in."
@@ -31,7 +32,7 @@ if [ -z "$NAMESPACE" ]; then
 fi
 
 if [ -z "${VAULT_ADDR:-}" ]; then
-  export VAULT_ADDR=https://vault.loodse.com/
+  export VAULT_ADDR=https://vault.kubermatic.com/
 fi
 
 if [ -z "${KUBECONFIG:-}" ]; then
@@ -69,6 +70,7 @@ set -x
   -kubeconfig=$KUBECONFIG \
   -namespace="$NAMESPACE" \
   -worker-name="$(worker_name)" \
+  -pprof-listen-address=":${PPROF_PORT}" \
   -log-debug=$KUBERMATIC_DEBUG \
   -log-format=Console \
   -logtostderr \

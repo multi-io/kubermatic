@@ -6,6 +6,8 @@ package models
 // Editing this file might prove futile when you re-run the swagger generate command
 
 import (
+	"context"
+
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/swag"
 )
@@ -21,6 +23,11 @@ type Sys11AuthSettings struct {
 
 // Validate validates this sys11 auth settings
 func (m *Sys11AuthSettings) Validate(formats strfmt.Registry) error {
+	return nil
+}
+
+// ContextValidate validates this sys11 auth settings based on context it is used
+func (m *Sys11AuthSettings) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
 	return nil
 }
 

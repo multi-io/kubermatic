@@ -106,7 +106,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 		}
 		return reconcile.Result{}, err
 	}
-	if cluster.Labels[kubermaticv1.WorkerNameLabelKey] != r.workerName || cluster.Spec.Pause {
+	if cluster.Labels[kubermaticv1.WorkerNameLabelKey] != r.workerName || cluster.Spec.Pause || (cluster.Spec.Version.Major() == 1 && cluster.Spec.Version.Minor() <= 18) {
 		return reconcile.Result{}, nil
 	}
 	if !cluster.Spec.Features[kubermaticv1.ClusterFeatureEtcdLauncher] {

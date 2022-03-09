@@ -25,6 +25,8 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
+	certmanagerv1 "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1"
+	certmanagermetav1 "github.com/jetstack/cert-manager/pkg/apis/meta/v1"
 	"github.com/sirupsen/logrus"
 
 	"k8c.io/kubermatic/v2/pkg/install/helm"
@@ -32,9 +34,6 @@ import (
 	"k8c.io/kubermatic/v2/pkg/install/util"
 	"k8c.io/kubermatic/v2/pkg/kubernetes"
 	"k8c.io/kubermatic/v2/pkg/log"
-
-	certmanagerv1alpha2 "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1alpha2"
-	certmanagermetav1 "github.com/jetstack/cert-manager/pkg/apis/meta/v1"
 
 	v1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -149,8 +148,9 @@ func migrateCertManagerV2(
 		{Version: "v1alpha2", Group: "cert-manager.io", Kind: "certificate"},
 	}
 
-	allCRDs := append(
-		restorableCRDs,
+	allCRDs := restorableCRDs
+	allCRDs = append(
+		allCRDs,
 		schema.GroupVersionKind{Version: "v1alpha2", Group: "acme.cert-manager.io", Kind: "challenge"},
 		schema.GroupVersionKind{Version: "v1alpha2", Group: "acme.cert-manager.io", Kind: "order"},
 	)
@@ -318,7 +318,7 @@ func getSecretForCertificate(ctx context.Context, kubeClient ctrlruntimeclient.C
 		return nil, fmt.Errorf("failed to encode certificate as JSON: %v", err)
 	}
 
-	cert := &certmanagerv1alpha2.Certificate{}
+	cert := &certmanagerv1.Certificate{}
 	if err := json.Unmarshal(bytes, cert); err != nil {
 		return nil, fmt.Errorf("failed to parse certificate: %v", err)
 	}
@@ -403,12 +403,12 @@ func waitForCertManagerWebhook(ctx context.Context, logger *logrus.Entry, kubeCl
 	}()
 
 	// create a dummy cert to see if the webhook is alive and well
-	dummyCert := &certmanagerv1alpha2.Certificate{
+	dummyCert := &certmanagerv1.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      certName,
 			Namespace: CertManagerNamespace,
 		},
-		Spec: certmanagerv1alpha2.CertificateSpec{
+		Spec: certmanagerv1.CertificateSpec{
 			SecretName: certName,
 			DNSNames:   []string{"www.example.com"},
 			IssuerRef: certmanagermetav1.ObjectReference{
@@ -430,7 +430,7 @@ func waitForCertManagerWebhook(ctx context.Context, logger *logrus.Entry, kubeCl
 }
 
 func deleteCertificate(ctx context.Context, kubeClient ctrlruntimeclient.Client, namespace string, name string) error {
-	cert := &certmanagerv1alpha2.Certificate{}
+	cert := &certmanagerv1.Certificate{}
 	key := types.NamespacedName{
 		Namespace: namespace,
 		Name:      name,

@@ -17,6 +17,9 @@ limitations under the License.
 /*
 Package mla contains controllers that are responsible for configuring MLA (Monitoring, Logging, and Alerting)
 for user clusters.
-- project_controller - Create/Update Grafana Organizations based on Kubermatic Projects.
+- org grafana controller - create/update/delete Grafana organizations based on Kubermatic Projects
+- user grafana controller - create/update/delete Grafana Users to organizations based on Kubermatic UserProjectBindings
+- datasource grafana controller - create/update/delete Grafana Datasources to organizations based on Kubermatic Clusters
+- alertmanager configuration controller - manage alertmanager configuration based on Kubermatic Clusters
 */
 package mla

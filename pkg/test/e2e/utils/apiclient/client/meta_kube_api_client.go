@@ -13,26 +13,37 @@ import (
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/addon"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/admin"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/alibaba"
+	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/allowedregistries"
+	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/allowedregistry"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/anexia"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/aws"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/azure"
+	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/backupcredentials"
+	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/constraint"
+	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/constraints"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/constrainttemplates"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/credentials"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/datacenter"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/digitalocean"
+	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/etcdbackupconfig"
+	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/etcdrestore"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/gcp"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/hetzner"
+	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/metering"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/metric"
+	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/mlaadminsetting"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/openstack"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/operations"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/packet"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/preset"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/project"
+	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/rulegroup"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/seed"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/serviceaccounts"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/settings"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/tokens"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/users"
+	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/version"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/versions"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/vsphere"
 )
@@ -82,26 +93,37 @@ func New(transport runtime.ClientTransport, formats strfmt.Registry) *MetaKubeAP
 	cli.Addon = addon.New(transport, formats)
 	cli.Admin = admin.New(transport, formats)
 	cli.Alibaba = alibaba.New(transport, formats)
+	cli.Allowedregistries = allowedregistries.New(transport, formats)
+	cli.Allowedregistry = allowedregistry.New(transport, formats)
 	cli.Anexia = anexia.New(transport, formats)
 	cli.Aws = aws.New(transport, formats)
 	cli.Azure = azure.New(transport, formats)
+	cli.Backupcredentials = backupcredentials.New(transport, formats)
+	cli.Constraint = constraint.New(transport, formats)
+	cli.Constraints = constraints.New(transport, formats)
 	cli.Constrainttemplates = constrainttemplates.New(transport, formats)
 	cli.Credentials = credentials.New(transport, formats)
 	cli.Datacenter = datacenter.New(transport, formats)
 	cli.Digitalocean = digitalocean.New(transport, formats)
+	cli.Etcdbackupconfig = etcdbackupconfig.New(transport, formats)
+	cli.Etcdrestore = etcdrestore.New(transport, formats)
 	cli.Gcp = gcp.New(transport, formats)
 	cli.Hetzner = hetzner.New(transport, formats)
+	cli.Metering = metering.New(transport, formats)
 	cli.Metric = metric.New(transport, formats)
+	cli.Mlaadminsetting = mlaadminsetting.New(transport, formats)
 	cli.Openstack = openstack.New(transport, formats)
 	cli.Operations = operations.New(transport, formats)
 	cli.Packet = packet.New(transport, formats)
 	cli.Preset = preset.New(transport, formats)
 	cli.Project = project.New(transport, formats)
+	cli.Rulegroup = rulegroup.New(transport, formats)
 	cli.Seed = seed.New(transport, formats)
 	cli.Serviceaccounts = serviceaccounts.New(transport, formats)
 	cli.Settings = settings.New(transport, formats)
 	cli.Tokens = tokens.New(transport, formats)
 	cli.Users = users.New(transport, formats)
+	cli.Version = version.New(transport, formats)
 	cli.Versions = versions.New(transport, formats)
 	cli.Vsphere = vsphere.New(transport, formats)
 	return cli
@@ -154,11 +176,21 @@ type MetaKubeAPI struct {
 
 	Alibaba alibaba.ClientService
 
+	Allowedregistries allowedregistries.ClientService
+
+	Allowedregistry allowedregistry.ClientService
+
 	Anexia anexia.ClientService
 
 	Aws aws.ClientService
 
 	Azure azure.ClientService
+
+	Backupcredentials backupcredentials.ClientService
+
+	Constraint constraint.ClientService
+
+	Constraints constraints.ClientService
 
 	Constrainttemplates constrainttemplates.ClientService
 
@@ -168,11 +200,19 @@ type MetaKubeAPI struct {
 
 	Digitalocean digitalocean.ClientService
 
+	Etcdbackupconfig etcdbackupconfig.ClientService
+
+	Etcdrestore etcdrestore.ClientService
+
 	Gcp gcp.ClientService
 
 	Hetzner hetzner.ClientService
 
+	Metering metering.ClientService
+
 	Metric metric.ClientService
+
+	Mlaadminsetting mlaadminsetting.ClientService
 
 	Openstack openstack.ClientService
 
@@ -184,6 +224,8 @@ type MetaKubeAPI struct {
 
 	Project project.ClientService
 
+	Rulegroup rulegroup.ClientService
+
 	Seed seed.ClientService
 
 	Serviceaccounts serviceaccounts.ClientService
@@ -193,6 +235,8 @@ type MetaKubeAPI struct {
 	Tokens tokens.ClientService
 
 	Users users.ClientService
+
+	Version version.ClientService
 
 	Versions versions.ClientService
 
@@ -207,26 +251,37 @@ func (c *MetaKubeAPI) SetTransport(transport runtime.ClientTransport) {
 	c.Addon.SetTransport(transport)
 	c.Admin.SetTransport(transport)
 	c.Alibaba.SetTransport(transport)
+	c.Allowedregistries.SetTransport(transport)
+	c.Allowedregistry.SetTransport(transport)
 	c.Anexia.SetTransport(transport)
 	c.Aws.SetTransport(transport)
 	c.Azure.SetTransport(transport)
+	c.Backupcredentials.SetTransport(transport)
+	c.Constraint.SetTransport(transport)
+	c.Constraints.SetTransport(transport)
 	c.Constrainttemplates.SetTransport(transport)
 	c.Credentials.SetTransport(transport)
 	c.Datacenter.SetTransport(transport)
 	c.Digitalocean.SetTransport(transport)
+	c.Etcdbackupconfig.SetTransport(transport)
+	c.Etcdrestore.SetTransport(transport)
 	c.Gcp.SetTransport(transport)
 	c.Hetzner.SetTransport(transport)
+	c.Metering.SetTransport(transport)
 	c.Metric.SetTransport(transport)
+	c.Mlaadminsetting.SetTransport(transport)
 	c.Openstack.SetTransport(transport)
 	c.Operations.SetTransport(transport)
 	c.Packet.SetTransport(transport)
 	c.Preset.SetTransport(transport)
 	c.Project.SetTransport(transport)
+	c.Rulegroup.SetTransport(transport)
 	c.Seed.SetTransport(transport)
 	c.Serviceaccounts.SetTransport(transport)
 	c.Settings.SetTransport(transport)
 	c.Tokens.SetTransport(transport)
 	c.Users.SetTransport(transport)
+	c.Version.SetTransport(transport)
 	c.Versions.SetTransport(transport)
 	c.Vsphere.SetTransport(transport)
 }

@@ -26,18 +26,22 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/utils/pointer"
-
 	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
 	apiv2 "k8c.io/kubermatic/v2/pkg/api/v2"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	v1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/handler/test"
 	"k8c.io/kubermatic/v2/pkg/handler/test/hack"
 	"k8c.io/kubermatic/v2/pkg/handler/v2/constraint"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/utils/pointer"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+const (
+	kubermaticNamespace = "kubermatic"
 )
 
 func TestListConstraints(t *testing.T) {
@@ -138,7 +142,7 @@ func TestListConstraints(t *testing.T) {
 			res := httptest.NewRecorder()
 			ctx := context.Background()
 
-			ep, clientsSets, err := test.CreateTestEndpointAndGetClients(*tc.ExistingAPIUser, nil, nil, nil, tc.ExistingObjects, nil, nil, hack.NewTestRouting)
+			ep, clientsSets, err := test.CreateTestEndpointAndGetClients(*tc.ExistingAPIUser, nil, nil, nil, tc.ExistingObjects, nil, nil, nil, hack.NewTestRouting)
 			if err != nil {
 				t.Fatalf("failed to create test endpoint due to %v", err)
 			}
@@ -193,7 +197,7 @@ func TestGetConstraints(t *testing.T) {
 			ConstraintName:   "ct1",
 			ProjectID:        test.GenDefaultProject().Name,
 			ClusterID:        test.GenDefaultCluster().Name,
-			ExpectedResponse: `{"name":"ct1","spec":{"constraintType":"RequiredLabel","match":{"kinds":[{"kinds":["namespace"],"apiGroups":[""]}],"labelSelector":{},"namespaceSelector":{}},"parameters":{"rawJSON":"{\"labels\":[\"gatekeeper\",\"opa\"]}"}},"status":{"enforcement":"true","auditTimestamp":"2019-05-11T01:46:13Z","violations":[{"enforcementAction":"deny","kind":"Namespace","message":"'you must provide labels: {\"gatekeeper\"}'","name":"default"},{"enforcementAction":"deny","kind":"Namespace","message":"'you must provide labels: {\"gatekeeper\"}'","name":"gatekeeper"}],"synced":true}}`,
+			ExpectedResponse: `{"name":"ct1","spec":{"constraintType":"RequiredLabel","match":{"kinds":[{"kinds":["namespace"],"apiGroups":[""]}],"labelSelector":{},"namespaceSelector":{}},"parameters":{"labels":["gatekeeper","opa"]},"selector":{"providers":["aws","gcp"],"labelSelector":{"matchLabels":{"deployment":"prod","domain":"sales"},"matchExpressions":[{"key":"cluster","operator":"Exists"}]}}},"status":{"enforcement":"true","auditTimestamp":"2019-05-11T01:46:13Z","violations":[{"enforcementAction":"deny","kind":"Namespace","message":"'you must provide labels: {\"gatekeeper\"}'","name":"default"},{"enforcementAction":"deny","kind":"Namespace","message":"'you must provide labels: {\"gatekeeper\"}'","name":"gatekeeper"}],"synced":true}}`,
 			HTTPStatus:       http.StatusOK,
 			ExistingObjects: test.GenDefaultKubermaticObjects(
 				test.GenTestSeed(),
@@ -227,7 +231,7 @@ func TestGetConstraints(t *testing.T) {
 			ConstraintName:   "ct1",
 			ProjectID:        test.GenDefaultProject().Name,
 			ClusterID:        test.GenDefaultCluster().Name,
-			ExpectedResponse: `{"name":"ct1","spec":{"constraintType":"RequiredLabel","match":{"kinds":[{"kinds":["namespace"],"apiGroups":[""]}],"labelSelector":{},"namespaceSelector":{}},"parameters":{"rawJSON":"{\"labels\":[\"gatekeeper\",\"opa\"]}"}},"status":{"enforcement":"true","auditTimestamp":"2019-05-11T01:46:13Z","violations":[{"enforcementAction":"deny","kind":"Namespace","message":"'you must provide labels: {\"gatekeeper\"}'","name":"default"},{"enforcementAction":"deny","kind":"Namespace","message":"'you must provide labels: {\"gatekeeper\"}'","name":"gatekeeper"}],"synced":true}}`,
+			ExpectedResponse: `{"name":"ct1","spec":{"constraintType":"RequiredLabel","match":{"kinds":[{"kinds":["namespace"],"apiGroups":[""]}],"labelSelector":{},"namespaceSelector":{}},"parameters":{"labels":["gatekeeper","opa"]},"selector":{"providers":["aws","gcp"],"labelSelector":{"matchLabels":{"deployment":"prod","domain":"sales"},"matchExpressions":[{"key":"cluster","operator":"Exists"}]}}},"status":{"enforcement":"true","auditTimestamp":"2019-05-11T01:46:13Z","violations":[{"enforcementAction":"deny","kind":"Namespace","message":"'you must provide labels: {\"gatekeeper\"}'","name":"default"},{"enforcementAction":"deny","kind":"Namespace","message":"'you must provide labels: {\"gatekeeper\"}'","name":"gatekeeper"}],"synced":true}}`,
 			HTTPStatus:       http.StatusOK,
 			ExistingObjects: test.GenDefaultKubermaticObjects(
 				test.GenTestSeed(),
@@ -245,7 +249,7 @@ func TestGetConstraints(t *testing.T) {
 			ConstraintName:   "ct1",
 			ProjectID:        test.GenDefaultProject().Name,
 			ClusterID:        test.GenDefaultCluster().Name,
-			ExpectedResponse: `{"name":"ct1","spec":{"constraintType":"RequiredLabel","match":{"kinds":[{"kinds":["namespace"],"apiGroups":[""]}],"labelSelector":{},"namespaceSelector":{}},"parameters":{"rawJSON":"{\"labels\":[\"gatekeeper\",\"opa\"]}"}},"status":{"synced":false}}`,
+			ExpectedResponse: `{"name":"ct1","spec":{"constraintType":"RequiredLabel","match":{"kinds":[{"kinds":["namespace"],"apiGroups":[""]}],"labelSelector":{},"namespaceSelector":{}},"parameters":{"labels":["gatekeeper","opa"]},"selector":{"providers":["aws","gcp"],"labelSelector":{"matchLabels":{"deployment":"prod","domain":"sales"},"matchExpressions":[{"key":"cluster","operator":"Exists"}]}}},"status":{"synced":false}}`,
 			HTTPStatus:       http.StatusOK,
 			ExistingObjects: test.GenDefaultKubermaticObjects(
 				test.GenTestSeed(),
@@ -264,7 +268,7 @@ func TestGetConstraints(t *testing.T) {
 			res := httptest.NewRecorder()
 			ctx := context.Background()
 
-			ep, clientsSets, err := test.CreateTestEndpointAndGetClients(*tc.ExistingAPIUser, nil, nil, nil, tc.ExistingObjects, nil, nil, hack.NewTestRouting)
+			ep, clientsSets, err := test.CreateTestEndpointAndGetClients(*tc.ExistingAPIUser, nil, nil, nil, tc.ExistingObjects, nil, nil, nil, hack.NewTestRouting)
 			if err != nil {
 				t.Fatalf("failed to create test endpoint due to %v", err)
 			}
@@ -433,7 +437,7 @@ func TestDeleteConstraints(t *testing.T) {
 			req := httptest.NewRequest("DELETE", fmt.Sprintf("/api/v2/projects/%s/clusters/%s/constraints/%s",
 				tc.ProjectID, tc.ClusterID, tc.ConstraintName), strings.NewReader(""))
 			res := httptest.NewRecorder()
-			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, nil, tc.ExistingObjects, nil, nil, hack.NewTestRouting)
+			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, nil, tc.ExistingObjects, nil, nil, nil, hack.NewTestRouting)
 			if err != nil {
 				t.Fatalf("failed to create test endpoint due to %v", err)
 			}
@@ -469,7 +473,7 @@ func TestCreateConstraints(t *testing.T) {
 			},
 			ProjectID:        test.GenDefaultProject().Name,
 			ClusterID:        test.GenDefaultCluster().Name,
-			ExpectedResponse: `{"name":"ct1","spec":{"constraintType":"RequiredLabel","match":{"kinds":[{"kinds":["namespace"],"apiGroups":[""]}],"labelSelector":{},"namespaceSelector":{}},"parameters":{"rawJSON":"{\"labels\":[\"gatekeeper\",\"opa\"]}"}}}`,
+			ExpectedResponse: `{"name":"ct1","spec":{"constraintType":"RequiredLabel","match":{"kinds":[{"kinds":["namespace"],"apiGroups":[""]}],"labelSelector":{},"namespaceSelector":{}},"parameters":{"labels":["gatekeeper","opa"]},"selector":{"providers":["aws","gcp"],"labelSelector":{"matchLabels":{"deployment":"prod","domain":"sales"},"matchExpressions":[{"key":"cluster","operator":"Exists"}]}}}}`,
 			HTTPStatus:       http.StatusOK,
 			ExistingObjects: test.GenDefaultKubermaticObjects(
 				test.GenTestSeed(),
@@ -503,7 +507,7 @@ func TestCreateConstraints(t *testing.T) {
 			},
 			ProjectID:        test.GenDefaultProject().Name,
 			ClusterID:        test.GenDefaultCluster().Name,
-			ExpectedResponse: `{"name":"ct1","spec":{"constraintType":"RequiredLabel","match":{"kinds":[{"kinds":["namespace"],"apiGroups":[""]}],"labelSelector":{},"namespaceSelector":{}},"parameters":{"rawJSON":"{\"labels\":[\"gatekeeper\",\"opa\"]}"}}}`,
+			ExpectedResponse: `{"name":"ct1","spec":{"constraintType":"RequiredLabel","match":{"kinds":[{"kinds":["namespace"],"apiGroups":[""]}],"labelSelector":{},"namespaceSelector":{}},"parameters":{"labels":["gatekeeper","opa"]},"selector":{"providers":["aws","gcp"],"labelSelector":{"matchLabels":{"deployment":"prod","domain":"sales"},"matchExpressions":[{"key":"cluster","operator":"Exists"}]}}}}`,
 			HTTPStatus:       http.StatusOK,
 			ExistingObjects: test.GenDefaultKubermaticObjects(
 				test.GenTestSeed(),
@@ -527,7 +531,51 @@ func TestCreateConstraints(t *testing.T) {
 				test.GenTestSeed(),
 				test.GenDefaultCluster(),
 			),
-			ExistingAPIUser: test.GenAPIUser("John", "john@acme.com"),
+			ExistingAPIUser: test.GenDefaultAPIUser(),
+		},
+		{
+			Name: "scenario 5: cannot create constraint with invalid parameters",
+			Constraint: func() apiv2.Constraint {
+				c := test.GenConstraint("ct1", test.GenDefaultCluster().Status.NamespaceName, "RequiredLabel")
+				c.Spec.Parameters = map[string]interface{}{"labels": "fail"}
+				return apiv2.Constraint{
+					Name: "ct1",
+					Spec: c.Spec,
+				}
+			}(),
+			ProjectID:        test.GenDefaultProject().Name,
+			ClusterID:        test.GenDefaultCluster().Name,
+			ExpectedResponse: `{"error":{"code":400,"message":"Validation failed, constraint spec is not valid: spec.parameters.labels: Invalid value: \"string\": labels in body must be of type array: \"string\""}}`,
+			HTTPStatus:       http.StatusBadRequest,
+			ExistingObjects: test.GenDefaultKubermaticObjects(
+				test.GenTestSeed(),
+				test.GenDefaultCluster(),
+				test.GenConstraintTemplate("requiredlabel"),
+			),
+			ExistingAPIUser: test.GenDefaultAPIUser(),
+		},
+		{
+			Name: "scenario 6: cannot create rawJSON constraint with invalid parameters",
+			Constraint: func() apiv2.Constraint {
+				c := test.GenConstraint("ct1", test.GenDefaultCluster().Status.NamespaceName, "RequiredLabel")
+				c.Spec.Parameters = kubermaticv1.Parameters{
+					"rawJSON": `{"labels":"gatekeeper"}`,
+				}
+				return apiv2.Constraint{
+					Name: "ct1",
+					Spec: c.Spec,
+				}
+			}(),
+			ProjectID:        test.GenDefaultProject().Name,
+			ClusterID:        test.GenDefaultCluster().Name,
+			ExpectedResponse: `{"error":{"code":400,"message":"Validation failed, constraint spec is not valid: spec.parameters.labels: Invalid value: \"string\": labels in body must be of type array: \"string\""}}`,
+			HTTPStatus:       http.StatusBadRequest,
+			ExistingObjects: test.GenDefaultKubermaticObjects(
+				test.GenTestSeed(),
+				test.GenDefaultCluster(),
+				test.GenConstraintTemplate("requiredlabel"),
+			),
+			ExistingAPIUser: test.GenDefaultAPIUser(),
 		},
 	}
 
@@ -547,7 +595,7 @@ func TestCreateConstraints(t *testing.T) {
 			req := httptest.NewRequest("POST", fmt.Sprintf("/api/v2/projects/%s/clusters/%s/constraints",
 				tc.ProjectID, tc.ClusterID), bytes.NewBuffer(body))
 			res := httptest.NewRecorder()
-			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, nil, tc.ExistingObjects, nil, nil, hack.NewTestRouting)
+			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, nil, tc.ExistingObjects, nil, nil, nil, hack.NewTestRouting)
 			if err != nil {
 				t.Fatalf("failed to create test endpoint due to %v", err)
 			}
@@ -581,12 +629,13 @@ func TestPatchConstraints(t *testing.T) {
 			ConstraintName:   "ct1",
 			ProjectID:        test.GenDefaultProject().Name,
 			ClusterID:        test.GenDefaultCluster().Name,
-			Patch:            `{"spec":{"constraintType":"somethingdifferentthatshouldnotbeapplied","match":{"kinds":[{"kinds":["pods"], "apiGroups":["v1"]}, {"kinds":["namespaces"]}]}}}`,
-			ExpectedResponse: `{"name":"ct1","spec":{"constraintType":"RequiredLabel","match":{"kinds":[{"kinds":["pods"],"apiGroups":["v1"]},{"kinds":["namespaces"]}],"labelSelector":{},"namespaceSelector":{}},"parameters":{"rawJSON":"{\"labels\":[\"gatekeeper\",\"opa\"]}"}}}`,
+			Patch:            `{"spec":{"constraintType":"RequiredLabel","parameters":{"labels":["test"]},"match":{"kinds":[{"kinds":["pods"], "apiGroups":["v1"]}, {"kinds":["namespaces"]}]}}}`,
+			ExpectedResponse: `{"name":"ct1","spec":{"constraintType":"RequiredLabel","match":{"kinds":[{"kinds":["pods"],"apiGroups":["v1"]},{"kinds":["namespaces"]}],"labelSelector":{},"namespaceSelector":{}},"parameters":{"labels":["test"]},"selector":{"providers":["aws","gcp"],"labelSelector":{"matchLabels":{"deployment":"prod","domain":"sales"},"matchExpressions":[{"key":"cluster","operator":"Exists"}]}}}}`,
 			HTTPStatus:       http.StatusOK,
 			ExistingObjects: test.GenDefaultKubermaticObjects(
 				test.GenTestSeed(),
 				test.GenDefaultCluster(),
+				test.GenConstraintTemplate("requiredlabel"),
 				test.GenConstraint("ct1", test.GenDefaultCluster().Status.NamespaceName, "RequiredLabel"),
 			),
 			ExistingAPIUser: test.GenDefaultAPIUser(),
@@ -596,12 +645,13 @@ func TestPatchConstraints(t *testing.T) {
 			ConstraintName:   "ct1",
 			ProjectID:        test.GenDefaultProject().Name,
 			ClusterID:        test.GenDefaultCluster().Name,
-			Patch:            `{"spec":{"constraintType":"somethingdifferentthatshouldnotbeapplied","match":{"kinds":[{"kinds":["pods"], "apiGroups":["v1"]}, {"kinds":"namespaces"}]}}}`,
+			Patch:            `{"spec":{"constraintType":"RequiredLabel","parameters":{"labels":["test"]},"match":{"kinds":[{"kinds":["pods"], "apiGroups":["v1"]}, {"kinds":["namespaces"]}]}}}`,
 			ExpectedResponse: `{"error":{"code":403,"message":"forbidden: \"john@acme.com\" doesn't belong to the given project = my-first-project-ID"}}`,
 			HTTPStatus:       http.StatusForbidden,
 			ExistingObjects: test.GenDefaultKubermaticObjects(
 				test.GenTestSeed(),
 				test.GenDefaultCluster(),
+				test.GenConstraintTemplate("requiredlabel"),
 				test.GenConstraint("ct1", test.GenDefaultCluster().Status.NamespaceName, "RequiredLabel"),
 			),
 			ExistingAPIUser: test.GenAPIUser("John", "john@acme.com"),
@@ -611,16 +661,65 @@ func TestPatchConstraints(t *testing.T) {
 			ConstraintName:   "ct1",
 			ProjectID:        test.GenDefaultProject().Name,
 			ClusterID:        test.GenDefaultCluster().Name,
-			Patch:            `{"spec":{"constraintType":"somethingdifferentthatshouldnotbeapplied","match":{"kinds":[{"kinds":["pods"], "apiGroups":["v1"]}, {"kinds":["namespaces"]}]}}}`,
-			ExpectedResponse: `{"name":"ct1","spec":{"constraintType":"RequiredLabel","match":{"kinds":[{"kinds":["pods"],"apiGroups":["v1"]},{"kinds":["namespaces"]}],"labelSelector":{},"namespaceSelector":{}},"parameters":{"rawJSON":"{\"labels\":[\"gatekeeper\",\"opa\"]}"}}}`,
+			Patch:            `{"spec":{"constraintType":"RequiredLabel","parameters":{"labels":["test"]},"match":{"kinds":[{"kinds":["pods"], "apiGroups":["v1"]}, {"kinds":["namespaces"]}]}}}`,
+			ExpectedResponse: `{"name":"ct1","spec":{"constraintType":"RequiredLabel","match":{"kinds":[{"kinds":["pods"],"apiGroups":["v1"]},{"kinds":["namespaces"]}],"labelSelector":{},"namespaceSelector":{}},"parameters":{"labels":["test"]},"selector":{"providers":["aws","gcp"],"labelSelector":{"matchLabels":{"deployment":"prod","domain":"sales"},"matchExpressions":[{"key":"cluster","operator":"Exists"}]}}}}`,
 			HTTPStatus:       http.StatusOK,
 			ExistingObjects: test.GenDefaultKubermaticObjects(
 				test.GenTestSeed(),
 				test.GenDefaultCluster(),
+				test.GenConstraintTemplate("requiredlabel"),
 				test.GenConstraint("ct1", test.GenDefaultCluster().Status.NamespaceName, "RequiredLabel"),
 				genKubermaticUser("John", "john@acme.com", true),
 			),
 			ExistingAPIUser: test.GenAPIUser("John", "john@acme.com"),
+		},
+		{
+			Name:             "scenario 4: cannot patch invalid constraint",
+			ConstraintName:   "ct1",
+			ProjectID:        test.GenDefaultProject().Name,
+			ClusterID:        test.GenDefaultCluster().Name,
+			Patch:            `{"spec":{"parameters":{"labels":"gatekeeper"}}}`,
+			ExpectedResponse: `{"error":{"code":400,"message":"Validation failed, constraint spec is not valid: spec.parameters.labels: Invalid value: \"string\": labels in body must be of type array: \"string\""}}`,
+			HTTPStatus:       http.StatusBadRequest,
+			ExistingObjects: test.GenDefaultKubermaticObjects(
+				test.GenTestSeed(),
+				test.GenDefaultCluster(),
+				test.GenConstraintTemplate("requiredlabel"),
+				test.GenConstraint("ct1", test.GenDefaultCluster().Status.NamespaceName, "RequiredLabel"),
+			),
+			ExistingAPIUser: test.GenDefaultAPIUser(),
+		},
+		{
+			Name:             "scenario 5: cannot change constraint name",
+			ConstraintName:   "ct1",
+			ProjectID:        test.GenDefaultProject().Name,
+			ClusterID:        test.GenDefaultCluster().Name,
+			Patch:            `{"name":"changedname","spec":{"constraintType":"RequiredLabel","match":{"kinds":[{"kinds":["pods"], "apiGroups":["v1"]}, {"kinds":["namespaces"]}]}}}`,
+			ExpectedResponse: `{"error":{"code":400,"message":"Changing constraint name is not allowed: \"ct1\" to \"changedname\""}}`,
+			HTTPStatus:       http.StatusBadRequest,
+			ExistingObjects: test.GenDefaultKubermaticObjects(
+				test.GenTestSeed(),
+				test.GenDefaultCluster(),
+				test.GenConstraintTemplate("requiredlabel"),
+				test.GenConstraint("ct1", test.GenDefaultCluster().Status.NamespaceName, "RequiredLabel"),
+			),
+			ExistingAPIUser: test.GenDefaultAPIUser(),
+		},
+		{
+			Name:             "scenario 6: cannot change constraint type",
+			ConstraintName:   "ct1",
+			ProjectID:        test.GenDefaultProject().Name,
+			ClusterID:        test.GenDefaultCluster().Name,
+			Patch:            `{"spec":{"match":{"kinds":[{"apiGroups":[""],"kinds":["pods"]}]},"parameters":{"rawJSON":"{\"labels\":[\"test1\"]}"},"constraintType":"somethingdifferentthatshouldnotbeapplied", "disabled": false, "selector":{"providers":["aws","gcp"],"labelSelector":{"matchLabels":{"filtered":"false"}}}}}`,
+			ExpectedResponse: `{"error":{"code":400,"message":"Changing constraint type is not allowed: \"RequiredLabel\" to \"somethingdifferentthatshouldnotbeapplied\""}}`,
+			HTTPStatus:       http.StatusBadRequest,
+			ExistingObjects: test.GenDefaultKubermaticObjects(
+				test.GenTestSeed(),
+				test.GenDefaultCluster(),
+				test.GenConstraintTemplate("requiredlabel"),
+				test.GenConstraint("ct1", test.GenDefaultCluster().Status.NamespaceName, "RequiredLabel"),
+			),
+			ExistingAPIUser: test.GenDefaultAPIUser(),
 		},
 	}
 
@@ -629,7 +728,91 @@ func TestPatchConstraints(t *testing.T) {
 			req := httptest.NewRequest("PATCH", fmt.Sprintf("/api/v2/projects/%s/clusters/%s/constraints/%s",
 				tc.ProjectID, tc.ClusterID, tc.ConstraintName), strings.NewReader(tc.Patch))
 			res := httptest.NewRecorder()
-			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, nil, tc.ExistingObjects, nil, nil, hack.NewTestRouting)
+			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, nil, tc.ExistingObjects, nil, nil, nil, hack.NewTestRouting)
+			if err != nil {
+				t.Fatalf("failed to create test endpoint due to %v", err)
+			}
+
+			ep.ServeHTTP(res, req)
+			fmt.Println(res)
+			if res.Code != tc.HTTPStatus {
+				t.Fatalf("Expected HTTP status code %d, got %d: %s", tc.HTTPStatus, res.Code, res.Body.String())
+			}
+
+			test.CompareWithResult(t, res, tc.ExpectedResponse)
+		})
+	}
+}
+
+func genKubermaticUser(name, email string, isAdmin bool) *kubermaticv1.User {
+	user := test.GenUser("", name, email)
+	user.Spec.IsAdmin = isAdmin
+	return user
+}
+
+func TestCreateDefaultConstraints(t *testing.T) {
+	t.Parallel()
+	testcases := []struct {
+		Name             string
+		CTtoCreate       apiv2.Constraint
+		ExpectedResponse string
+		HTTPStatus       int
+		ExistingAPIUser  *apiv1.User
+		ExistingObjects  []ctrlruntimeclient.Object
+	}{
+		{
+			Name: "scenario 1: admin can create default constraint",
+			CTtoCreate: apiv2.Constraint{
+				Name: "ct1",
+				Spec: test.GenConstraint("ct1", kubermaticNamespace, "RequiredLabel").Spec,
+			},
+			ExpectedResponse: `{"name":"ct1","spec":{"constraintType":"RequiredLabel","match":{"kinds":[{"kinds":["namespace"],"apiGroups":[""]}],"labelSelector":{},"namespaceSelector":{}},"parameters":{"labels":["gatekeeper","opa"]},"selector":{"providers":["aws","gcp"],"labelSelector":{"matchLabels":{"deployment":"prod","domain":"sales"},"matchExpressions":[{"key":"cluster","operator":"Exists"}]}}}}`,
+			HTTPStatus:       http.StatusOK,
+			ExistingAPIUser:  test.GenDefaultAdminAPIUser(),
+			ExistingObjects:  []ctrlruntimeclient.Object{test.GenConstraintTemplate("requiredlabel")},
+		},
+		{
+			Name: "scenario 2: non-admin can not create default constraint",
+			CTtoCreate: apiv2.Constraint{
+				Name: "ct1",
+				Spec: test.GenConstraint("ct1", kubermaticNamespace, "RequiredLabel").Spec,
+			},
+			ExpectedResponse: `{"error":{"code":403,"message":"forbidden: \"bob@acme.com\" doesn't have admin rights"}}`,
+			HTTPStatus:       http.StatusForbidden,
+			ExistingAPIUser:  test.GenDefaultAPIUser(),
+			ExistingObjects:  []ctrlruntimeclient.Object{test.GenConstraintTemplate("requiredlabel")},
+		},
+		{
+			Name: "scenario 3: cannot create constraint with not existing constraint template",
+			CTtoCreate: apiv2.Constraint{
+				Name: "ct1",
+				Spec: test.GenConstraint("ct1", kubermaticNamespace, "RequiredLabel").Spec,
+			},
+			ExpectedResponse: `{"error":{"code":400,"message":"Validation failed, constraint needs to have an existing constraint template: constrainttemplates.kubermatic.k8s.io \"requiredlabel\" not found"}}`,
+			HTTPStatus:       http.StatusBadRequest,
+			ExistingAPIUser:  test.GenDefaultAdminAPIUser(),
+		},
+	}
+	for _, tc := range testcases {
+		var reqBody struct {
+			Name string                      `json:"name"`
+			Spec kubermaticv1.ConstraintSpec `json:"spec"`
+		}
+		reqBody.Spec = tc.CTtoCreate.Spec
+		reqBody.Name = tc.CTtoCreate.Name
+
+		body, err := json.Marshal(reqBody)
+		if err != nil {
+			t.Fatalf("error marshalling body into json: %v", err)
+		}
+		t.Run(tc.Name, func(t *testing.T) {
+
+			tc.ExistingObjects = append(tc.ExistingObjects, test.APIUserToKubermaticUser(*tc.ExistingAPIUser))
+
+			req := httptest.NewRequest("POST", "/api/v2/constraints", bytes.NewBuffer(body))
+			res := httptest.NewRecorder()
+
+			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, nil, tc.ExistingObjects, nil, nil, nil, hack.NewTestRouting)
 			if err != nil {
 				t.Fatalf("failed to create test endpoint due to %v", err)
 			}
@@ -645,8 +828,280 @@ func TestPatchConstraints(t *testing.T) {
 	}
 }
 
-func genKubermaticUser(name, email string, isAdmin bool) *kubermaticv1.User {
-	user := test.GenUser("", name, email)
-	user.Spec.IsAdmin = isAdmin
-	return user
+func convertInternalToAPIConstraint(c *v1.Constraint) *apiv2.Constraint {
+	return &apiv2.Constraint{
+		Name: c.Name,
+		Spec: c.Spec,
+	}
+}
+
+func TestListDefaultConstraints(t *testing.T) {
+	ct1 := test.GenConstraint("ct1", kubermaticNamespace, "RequiredLabel")
+	ct2 := test.GenConstraint("ct2", kubermaticNamespace, "RequiredLabel")
+
+	t.Parallel()
+	testcases := []struct {
+		Name                       string
+		ct1                        *v1.Constraint
+		ct2                        *v1.Constraint
+		ExpectedDefaultConstraints []apiv2.Constraint
+		HTTPStatus                 int
+		ExistingAPIUser            *apiv1.User
+		ExistingObjects            []ctrlruntimeclient.Object
+	}{
+		{
+			Name: "scenario 1: list all default constraint",
+			ExpectedDefaultConstraints: []apiv2.Constraint{
+				*convertInternalToAPIConstraint(ct1),
+				*convertInternalToAPIConstraint(ct2),
+			},
+			HTTPStatus: http.StatusOK,
+			ExistingObjects: test.GenDefaultKubermaticObjects(
+				ct1,
+				ct2,
+			),
+			ExistingAPIUser: test.GenDefaultAPIUser(),
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.Name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/api/v2/constraints", strings.NewReader(""))
+			res := httptest.NewRecorder()
+			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, nil, tc.ExistingObjects, nil, nil, nil, hack.NewTestRouting)
+			if err != nil {
+				t.Fatalf("failed to create test endpoint due to %v", err)
+			}
+
+			ep.ServeHTTP(res, req)
+
+			if res.Code != tc.HTTPStatus {
+				t.Fatalf("Expected HTTP status code %d, got %d: %s", tc.HTTPStatus, res.Code, res.Body.String())
+			}
+
+			actualCTs := test.NewConstraintsSliceWrapper{}
+			actualCTs.DecodeOrDie(res.Body, t).Sort()
+
+			wrappedExpectedCTs := test.NewConstraintsSliceWrapper(tc.ExpectedDefaultConstraints)
+			wrappedExpectedCTs.Sort()
+
+			actualCTs.EqualOrDie(wrappedExpectedCTs, t)
+		})
+	}
+}
+
+func TestGetDefaultConstraint(t *testing.T) {
+	t.Parallel()
+	testcases := []struct {
+		Name             string
+		CTName           string
+		ExpectedResponse string
+		HTTPStatus       int
+		ExistingAPIUser  *apiv1.User
+		ExistingObjects  []ctrlruntimeclient.Object
+	}{
+		{
+			Name:             "scenario 1: get existing default constraint",
+			CTName:           "ct1",
+			ExpectedResponse: `{"name":"ct1","spec":{"constraintType":"RequiredLabel","match":{"kinds":[{"kinds":["namespace"],"apiGroups":[""]}],"labelSelector":{},"namespaceSelector":{}},"parameters":{"labels":["gatekeeper","opa"]},"selector":{"providers":["aws","gcp"],"labelSelector":{"matchLabels":{"deployment":"prod","domain":"sales"},"matchExpressions":[{"key":"cluster","operator":"Exists"}]}}}}`,
+			HTTPStatus:       http.StatusOK,
+			ExistingAPIUser:  test.GenDefaultAPIUser(),
+			ExistingObjects: test.GenDefaultKubermaticObjects(
+				test.GenConstraint("ct1", kubermaticNamespace, "RequiredLabel"),
+				test.GenConstraint("ct2", kubermaticNamespace, "RequiredLabel"),
+			)},
+		{
+			Name:             "scenario 2: get non-existing default constraint",
+			CTName:           "missing",
+			ExpectedResponse: `{"error":{"code":404,"message":"constraints.kubermatic.k8s.io \"missing\" not found"}}`,
+			HTTPStatus:       http.StatusNotFound,
+			ExistingObjects: test.GenDefaultKubermaticObjects(
+				test.GenConstraint("ct1", kubermaticNamespace, "RequiredLabel"),
+				test.GenConstraint("ct2", kubermaticNamespace, "RequiredLabel"),
+			),
+			ExistingAPIUser: test.GenDefaultAPIUser(),
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.Name, func(t *testing.T) {
+
+			req := httptest.NewRequest("GET", fmt.Sprintf("/api/v2/constraints/%s", tc.CTName), strings.NewReader(""))
+			res := httptest.NewRecorder()
+
+			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, nil, tc.ExistingObjects, nil, nil, nil, hack.NewTestRouting)
+			if err != nil {
+				t.Fatalf("failed to create test endpoint due to %v", err)
+			}
+
+			ep.ServeHTTP(res, req)
+
+			if res.Code != tc.HTTPStatus {
+				t.Fatalf("Expected HTTP status code %d, got %d: %s", tc.HTTPStatus, res.Code, res.Body.String())
+			}
+
+			test.CompareWithResult(t, res, tc.ExpectedResponse)
+		})
+	}
+}
+
+func TestDeleteDefaultConstraints(t *testing.T) {
+	t.Parallel()
+	testcases := []struct {
+		Name             string
+		CTToDeleteName   string
+		ExpectedResponse string
+		HTTPStatus       int
+		ExistingAPIUser  *apiv1.User
+		ExistingObjects  []ctrlruntimeclient.Object
+	}{
+		{
+			Name:             "scenario 1: admin can delete default constraint",
+			CTToDeleteName:   "ct",
+			ExpectedResponse: `{}`,
+			HTTPStatus:       http.StatusOK,
+			ExistingAPIUser:  test.GenDefaultAdminAPIUser(),
+			ExistingObjects:  []ctrlruntimeclient.Object{test.GenConstraint("ct", kubermaticNamespace, "RequiredLabel")},
+		},
+		{
+			Name:             "scenario 2: non-admin can not create default constraint",
+			CTToDeleteName:   "ct",
+			ExpectedResponse: `{"error":{"code":403,"message":"forbidden: \"bob@acme.com\" doesn't have admin rights"}}`,
+			HTTPStatus:       http.StatusForbidden,
+			ExistingObjects:  []ctrlruntimeclient.Object{test.GenConstraint("ct", kubermaticNamespace, "RequiredLabel")},
+			ExistingAPIUser:  test.GenDefaultAPIUser(),
+		},
+		{
+			Name:             "scenario 3: delete non-existing default constraint should fail",
+			CTToDeleteName:   "idontexist",
+			ExpectedResponse: `{"error":{"code":404,"message":"constraints.kubermatic.k8s.io \"idontexist\" not found"}}`,
+			HTTPStatus:       http.StatusNotFound,
+			ExistingObjects:  []ctrlruntimeclient.Object{test.GenConstraint("ct", kubermaticNamespace, "RequiredLabel")},
+			ExistingAPIUser:  test.GenDefaultAdminAPIUser(),
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.Name, func(t *testing.T) {
+
+			tc.ExistingObjects = append(tc.ExistingObjects, test.APIUserToKubermaticUser(*tc.ExistingAPIUser))
+			req := httptest.NewRequest("DELETE", fmt.Sprintf("/api/v2/constraints/%s", tc.CTToDeleteName), strings.NewReader(""))
+			res := httptest.NewRecorder()
+			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, nil, tc.ExistingObjects, nil, nil, nil, hack.NewTestRouting)
+			if err != nil {
+				t.Fatalf("failed to create test endpoint due to %v", err)
+			}
+
+			ep.ServeHTTP(res, req)
+
+			if res.Code != tc.HTTPStatus {
+				t.Fatalf("Expected HTTP status code %d, got %d: %s", tc.HTTPStatus, res.Code, res.Body.String())
+			}
+
+			test.CompareWithResult(t, res, tc.ExpectedResponse)
+		})
+	}
+}
+
+func TestPatchDefaultConstraints(t *testing.T) {
+	t.Parallel()
+	testcases := []struct {
+		Name             string
+		ConstraintName   string
+		Patch            string
+		ExpectedResponse string
+		HTTPStatus       int
+		ExistingAPIUser  *apiv1.User
+		ExistingObjects  []ctrlruntimeclient.Object
+	}{
+		{
+			Name:             "scenario 1: admin can patch default constraint",
+			Patch:            `{"spec":{"match":{"kinds":[{"apiGroups":[""],"kinds":["pods"]}]},"parameters":{"rawJSON":"{\"labels\":[\"test\"]}"},"constraintType":"RequiredLabel", "disabled": false, "selector":{"providers":["aws","gcp"],"labelSelector":{"matchLabels":{"filtered":"false"}}}}}`,
+			ConstraintName:   "ct1",
+			ExpectedResponse: `{"name":"ct1","spec":{"constraintType":"RequiredLabel","match":{"kinds":[{"kinds":["pods"],"apiGroups":[""]}],"labelSelector":{},"namespaceSelector":{}},"parameters":{"labels":["gatekeeper","opa"],"rawJSON":"{\"labels\":[\"test\"]}"},"selector":{"providers":["aws","gcp"],"labelSelector":{"matchLabels":{"deployment":"prod","domain":"sales","filtered":"false"},"matchExpressions":[{"key":"cluster","operator":"Exists"}]}}}}`,
+			HTTPStatus:       http.StatusOK,
+			ExistingAPIUser:  test.GenDefaultAdminAPIUser(),
+			ExistingObjects: []ctrlruntimeclient.Object{
+				test.GenConstraintTemplate("requiredlabel"),
+				test.GenConstraint("ct1", kubermaticNamespace, "RequiredLabel"),
+			},
+		},
+		{
+			Name:             "scenario 2: non-admin can not patch default constraint",
+			ConstraintName:   "ct1",
+			HTTPStatus:       http.StatusForbidden,
+			ExistingAPIUser:  test.GenDefaultAPIUser(),
+			Patch:            `{"spec":{"constraintType":"somethingdifferentthatshouldnotbeapplied","match":{"kinds":[{"kinds":["pods"], "apiGroups":["v1"]}, {"kinds":"namespaces"}]}}}`,
+			ExpectedResponse: `{"error":{"code":403,"message":"forbidden: \"bob@acme.com\" doesn't have admin rights"}}`,
+			ExistingObjects: test.GenDefaultKubermaticObjects(
+				test.GenConstraintTemplate("requiredlabel"),
+				test.GenConstraint("ct1", kubermaticNamespace, "RequiredLabel"),
+			),
+		},
+		{
+			Name:             "scenario 3: cannot patch invalid constraint",
+			ConstraintName:   "ct1",
+			Patch:            `{"spec":{"parameters":{"labels":"gatekeeper"}}}`,
+			ExpectedResponse: `{"error":{"code":400,"message":"patched default constraint validation failed: Validation failed, constraint spec is not valid: spec.parameters.labels: Invalid value: \"string\": labels in body must be of type array: \"string\""}}`,
+			HTTPStatus:       http.StatusBadRequest,
+			ExistingObjects: []ctrlruntimeclient.Object{
+				test.GenConstraintTemplate("requiredlabel"),
+				test.GenConstraint("ct1", kubermaticNamespace, "RequiredLabel"),
+			},
+			ExistingAPIUser: test.GenDefaultAdminAPIUser(),
+		},
+		{
+			Name:             "scenario 4: cannot change default constraint name",
+			ConstraintName:   "ct1",
+			Patch:            `{"name":"changedname","spec":{"match":{"kinds":[{"apiGroups":[""],"kinds":["pods"]}]},"parameters":{"rawJSON":"{\"labels\":[\"test1\"]}"},"constraintType":"RequiredLabel", "disabled": false, "selector":{"providers":["aws","gcp"],"labelSelector":{"matchLabels":{"filtered":"false"}}}}}`,
+			ExpectedResponse: `{"error":{"code":400,"message":"Changing default constraint name is not allowed: \"ct1\" to \"changedname\""}}`,
+			HTTPStatus:       http.StatusBadRequest,
+			ExistingObjects: []ctrlruntimeclient.Object{
+				test.GenConstraintTemplate("requiredlabel"),
+				test.GenConstraint("ct1", kubermaticNamespace, "RequiredLabel"),
+			},
+			ExistingAPIUser: test.GenDefaultAdminAPIUser(),
+		},
+		{
+			Name:             "scenario 5: cannot change default constraint type",
+			ConstraintName:   "ct1",
+			Patch:            `{"spec":{"match":{"kinds":[{"apiGroups":[""],"kinds":["pods"]}]},"parameters":{"rawJSON":"{\"labels\":[\"test1\"]}"},"constraintType":"somethingdifferentthatshouldnotbeapplied", "disabled": false, "selector":{"providers":["aws","gcp"],"labelSelector":{"matchLabels":{"filtered":"false"}}}}}`,
+			ExpectedResponse: `{"error":{"code":400,"message":"Changing default constraint type is not allowed: \"RequiredLabel\" to \"somethingdifferentthatshouldnotbeapplied\""}}`,
+			HTTPStatus:       http.StatusBadRequest,
+			ExistingObjects: []ctrlruntimeclient.Object{
+				test.GenConstraintTemplate("requiredlabel"),
+				test.GenConstraint("ct1", kubermaticNamespace, "RequiredLabel"),
+			},
+			ExistingAPIUser: test.GenDefaultAdminAPIUser(),
+		},
+		{
+			Name:             "scenario 6: cannot patch non-existing default constraint",
+			ConstraintName:   "doesnotexist",
+			Patch:            `{"spec":{"match":{"kinds":[{"apiGroups":[""],"kinds":["pods"]}]},"parameters":{"rawJSON":"{\"labels\":[\"test1\"]}"},"constraintType":"RequiredLabel", "disabled": false, "selector":{"providers":["aws","gcp"],"labelSelector":{"matchLabels":{"filtered":"false"}}}}}`,
+			ExpectedResponse: `{"error":{"code":404,"message":"constraints.kubermatic.k8s.io \"doesnotexist\" not found"}}`,
+			HTTPStatus:       http.StatusNotFound,
+			ExistingAPIUser:  test.GenDefaultAdminAPIUser(),
+			ExistingObjects: []ctrlruntimeclient.Object{
+				test.GenConstraintTemplate("requiredlabel"),
+			},
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.Name, func(t *testing.T) {
+
+			tc.ExistingObjects = append(tc.ExistingObjects, test.APIUserToKubermaticUser(*tc.ExistingAPIUser))
+
+			req := httptest.NewRequest("PATCH", fmt.Sprintf("/api/v2/constraints/%s", tc.ConstraintName), strings.NewReader(tc.Patch))
+			res := httptest.NewRecorder()
+			ep, err := test.CreateTestEndpoint(*tc.ExistingAPIUser, nil, tc.ExistingObjects, nil, nil, nil, hack.NewTestRouting)
+			if err != nil {
+				t.Fatalf("failed to create test endpoint due to %v", err)
+			}
+
+			ep.ServeHTTP(res, req)
+
+			if res.Code != tc.HTTPStatus {
+				t.Fatalf("Expected HTTP status code %d, got %d: %s", tc.HTTPStatus, res.Code, res.Body.String())
+			}
+
+			test.CompareWithResult(t, res, tc.ExpectedResponse)
+		})
+	}
 }

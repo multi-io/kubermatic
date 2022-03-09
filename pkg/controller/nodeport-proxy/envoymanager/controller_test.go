@@ -22,10 +22,10 @@ import (
 	"time"
 
 	"github.com/go-test/deep"
-	"github.com/gogo/protobuf/proto"
-	"github.com/golang/protobuf/ptypes"
-	"github.com/golang/protobuf/ptypes/any"
 	"go.uber.org/zap/zaptest"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/durationpb"
 
 	envoyclusterv3 "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
 	envoycorev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
@@ -363,7 +363,7 @@ func TestSync(t *testing.T) {
 			gotClusters := map[string]*envoyclusterv3.Cluster{}
 			s, _ := c.cache.GetSnapshot(c.EnvoyNodeName)
 			for name, res := range s.Resources[envoycachetype.Cluster].Items {
-				gotClusters[name] = res.(*envoyclusterv3.Cluster)
+				gotClusters[name] = res.Resource.(*envoyclusterv3.Cluster)
 			}
 			// Delete the admin cluster. We're not going to bother comparing it here, as its a static resource.
 			// It would just pollute the testing code
@@ -375,7 +375,7 @@ func TestSync(t *testing.T) {
 
 			gotListeners := map[string]*envoylistenerv3.Listener{}
 			for name, res := range s.Resources[envoycachetype.Listener].Items {
-				gotListeners[name] = res.(*envoylistenerv3.Listener)
+				gotListeners[name] = res.Resource.(*envoylistenerv3.Listener)
 			}
 			delete(gotListeners, "service_stats")
 
@@ -437,7 +437,7 @@ func makeSNIListener(t *testing.T, portValue uint32, hostClusterNames ...hostClu
 			AccessLog: makeAccessLog(),
 		}
 
-		tcpProxyConfigMarshalled, err := ptypes.MarshalAny(tcpProxyConfig)
+		tcpProxyConfigMarshalled, err := anypb.New(tcpProxyConfig)
 		if err != nil {
 			t.Fatalf("failed to marshal tcpProxyConfig: %v", err)
 		}
@@ -522,7 +522,7 @@ func makeCluster(t *testing.T, name string, portValue uint32, addresses ...strin
 	}
 	return &envoyclusterv3.Cluster{
 		Name:           name,
-		ConnectTimeout: ptypes.DurationProto(clusterConnectTimeout),
+		ConnectTimeout: durationpb.New(clusterConnectTimeout),
 		ClusterDiscoveryType: &envoyclusterv3.Cluster_Type{
 			Type: envoyclusterv3.Cluster_STATIC,
 		},
@@ -670,8 +670,8 @@ func TestExposeAnnotationPredicate(t *testing.T) {
 	}
 }
 
-func marshalMessage(t *testing.T, msg proto.Message) *any.Any {
-	marshalled, err := ptypes.MarshalAny(msg)
+func marshalMessage(t *testing.T, msg proto.Message) *anypb.Any {
+	marshalled, err := anypb.New(msg)
 	if err != nil {
 		t.Fatalf("failed to marshal from message to any: %v", err)
 	}

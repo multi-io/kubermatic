@@ -114,6 +114,9 @@ func (r *reconciler) reconcile(ctx context.Context, cluster *kubermaticv1.Cluste
 	if cluster.Spec.Pause {
 		return nil
 	}
+	if v := cluster.Spec.Version; v.Version != nil && v.Major() == 1 && v.Minor() <= 18 {
+		return nil
+	}
 
 	upToDate, err := r.seedResourcesUpToDate(ctx, cluster)
 	if err != nil {
@@ -183,7 +186,7 @@ func (r *reconciler) seedResourcesUpToDate(ctx context.Context, cluster *kuberma
 
 	// This is to avoid setting the resource up-to-date condition in the
 	// initial stage when deploymens and statefulsets are not yet deployed.
-	// TODO(irozzo) This is not perfect as we may endup in a situation where
+	// TODO This is not perfect as we may endup in a situation where
 	// the available control plane components are ready, but not all components have
 	// been deployed yet. This scenario is quite unlikely to happen though and
 	// the impact of having the condition set is not big.

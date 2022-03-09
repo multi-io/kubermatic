@@ -238,3 +238,99 @@ func (p *FakeConstraintProvider) Create(userInfo *provider.UserInfo, constraint 
 func (p *FakeConstraintProvider) Update(userInfo *provider.UserInfo, constraint *kubermaticapiv1.Constraint) (*kubermaticapiv1.Constraint, error) {
 	return p.Provider.Update(userInfo, constraint)
 }
+
+type FakeDefaultConstraintProvider struct {
+	Provider   *kubernetes.DefaultConstraintProvider
+	FakeClient ctrlruntimeclient.Client
+}
+
+func (p *FakeDefaultConstraintProvider) Create(ct *kubermaticapiv1.Constraint) (*kubermaticapiv1.Constraint, error) {
+	return p.Provider.Create(ct)
+}
+
+func (p *FakeDefaultConstraintProvider) List() (*kubermaticapiv1.ConstraintList, error) {
+	return p.Provider.List()
+}
+
+func (p *FakeDefaultConstraintProvider) Get(name string) (*kubermaticapiv1.Constraint, error) {
+	return p.Provider.Get(name)
+}
+
+func (p *FakeDefaultConstraintProvider) Delete(name string) error {
+	return p.Provider.Delete(name)
+}
+
+func (p *FakeDefaultConstraintProvider) Update(constraint *kubermaticapiv1.Constraint) (*kubermaticapiv1.Constraint, error) {
+	return p.Provider.Update(constraint)
+}
+
+type FakePrivilegedAllowedRegistryProvider struct {
+	Provider   *kubernetes.PrivilegedAllowedRegistryProvider
+	FakeClient ctrlruntimeclient.Client
+}
+
+func (p *FakePrivilegedAllowedRegistryProvider) CreateUnsecured(wr *kubermaticapiv1.AllowedRegistry) (*kubermaticapiv1.AllowedRegistry, error) {
+	return p.Provider.CreateUnsecured(wr)
+}
+
+func (p *FakePrivilegedAllowedRegistryProvider) GetUnsecured(name string) (*kubermaticapiv1.AllowedRegistry, error) {
+	return p.Provider.GetUnsecured(name)
+}
+
+func (p *FakePrivilegedAllowedRegistryProvider) ListUnsecured() (*kubermaticapiv1.AllowedRegistryList, error) {
+	return p.Provider.ListUnsecured()
+}
+
+func (p *FakePrivilegedAllowedRegistryProvider) UpdateUnsecured(wr *kubermaticapiv1.AllowedRegistry) (*kubermaticapiv1.AllowedRegistry, error) {
+	return p.Provider.UpdateUnsecured(wr)
+}
+
+func (p *FakePrivilegedAllowedRegistryProvider) DeleteUnsecured(name string) error {
+	return p.Provider.DeleteUnsecured(name)
+}
+
+type FakeEtcdBackupConfigProvider struct {
+	Provider   *kubernetes.EtcdBackupConfigProvider
+	FakeClient ctrlruntimeclient.Client
+}
+
+func (p *FakeEtcdBackupConfigProvider) Create(userInfo *provider.UserInfo, ebc *kubermaticapiv1.EtcdBackupConfig) (*kubermaticapiv1.EtcdBackupConfig, error) {
+	return p.Provider.Create(userInfo, ebc)
+}
+
+func (p *FakeEtcdBackupConfigProvider) Get(userInfo *provider.UserInfo, cluster *kubermaticapiv1.Cluster, name string) (*kubermaticapiv1.EtcdBackupConfig, error) {
+	return p.Provider.Get(userInfo, cluster, name)
+}
+
+func (p *FakeEtcdBackupConfigProvider) List(userInfo *provider.UserInfo, cluster *kubermaticapiv1.Cluster) (*kubermaticapiv1.EtcdBackupConfigList, error) {
+	return p.Provider.List(userInfo, cluster)
+}
+
+func (p *FakeEtcdBackupConfigProvider) Delete(userInfo *provider.UserInfo, cluster *kubermaticapiv1.Cluster, name string) error {
+	return p.Provider.Delete(userInfo, cluster, name)
+}
+
+func (p *FakeEtcdBackupConfigProvider) Patch(userInfo *provider.UserInfo, old, new *kubermaticapiv1.EtcdBackupConfig) (*kubermaticapiv1.EtcdBackupConfig, error) {
+	return p.Provider.Patch(userInfo, old, new)
+}
+
+type FakeEtcdRestoreProvider struct {
+	Provider   *kubernetes.EtcdRestoreProvider
+	FakeClient ctrlruntimeclient.Client
+}
+
+func (p *FakeEtcdRestoreProvider) Create(userInfo *provider.UserInfo, ebc *kubermaticapiv1.EtcdRestore) (*kubermaticapiv1.EtcdRestore, error) {
+	return p.Provider.Create(userInfo, ebc)
+}
+
+func (p *FakeEtcdRestoreProvider) Get(userInfo *provider.UserInfo, cluster *kubermaticapiv1.Cluster, name string) (*kubermaticapiv1.EtcdRestore, error) {
+	return p.Provider.Get(userInfo, cluster, name)
+}
+
+func (p *FakeEtcdRestoreProvider) List(userInfo *provider.UserInfo, cluster *kubermaticapiv1.Cluster) (*kubermaticapiv1.EtcdRestoreList, error) {
+	return p.Provider.List(userInfo, cluster)
+}
+
+func (p *FakeEtcdRestoreProvider) Delete(userInfo *provider.UserInfo, cluster *kubermaticapiv1.Cluster, name string) error {
+	return p.Provider.Delete(userInfo, cluster, name)
+}
