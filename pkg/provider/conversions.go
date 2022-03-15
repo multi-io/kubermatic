@@ -18,11 +18,9 @@ package provider
 
 import (
 	"fmt"
-	"net/http"
-	"strings"
-
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/util/errors"
+	"net/http"
 )
 
 // DatacenterFromSeedMap returns datacenter from the seed:datacenter map.
@@ -58,22 +56,23 @@ func DatacenterFromSeedMap(userInfo *UserInfo, seedsGetter SeedsGetter, datacent
 	matchingDatacenter := matchingDatacenters[0]
 	matchingSeed := matchingSeeds[0]
 
-	if !userInfo.IsAdmin {
-		emailDomain, err := getUserEmailDomain(userInfo)
-		if err != nil {
-			return nil, nil, errors.New(http.StatusInternalServerError, fmt.Sprintf("invalid email domain: %v", err))
-		}
+	/*	if !userInfo.IsAdmin {
+			emailDomain, err := getUserEmailDomain(userInfo)
+			if err != nil {
+				return nil, nil, errors.New(http.StatusInternalServerError, fmt.Sprintf("invalid email domain: %v", err))
+			}
 
-		if !canAccessDatacenter(matchingDatacenter, emailDomain) {
-			return nil, nil, errors.New(http.StatusForbidden, fmt.Sprintf("cannot access %s datacenter due to email domain requirements", datacenterName))
+			if !canAccessDatacenter(matchingDatacenter, emailDomain) {
+				return nil, nil, errors.New(http.StatusForbidden, fmt.Sprintf("cannot access %s datacenter due to email domain requirements", datacenterName))
+			}
 		}
-	}
-
+	*/
 	return matchingSeed, &matchingDatacenter, nil
 }
 
 // canAccessDatacenter returns information if user with provided email domain can access given datacenter
 // based on the required email domains that are set on it.
+/*
 func canAccessDatacenter(dc kubermaticv1.Datacenter, emailDomain string) bool {
 	// Return false if required email domain is set, but it is different from user email domain.
 	if dc.Spec.RequiredEmailDomain != "" && !strings.EqualFold(emailDomain, dc.Spec.RequiredEmailDomain) {
@@ -104,3 +103,5 @@ func getUserEmailDomain(userInfo *UserInfo) (string, error) {
 	}
 	return split[1], nil
 }
+
+*/
