@@ -80,7 +80,7 @@ func (s *kubevirtScenario) Cluster(secrets secrets) *apimodels.CreateClusterSpec
 	}
 }
 
-func (s *kubevirtScenario) NodeDeployments(_ context.Context, num int, _ secrets, _ string) ([]apimodels.NodeDeployment, error) {
+func (s *kubevirtScenario) NodeDeployments(_ context.Context, num int, _ secrets) ([]apimodels.NodeDeployment, error) {
 	var sourceURL string
 	registryAddr := "http://http-server.kube-system.svc.cluster.local"
 

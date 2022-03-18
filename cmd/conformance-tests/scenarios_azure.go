@@ -78,7 +78,7 @@ func (s *azureScenario) Cluster(secrets secrets) *apimodels.CreateClusterSpec {
 	}
 }
 
-func (s *azureScenario) NodeDeployments(_ context.Context, num int, _ secrets, _ string) ([]apimodels.NodeDeployment, error) {
+func (s *azureScenario) NodeDeployments(_ context.Context, num int, _ secrets) ([]apimodels.NodeDeployment, error) {
 	replicas := int32(num)
 	size := "Standard_F2"
 	return []apimodels.NodeDeployment{

@@ -25,19 +25,21 @@ import (
 )
 
 // Returns a matrix of (version x operating system)
-func getOpenStackScenarios(versions []*semver.Semver) []testScenario {
+func getOpenStackScenarios(versions []*semver.Semver, ubuntuImage, flatcarImage string) []testScenario {
 	var scenarios []testScenario
 	for _, v := range versions {
 		// Ubuntu
 		scenarios = append(scenarios, &openStackScenario{
-			version: v,
+			nodeImage: ubuntuImage,
+			version:   v,
 			nodeOsSpec: apimodels.OperatingSystemSpec{
 				Ubuntu: &apimodels.UbuntuSpec{},
 			},
 		})
 		// Flatcar
 		scenarios = append(scenarios, &openStackScenario{
-			version: v,
+			nodeImage: flatcarImage,
+			version:   v,
 			nodeOsSpec: apimodels.OperatingSystemSpec{
 				Flatcar: &apimodels.FlatcarSpec{
 					DisableAutoUpdate: true,
@@ -50,6 +52,7 @@ func getOpenStackScenarios(versions []*semver.Semver) []testScenario {
 }
 
 type openStackScenario struct {
+	nodeImage  string
 	version    *semver.Semver
 	nodeOsSpec apimodels.OperatingSystemSpec
 }
@@ -79,7 +82,7 @@ func (s *openStackScenario) Cluster(secrets secrets) *apimodels.CreateClusterSpe
 	}
 }
 
-func (s *openStackScenario) NodeDeployments(_ context.Context, num int, _ secrets, sys11NodeImage string) ([]apimodels.NodeDeployment, error) {
+func (s *openStackScenario) NodeDeployments(_ context.Context, num int, _ secrets) ([]apimodels.NodeDeployment, error) {
 	//osName := getOSNameFromSpec(s.nodeOsSpec)
 	//image := "kubermatic-e2e-" + osName
 	flavor := "m1.small"
@@ -93,7 +96,7 @@ func (s *openStackScenario) NodeDeployments(_ context.Context, num int, _ secret
 					Cloud: &apimodels.NodeCloudSpec{
 						Openstack: &apimodels.OpenstackNodeSpec{
 							Flavor:                    &flavor,
-							Image:                     &sys11NodeImage,
+							Image:                     &s.nodeImage,
 							InstanceReadyCheckPeriod:  "5s",
 							InstanceReadyCheckTimeout: "2m",
 						},

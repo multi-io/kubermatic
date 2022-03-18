@@ -78,7 +78,7 @@ func podIsReady(p *corev1.Pod) bool {
 type testScenario interface {
 	Name() string
 	Cluster(secrets secrets) *apimodels.CreateClusterSpec
-	NodeDeployments(ctx context.Context, num int, secrets secrets, image string) ([]apimodels.NodeDeployment, error)
+	NodeDeployments(ctx context.Context, num int, secrets secrets) ([]apimodels.NodeDeployment, error)
 	OS() apimodels.OperatingSystemSpec
 }
 
@@ -113,8 +113,6 @@ func newRunner(scenarios []testScenario, opts *Opts, log *zap.SugaredLogger) *te
 		kubermaticProjectID:          opts.kubermaticProjectID,
 		kubermaticClient:             opts.kubermaticClient,
 		kubermaticAuthenticator:      opts.kubermaticAuthenticator,
-
-		sys11NodeImage: opts.sys11NodeImage,
 	}
 }
 
@@ -154,8 +152,6 @@ type testRunner struct {
 	kubermaticProjectID     string
 	kubermaticClient        *apiclient.MetaKubeAPI
 	kubermaticAuthenticator runtime.ClientAuthInfoWriter
-
-	sys11NodeImage string
 }
 
 type testResult struct {
@@ -549,7 +545,7 @@ func (r *testRunner) deleteCluster(ctx context.Context, report *reporters.JUnitT
 		"[Kubermatic] Delete cluster",
 		report,
 		func() error {
-			var selector labels.Selector
+			selector := labels.NewSelector()
 			var err error
 			if r.workerName != "" {
 				selector, err = labels.Parse(fmt.Sprintf("worker-name=%s", r.workerName))
@@ -830,7 +826,7 @@ func (r *testRunner) createNodeDeployments(ctx context.Context, log *zap.Sugared
 		ClusterID: clusterName,
 		DC:        r.seed.Name,
 	}
-	utils.SetupParams(nil, nodeDeploymentGetParams, 5*time.Second, 1*time.Minute)
+	utils.SetupParams(nil, nodeDeploymentGetParams, 10*time.Second, 5*time.Minute)
 
 	log.Info("Getting existing NodeDeployments")
 	resp, err := r.kubermaticClient.Project.ListNodeDeployments(nodeDeploymentGetParams, r.kubermaticAuthenticator)
@@ -856,7 +852,7 @@ func (r *testRunner) createNodeDeployments(ctx context.Context, log *zap.Sugared
 	var nodeDeployments []apimodels.NodeDeployment
 	if err := wait.PollImmediate(10*time.Second, time.Minute, func() (bool, error) {
 		var err error
-		nodeDeployments, err = scenario.NodeDeployments(ctx, nodeCount, r.secrets, r.sys11NodeImage)
+		nodeDeployments, err = scenario.NodeDeployments(ctx, nodeCount, r.secrets)
 		if err != nil {
 			log.Warnw("Getting NodeDeployments from scenario failed", zap.Error(err))
 			return false, nil
@@ -875,7 +871,7 @@ func (r *testRunner) createNodeDeployments(ctx context.Context, log *zap.Sugared
 			DC:        r.seed.Name,
 			Body:      &nd,
 		}
-		utils.SetupParams(nil, params, 5*time.Second, 1*time.Minute, http.StatusConflict)
+		utils.SetupParams(nil, params, 5*time.Second, 5*time.Minute, http.StatusConflict)
 
 		if _, err := r.kubermaticClient.Project.CreateNodeDeployment(params, r.kubermaticAuthenticator); err != nil {
 			return fmt.Errorf("failed to create NodeDeployment %s: %v", nd.Name, err)
@@ -964,7 +960,7 @@ func (r *testRunner) createCluster(ctx context.Context, log *zap.SugaredLogger, 
 		DC:        r.seed.Name,
 		Body:      cluster,
 	}
-	utils.SetupParams(nil, params, 3*time.Second, 1*time.Minute, http.StatusConflict)
+	utils.SetupParams(nil, params, 3*time.Second, 5*time.Minute, http.StatusConflict)
 
 	response, err := r.kubermaticClient.Project.CreateCluster(params, r.kubermaticAuthenticator)
 	if err != nil {

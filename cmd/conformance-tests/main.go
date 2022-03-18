@@ -21,6 +21,7 @@ import (
 	cryptorand "crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"flag"
@@ -50,6 +51,7 @@ import (
 	kubermativsemver "k8c.io/kubermatic/v2/pkg/semver"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils"
 	apiclient "k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client"
+	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/openstack"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/project"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/models"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/dex"
@@ -105,8 +107,6 @@ type Opts struct {
 	scenarioOptions              string
 	pushgatewayEndpoint          string
 
-	sys11NodeImage string
-
 	secrets secrets
 }
 
@@ -128,10 +128,11 @@ type secrets struct {
 		Token string
 	}
 	OpenStack struct {
-		Domain   string
-		Tenant   string
-		Username string
-		Password string
+		DatacenterName string
+		Domain         string
+		Tenant         string
+		Username       string
+		Password       string
 	}
 	VSphere struct {
 		Username string
@@ -213,7 +214,6 @@ func main() {
 	flag.StringVar(&opts.workerName, "worker-name", "", "name of the worker, if set the 'worker-name' label will be set on all clusters")
 	flag.StringVar(&sversions, "versions", strings.Join(supportedVersions, ","), "a comma-separated list of versions to test")
 	flag.StringVar(&sdistributions, "distributions", "", "a comma-separated list of distributions to test (cannot be used in conjunction with -exclude-distributions)")
-	flag.StringVar(&opts.sys11NodeImage, "syseleven-node-image", "", "Introduced by SysEleven. Node image to be used in machine deployments creation.")
 	flag.StringVar(&sexcludeDistributions, "exclude-distributions", "", "a comma-separated list of distributions that will get excluded from the tests (cannot be used in conjunction with -distributions)")
 	flag.BoolVar(&opts.printGinkoLogs, "print-ginkgo-logs", false, "Whether to print ginkgo logs when ginkgo encountered failures")
 	flag.BoolVar(&opts.printContainerLogs, "print-container-logs", false, "Whether to print the logs of all controlplane containers after the test (even in case of success)")
@@ -231,6 +231,7 @@ func main() {
 	flag.StringVar(&opts.secrets.OpenStack.Domain, "openstack-domain", "", "OpenStack: Domain")
 	flag.StringVar(&opts.secrets.OpenStack.Tenant, "openstack-tenant", "", "OpenStack: Tenant")
 	flag.StringVar(&opts.secrets.OpenStack.Username, "openstack-username", "", "OpenStack: Username")
+	flag.StringVar(&opts.secrets.OpenStack.DatacenterName, "openstack-datacenter-name", "", "OpenStack: Datacenter Name")
 	flag.StringVar(&opts.secrets.OpenStack.Password, "openstack-password", "", "OpenStack: Password")
 	flag.StringVar(&opts.secrets.VSphere.Username, "vsphere-username", "", "vSphere: Username")
 	flag.StringVar(&opts.secrets.VSphere.Password, "vsphere-password", "", "vSphere: Password")
@@ -389,7 +390,9 @@ func main() {
 	opts.publicKeys = append(opts.publicKeys, e2eTestPubKeyBytes)
 	opts.homeDir = homeDir
 
-	if err := createSSHKeys(rootCtx, opts.kubermaticClient, opts.kubermaticAuthenticator, &opts, log); err != nil {
+	cleanupkeys, err := createSSHKeys(rootCtx, opts.kubermaticClient, opts.kubermaticAuthenticator, &opts, log)
+	defer cleanupkeys()
+	if err != nil {
 		log.Panicw("Failed to create SSH keys", zap.Error(err))
 	}
 
@@ -444,6 +447,7 @@ func main() {
 	log.Infof("Whole suite took: %.2f seconds", time.Since(start).Seconds())
 }
 
+//nolint:golint,cyclomatic
 func getScenarios(opts Opts, log *zap.SugaredLogger) []testScenario {
 	scenarioOptions := strings.Split(opts.scenarioOptions, ",")
 
@@ -462,7 +466,40 @@ func getScenarios(opts Opts, log *zap.SugaredLogger) []testScenario {
 	}
 	if opts.providers.Has("openstack") {
 		log.Info("Adding OpenStack scenarios")
-		scenarios = append(scenarios, getOpenStackScenarios(opts.versions)...)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		params := openstack.NewListOpenstackImagesParams().
+			WithContext(ctx).
+			WithDomain(&opts.secrets.OpenStack.Domain).
+			WithDatacenterName(&opts.secrets.OpenStack.DatacenterName).
+			WithUsername(&opts.secrets.OpenStack.Username).
+			WithPassword(&opts.secrets.OpenStack.Password).
+			WithTenant(&opts.secrets.OpenStack.Tenant)
+		ret, err := opts.kubermaticClient.Openstack.ListOpenstackImages(params, opts.kubermaticAuthenticator)
+		if err != nil {
+			v, _ := json.Marshal(err)
+			log.Panic(string(v))
+		}
+		var ubuntu, flatcar string
+		for _, item := range ret.Payload {
+			if item == nil {
+				continue
+			}
+			if v, ok := item.Metadata["os_distro"]; ok && v.(string) == "ubuntu" {
+				if v, ok := item.Metadata["os_version"]; ok && v.(string) == "20.04" {
+					ubuntu = item.Name
+				}
+			}
+			if v, ok := item.Metadata["os_distro"]; ok && v.(string) == "flatcar" {
+				if v, ok := item.Metadata["os_version"]; ok && v.(string) == "stable" {
+					flatcar = item.Name
+				}
+			}
+		}
+		if ubuntu == "" || flatcar == "" {
+			log.Panic("could not find ubuntu and flatcar images to use for openstack scenarios")
+		}
+		scenarios = append(scenarios, getOpenStackScenarios(opts.versions, ubuntu, flatcar)...)
 	}
 	if opts.providers.Has("vsphere") {
 		log.Info("Adding vSphere scenarios")
@@ -626,7 +663,19 @@ func createProject(ctx context.Context, client *apiclient.MetaKubeAPI, bearerTok
 	return projectID, nil
 }
 
-func createSSHKeys(ctx context.Context, client *apiclient.MetaKubeAPI, bearerToken runtime.ClientAuthInfoWriter, opts *Opts, log *zap.SugaredLogger) error {
+func createSSHKeys(ctx context.Context, client *apiclient.MetaKubeAPI, bearerToken runtime.ClientAuthInfoWriter, opts *Opts, log *zap.SugaredLogger) (func(), error) {
+	var keyids []string
+	cleanup := func() {
+		for _, id := range keyids {
+			params := project.NewDeleteSSHKeyParams().
+				WithProjectID(opts.kubermaticProjectID).
+				WithSSHKeyID(id)
+			if _, err := client.Project.DeleteSSHKey(params, bearerToken); err != nil {
+				v, _ := json.Marshal(err)
+				log.Errorf("Failed to clean up SSHKey: %v", string(v))
+			}
+		}
+	}
 	for i, key := range opts.publicKeys {
 		log.Infow("Creating UserSSHKey", "pubkey", string(key))
 
@@ -642,12 +691,14 @@ func createSSHKeys(ctx context.Context, client *apiclient.MetaKubeAPI, bearerTok
 		}
 		utils.SetupParams(nil, body, 3*time.Second, 1*time.Minute, http.StatusConflict)
 
-		if _, err := client.Project.CreateSSHKey(body, bearerToken); err != nil {
-			return fmt.Errorf("failed to create SSH key: %v", err)
+		ret, err := client.Project.CreateSSHKey(body, bearerToken)
+		if err != nil {
+			return cleanup, fmt.Errorf("failed to create SSH key: %v", err)
 		}
+		keyids = append(keyids, ret.Payload.ID)
 	}
 
-	return nil
+	return cleanup, nil
 }
 
 func getLatestMinorVersions(versions []*semver.Version) []string {
