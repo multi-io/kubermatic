@@ -495,6 +495,15 @@ func (r *Reconciler) ensureNetworkPolicies(ctx context.Context, c *kubermaticv1.
 			apiserver.MachineControllerWebhookCreator(c),
 			apiserver.MetricsServerAllowCreator(c),
 		}
+
+		// todo make the urls configurable for every seed
+		if c.Spec.Sys11Auth.Realm != "" {
+			namedNetworkPolicyCreatorGetters = append(namedNetworkPolicyCreatorGetters, apiserver.ExternalURLAllowCreator("prod-keycloak-public", "https://login.syseleven.de"))
+			namedNetworkPolicyCreatorGetters = append(namedNetworkPolicyCreatorGetters, apiserver.ExternalURLAllowCreator("prod-keycloak-internal", "https://login-internal.syseleven.de"))
+			namedNetworkPolicyCreatorGetters = append(namedNetworkPolicyCreatorGetters, apiserver.ExternalURLAllowCreator("dev-keycloak-public", "https://login-stage.syseleven.de"))
+			namedNetworkPolicyCreatorGetters = append(namedNetworkPolicyCreatorGetters, apiserver.ExternalURLAllowCreator("dev-keycloak-internal", "https://login-internal-stage.syseleven.de"))
+		}
+
 		if c.Spec.OIDC.IssuerURL != "" {
 			namedNetworkPolicyCreatorGetters = append(namedNetworkPolicyCreatorGetters, apiserver.OIDCIssuerAllowCreator(c.Spec.OIDC.IssuerURL))
 		} else if r.features.KubernetesOIDCAuthentication {
