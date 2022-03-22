@@ -228,8 +228,13 @@ func MetricsServerAllowCreator(c *kubermaticv1.Cluster) reconciling.NamedNetwork
 
 // OIDCIssuerAllowCreator returns a func to create/update the apiserver oidc-issuer-allow egress policy.
 func OIDCIssuerAllowCreator(issuerURL string) reconciling.NamedNetworkPolicyCreatorGetter {
+	return ExternalURLAllowCreator("oidc-issuer-allow", issuerURL)
+}
+
+// ExternalURLAllowCreator returns a func to create/update the apiserver egress policy to a named external URL.
+func ExternalURLAllowCreator(name, issuerURL string) reconciling.NamedNetworkPolicyCreatorGetter {
 	return func() (string, reconciling.NetworkPolicyCreator) {
-		return "oidc-issuer-allow", func(np *networkingv1.NetworkPolicy) (*networkingv1.NetworkPolicy, error) {
+		return name, func(np *networkingv1.NetworkPolicy) (*networkingv1.NetworkPolicy, error) {
 			var ipList []net.IP
 			u, err := url.Parse(issuerURL)
 			if err != nil {
