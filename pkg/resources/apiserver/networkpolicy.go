@@ -232,9 +232,9 @@ func OIDCIssuerAllowCreator(issuerURL string) reconciling.NamedNetworkPolicyCrea
 }
 
 // ExternalURLAllowCreator returns a func to create/update the apiserver egress policy to a named external URL.
-func ExternalURLAllowCreator(name, issuerURL string) reconciling.NamedNetworkPolicyCreatorGetter {
+func ExternalURLAllowCreator(ruleName, issuerURL string) reconciling.NamedNetworkPolicyCreatorGetter {
 	return func() (string, reconciling.NetworkPolicyCreator) {
-		return name, func(np *networkingv1.NetworkPolicy) (*networkingv1.NetworkPolicy, error) {
+		return ruleName, func(np *networkingv1.NetworkPolicy) (*networkingv1.NetworkPolicy, error) {
 			var ipList []net.IP
 			u, err := url.Parse(issuerURL)
 			if err != nil {
