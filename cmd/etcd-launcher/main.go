@@ -97,6 +97,10 @@ func main() {
 	log.Infof("initial-state: %s", e.initialState)
 	log.Infof("initial-cluster: %s", strings.Join(initialMemberList(e.clusterSize, e.namespace), ","))
 
+	if err := ensureRecoveryFromLostDataDir(e, log); err != nil {
+		log.Panicw("failed to ensure recovery from lost data directory", zap.Error(err))
+	}
+
 	// setup and start etcd command
 	etcdCmd, err := startEtcdCmd(e, log)
 	if err != nil {
@@ -104,7 +108,7 @@ func main() {
 	}
 
 	if err = wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
-		return e.isClusterHealthy(log)
+		return e.isClusterReachable(log)
 	}); err != nil {
 		log.Panicw("manager thread failed to connect to cluster", zap.Error(err))
 	}
@@ -113,27 +117,12 @@ func main() {
 	if err != nil {
 		log.Panicw("failed to check cluster membership", zap.Error(err))
 	}
-	if thisMember != nil {
-		log.Infof("%v is a member", thisMember.GetPeerURLs())
-
-		if _, err := os.Stat(filepath.Join(e.dataDir, "member")); os.IsNotExist(err) {
-			client, err := e.getClusterClient()
-			if err != nil {
-				log.Panicw("can't find cluster client: %v", zap.Error(err))
-			}
-			log.Warnw("No data dir, to ensure recovery removing and adding the member")
-			_, err = client.MemberRemove(context.Background(), thisMember.ID)
-			if err != nil {
-				close(client, log)
-				log.Panicw("remove itself due to data dir loss", zap.Error(err))
-			}
-			close(client, log)
-			if err := joinCluster(e, log); err != nil {
-				log.Panicw("join cluster as fresh member", zap.Error(err))
-			}
+	if thisMember == nil {
+		if err := joinCluster(e, log); err != nil {
+			log.Panicw("join cluster as fresh member", zap.Error(err))
 		}
-	} else if err := joinCluster(e, log); err != nil {
-		log.Panicw("join cluster as fresh member", zap.Error(err))
+	} else {
+		log.Infof("%v is a member", thisMember.GetPeerURLs())
 	}
 
 	// handle changes to peerURLs (https -> http)
@@ -153,6 +142,40 @@ func main() {
 	if err = etcdCmd.Wait(); err != nil {
 		log.Panic(err)
 	}
+}
+
+func ensureRecoveryFromLostDataDir(e *etcdCluster, log *zap.SugaredLogger) error {
+	if _, err := os.Stat(filepath.Join(e.dataDir, "member")); os.IsNotExist(err) {
+		log.Info("Data dir is empty. Check for recovery from lost/deleted PVC.")
+		reachable, _ := e.isClusterReachable(log)
+		if !reachable {
+			log.Info("Not reachable etcd. Can't check if instance is new or known member. Assume it's a new cluster")
+			return nil
+		}
+		log.Info("Checking for membership")
+		thisMember, err := e.getMemberByName(e.podName, log)
+		if err != nil {
+			return fmt.Errorf("check cluster membership: %w", err)
+		}
+		if thisMember == nil {
+			log.Info("Instance is a new member. Can join the usual way")
+			return nil
+		}
+		log.Info("Instance is a known member. Since data dir is empty, member will be removed to allow fresh join")
+		client, err := e.getClusterClient()
+		if err != nil {
+			return fmt.Errorf("etcd cluster client: %w", err)
+		}
+		defer close(client, log)
+		_, err = client.MemberRemove(context.Background(), thisMember.ID)
+		if err != nil {
+			return fmt.Errorf("remove membership after data dir loss: %w", err)
+		}
+		if err := joinCluster(e, log); err != nil {
+			return fmt.Errorf("join cluster as new member: %w", err)
+		}
+	}
+	return nil
 }
 
 func createLogger() *zap.SugaredLogger {
@@ -233,13 +256,10 @@ func joinCluster(e *etcdCluster, log *zap.SugaredLogger) error {
 	if err != nil {
 		return errors.Wrap(err, "can't find cluster client")
 	}
-
+	defer close(client, log)
 	if _, err := client.MemberAdd(context.Background(), []string{fmt.Sprintf("http://%s.etcd.%s.svc.cluster.local:2380", e.podName, e.namespace)}); err != nil {
-		close(client, log)
 		return errors.Wrap(err, "add itself as a member")
 	}
-
-	defer close(client, log)
 
 	log.Info("joined etcd cluster successfully.")
 	return nil
@@ -391,7 +411,6 @@ func (e *etcdCluster) getClientWithEndpoints(eps []string) (*clientv3.Client, er
 		time.Sleep(5 * time.Second)
 	}
 	return nil, fmt.Errorf("failed to establish client connection: %v", err)
-
 }
 
 func (e *etcdCluster) listMembers(log *zap.SugaredLogger) ([]*etcdserverpb.Member, error) {
@@ -456,11 +475,11 @@ func contains(list []string, v string) bool {
 	return false
 }
 
-func (e *etcdCluster) isClusterHealthy(log *zap.SugaredLogger) (bool, error) {
-	return e.isHealthyWithEndpoints(clientEndpoints(e.clusterSize, e.namespace), log)
+func (e *etcdCluster) isClusterReachable(log *zap.SugaredLogger) (bool, error) {
+	return e.isReachableWithEndpoints(clientEndpoints(e.clusterSize, e.namespace), log)
 }
 
-func (e *etcdCluster) isHealthyWithEndpoints(endpoints []string, log *zap.SugaredLogger) (bool, error) {
+func (e *etcdCluster) isReachableWithEndpoints(endpoints []string, log *zap.SugaredLogger) (bool, error) {
 	client, err := e.getClientWithEndpoints(endpoints)
 	if err != nil {
 		return false, err
@@ -516,7 +535,7 @@ func (e *etcdCluster) removeDeadMembers(log *zap.SugaredLogger) error {
 		if err = wait.Poll(1*time.Second, 15*time.Second, func() (bool, error) {
 			// we use the cluster FQDN endpoint url here. Using the IP endpoint will
 			// fail because the certificates don't include Pod IP addresses.
-			return e.isHealthyWithEndpoints(member.ClientURLs[len(member.ClientURLs)-1:], log)
+			return e.isReachableWithEndpoints(member.ClientURLs[len(member.ClientURLs)-1:], log)
 		}); err != nil {
 			log.Infow("member is not responding, removing from cluster", "member-name", member.Name)
 			_, err = client.MemberRemove(context.Background(), member.ID)
