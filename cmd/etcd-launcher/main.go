@@ -97,8 +97,10 @@ func main() {
 	log.Infof("initial-state: %s", e.initialState)
 	log.Infof("initial-cluster: %s", strings.Join(initialMemberList(e.clusterSize, e.namespace), ","))
 
-	if err := ensureRecoveryFromLostDataDir(e, log); err != nil {
-		log.Panicw("failed to ensure recovery from lost data directory", zap.Error(err))
+	if e.initialState == initialStateExisting {
+		if err := ensureRecoveryFromLostDataDir(e, log); err != nil {
+			log.Panicw("failed to ensure recovery from lost data directory", zap.Error(err))
+		}
 	}
 
 	// setup and start etcd command
