@@ -22,7 +22,7 @@ SHELL ["/bin/ash", "-o", "pipefail", "-c"]
 # kubectl binaries and deduce which one to use based on the version skew
 # policy.
 ADD https://storage.googleapis.com/kubernetes-release/release/v1.22.1/bin/linux/amd64/kubectl /usr/local/bin/kubectl-1.22
-ADD https://storage.googleapis.com/kubernetes-release/release/v1.20.10/bin/linux/amd64/kubectl /usr/local/bin/kubectl
+ADD https://storage.googleapis.com/kubernetes-release/release/v1.20.10/bin/linux/amd64/kubectl /usr/local/bin/kubectl-1.20
 RUN wget -q -O- https://get.helm.sh/helm-v3.5.0-linux-amd64.tar.gz | tar xzOf - linux-amd64/helm > /usr/local/bin/helm
 
 # We need the ca-certs so they api doesn't crash because it can't verify the certificate of Dex
