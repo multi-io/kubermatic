@@ -361,7 +361,7 @@ type OpenstackTenantReq struct {
 }
 
 // OpenstackReq represent a request for openstack
-// swagger:parameters listOpenstackSizes listOpenstackNetworks listOpenstackSecurityGroups listOpenstackAvailabilityZones
+// swagger:parameters listOpenstackImages listOpenstackSizes listOpenstackNetworks listOpenstackSecurityGroups listOpenstackAvailabilityZones
 type OpenstackReq struct {
 	// in: header
 	// Username OpenStack user name

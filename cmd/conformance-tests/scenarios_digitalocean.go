@@ -73,7 +73,7 @@ func (s *digitaloceanScenario) Cluster(secrets secrets) *apimodels.CreateCluster
 	}
 }
 
-func (s *digitaloceanScenario) NodeDeployments(_ context.Context, num int, _ secrets, _ string) ([]apimodels.NodeDeployment, error) {
+func (s *digitaloceanScenario) NodeDeployments(_ context.Context, num int, _ secrets) ([]apimodels.NodeDeployment, error) {
 	replicas := int32(num)
 	size := "4gb"
 	return []apimodels.NodeDeployment{

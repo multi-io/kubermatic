@@ -93,7 +93,7 @@ func (s *awsScenario) Cluster(secrets secrets) *apimodels.CreateClusterSpec {
 	}
 }
 
-func (s *awsScenario) NodeDeployments(ctx context.Context, num int, secrets secrets, _ string) ([]apimodels.NodeDeployment, error) {
+func (s *awsScenario) NodeDeployments(ctx context.Context, num int, secrets secrets) ([]apimodels.NodeDeployment, error) {
 	instanceType := "t2.medium"
 	volumeType := "gp2"
 	volumeSize := int64(100)
