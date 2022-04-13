@@ -116,7 +116,6 @@ replace (
 	k8s.io/metrics => k8s.io/metrics v0.22.2
 )
 
-
 replace (
 	github.com/openshift/api => github.com/openshift/api v0.0.0-20210428205234-a8389931bee7
 	github.com/openshift/client-go => github.com/openshift/client-go v0.0.0-20210112165513-ebc401615f47
@@ -124,6 +123,7 @@ replace (
 	github.com/operator-framework/operator-lifecycle-manager => github.com/operator-framework/operator-lifecycle-manager v0.0.0-20190128024246-5eb7ae5bdb7a
 	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.22.2
 )
-replace github.com/kubermatic/machine-controller => github.com/syseleven/machine-controller v1.36.2-sys11-3
+
+replace github.com/kubermatic/machine-controller => github.com/syseleven/machine-controller v1.36.2-sys11-6
 
 replace github.com/ajeddeloh/go-json => github.com/coreos/go-json v0.0.0-20211020211907-c63f628265de

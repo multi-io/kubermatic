@@ -20,6 +20,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	openstack "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/openstack/types"
+	"k8c.io/kubermatic/v2/pkg/resources/cloudconfig"
 	"strconv"
 	"strings"
 
@@ -30,7 +32,6 @@ import (
 	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/resources"
-	"k8c.io/kubermatic/v2/pkg/resources/cloudconfig"
 	"k8c.io/kubermatic/v2/pkg/validation"
 	"k8c.io/kubermatic/v2/pkg/validation/nodeupdate"
 
@@ -161,11 +162,6 @@ func getProviderConfig(c *kubermaticv1.Cluster, nd *apiv1.NodeDeployment, dc *ku
 		err      error
 	)
 
-	credentials, err := resources.GetCredentials(data)
-	if err != nil {
-		return nil, err
-	}
-
 	switch {
 	case nd.Spec.Template.Cloud.AWS != nil:
 		config.CloudProvider = providerconfig.CloudProviderAWS
@@ -181,6 +177,11 @@ func getProviderConfig(c *kubermaticv1.Cluster, nd *apiv1.NodeDeployment, dc *ku
 		}
 	case nd.Spec.Template.Cloud.VSphere != nil:
 		config.CloudProvider = providerconfig.CloudProviderVsphere
+
+		credentials, err := resources.GetCredentials(data)
+		if err != nil {
+			return nil, err
+		}
 
 		// We use OverwriteCloudConfig for VSphere to ensure we always use the credentials
 		// passed in via frontend for the cloud-provider functionality.
@@ -252,6 +253,65 @@ func getProviderConfig(c *kubermaticv1.Cluster, nd *apiv1.NodeDeployment, dc *ku
 	config.CloudProviderSpec = *cloudExt
 
 	return &config, nil
+}
+
+func preserveBlankFieldsInConfig(before, after *openstack.RawConfig) *openstack.RawConfig {
+	// Note(fkasymovgeniiuulu): machine-controller had a bug that adds empty
+	// fields to the provider spec which causes node rollovers.
+	// This problem was fixed at https://github.com/syseleven/machine-controller/pull/27.
+	// Here we are keeping these empty field in the provider spec to avoid node rollovers for machine deployments
+	// that already got empty field.
+	ms := mergedEmptyProviderConfigVarString
+	mb := mergedEmptyProviderConfigVarBool
+
+	result := *after
+
+	result.IdentityEndpoint = ms(before.IdentityEndpoint, after.IdentityEndpoint)
+	result.Username = ms(before.Username, after.Username)
+	result.Password = ms(before.Password, after.Password)
+	result.ApplicationCredentialID = ms(before.ApplicationCredentialID, after.ApplicationCredentialID)
+	result.ApplicationCredentialSecret = ms(before.ApplicationCredentialSecret, after.ApplicationCredentialSecret)
+	result.DomainName = ms(before.DomainName, after.DomainName)
+	result.ProjectName = ms(before.ProjectName, after.ProjectName)
+	result.ProjectID = ms(before.ProjectID, after.ProjectID)
+	result.TenantName = ms(before.TenantName, after.TenantName)
+	result.TenantID = ms(before.TenantID, after.TenantID)
+	result.TokenID = ms(before.TokenID, after.TokenID)
+	result.Region = ms(before.Region, after.Region)
+	result.InstanceReadyCheckPeriod = ms(before.InstanceReadyCheckPeriod, after.InstanceReadyCheckPeriod)
+	result.InstanceReadyCheckTimeout = ms(before.InstanceReadyCheckTimeout, after.InstanceReadyCheckTimeout)
+	result.ComputeAPIVersion = ms(before.ComputeAPIVersion, after.ComputeAPIVersion)
+	result.Image = ms(before.Image, after.Image)
+	result.Flavor = ms(before.Flavor, after.Flavor)
+	result.Network = ms(before.Network, after.Network)
+	result.Subnet = ms(before.Subnet, after.Subnet)
+	result.FloatingIPPool = ms(before.FloatingIPPool, after.FloatingIPPool)
+	result.AvailabilityZone = ms(before.AvailabilityZone, after.AvailabilityZone)
+	result.TrustDevicePath = mb(before.TrustDevicePath, after.TrustDevicePath)
+	result.RootDiskVolumeType = ms(before.RootDiskVolumeType, after.RootDiskVolumeType)
+	result.ServerGroupID = ms(before.ServerGroupID, after.ServerGroupID)
+
+	return &result
+}
+
+func mergedEmptyProviderConfigVarString(before, after *providerconfig.ConfigVarString) *providerconfig.ConfigVarString {
+	if after != nil {
+		return after
+	}
+	if before != nil && before.Empty() {
+		return before
+	}
+	return nil
+}
+
+func mergedEmptyProviderConfigVarBool(before, after *providerconfig.ConfigVarBool) *providerconfig.ConfigVarBool {
+	if after != nil {
+		return after
+	}
+	if before != nil && before.Empty() {
+		return before
+	}
+	return nil
 }
 
 func getProviderOS(config *providerconfig.Config, nd *apiv1.NodeDeployment) error {
