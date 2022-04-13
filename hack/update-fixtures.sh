@@ -21,6 +21,7 @@ source hack/lib.sh
 
 CONTAINERIZE_IMAGE=golang:1.16.12 containerize ./hack/update-fixtures.sh
 
+export XDG_CACHE_HOME=/tmp
 echodate "Updating fixtures..."
 make test-update &> /dev/null
 echodate "Updated fixtures, starting tests..."

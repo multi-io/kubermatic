@@ -117,6 +117,20 @@ func GetAPIV2NodeCloudSpec(machineSpec clusterv1alpha1.MachineSpec) (*apiv1.Node
 
 	cloudSpec := &apiv1.NodeCloudSpec{}
 
+	stringProviderConfigValue := func(c *providerconfig.ConfigVarString) string {
+		if c == nil {
+			return ""
+		}
+		return c.Value
+	}
+
+	boolProviderConfigValue := func(c *providerconfig.ConfigVarBool) bool {
+		if c == nil {
+			return false
+		}
+		return c.Value
+	}
+
 	switch decodedProviderSpec.CloudProvider {
 	case providerconfig.CloudProviderAWS:
 		config := &aws.RawConfig{}
@@ -129,11 +143,11 @@ func GetAPIV2NodeCloudSpec(machineSpec clusterv1alpha1.MachineSpec) (*apiv1.Node
 		cloudSpec.AWS = &apiv1.AWSNodeSpec{
 			Tags:                             config.Tags,
 			VolumeSize:                       config.DiskSize,
-			VolumeType:                       config.DiskType.Value,
-			InstanceType:                     config.InstanceType.Value,
-			AMI:                              config.AMI.Value,
-			AvailabilityZone:                 config.AvailabilityZone.Value,
-			SubnetID:                         config.SubnetID.Value,
+			VolumeType:                       stringProviderConfigValue(config.DiskType),
+			InstanceType:                     stringProviderConfigValue(config.InstanceType),
+			AMI:                              stringProviderConfigValue(config.AMI),
+			AvailabilityZone:                 stringProviderConfigValue(config.AvailabilityZone),
+			SubnetID:                         stringProviderConfigValue(config.SubnetID),
 			AssignPublicIP:                   config.AssignPublicIP,
 			IsSpotInstance:                   config.IsSpotInstance,
 			SpotInstanceMaxPrice:             spotInstanceMaxPrice,
@@ -146,10 +160,10 @@ func GetAPIV2NodeCloudSpec(machineSpec clusterv1alpha1.MachineSpec) (*apiv1.Node
 			return nil, fmt.Errorf("failed to parse Azure config: %v", err)
 		}
 		cloudSpec.Azure = &apiv1.AzureNodeSpec{
-			Size:           config.VMSize.Value,
-			AssignPublicIP: config.AssignPublicIP.Value,
+			Size:           stringProviderConfigValue(config.VMSize),
+			AssignPublicIP: boolProviderConfigValue(config.AssignPublicIP),
 			Tags:           config.Tags,
-			ImageID:        config.ImageID.Value,
+			ImageID:        stringProviderConfigValue(config.ImageID),
 			Zones:          config.Zones,
 			DataDiskSize:   config.DataDiskSize,
 			OSDiskSize:     config.OSDiskSize,
@@ -160,10 +174,10 @@ func GetAPIV2NodeCloudSpec(machineSpec clusterv1alpha1.MachineSpec) (*apiv1.Node
 			return nil, fmt.Errorf("failed to parse digitalocean config: %v", err)
 		}
 		cloudSpec.Digitalocean = &apiv1.DigitaloceanNodeSpec{
-			IPv6:       config.IPv6.Value,
-			Size:       config.Size.Value,
-			Backups:    config.Backups.Value,
-			Monitoring: config.Monitoring.Value,
+			IPv6:       boolProviderConfigValue(config.IPv6),
+			Size:       stringProviderConfigValue(config.Size),
+			Backups:    boolProviderConfigValue(config.Backups),
+			Monitoring: boolProviderConfigValue(config.Monitoring),
 		}
 		for _, v := range config.Tags {
 			cloudSpec.Digitalocean.Tags = append(cloudSpec.Digitalocean.Tags, v.Value)
@@ -174,12 +188,12 @@ func GetAPIV2NodeCloudSpec(machineSpec clusterv1alpha1.MachineSpec) (*apiv1.Node
 			return nil, fmt.Errorf("failed to parse openstack config: %v", err)
 		}
 		cloudSpec.Openstack = &apiv1.OpenstackNodeSpec{
-			Flavor:                    config.Flavor.Value,
-			Image:                     config.Image.Value,
+			Flavor:                    stringProviderConfigValue(config.Flavor),
+			Image:                     stringProviderConfigValue(config.Image),
 			Tags:                      config.Tags,
-			AvailabilityZone:          config.AvailabilityZone.Value,
-			InstanceReadyCheckPeriod:  config.InstanceReadyCheckPeriod.Value,
-			InstanceReadyCheckTimeout: config.InstanceReadyCheckTimeout.Value,
+			AvailabilityZone:          stringProviderConfigValue(config.AvailabilityZone),
+			InstanceReadyCheckPeriod:  stringProviderConfigValue(config.InstanceReadyCheckPeriod),
+			InstanceReadyCheckTimeout: stringProviderConfigValue(config.InstanceReadyCheckTimeout),
 		}
 		cloudSpec.Openstack.UseFloatingIP = config.FloatingIPPool.Value != ""
 		if config.RootDiskSizeGB != nil && *config.RootDiskSizeGB > 0 {
@@ -191,7 +205,7 @@ func GetAPIV2NodeCloudSpec(machineSpec clusterv1alpha1.MachineSpec) (*apiv1.Node
 			return nil, fmt.Errorf("failed to parse hetzner config: %v", err)
 		}
 		cloudSpec.Hetzner = &apiv1.HetznerNodeSpec{
-			Type: config.ServerType.Value,
+			Type: stringProviderConfigValue(config.ServerType),
 		}
 		// MachineDeployments created by KKP will only ever have a single network
 		// set, but users might have created ones with many; we have to make a choice
@@ -227,14 +241,14 @@ func GetAPIV2NodeCloudSpec(machineSpec clusterv1alpha1.MachineSpec) (*apiv1.Node
 			return nil, fmt.Errorf("failed to parse gcp config: %v", err)
 		}
 		cloudSpec.GCP = &apiv1.GCPNodeSpec{
-			Zone:        config.Zone.Value,
-			MachineType: config.MachineType.Value,
+			Zone:        stringProviderConfigValue(config.Zone),
+			MachineType: stringProviderConfigValue(config.MachineType),
 			DiskSize:    config.DiskSize,
-			DiskType:    config.DiskType.Value,
-			Preemptible: config.Preemptible.Value,
+			DiskType:    stringProviderConfigValue(config.DiskType),
+			Preemptible: boolProviderConfigValue(config.Preemptible),
 			Labels:      config.Labels,
 			Tags:        config.Tags,
-			CustomImage: config.CustomImage.Value,
+			CustomImage: stringProviderConfigValue(config.CustomImage),
 		}
 	case providerconfig.CloudProviderKubeVirt:
 		config := &kubevirt.RawConfig{}
@@ -243,12 +257,12 @@ func GetAPIV2NodeCloudSpec(machineSpec clusterv1alpha1.MachineSpec) (*apiv1.Node
 		}
 
 		cloudSpec.Kubevirt = &apiv1.KubevirtNodeSpec{
-			CPUs:             config.CPUs.Value,
-			Memory:           config.Memory.Value,
-			Namespace:        config.Namespace.Value,
-			SourceURL:        config.SourceURL.Value,
-			StorageClassName: config.StorageClassName.Value,
-			PVCSize:          config.PVCSize.Value,
+			CPUs:             stringProviderConfigValue(config.CPUs),
+			Memory:           stringProviderConfigValue(config.Memory),
+			Namespace:        stringProviderConfigValue(config.Namespace),
+			SourceURL:        stringProviderConfigValue(config.SourceURL),
+			StorageClassName: stringProviderConfigValue(config.StorageClassName),
+			PVCSize:          stringProviderConfigValue(config.PVCSize),
 		}
 	case providerconfig.CloudProviderAlibaba:
 		config := &alibaba.RawConfig{}
@@ -256,13 +270,13 @@ func GetAPIV2NodeCloudSpec(machineSpec clusterv1alpha1.MachineSpec) (*apiv1.Node
 			return nil, fmt.Errorf("failed to parse alibaba config: %v", err)
 		}
 		cloudSpec.Alibaba = &apiv1.AlibabaNodeSpec{
-			InstanceType:            config.InstanceType.Value,
-			DiskSize:                config.DiskSize.Value,
-			DiskType:                config.DiskType.Value,
-			VSwitchID:               config.VSwitchID.Value,
-			InternetMaxBandwidthOut: config.InternetMaxBandwidthOut.Value,
+			InstanceType:            stringProviderConfigValue(config.InstanceType),
+			DiskSize:                stringProviderConfigValue(config.DiskSize),
+			DiskType:                stringProviderConfigValue(config.DiskType),
+			VSwitchID:               stringProviderConfigValue(config.VSwitchID),
+			InternetMaxBandwidthOut: stringProviderConfigValue(config.InternetMaxBandwidthOut),
 			Labels:                  config.Labels,
-			ZoneID:                  config.ZoneID.Value,
+			ZoneID:                  stringProviderConfigValue(config.ZoneID),
 		}
 	case providerconfig.CloudProviderAnexia:
 		{
@@ -271,8 +285,8 @@ func GetAPIV2NodeCloudSpec(machineSpec clusterv1alpha1.MachineSpec) (*apiv1.Node
 				return nil, fmt.Errorf("failed to parse anexia config: %v", err)
 			}
 			cloudSpec.Anexia = &apiv1.AnexiaNodeSpec{
-				VlanID:     config.VlanID.Value,
-				TemplateID: config.TemplateID.Value,
+				VlanID:     stringProviderConfigValue(config.VlanID),
+				TemplateID: stringProviderConfigValue(config.TemplateID),
 				CPUs:       config.CPUs,
 				Memory:     int64(config.Memory),
 				DiskSize:   int64(config.DiskSize),

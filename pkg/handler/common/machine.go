@@ -132,9 +132,9 @@ func CreateMachineDeployment(ctx context.Context, userInfoGetter provider.UserIn
 	return outputMachineDeployment(md)
 }
 
-// removeUnnecessaryOrderingDiff returns old ordering of ssh keys if the new keys are the same as old keys which protects from unnecessary diff in machine template.
+// preserveOldOrderOfKeys returns old ordering of ssh keys if the new keys are the same as old keys which protects from unnecessary diff in machine template.
 // This ensures we do not recreate machines because ssh keys are in different order.
-func removeUnnecessaryOrderingDiff(md *clusterv1alpha1.MachineDeployment, keys []*kubermaticv1.UserSSHKey) ([]*kubermaticv1.UserSSHKey, error) {
+func preserveOldOrderOfKeys(md *clusterv1alpha1.MachineDeployment, keys []*kubermaticv1.UserSSHKey) ([]*kubermaticv1.UserSSHKey, error) {
 	cfg, err := providerconfig.GetConfig(md.Spec.Template.Spec.ProviderSpec)
 	if err != nil {
 		return nil, err
@@ -565,7 +565,7 @@ func PatchMachineDeployment(ctx context.Context, userInfoGetter provider.UserInf
 			return nil, common.KubernetesErrorToHTTPError(err)
 		}
 
-		keys, err = removeUnnecessaryOrderingDiff(machineDeployment, keys)
+		keys, err = preserveOldOrderOfKeys(machineDeployment, keys)
 		if err != nil {
 			return nil, common.KubernetesErrorToHTTPError(err)
 		}
@@ -583,6 +583,14 @@ func PatchMachineDeployment(ctx context.Context, userInfoGetter provider.UserInf
 	patchedMachineDeployment, err := machineresource.Deployment(cluster, patchedNodeDeployment, dc, keys, data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create machine deployment from template: %v", err)
+	}
+	if cluster.Spec.Cloud.Openstack != nil {
+		// Note(fkasymovgeniiuulu): Currently only for openstack because we don't care about possible node rollovers on
+		// other providers.
+		patchedMachineDeployment, err = machineresource.EnsureNoUnnecessaryOpenstackProviderSpecDiff(machineDeployment, patchedMachineDeployment)
+		if err != nil {
+			return nil, fmt.Errorf("ensure no unnecessary provider spec diff: %w", err)
+		}
 	}
 
 	// Only the fields from NodeDeploymentSpec will be updated by a patch.
