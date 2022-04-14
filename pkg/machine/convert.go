@@ -195,7 +195,7 @@ func GetAPIV2NodeCloudSpec(machineSpec clusterv1alpha1.MachineSpec) (*apiv1.Node
 			InstanceReadyCheckPeriod:  stringProviderConfigValue(config.InstanceReadyCheckPeriod),
 			InstanceReadyCheckTimeout: stringProviderConfigValue(config.InstanceReadyCheckTimeout),
 		}
-		cloudSpec.Openstack.UseFloatingIP = config.FloatingIPPool.Value != ""
+		cloudSpec.Openstack.UseFloatingIP = config.FloatingIPPool != nil && config.FloatingIPPool.Value != ""
 		if config.RootDiskSizeGB != nil && *config.RootDiskSizeGB > 0 {
 			cloudSpec.Openstack.RootDiskSizeGB = config.RootDiskSizeGB
 		}
