@@ -24,6 +24,7 @@ import (
 
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/features"
+	"k8c.io/kubermatic/v2/pkg/resources"
 	"k8c.io/kubermatic/v2/pkg/validation"
 
 	admissionv1 "k8s.io/api/admission/v1"
@@ -229,11 +230,11 @@ func validateClusterNetworkingConfigUpdateImmutability(c, oldC *kubermaticv1.Clu
 		oldC.Services.CIDRBlocks,
 		fldPath.Child("services", "cidrBlocks"),
 	)...)
-	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(
-		c.ProxyMode,
-		oldC.ProxyMode,
-		fldPath.Child("proxyMode"),
-	)...)
+	switch c.ProxyMode {
+	case resources.IPTablesProxyMode, resources.IPVSProxyMode:
+	default:
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("proxyMode"), c.ProxyMode, []string{resources.IPTablesProxyMode, resources.IPVSProxyMode}))
+	}
 	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(
 		c.DNSDomain,
 		oldC.DNSDomain,
