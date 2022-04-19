@@ -608,7 +608,7 @@ func TestNumberOfFields(t *testing.T) {
 		t.Fatalf("want kubermaticv1.ComponentSettings{}.ControllerManager.LeaderElectionSettings.NumField=%d, got %d", want, got)
 	}
 
-	if want, got := 4, reflect.ValueOf(settings.OpenVPN).NumField(); want != got {
+	if want, got := 5, reflect.ValueOf(settings.OpenVPN).NumField(); want != got {
 		t.Fatalf("want kubermaticv1.ComponentSettings{}.OpenVPN.NumField=%d, got %d", want, got)
 	}
 
