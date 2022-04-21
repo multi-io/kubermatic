@@ -128,7 +128,6 @@ func DeploymentCreator(data metricsServerData) reconciling.NamedDeploymentCreato
 						"--authorization-kubeconfig", "/etc/kubernetes/kubeconfig/kubeconfig",
 						"--kubelet-insecure-tls",
 						"--kubelet-use-node-status-port",
-						"--metric-resolution", "15s",
 						// We use the same as the API server as we use the same dnat-controller
 						"--kubelet-preferred-address-types", "ExternalIP,InternalIP",
 						"--v", "1",
