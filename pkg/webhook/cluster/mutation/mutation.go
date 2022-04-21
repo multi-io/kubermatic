@@ -203,6 +203,9 @@ func (h *AdmissionHandler) defaultClusterComponentSettings(c *kubermaticv1.Clust
 	if v := settings.OpenVPN.Client.Resources; v != nil {
 		settings.OpenVPN.Client.Resources = h.defaultComponentSettings.OpenVPN.Client.Resources
 	}
+	if v := settings.OpenVPN.DnatController.Resources; v != nil {
+		settings.OpenVPN.DnatController.Resources = h.defaultComponentSettings.OpenVPN.DnatController.Resources
+	}
 	if v := settings.OpenVPN.Exporter.Resources; v != nil {
 		settings.OpenVPN.Exporter.Resources = h.defaultComponentSettings.OpenVPN.Exporter.Resources
 	}
