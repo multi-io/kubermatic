@@ -17,6 +17,7 @@ limitations under the License.
 package vpnsidecar
 
 import (
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/resources"
 
 	corev1 "k8s.io/api/core/v1"
@@ -41,10 +42,19 @@ type dnatControllerData interface {
 	NodeAccessNetwork() string
 	DNATControllerImage() string
 	DNATControllerTag() string
+	Cluster() *kubermaticv1.Cluster
 }
 
 // DnatControllerContainer returns a sidecar container for running the dnat controller.
 func DnatControllerContainer(data dnatControllerData, name, apiserverAddress string) (*corev1.Container, error) {
+	var resourceRequirements corev1.ResourceRequirements
+
+	if r := data.Cluster().Spec.ComponentsOverride.OpenVPN.DnatController.Resources; r != nil {
+		resourceRequirements = *r
+	} else {
+		resourceRequirements = dnatControllerResourceRequirements
+	}
+
 	procMountType := corev1.DefaultProcMount
 	args := []string{
 		"-kubeconfig", "/etc/kubernetes/kubeconfig/kubeconfig",
@@ -66,7 +76,7 @@ func DnatControllerContainer(data dnatControllerData, name, apiserverAddress str
 			RunAsUser: resources.Int64(0),
 			ProcMount: &procMountType,
 		},
-		Resources: dnatControllerResourceRequirements,
+		Resources: resourceRequirements,
 		VolumeMounts: []corev1.VolumeMount{
 			{
 				MountPath: "/etc/kubernetes/kubeconfig",

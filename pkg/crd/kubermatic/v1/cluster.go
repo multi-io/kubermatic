@@ -454,6 +454,7 @@ type StatefulSetSettings struct {
 type OpenVPNSettings struct {
 	Server                OpenVPNServerSettings                `json:"server"`
 	Client                OpenVPNClientSettings                `json:"client"`
+	DnatController        OpenVPNDnatControllerSettings        `json:"dnatController"`
 	IPFixup               OpenVPNIPFixupSettings               `json:"ipFixup"`
 	Exporter              OpenVPNExporterSettings              `json:"exporter"`
 	IPTablesInitContainer OpenVPNIPTablesInitContainerSettings `json:"ipTablesInitContainer"`
@@ -464,6 +465,10 @@ type OpenVPNServerSettings struct {
 }
 
 type OpenVPNClientSettings struct {
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+type OpenVPNDnatControllerSettings struct {
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
