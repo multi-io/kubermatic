@@ -236,11 +236,6 @@ func validateClusterNetworkingConfigUpdateImmutability(c, oldC *kubermaticv1.Clu
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("proxyMode"), c.ProxyMode, []string{resources.IPTablesProxyMode, resources.IPVSProxyMode}))
 	}
 	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(
-		c.DNSDomain,
-		oldC.DNSDomain,
-		fldPath.Child("dnsDomain"),
-	)...)
-	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(
 		c.NodeLocalDNSCacheEnabled,
 		oldC.NodeLocalDNSCacheEnabled,
 		fldPath.Child("nodeLocalDNSCacheEnabled"),
