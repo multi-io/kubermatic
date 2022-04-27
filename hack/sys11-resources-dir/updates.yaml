@@ -1,7 +1,4 @@
 updates:
-- from: 1.18.*
-  to: 1.19.7
-  type: kubernetes
 - from: 1.19.*
   to: 1.19.*
   type: kubernetes
@@ -16,4 +13,10 @@ updates:
   type: kubernetes
 - from: 1.21.*
   to: 1.21.*
+  type: kubernetes
+- from: 1.21.*
+  to: 1.22.*
+  type: kubernetes
+- from: 1.22.*
+  to: 1.22.*
   type: kubernetes
