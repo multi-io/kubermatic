@@ -132,14 +132,18 @@ func ConcurrencyLimitReached(ctx context.Context, client ctrlruntimeclient.Clien
 		return true, fmt.Errorf("failed to list clusters: %v", err)
 	}
 
-	finishedUpdatingClustersCount := 0
+	clustersUpdatingInProgressCount := 0
 	for _, cluster := range clusters.Items {
-		if cluster.Status.HasConditionValue(kubermaticv1.ClusterConditionSeedResourcesUpToDate, corev1.ConditionTrue) {
-			finishedUpdatingClustersCount++
+		if cluster.Spec.Pause {
+			continue
+		}
+		if v := cluster.Spec.Version; v.Version != nil && v.Major() == 1 && v.Minor() <= 18 {
+			continue
+		}
+		if !cluster.Status.HasConditionValue(kubermaticv1.ClusterConditionSeedResourcesUpToDate, corev1.ConditionTrue) {
+			clustersUpdatingInProgressCount++
 		}
 	}
-
-	clustersUpdatingInProgressCount := len(clusters.Items) - finishedUpdatingClustersCount
 
 	return clustersUpdatingInProgressCount >= limit, nil
 }
