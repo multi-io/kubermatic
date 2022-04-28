@@ -18,6 +18,8 @@ package util
 
 import (
 	"context"
+	"k8c.io/kubermatic/v2/pkg/semver"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"testing"
 
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
@@ -45,7 +47,29 @@ func TestConcurrencyLimitReached(t *testing.T) {
 
 	for _, testCase := range concurrencyLimitReachedTestCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			reached, err := ConcurrencyLimitReached(context.Background(), ctrlruntimefakeclient.NewClientBuilder().WithObjects(&kubermaticv1.Cluster{}).Build(), testCase.maxConcurrentLimit)
+			reached, err := ConcurrencyLimitReached(context.Background(), ctrlruntimefakeclient.NewClientBuilder().WithObjects(
+				&kubermaticv1.Cluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "valid",
+					},
+				},
+				&kubermaticv1.Cluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "paused",
+					},
+					Spec: kubermaticv1.ClusterSpec{
+						Pause: true,
+					},
+				},
+				&kubermaticv1.Cluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "unsupported",
+					},
+					Spec: kubermaticv1.ClusterSpec{
+						Version: *semver.NewSemverOrDie("1.18.0"),
+					},
+				},
+			).Build(), testCase.maxConcurrentLimit)
 
 			if err != nil {
 				t.Fatalf("failed to run test: %v with error: %v", testCase.name, err)
