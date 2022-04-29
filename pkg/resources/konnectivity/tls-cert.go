@@ -64,17 +64,6 @@ func TLSServingCertificateCreator(data tlsServingCertCreatorData) reconciling.Na
 				},
 			}
 
-			if b, exists := se.Data[resources.KonnectivityProxyTLSSecretName+".crt"]; exists {
-				certs, err := certutil.ParseCertsPEM(b)
-				if err != nil {
-					return nil, fmt.Errorf("failed to parse certificate (key=%s) from existing secret: %v", resources.KonnectivityProxyTLSSecretName+".crt", err)
-				}
-
-				if resources.IsServerCertificateValidForAllOf(certs[0], "konnectivity-proxy", altNames, ca.Cert) {
-					return se, nil
-				}
-			}
-
 			if data.Cluster().Spec.ExposeStrategy != kubermaticv1.ExposeStrategyTunneling {
 				externalIP := data.Cluster().Address.IP
 				if externalIP == "" {
@@ -86,6 +75,17 @@ func TLSServingCertificateCreator(data tlsServingCertCreatorData) reconciling.Na
 					return nil, errors.New("no external IP")
 				}
 				altNames.IPs = append(altNames.IPs, externalIPParsed)
+			}
+
+			if b, exists := se.Data[resources.KonnectivityProxyTLSSecretName+".crt"]; exists {
+				certs, err := certutil.ParseCertsPEM(b)
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse certificate (key=%s) from existing secret: %v", resources.KonnectivityProxyTLSSecretName+".crt", err)
+				}
+
+				if resources.IsServerCertificateValidForAllOf(certs[0], "konnectivity-proxy", altNames, ca.Cert) {
+					return se, nil
+				}
 			}
 
 			key, err := triple.NewPrivateKey()
