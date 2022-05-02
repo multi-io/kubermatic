@@ -4,7 +4,7 @@ set -o errexit
 set -o pipefail
 set -x
 
-: "${SRC_DIR:=$(go env GOPATH)/src/k8c.io/kubermatic}"
+: "${SRC_DIR:=$(go env GOPATH)/src/gitlab.syseleven.de/kubernetes/kubermatic}"
 : "${KUBERMATIC_WORKERNAME:=${KUBERMATIC_WORKERNAME:-$(uname -n)}}"
 : "${INSTALLER_DIR:="$(go env GOPATH)/src/gitlab.syseleven.de/kubernetes/kubermatic-installer"}"
 : "${KUBERMATIC_ENV:=dev}"
@@ -58,6 +58,7 @@ if [[ "${DEBUG}" == "true" ]]; then
       -ca-bundle=charts/kubermatic-operator/static/ca-bundle.pem \
       -versions=${RESOURCES_DIR}/versions.yaml \
       -updates=${RESOURCES_DIR}/updates.yaml \
+      -provider-incompatibilities=${RESOURCES_DIR}/provider-incompatibilities.yaml \
       -master-resources=${RESOURCES_DIR} \
       ${WORKER_OPTION} \
       -internal-address=127.0.0.1:18085 \
@@ -79,6 +80,7 @@ else
       -ca-bundle=charts/kubermatic-operator/static/ca-bundle.pem \
       -versions=${RESOURCES_DIR}/versions.yaml \
       -updates=${RESOURCES_DIR}/updates.yaml \
+      -provider-incompatibilities=${RESOURCES_DIR}/provider-incompatibilities.yaml \
       -master-resources=${RESOURCES_DIR} \
       ${WORKER_OPTION} \
       -internal-address=127.0.0.1:18085 \

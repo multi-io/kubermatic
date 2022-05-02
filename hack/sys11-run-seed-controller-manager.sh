@@ -97,6 +97,7 @@ if [[ "${DEBUG}" == "true" ]]; then
       -kubeconfig=$seedKubeconfig \
       -versions=${RESOURCES_DIR}/versions.yaml \
       -updates=${RESOURCES_DIR}/updates.yaml \
+      -provider-incompatibilities=${RESOURCES_DIR}/provider-incompatibilities.yaml \
       -kubernetes-addons-path=${INSTALLER_DIR}/kubermatic/cluster-addons/addons \
       -openshift-addons-path=openshift_addons \
       -kubernetes-addons-list=$defaultAddons \
