@@ -734,8 +734,15 @@ func (r *reconciler) reconcileSecrets(ctx context.Context, data reconcileData) e
 func (r *reconciler) reconcileDaemonSet(ctx context.Context, data reconcileData) error {
 	var dsCreators []reconciling.NamedDaemonSetCreatorGetter
 
+	var cluster kubermaticv1.Cluster
+	if err := r.seedClient.Get(ctx, ctrlruntimeclient.ObjectKey{Name: r.clusterName}, &cluster); err != nil {
+		return fmt.Errorf("failed to reconcile the DaemonSet: failed to get cluster: %v", err)
+	}
+
+	// may be nil
+	nodeLocalDNSResourcesOverride := cluster.Spec.ComponentsOverride.NodeLocalDNS.Resources
 	if r.nodeLocalDNSCache {
-		dsCreators = append(dsCreators, nodelocaldns.DaemonSetCreator())
+		dsCreators = append(dsCreators, nodelocaldns.DaemonSetCreator(nodeLocalDNSResourcesOverride))
 	}
 
 	if r.userSSHKeyAgent {

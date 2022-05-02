@@ -257,6 +257,9 @@ func (h *AdmissionHandler) defaultClusterComponentSettings(c *kubermaticv1.Clust
 	if settings.Autoscaler.SkipNodesWithLocalStorage == nil {
 		settings.Autoscaler.SkipNodesWithLocalStorage = h.defaultComponentSettings.Autoscaler.SkipNodesWithLocalStorage
 	}
+	if settings.NodeLocalDNS.Resources == nil {
+		settings.NodeLocalDNS.Resources = h.defaultComponentSettings.NodeLocalDNS.Resources
+	}
 
 	// Always enable external CCM
 	if c.Spec.Cloud.Anexia != nil || c.Spec.Cloud.Kubevirt != nil {
