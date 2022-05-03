@@ -44,6 +44,9 @@ spec:
           Populated by the system. Read-only. Null for lists. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
         name: Age
         type: date
+      - jsonPath: .metadata.deletionTimestamp
+        name: Deleted
+        type: date
       - jsonPath: .spec.humanReadableName
         name: HumanReadableName
         type: string
