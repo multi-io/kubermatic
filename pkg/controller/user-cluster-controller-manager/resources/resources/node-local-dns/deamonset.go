@@ -37,7 +37,19 @@ const (
 	extraConfigImportPath = extraConficMountPath + "/*Corefile"
 )
 
-func DaemonSetCreator() reconciling.NamedDaemonSetCreatorGetter {
+var (
+	defaultResourceRequirements = corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("100Mi"),
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("20Mi"),
+			corev1.ResourceCPU:    resource.MustParse("50m"),
+		},
+	}
+)
+
+func DaemonSetCreator(resourcesOverride *corev1.ResourceRequirements) reconciling.NamedDaemonSetCreatorGetter {
 	return func() (string, reconciling.DaemonSetCreator) {
 		return resources.NodeLocalDNSDaemonSetName, func(ds *appsv1.DaemonSet) (*appsv1.DaemonSet, error) {
 			maxUnvailable := intstr.FromString("10%")
@@ -84,20 +96,17 @@ func DaemonSetCreator() reconciling.NamedDaemonSetCreatorGetter {
 
 			patchTolerations(&ds.Spec.Template.Spec)
 
+			var resourceRequirements corev1.ResourceRequirements
+			if resourcesOverride != nil {
+				resourceRequirements = *resourcesOverride
+			} else {
+				resourceRequirements = defaultResourceRequirements
+			}
+
 			hostPathType := corev1.HostPathFileOrCreate
 			ds.Spec.Template.Spec.Containers = []corev1.Container{
 				{
-					// Sys11 start
-					Resources: corev1.ResourceRequirements{
-						Limits: corev1.ResourceList{
-							corev1.ResourceMemory: resource.MustParse("100Mi"),
-						},
-						Requests: corev1.ResourceList{
-							corev1.ResourceMemory: resource.MustParse("20Mi"),
-							corev1.ResourceCPU:    resource.MustParse("50m"),
-						},
-					},
-					// Sys11 end
+					Resources:       resourceRequirements,
 					Name:            "node-cache",
 					ImagePullPolicy: corev1.PullAlways,
 					Image:           fmt.Sprintf("%s/dns/k8s-dns-node-cache:1.17.0", resources.RegistryK8SGCR),
