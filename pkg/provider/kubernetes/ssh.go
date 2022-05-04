@@ -128,6 +128,9 @@ func genUserSSHKey(project *kubermaticapiv1.Project, keyName, pubKey string) (*k
 					Name:       project.Name,
 				},
 			},
+			Labels: map[string]string{
+				kubermaticapiv1.ProjectIDLabelKey: project.Name,
+			},
 		},
 		Spec: kubermaticapiv1.SSHKeySpec{
 			PublicKey:   pubKey,

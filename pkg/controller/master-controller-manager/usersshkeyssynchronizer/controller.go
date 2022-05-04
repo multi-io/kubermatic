@@ -34,6 +34,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	kubeapierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/record"
@@ -115,7 +116,7 @@ func Add(
 
 	if err := c.Watch(
 		&source.Kind{Type: &kubermaticv1.UserSSHKey{}},
-		enqueueAllClusters(reconciler.seedClients, workerSelector),
+		enqueueSSHKeyClusters(reconciler.seedClients, workerSelector),
 	); err != nil {
 		return fmt.Errorf("failed to create watch for userSSHKey: %v", err)
 	}
@@ -173,8 +174,17 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, requ
 		return nil
 	}
 
+	listOpts := &ctrlruntimeclient.ListOptions{}
+	if pid := getProjectID(cluster); pid != "" {
+		projectLabelRequirement, err := labels.NewRequirement(kubermaticv1.ProjectIDLabelKey, selection.Equals, []string{pid})
+		if err != nil {
+			return fmt.Errorf("failed to construct label requirement for project: %v", err)
+		}
+
+		listOpts.LabelSelector = labels.NewSelector().Add(*projectLabelRequirement)
+	}
 	userSSHKeys := &kubermaticv1.UserSSHKeyList{}
-	if err := r.client.List(ctx, userSSHKeys); err != nil {
+	if err := r.client.List(ctx, userSSHKeys, listOpts); err != nil {
 		return fmt.Errorf("failed to list userSSHKeys: %v", err)
 	}
 
@@ -239,15 +249,21 @@ func buildUserSSHKeysForCluster(clusterName string, list *kubermaticv1.UserSSHKe
 	return clusterKeys
 }
 
-// enqueueAllClusters enqueues all clusters
-func enqueueAllClusters(clients map[string]ctrlruntimeclient.Client, workerSelector labels.Selector) handler.EventHandler {
-	return handler.EnqueueRequestsFromMapFunc(func(_ ctrlruntimeclient.Object) []reconcile.Request {
+// enqueueSSHKeyClusters enqueues all clusters
+func enqueueSSHKeyClusters(clients map[string]ctrlruntimeclient.Client, workerSelector labels.Selector) handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(a ctrlruntimeclient.Object) []reconcile.Request {
 		var requests []reconcile.Request
 
-		listOpts := &ctrlruntimeclient.ListOptions{
-			LabelSelector: workerSelector,
+		selector := workerSelector
+		if pid := getProjectID(a); pid != "" {
+			v, err := labels.NewRequirement(kubermaticv1.ProjectIDLabelKey, selection.Equals, []string{pid})
+			if err == nil {
+				selector = selector.Add(*v)
+			}
 		}
-
+		listOpts := &ctrlruntimeclient.ListOptions{
+			LabelSelector: selector,
+		}
 		for seedName, client := range clients {
 			clusterList := &kubermaticv1.ClusterList{}
 			if err := client.List(context.Background(), clusterList, listOpts); err != nil {
@@ -281,4 +297,14 @@ func updateUserSSHKeysSecrets(list []kubermaticv1.UserSSHKey) reconciling.NamedS
 			return existing, nil
 		}
 	}
+}
+
+func getProjectID(a ctrlruntimeclient.Object) string {
+	for _, r := range a.GetOwnerReferences() {
+		if r.Kind == kubermaticv1.ProjectKindName {
+			return r.Name
+		}
+	}
+
+	return a.GetLabels()[kubermaticv1.ProjectIDLabelKey]
 }
