@@ -301,27 +301,27 @@ func ensureClusterRBACRoleBindingForResource(ctx context.Context, c ctrlruntimec
 		return err
 	}
 
-	subjectsToAdd := []rbacv1.Subject{}
+	subjects := []rbacv1.Subject{}
 
 	for _, generatedRoleBindingSubject := range generatedClusterRoleBinding.Subjects {
-		shouldAdd := true
+		add := true
 		for _, existingRoleBindingSubject := range sharedExistingClusterRoleBinding.Subjects {
-			if equality.Semantic.DeepEqual(existingRoleBindingSubject, generatedRoleBindingSubject) {
-				shouldAdd = false
+			if existingRoleBindingSubject == generatedRoleBindingSubject {
+				add = false
 				break
 			}
 		}
-		if shouldAdd {
-			subjectsToAdd = append(subjectsToAdd, generatedRoleBindingSubject)
+		if add {
+			subjects = append(subjects, generatedRoleBindingSubject)
 		}
 	}
 
-	if len(subjectsToAdd) == 0 {
+	if len(subjects) == 0 {
 		return nil
 	}
 
 	existingClusterRoleBinding := sharedExistingClusterRoleBinding.DeepCopy()
-	existingClusterRoleBinding.Subjects = append(existingClusterRoleBinding.Subjects, subjectsToAdd...)
+	existingClusterRoleBinding.Subjects = append(existingClusterRoleBinding.Subjects, subjects...)
 	return c.Update(ctx, existingClusterRoleBinding)
 }
 
