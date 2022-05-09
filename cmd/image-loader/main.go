@@ -445,6 +445,7 @@ func getTemplateData(clusterVersion *kubermaticversion.Version, kubermaticVersio
 		resources.ApiserverFrontProxyClientCertificateSecretName,
 		resources.EtcdTLSCertificateSecretName,
 		resources.MachineControllerKubeconfigSecretName,
+		resources.CSICinderControllerKubeconfigSecretName,
 		resources.ControllerManagerKubeconfigSecretName,
 		resources.SchedulerKubeconfigSecretName,
 		resources.KubeStateMetricsKubeconfigSecretName,

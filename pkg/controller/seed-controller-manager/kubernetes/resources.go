@@ -19,7 +19,6 @@ package kubernetes
 import (
 	"context"
 	"fmt"
-
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/resources"
 	"k8c.io/kubermatic/v2/pkg/resources/apiserver"
@@ -29,6 +28,7 @@ import (
 	"k8c.io/kubermatic/v2/pkg/resources/clusterautoscaler"
 	"k8c.io/kubermatic/v2/pkg/resources/clusterproxy"
 	"k8c.io/kubermatic/v2/pkg/resources/controllermanager"
+	"k8c.io/kubermatic/v2/pkg/resources/csi/openstack"
 	"k8c.io/kubermatic/v2/pkg/resources/dns"
 	"k8c.io/kubermatic/v2/pkg/resources/etcd"
 	"k8c.io/kubermatic/v2/pkg/resources/gatekeeper"
@@ -282,6 +282,10 @@ func GetServiceCreators(data *resources.TemplateData) []reconciling.NamedService
 		creators = append(creators, rancherserver.ServiceCreator(data.Cluster().Spec.ExposeStrategy))
 	}
 
+	if resources.ExternalCloudProviderEnabled(data.Cluster()) && data.Cluster().Spec.Cloud.Openstack != nil {
+		creators = append(creators, openstack.ServiceCreator(data))
+	}
+
 	return creators
 }
 
@@ -368,6 +372,7 @@ func (r *Reconciler) GetSecretCreators(data *resources.TemplateData) [][]reconci
 			resources.GetInternalKubeconfigCreator(resources.MetricsServerKubeconfigSecretName, resources.MetricsServerCertUsername, nil, data),
 			resources.GetInternalKubeconfigCreator(resources.InternalUserClusterAdminKubeconfigSecretName, resources.InternalUserClusterAdminKubeconfigCertUsername, []string{"system:masters"}, data),
 			resources.GetInternalKubeconfigCreator(resources.KubernetesDashboardKubeconfigSecretName, resources.KubernetesDashboardCertUsername, nil, data),
+			resources.GetInternalKubeconfigCreator(resources.CSICinderControllerKubeconfigSecretName, resources.CSICinderControllerCertUsername, nil, data),
 			resources.GetInternalKubeconfigCreator(resources.ClusterAutoscalerKubeconfigSecretName, resources.ClusterAutoscalerCertUsername, nil, data),
 			resources.AdminKubeconfigCreator(data),
 			apiserver.TokenViewerCreator(),
@@ -558,6 +563,9 @@ func GetStatefulSetCreators(data *resources.TemplateData, enableDataCorruptionCh
 	}
 	if flag := data.Cluster().Spec.Features[kubermaticv1.ClusterFeatureRancherIntegration]; flag {
 		creators = append(creators, rancherserver.StatefulSetCreator(data))
+	}
+	if resources.ExternalCloudProviderEnabled(data.Cluster()) && data.Cluster().Spec.Cloud.Openstack != nil {
+		creators = append(creators, openstack.StatefulSetCreator(data))
 	}
 	return creators
 }
