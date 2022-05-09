@@ -254,9 +254,6 @@ func (h *AdmissionHandler) defaultClusterComponentSettings(c *kubermaticv1.Clust
 	if !settings.Openstack.EnableIngressHostname {
 		settings.Openstack.EnableIngressHostname = h.defaultComponentSettings.Openstack.EnableIngressHostname
 	}
-	if settings.Autoscaler.SkipNodesWithLocalStorage == nil {
-		settings.Autoscaler.SkipNodesWithLocalStorage = h.defaultComponentSettings.Autoscaler.SkipNodesWithLocalStorage
-	}
 	if settings.NodeLocalDNS.Resources == nil {
 		settings.NodeLocalDNS.Resources = h.defaultComponentSettings.NodeLocalDNS.Resources
 	}
