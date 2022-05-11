@@ -683,23 +683,15 @@ func (r *Reconciler) sys11EnsureVerticalPodAutoscalers(ctx context.Context, c *k
 	//if err != nil {
 	//	return err
 	//}
-	//machineControllerWebhookOwnerRef, err := getDeploymentOwnerReference(resources.MachineControllerWebhookDeploymentName)
-	//if err != nil {
-	//	return err
-	//}
+	machineControllerWebhookOwnerRef, err := getDeploymentOwnerReference(resources.MachineControllerWebhookDeploymentName)
+	if err != nil {
+		return err
+	}
 	userClusterControllerOwnerRef, err := getDeploymentOwnerReference(resources.UserClusterControllerDeploymentName)
 	if err != nil {
 		return err
 	}
-	openvpnServerOwnerRef, err := getDeploymentOwnerReference(resources.OpenVPNServerDeploymentName)
-	if err != nil {
-		return err
-	}
 	dnsResolverOwnerRef, err := getDeploymentOwnerReference(resources.DNSResolverDeploymentName)
-	if err != nil {
-		return err
-	}
-	metricsServerOwnerRef, err := getDeploymentOwnerReference(resources.MetricsServerDeploymentName)
 	if err != nil {
 		return err
 	}
@@ -715,12 +707,19 @@ func (r *Reconciler) sys11EnsureVerticalPodAutoscalers(ctx context.Context, c *k
 		etcd.VPACreator(etcdOwnerRef, updateMode),
 		// Disable for now https://github.com/kubermatic/machine-controller/issues/1058
 		// machinecontroller.VPACreator(machineControllerOwnerRef, updateMode),
-		// machinecontroller.WebhookVPACreator(machineControllerWebhookOwnerRef, updateMode),
+		machinecontroller.WebhookVPACreator(machineControllerWebhookOwnerRef, updateMode),
 		usercluster.VPACreator(userClusterControllerOwnerRef, updateMode),
-		openvpn.VPACreator(openvpnServerOwnerRef, updateMode),
 		dns.VPACreator(dnsResolverOwnerRef, updateMode),
-		metricsserver.VPACreator(metricsServerOwnerRef, updateMode),
 		clusterproxy.VPACreator(clusterProxyOwnerRef, updateMode),
+	}
+
+	// With Konnectivity, metrics server lives in the user cluster
+	if !data.Cluster().Spec.ClusterNetwork.KonnectivityEnabled {
+		metricsServerOwnerRef, err := getDeploymentOwnerReference(resources.MetricsServerDeploymentName)
+		if err != nil {
+			return err
+		}
+		creators = append(creators, metricsserver.VPACreator(metricsServerOwnerRef, updateMode))
 	}
 
 	// If CCM migration is ongoing defer the deployment of the CCM to the

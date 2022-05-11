@@ -3,7 +3,6 @@ package apiserver
 import (
 	"k8c.io/kubermatic/v2/pkg/resources"
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
-	"k8c.io/kubermatic/v2/pkg/resources/vpnsidecar"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,16 +17,14 @@ var (
 		{
 			ContainerName: resources.ApiserverDeploymentName,
 			MinAllowed: corev1.ResourceList{
-				corev1.ResourceMemory: resource.MustParse("200Mi"),
 				corev1.ResourceCPU:    resource.MustParse("50m"),
+				corev1.ResourceMemory: resource.MustParse("200Mi"),
 			},
 			MaxAllowed: corev1.ResourceList{
-				corev1.ResourceMemory: resource.MustParse("3Gi"),
-				corev1.ResourceCPU:    resource.MustParse("600m"),
+				corev1.ResourceCPU:    resource.MustParse("800m"),
+				corev1.ResourceMemory: resource.MustParse("7Gi"),
 			},
 		},
-		vpnsidecar.VpnClientVPAContainerPolicy,
-		vpnsidecar.DnatControllerVPAPolicy,
 	}
 )
 

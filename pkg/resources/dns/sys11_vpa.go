@@ -17,12 +17,12 @@ var (
 		{
 			ContainerName: resources.DNSResolverDeploymentName,
 			MinAllowed: corev1.ResourceList{
-				corev1.ResourceMemory: resource.MustParse("10Mi"),
-				corev1.ResourceCPU:    resource.MustParse("5m"),
+				corev1.ResourceCPU:    resource.MustParse("10m"),
+				corev1.ResourceMemory: resource.MustParse("25Mi"),
 			},
 			MaxAllowed: corev1.ResourceList{
-				corev1.ResourceMemory: resource.MustParse("50Mi"),
-				corev1.ResourceCPU:    resource.MustParse("10m"),
+				corev1.ResourceCPU:    resource.MustParse("25m"),
+				corev1.ResourceMemory: resource.MustParse("60Mi"),
 			},
 		},
 	}

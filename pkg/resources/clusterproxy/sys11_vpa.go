@@ -3,7 +3,6 @@ package clusterproxy
 import (
 	"k8c.io/kubermatic/v2/pkg/resources"
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
-	"k8c.io/kubermatic/v2/pkg/resources/vpnsidecar"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,7 +25,6 @@ var (
 				corev1.ResourceCPU:    resource.MustParse("10m"),
 			},
 		},
-		vpnsidecar.VpnClientVPAContainerPolicy,
 	}
 )
 

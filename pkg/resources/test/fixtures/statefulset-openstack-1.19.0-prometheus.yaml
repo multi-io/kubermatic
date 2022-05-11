@@ -68,11 +68,11 @@ spec:
           timeoutSeconds: 3
         resources:
           limits:
-            cpu: 200m
-            memory: 2Gi
+            cpu: 100m
+            memory: 800Mi
           requests:
-            cpu: 50m
-            memory: 256Mi
+            cpu: 75m
+            memory: 700Mi
         volumeMounts:
         - mountPath: /etc/prometheus/config
           name: config
