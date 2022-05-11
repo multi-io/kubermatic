@@ -157,11 +157,11 @@ spec:
           timeoutSeconds: 15
         resources:
           limits:
-            cpu: "2"
-            memory: 2Gi
+            cpu: 50m
+            memory: 20Mi
           requests:
-            cpu: 100m
-            memory: 100Mi
+            cpu: 50m
+            memory: 20Mi
         volumeMounts:
         - mountPath: /etc/kubernetes/pki/ca
           name: ca

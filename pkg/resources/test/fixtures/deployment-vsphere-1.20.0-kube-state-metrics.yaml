@@ -56,11 +56,11 @@ spec:
           timeoutSeconds: 15
         resources:
           limits:
-            cpu: 100m
-            memory: 1Gi
+            cpu: 10m
+            memory: 50Mi
           requests:
             cpu: 10m
-            memory: 12Mi
+            memory: 35Mi
         volumeMounts:
         - mountPath: /etc/kubernetes/kubeconfig
           name: kube-state-metrics-kubeconfig

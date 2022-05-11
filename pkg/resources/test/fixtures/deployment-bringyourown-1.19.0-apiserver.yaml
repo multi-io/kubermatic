@@ -265,11 +265,11 @@ spec:
           timeoutSeconds: 15
         resources:
           limits:
-            cpu: "2"
-            memory: 4Gi
+            cpu: 250m
+            memory: 1Gi
           requests:
-            cpu: 100m
-            memory: 256Mi
+            cpu: 200m
+            memory: 750Mi
         volumeMounts:
         - mountPath: /etc/kubernetes/tls
           name: apiserver-tls

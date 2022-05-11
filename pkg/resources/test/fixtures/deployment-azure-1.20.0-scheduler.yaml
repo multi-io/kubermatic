@@ -138,11 +138,11 @@ spec:
           timeoutSeconds: 15
         resources:
           limits:
-            cpu: "1"
-            memory: 512Mi
+            cpu: 15m
+            memory: 30Mi
           requests:
-            cpu: 20m
-            memory: 64Mi
+            cpu: 10m
+            memory: 30Mi
         volumeMounts:
         - mountPath: /etc/kubernetes/kubeconfig
           name: scheduler-kubeconfig

@@ -3,7 +3,6 @@ package controllermanager
 import (
 	"k8c.io/kubermatic/v2/pkg/resources"
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
-	"k8c.io/kubermatic/v2/pkg/resources/vpnsidecar"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,15 +17,14 @@ var (
 		{
 			ContainerName: resources.ControllerManagerDeploymentName,
 			MinAllowed: corev1.ResourceList{
-				corev1.ResourceMemory: resource.MustParse("50Mi"),
-				corev1.ResourceCPU:    resource.MustParse("25m"),
+				corev1.ResourceCPU:    resource.MustParse("10m"),
+				corev1.ResourceMemory: resource.MustParse("25Mi"),
 			},
 			MaxAllowed: corev1.ResourceList{
-				corev1.ResourceMemory: resource.MustParse("350Mi"),
-				corev1.ResourceCPU:    resource.MustParse("200m"),
+				corev1.ResourceCPU:    resource.MustParse("250m"),
+				corev1.ResourceMemory: resource.MustParse("700Mi"),
 			},
 		},
-		vpnsidecar.VpnClientVPAContainerPolicy,
 	}
 )
 

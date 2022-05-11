@@ -62,11 +62,11 @@ spec:
           timeoutSeconds: 15
         resources:
           limits:
-            cpu: 500m
-            memory: 512Mi
+            cpu: 15m
+            memory: 25Mi
           requests:
-            cpu: 25m
-            memory: 32Mi
+            cpu: 15m
+            memory: 25Mi
         volumeMounts:
         - mountPath: /etc/kubernetes/kubeconfig
           name: internal-admin-kubeconfig

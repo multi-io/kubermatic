@@ -37,12 +37,12 @@ import (
 var (
 	defaultResourceRequirements = corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
-			corev1.ResourceMemory: resource.MustParse("20Mi"),
-			corev1.ResourceCPU:    resource.MustParse("5m"),
+			corev1.ResourceCPU:    resource.MustParse("10m"),
+			corev1.ResourceMemory: resource.MustParse("25Mi"),
 		},
 		Limits: corev1.ResourceList{
-			corev1.ResourceMemory: resource.MustParse("128Mi"),
-			corev1.ResourceCPU:    resource.MustParse("100m"),
+			corev1.ResourceCPU:    resource.MustParse("10m"),
+			corev1.ResourceMemory: resource.MustParse("25Mi"),
 		},
 	}
 )
@@ -266,7 +266,7 @@ func ConfigMapCreator(data configMapCreatorData) reconciling.NamedConfigMapCreat
 	}
 }
 
-// PodDisruptionBudgetCreator returns a func to create/update the apiserver PodDisruptionBudget
+// PodDisruptionBudgetCreator returns a func to create/update the dns resolver PodDisruptionBudget
 func PodDisruptionBudgetCreator() reconciling.NamedPodDisruptionBudgetCreatorGetter {
 	return func() (string, reconciling.PodDisruptionBudgetCreator) {
 		return resources.DNSResolverPodDisruptionBudetName, func(pdb *policyv1beta1.PodDisruptionBudget) (*policyv1beta1.PodDisruptionBudget, error) {
