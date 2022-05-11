@@ -1929,10 +1929,8 @@ github.com/subosito/gotenv v1.2.0/go.mod h1:N0PQaV/YGNqwC0u51sEeR/aUtSLEXKX9iv69
 github.com/syndtr/gocapability v0.0.0-20170704070218-db04d3cc01c8/go.mod h1:hkRG7XYTFWNJGYcbNJQlaLq0fg1yr4J4t/NcTQtrfww=
 github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2/go.mod h1:hkRG7XYTFWNJGYcbNJQlaLq0fg1yr4J4t/NcTQtrfww=
 github.com/syndtr/goleveldb v1.0.0/go.mod h1:ZVVdQEZoIme9iO1Ch2Jdy24qqXrMMOU6lpPAyBWyWuQ=
-github.com/syseleven/machine-controller v1.36.2-sys11-5 h1:apa2lgY3F/2YexeEZZY+ZjdFo+YfEBSUw+zFXXKVySM=
-github.com/syseleven/machine-controller v1.36.2-sys11-5/go.mod h1:nrlKyGzY3pXYM2pR9g5J94cgJoVjMqZrUxoLHmnwljE=
-github.com/syseleven/machine-controller v1.36.2-sys11-6 h1:H9k0JvKDuscuYAP2yNR5wL8YbYpijo3XVpKz3GfqsSc=
-github.com/syseleven/machine-controller v1.36.2-sys11-6/go.mod h1:nrlKyGzY3pXYM2pR9g5J94cgJoVjMqZrUxoLHmnwljE=
+github.com/syseleven/machine-controller v1.37.0-sys11-0 h1:Gm5Fp4oKDtLuKCeZOJEINQ5Sgy8lmNlWI03QrozFb+Q=
+github.com/syseleven/machine-controller v1.37.0-sys11-0/go.mod h1:nrlKyGzY3pXYM2pR9g5J94cgJoVjMqZrUxoLHmnwljE=
 github.com/tchap/go-patricia v2.3.0+incompatible/go.mod h1:bmLyhP68RS6kStMGxByiQ23RP/odRBOTVjwp2cDyi6I=
 github.com/tdakkota/asciicheck v0.0.0-20200416190851-d7f85be797a2/go.mod h1:yHp0ai0Z9gUljN3o0xMhYJnH/IcvkdTBOX2fmJ93JEM=
 github.com/tdakkota/asciicheck v0.0.0-20200416200610-e657995f937b/go.mod h1:yHp0ai0Z9gUljN3o0xMhYJnH/IcvkdTBOX2fmJ93JEM=
