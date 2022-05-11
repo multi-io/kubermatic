@@ -124,6 +124,6 @@ replace (
 	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.22.2
 )
 
-replace github.com/kubermatic/machine-controller => github.com/syseleven/machine-controller v1.36.2-sys11-6
+replace github.com/kubermatic/machine-controller => github.com/syseleven/machine-controller v1.37.0-sys11-0
 
 replace github.com/ajeddeloh/go-json => github.com/coreos/go-json v0.0.0-20211020211907-c63f628265de
