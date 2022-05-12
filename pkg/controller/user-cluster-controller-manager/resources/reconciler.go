@@ -29,6 +29,7 @@ import (
 	controllermanager "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/controller-manager"
 	coredns "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/core-dns"
 	csimigration "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/csi-migration"
+	csiopenstack "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/csi/openstack"
 	dnatcontroller "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/dnat-controller"
 	dnsautoscaler "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/dns-autoscaler"
 	envoyagent "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/envoy-agent"
@@ -445,6 +446,7 @@ func (r *reconciler) reconcileClusterRoles(ctx context.Context) error {
 		clusterautoscaler.ClusterRoleCreator(),
 		// Sys11 disable kubernetesdashboard.ClusterRoleCreator(),
 		coredns.ClusterRoleCreator(),
+		csiopenstack.ClusterRoleCreator(),
 		dnsautoscaler.ClusterRolereator(),
 	}
 	if r.opaIntegration {
@@ -482,6 +484,7 @@ func (r *reconciler) reconcileClusterRoleBindings(ctx context.Context) error {
 		cloudcontroller.ClusterRoleBindingCreator(),
 		// Sys11 disable kubernetesdashboard.ClusterRoleBindingCreator(),
 		coredns.ClusterRoleBindingCreator(),
+		csiopenstack.ClusterRoleBindingCreator(),
 		dnsautoscaler.ClusterRoleBindingCreator(),
 	}
 	if r.opaIntegration {
