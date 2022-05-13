@@ -1,0 +1,176 @@
+# This file has been generated, DO NOT EDIT.
+
+metadata:
+  creationTimestamp: null
+  name: csi-cinder-controllerplugin
+spec:
+  podManagementPolicy: OrderedReady
+  replicas: 1
+  selector:
+    matchLabels:
+      app: csi-cinder-controllerplugin
+      cluster: de-test-01
+  serviceName: csi-cinder-controller-service
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: csi-cinder-controllerplugin
+        ca-bundle-configmap-revision: "123456"
+        cloud-config-configmap-revision: "123456"
+        cluster: de-test-01
+        csi-cinder-controller-kubeconfig-secret-revision: "123456"
+    spec:
+      containers:
+      - args:
+        - --csi-address=/var/lib/csi/sockets/pluginproxy/csi.sock
+        - --timeout=3m
+        - --kubeconfig=/etc/kubernetes/kubeconfig/kubeconfig
+        image: quay.io/k8scsi/csi-attacher:v3.1.0
+        imagePullPolicy: IfNotPresent
+        name: csi-attacher
+        resources:
+          limits:
+            cpu: 500m
+            memory: 128Mi
+          requests:
+            cpu: 50m
+            memory: 32Mi
+        volumeMounts:
+        - mountPath: /var/lib/csi/sockets/pluginproxy/
+          name: socket-dir
+        - mountPath: /etc/kubernetes/kubeconfig
+          name: csi-cinder-controller-kubeconfig
+          readOnly: true
+      - args:
+        - --csi-address=/var/lib/csi/sockets/pluginproxy/csi.sock
+        - --timeout=3m
+        - --default-fstype=ext4
+        - --kubeconfig=/etc/kubernetes/kubeconfig/kubeconfig
+        image: quay.io/k8scsi/csi-provisioner:v2.1.0
+        imagePullPolicy: IfNotPresent
+        name: csi-provisioner
+        resources:
+          limits:
+            cpu: 500m
+            memory: 128Mi
+          requests:
+            cpu: 50m
+            memory: 48Mi
+        volumeMounts:
+        - mountPath: /var/lib/csi/sockets/pluginproxy/
+          name: socket-dir
+        - mountPath: /etc/kubernetes/kubeconfig
+          name: csi-cinder-controller-kubeconfig
+          readOnly: true
+      - args:
+        - --csi-address=/var/lib/csi/sockets/pluginproxy/csi.sock
+        - --timeout=3m
+        - --kubeconfig=/etc/kubernetes/kubeconfig/kubeconfig
+        image: quay.io/k8scsi/csi-snapshotter:v2.1.4
+        imagePullPolicy: IfNotPresent
+        name: csi-snapshotter
+        resources:
+          limits:
+            cpu: 500m
+            memory: 128Mi
+          requests:
+            cpu: 50m
+            memory: 32Mi
+        volumeMounts:
+        - mountPath: /var/lib/csi/sockets/pluginproxy/
+          name: socket-dir
+        - mountPath: /etc/kubernetes/kubeconfig
+          name: csi-cinder-controller-kubeconfig
+          readOnly: true
+      - args:
+        - --csi-address=/var/lib/csi/sockets/pluginproxy/csi.sock
+        - --timeout=3m
+        - --handle-volume-inuse-error=false
+        - --kubeconfig=/etc/kubernetes/kubeconfig/kubeconfig
+        image: quay.io/k8scsi/csi-resizer:v1.1.0
+        imagePullPolicy: IfNotPresent
+        name: csi-resizer
+        resources:
+          limits:
+            cpu: 500m
+            memory: 128Mi
+          requests:
+            cpu: 50m
+            memory: 32Mi
+        volumeMounts:
+        - mountPath: /var/lib/csi/sockets/pluginproxy/
+          name: socket-dir
+        - mountPath: /etc/kubernetes/kubeconfig
+          name: csi-cinder-controller-kubeconfig
+          readOnly: true
+      - args:
+        - --csi-address=/var/lib/csi/sockets/pluginproxy/csi.sock
+        image: quay.io/k8scsi/livenessprobe:v2.2.0
+        imagePullPolicy: IfNotPresent
+        name: liveness-probe
+        resources:
+          limits:
+            cpu: 500m
+            memory: 64Mi
+          requests:
+            cpu: 50m
+            memory: 16Mi
+        volumeMounts:
+        - mountPath: /var/lib/csi/sockets/pluginproxy/
+          name: socket-dir
+        - mountPath: /etc/kubernetes/kubeconfig
+          name: csi-cinder-controller-kubeconfig
+          readOnly: true
+      - command:
+        - /bin/cinder-csi-plugin
+        - --nodeid=requiredbutnotused
+        - --endpoint=unix://csi/csi.sock
+        - --cloud-config=/etc/config/config
+        - --cluster=de-test-01
+        image: public.ecr.aws/n1k6e5t7/k8scloudprovider/cinder-csi-plugin:v1.22.0
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 5
+          httpGet:
+            path: /healthz
+            port: healthz
+          initialDelaySeconds: 10
+          periodSeconds: 60
+          timeoutSeconds: 10
+        name: cinder-csi-plugin
+        ports:
+        - containerPort: 9808
+          name: healthz
+          protocol: TCP
+        resources:
+          limits:
+            cpu: 500m
+            memory: 128Mi
+          requests:
+            cpu: 50m
+            memory: 32Mi
+        volumeMounts:
+        - mountPath: /csi
+          name: socket-dir
+        - mountPath: /etc/config
+          name: cloud-config
+          readOnly: true
+      imagePullSecrets:
+      - name: dockercfg
+      volumes:
+      - emptyDir: {}
+        name: socket-dir
+      - configMap:
+          name: cloud-config
+        name: cloud-config
+      - configMap:
+          name: ca-bundle
+        name: ca-bundle
+      - name: csi-cinder-controller-kubeconfig
+        secret:
+          secretName: csi-cinder-controller-kubeconfig
+  updateStrategy:
+    type: RollingUpdate
+status:
+  replicas: 0

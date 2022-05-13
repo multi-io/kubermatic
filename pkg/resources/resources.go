@@ -106,6 +106,10 @@ const (
 	EtcdStatefulSetName = "etcd"
 	// EtcdDefaultBackupConfigName is the name for the default (preinstalled) EtcdBackupConfig of a cluster.
 	EtcdDefaultBackupConfigName = "default-backups"
+	// CsiCinderControllerPluginStatefulSetName is the name for the CSI cinder controller plugin StatefulSet
+	CsiCinderControllerPluginStatefulSetName = "csi-cinder-controllerplugin"
+	// CsiCinderControllerPluginServiceName is the name for the CSI cinder controller plugin service
+	CsiCinderControllerPluginServiceName = "csi-cinder-controller-service"
 
 	// ApiserverServiceName is the name for the apiserver service
 	ApiserverServiceName = "apiserver-external"
@@ -162,6 +166,8 @@ const (
 	// ClusterAutoscalerKubeconfigSecretName is the name of the kubeconfig secret used for
 	// the cluster-autoscaler
 	ClusterAutoscalerKubeconfigSecretName = "cluster-autoscaler-kubeconfig"
+	// CSICinderControllerKubeconfigSecretName is the name for the secret containing the kubeconfig used by the CSI cinder controller plugin
+	CSICinderControllerKubeconfigSecretName = "csi-cinder-controller-kubeconfig"
 	// KubernetesDashboardKubeconfigSecretName is the name of the kubeconfig secret user for Kubernetes Dashboard
 	KubernetesDashboardKubeconfigSecretName = "kubernetes-dashboard-kubeconfig"
 
@@ -263,6 +269,8 @@ const (
 	MetricsServerCertUsername = "metrics-server"
 	// ControllerManagerCertUsername is the name of the user coming from kubeconfig cert
 	ControllerManagerCertUsername = "system:kube-controller-manager"
+	// CSICinderControllerCertUsername is the name of the user coming from kubeconfig cert
+	CSICinderControllerCertUsername = "csi-cinder-controller"
 	// CloudControllerManagerCertUsername is the name of the user coming from kubeconfig cert
 	CloudControllerManagerCertUsername = "system:cloud-controller-manager"
 	// SchedulerCertUsername is the name of the user coming from kubeconfig cert
@@ -389,6 +397,8 @@ const (
 	RegistrySys11Scr = "scr.syseleven.de"
 	// RegistryAnexia defines the anexia specific docker registry
 	RegistryAnexia = "anx-cr.io"
+	// RegistryAwsEcr defines the AWS ECR docker registry
+	RegistryAwsEcr = "public.ecr.aws"
 
 	// TopologyKeyHostname defines the topology key for the node hostname
 	TopologyKeyHostname = "kubernetes.io/hostname"
