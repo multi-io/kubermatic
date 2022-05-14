@@ -13,7 +13,10 @@ cd ${SRC_DIR}
 : "${INSTALLER_DIR:="$(go env GOPATH)/src/gitlab.syseleven.de/kubernetes/kubermatic-installer"}"
 : "${KUBERMATIC_ENV:=dev}"
 : "${KUBERMATIC_CLUSTER:=dbl1}"
-: "${RESOURCES_DIR:=${INSTALLER_DIR}/environments/${KUBERMATIC_ENV}/clusters/${KUBERMATIC_CLUSTER}/kubermatic/versions}"
+
+ENV_CLUSTER_DIR="${INSTALLER_DIR}/environments/${KUBERMATIC_ENV}/clusters/${KUBERMATIC_CLUSTER}"
+
+: "${RESOURCES_DIR:=${ENV_CLUSTER_DIR}/kubermatic/versions}"
 : "${CONFIG_DIR:=${INSTALLER_DIR}/environments/${KUBERMATIC_ENV}/kubermatic}"
 if [[ -z "$SKIP_INSTALLER" ]]; then
 KUBERMATIC_ENV=${KUBERMATIC_ENV} KUBERMATIC_CLUSTER=${KUBERMATIC_CLUSTER} make -C ${INSTALLER_DIR}/kubermatic values.yaml
@@ -47,20 +50,24 @@ else
   SYS11_OPTIONS=
 fi
 
-dockercfgjson="$(mktemp)"
-trap "rm -f $dockercfgjson" EXIT
-cat "${INSTALLER_DIR}/kubermatic/values.yaml" | yq .kubermatic.imagePullSecretData -r | base64 --decode | jq . >"$dockercfgjson"
+tmpdir="$(mktemp -d)"
+trap "rm -rf $tmpdir" EXIT
 
-inClusterPrometheusRulesFile="$(mktemp)"
-trap "rm -f $inClusterPrometheusRulesFile" EXIT
-cat "${INSTALLER_DIR}/kubermatic/values.yaml" | yq .kubermatic.clusterNamespacePrometheus.rules >"$inClusterPrometheusRulesFile"
+cat "${INSTALLER_DIR}/kubermatic/values.yaml" | yq .kubermatic.imagePullSecretData -r | base64 --decode | jq . >"${tmpdir}/dockercfgjson"
 
-seedKubeconfig="$(mktemp)"
-trap "rm -f $seedKubeconfig" EXIT
-cp ${CONFIG_DIR}/kubeconfig $seedKubeconfig
-kubectl --kubeconfig $seedKubeconfig config use-context $KUBERMATIC_CLUSTER
+cat "${INSTALLER_DIR}/kubermatic/values.yaml" | yq .kubermatic.clusterNamespacePrometheus.rules >"${tmpdir}/inClusterPrometheusRulesFile"
+cat "${INSTALLER_DIR}/kubermatic/additional-projects/kubermaticconfiguration/kubermaticconfiguration.yaml" | yq '.spec.userCluster.monitoring.customRules | select(.)' -r >"${tmpdir}/inClusterPrometheusRulesFile"
 
-defaultAddons=$(cat "${INSTALLER_DIR}/kubermatic/values.yaml" | yq '.kubermatic.controller.addons.kubernetes.defaultAddons | join(",")' -r)
+defaultAddons=$(cat "${ENV_CLUSTER_DIR}/kubermatic/variables/kubermatic.yaml" | yq '.kubermatic_default_addons | join(",")' -r)
+
+echo ">>>defaultAddons = $defaultAddons"
+
+## Would need format conversion as in CreateVersionsYAML() / CreateUpdatesYAML() in pkg/controller/operator/common/defaults.go
+#cat "${ENV_CLUSTER_DIR}/kubermatic/variables/kubermatic.yaml" | yq '{versions: .versions_and_updates.kubernetes.versions}' --yaml-output >"${tmpdir}/versions"
+#cat "${ENV_CLUSTER_DIR}/kubermatic/variables/kubermatic.yaml" | yq '{updates: .versions_and_updates.kubernetes.updates}' --yaml-output >"${tmpdir}/updates"
+## => read from seed cluster directly
+kubectl -n kubermatic get secret extra-files -o json | jq '.data."versions.yaml"' -r | base64 --decode >"${tmpdir}/versions"
+kubectl -n kubermatic get secret extra-files -o json | jq '.data."updates.yaml"' -r | base64 --decode >"${tmpdir}/updates"
 
 if [[ "${TAG_WORKER}" == "false" ]]; then
     WORKER_OPTION=
@@ -92,75 +99,84 @@ fi
 
 if [[ "${DEBUG}" == "true" ]]; then
     dlv --listen=:2345 --headless=true --api-version=2 --accept-multiclient exec ./_build/seed-controller-manager -- \
+      -ca-bundle=${INSTALLER_DIR}/kubermatic/kubermatic-code/charts/kubermatic-operator/static/ca-bundle.pem \
+      -controller-manager-default-replicas=1 \
       -dynamic-datacenters=true \
       -datacenter-name=${KUBERMATIC_CLUSTER} \
-      -kubeconfig=$seedKubeconfig \
-      -versions=${RESOURCES_DIR}/versions.yaml \
-      -updates=${RESOURCES_DIR}/updates.yaml \
+      -enable-etcd-backups-restores \
+      -etcd-disk-size=$(cat "${ENV_CLUSTER_DIR}/kubermatic/variables/kubermatic.yaml" | yq '.customer_etcd_disk_size' -r) \
+      -versions="${tmpdir}/versions" \
+      -updates="${tmpdir}/updates" \
       -provider-incompatibilities=${RESOURCES_DIR}/provider-incompatibilities.yaml \
       -kubernetes-addons-path=${INSTALLER_DIR}/kubermatic/cluster-addons/addons \
-      -openshift-addons-path=openshift_addons \
       -kubernetes-addons-list=$defaultAddons \
       -overwrite-registry= \
       -nodeport-range=30000-32767 \
-      -docker-pull-config-json-file="$dockercfgjson" \
+      -docker-pull-config-json-file="${tmpdir}/dockercfgjson" \
       -feature-gates=etcdLauncher=true \
       ${SYS11_OPTIONS} \
       -monitoring-scrape-annotation-prefix=monitoring.metakube.de \
+      -monitoring-environment-label="$(cat "${INSTALLER_DIR}/environments/${KUBERMATIC_ENV}/variables/base.yaml" | yq '.environment' -r)" \
       -namespace=kubermatic \
       ${WORKER_OPTION} \
       -external-url=${EXTERNAL_URL} \
+      -in-cluster-prometheus-disable-default-rules=false \
+      -in-cluster-prometheus-disable-default-scraping-configs=false \
+      -in-cluster-prometheus-rules-file="${tmpdir}/inClusterPrometheusRulesFile" \
       -logtostderr=1 \
       -log-debug=1 \
+      -scheduler-default-replicas=1 \
       -backup-container=./hack/sys11-store-container.yaml \
       -cleanup-container=./hack/sys11-cleanup-container.yaml \
       -backup-delete-container=./hack/sys11-delete-container.yaml \
-      -default-component-settings=./hack/sys11-default-component-settings.yaml \
       -worker-count=1 \
       -kubermatic-image=docker.io/syseleven/kubermatic \
       -dnatcontroller-image=syseleven/kubeletdnat-controller \
       -etcd-launcher-image=syseleven/etcd-launcher \
-      -enable-leader-election=false \
       ${DISABLE_LE_OPTION} \
       ${LE_NAMESPACE_OPTION} \
       -v=8 $@
 
 else
     ./_build/seed-controller-manager \
+      -ca-bundle=${INSTALLER_DIR}/kubermatic/kubermatic-code/charts/kubermatic-operator/static/ca-bundle.pem \
+      -controller-manager-default-replicas=1 \
       -dynamic-datacenters=true \
       -datacenter-name=${KUBERMATIC_CLUSTER} \
-      -kubeconfig=$seedKubeconfig \
-      -versions=${RESOURCES_DIR}/versions.yaml \
-      -updates=${RESOURCES_DIR}/updates.yaml \
+      -enable-etcd-backups-restores \
+      -etcd-disk-size=$(cat "${ENV_CLUSTER_DIR}/kubermatic/variables/kubermatic.yaml" | yq '.customer_etcd_disk_size' -r) \
+      -versions="${tmpdir}/versions" \
+      -updates="${tmpdir}/updates" \
       -kubernetes-addons-path=${INSTALLER_DIR}/kubermatic/cluster-addons/addons \
-      -openshift-addons-path=openshift_addons \
       -kubernetes-addons-list=$defaultAddons \
       -overwrite-registry= \
       -nodeport-range=30000-32767 \
-      -docker-pull-config-json-file="$dockercfgjson" \
+      -docker-pull-config-json-file="${tmpdir}/dockercfgjson" \
       -feature-gates=etcdLauncher=true \
       ${SYS11_OPTIONS} \
       -monitoring-scrape-annotation-prefix=monitoring.metakube.de \
+      -monitoring-environment-label="$(cat "${INSTALLER_DIR}/environments/${KUBERMATIC_ENV}/variables/base.yaml" | yq '.environment' -r)" \
       -namespace=kubermatic \
       ${WORKER_OPTION} \
       -external-url=${EXTERNAL_URL} \
+      -in-cluster-prometheus-disable-default-rules=false \
+      -in-cluster-prometheus-disable-default-scraping-configs=false \
+      -in-cluster-prometheus-rules-file="${tmpdir}/inClusterPrometheusRulesFile" \
       -logtostderr=1 \
       -log-debug=1 \
+      -scheduler-default-replicas=1 \
       -backup-container=./hack/sys11-store-container.yaml \
       -cleanup-container=./hack/sys11-cleanup-container.yaml \
       -backup-delete-container=./hack/sys11-delete-container.yaml \
-      -default-component-settings=./hack/sys11-default-component-settings.yaml \
       -worker-count=1 \
       -kubermatic-image=docker.io/syseleven/kubermatic \
       -dnatcontroller-image=syseleven/kubeletdnat-controller \
       -etcd-launcher-image=syseleven/etcd-launcher \
-      -enable-leader-election=false \
       ${DISABLE_LE_OPTION} \
       ${LE_NAMESPACE_OPTION} \
       -v=6 $@
 
       # TODO
-      #-in-cluster-prometheus-rules-file="$inClusterPrometheusRulesFile" \
       #-seed-admissionwebhook-cert-file=/opt/seed-webhook-serving-cert/serverCert.pem
       #-seed-admissionwebhook-key-file=/opt/seed-webhook-serving-cert/serverKey.pem
       #-oidc-ca-file=../secrets/seed-clusters/dev.kubermatic.io/caBundle.pem \
