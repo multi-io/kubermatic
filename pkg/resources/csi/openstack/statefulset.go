@@ -263,10 +263,12 @@ func StatefulSetCreator(data csiCinderControllerPluginStatefulSetCreatorData) re
 					LivenessProbe: &corev1.Probe{
 						Handler: corev1.Handler{
 							HTTPGet: &corev1.HTTPGetAction{
-								Path: "/healthz",
-								Port: intstr.FromString("healthz"),
+								Path:   "/healthz",
+								Port:   intstr.FromString("healthz"),
+								Scheme: corev1.URISchemeHTTP,
 							},
 						},
+						SuccessThreshold:    1,
 						FailureThreshold:    5,
 						InitialDelaySeconds: 10,
 						TimeoutSeconds:      10,
