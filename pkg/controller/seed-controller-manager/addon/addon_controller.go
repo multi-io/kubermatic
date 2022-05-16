@@ -66,9 +66,10 @@ import (
 const (
 	ControllerName = "kubermatic_addon_controller"
 
-	addonLabelKey        = "kubermatic-addon"
-	cleanupFinalizerName = "cleanup-manifests"
-	addonEnsureLabelKey  = "addons.kubermatic.io/ensure"
+	addonLabelKey             = "kubermatic-addon"
+	cleanupFinalizerName      = "cleanup-manifests"
+	addonEnsureLabelKey       = "addons.kubermatic.io/ensure"
+	addonSoftDeletionVariable = "skipReconcile"
 )
 
 // KubeconfigProvider provides functionality to get a clusters admin kubeconfig
@@ -204,7 +205,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 	}
 
 	// If API server or etcd are down then addon installation will fail.
-	if !cluster.Status.ExtendedHealth.AllHealthy() {
+	if cluster.Status.ExtendedHealth.Apiserver != kubermaticv1.HealthStatusUp {
 		return reconcile.Result{
 			Requeue:      true,
 			RequeueAfter: kubermaticv1.ControllerRequeueAddonReconcileOnClusterNotReadyPeriod,
@@ -246,7 +247,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, addon *kubermaticv1.Addon, cluster *kubermaticv1.Cluster) (*reconcile.Result, error) {
 	if cluster.Status.ExtendedHealth.Apiserver != kubermaticv1.HealthStatusUp {
 		log.Debug("API server is not running, trying again in 10 seconds")
-		return &reconcile.Result{RequeueAfter: 10 * time.Second}, nil
+		return &reconcile.Result{RequeueAfter: kubermaticv1.ControllerRequeueAddonReconcileOnClusterNotReadyPeriod}, nil
 	}
 
 	reqeueAfter, err := r.ensureRequiredResourceTypesExist(ctx, log, addon, cluster)
@@ -274,7 +275,7 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, addo
 	// This is true when the addon: 1) is fully deployed, 2) doesn't have a `addonEnsureLabelKey` set to true.
 	// we do this to allow users to "edit/delete" resources deployed by unlabeled addons,
 	// while we enfornce the labeled ones
-	if addonResourcesCreated(addon) && !hasEnsureResourcesLabel(addon) {
+	if addonResourcesCreated(addon) && addon.Labels[addonEnsureLabelKey] != "true" {
 		return nil, nil
 	}
 
@@ -287,6 +288,9 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, addo
 	}
 	if err := r.ensureResourcesCreatedConditionIsSet(ctx, addon); err != nil {
 		return nil, fmt.Errorf("failed to set add ResourcesCreated Condition: %v", err)
+	}
+	if err := r.ensureSoftDeletion(ctx, addon); err != nil {
+		return nil, fmt.Errorf("failed to ensure soft deletion: %v", err)
 	}
 	return nil, nil
 }
@@ -568,6 +572,23 @@ func (r *Reconciler) ensureFinalizerIsSet(ctx context.Context, addon *kubermatic
 	return r.Client.Patch(ctx, addon, ctrlruntimeclient.MergeFrom(oldAddon))
 }
 
+// ensureSoftDeletion checks if addon is marked for soft deletion and if so, it removes addon ensure label so that
+// it's ignored in the next reconcile.
+func (r *Reconciler) ensureSoftDeletion(ctx context.Context, addon *kubermaticv1.Addon) error {
+	if addon.Labels[addonEnsureLabelKey] == "true" {
+		var m map[string]interface{}
+		if err := json.Unmarshal(addon.Spec.Variables.Raw, &m); err != nil {
+			return fmt.Errorf("failed to unmarshal addon variable: %v", err)
+		}
+		if m[addonSoftDeletionVariable] != nil {
+			cpy := addon.DeepCopy()
+			delete(cpy.Labels, addonEnsureLabelKey)
+			return r.Client.Patch(ctx, cpy, ctrlruntimeclient.MergeFrom(addon))
+		}
+	}
+	return nil
+}
+
 func (r *Reconciler) ensureResourcesCreatedConditionIsSet(ctx context.Context, addon *kubermaticv1.Addon) error {
 	_, cond := getAddonCondition(addon, kubermaticv1.AddonResourcesCreated)
 	if cond != nil && cond.Status == corev1.ConditionTrue {
@@ -673,8 +694,4 @@ func addonResourcesCreated(addon *kubermaticv1.Addon) bool {
 		return true
 	}
 	return false
-}
-
-func hasEnsureResourcesLabel(addon *kubermaticv1.Addon) bool {
-	return addon.Labels[addonEnsureLabelKey] == "true"
 }
