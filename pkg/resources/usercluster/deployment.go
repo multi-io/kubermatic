@@ -40,12 +40,12 @@ var (
 	defaultResourceRequirements = map[string]*corev1.ResourceRequirements{
 		name: {
 			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("15m"),
-				corev1.ResourceMemory: resource.MustParse("25Mi"),
+				corev1.ResourceMemory: resource.MustParse("32Mi"),
+				corev1.ResourceCPU:    resource.MustParse("25m"),
 			},
 			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("15m"),
-				corev1.ResourceMemory: resource.MustParse("25Mi"),
+				corev1.ResourceMemory: resource.MustParse("512Mi"),
+				corev1.ResourceCPU:    resource.MustParse("500m"),
 			},
 		},
 	}

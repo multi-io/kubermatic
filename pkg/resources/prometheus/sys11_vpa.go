@@ -17,12 +17,12 @@ var (
 		{
 			ContainerName: resources.PrometheusStatefulSetName,
 			MinAllowed: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("10m"),
 				corev1.ResourceMemory: resource.MustParse("300Mi"),
+				corev1.ResourceCPU:    resource.MustParse("50m"),
 			},
 			MaxAllowed: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("350m"),
-				corev1.ResourceMemory: resource.MustParse("7.5Gi"),
+				corev1.ResourceMemory: resource.MustParse("8Gi"),
+				corev1.ResourceCPU:    resource.MustParse("2"),
 			},
 		},
 	}

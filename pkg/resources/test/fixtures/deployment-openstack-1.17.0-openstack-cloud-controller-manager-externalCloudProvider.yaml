@@ -38,11 +38,11 @@ spec:
         name: openvpn-client
         resources:
           limits:
-            cpu: 10m
-            memory: 10Mi
+            cpu: 100m
+            memory: 32Mi
           requests:
-            cpu: 10m
-            memory: 10Mi
+            cpu: 5m
+            memory: 5Mi
         securityContext:
           privileged: true
         volumeMounts:
@@ -69,11 +69,11 @@ spec:
         name: cloud-controller-manager
         resources:
           limits:
-            cpu: 10m
-            memory: 30Mi
+            cpu: 500m
+            memory: 512Mi
           requests:
-            cpu: 10m
-            memory: 20Mi
+            cpu: 100m
+            memory: 100Mi
         volumeMounts:
         - mountPath: /etc/kubernetes/kubeconfig
           name: cloud-controller-manager-kubeconfig

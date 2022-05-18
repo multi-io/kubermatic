@@ -27,12 +27,12 @@ import (
 var (
 	vpnClientResourceRequirements = corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse("5m"),
 			corev1.ResourceMemory: resource.MustParse("5Mi"),
+			corev1.ResourceCPU:    resource.MustParse("5m"),
 		},
 		Limits: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse("100m"),
 			corev1.ResourceMemory: resource.MustParse("32Mi"),
+			corev1.ResourceCPU:    resource.MustParse("100m"),
 		},
 	}
 )

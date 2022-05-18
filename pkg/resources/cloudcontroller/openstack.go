@@ -39,12 +39,12 @@ const (
 var (
 	osResourceRequirements = corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse("10m"),
-			corev1.ResourceMemory: resource.MustParse("25Mi"),
+			corev1.ResourceMemory: resource.MustParse("100Mi"),
+			corev1.ResourceCPU:    resource.MustParse("100m"),
 		},
 		Limits: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse("10m"),
-			corev1.ResourceMemory: resource.MustParse("25Mi"),
+			corev1.ResourceMemory: resource.MustParse("512Mi"),
+			corev1.ResourceCPU:    resource.MustParse("500m"),
 		},
 	}
 )

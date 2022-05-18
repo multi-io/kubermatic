@@ -78,11 +78,11 @@ spec:
           timeoutSeconds: 15
         resources:
           limits:
-            cpu: 10m
-            memory: 75Mi
+            cpu: 100m
+            memory: 512Mi
           requests:
-            cpu: 5m
-            memory: 20Mi
+            cpu: 10m
+            memory: 32Mi
         volumeMounts:
         - mountPath: /etc/kubernetes/kubeconfig
           name: machinecontroller-kubeconfig

@@ -3,6 +3,7 @@ package scheduler
 import (
 	"k8c.io/kubermatic/v2/pkg/resources"
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
+	"k8c.io/kubermatic/v2/pkg/resources/vpnsidecar"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -17,14 +18,15 @@ var (
 		{
 			ContainerName: resources.SchedulerDeploymentName,
 			MinAllowed: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("10m"),
-				corev1.ResourceMemory: resource.MustParse("25Mi"),
+				corev1.ResourceMemory: resource.MustParse("20Mi"),
+				corev1.ResourceCPU:    resource.MustParse("5m"),
 			},
 			MaxAllowed: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("100m"),
-				corev1.ResourceMemory: resource.MustParse("550Mi"),
+				corev1.ResourceMemory: resource.MustParse("150Mi"),
+				corev1.ResourceCPU:    resource.MustParse("75m"),
 			},
 		},
+		vpnsidecar.VpnClientVPAContainerPolicy,
 	}
 )
 

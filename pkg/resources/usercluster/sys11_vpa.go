@@ -17,12 +17,12 @@ var (
 		{
 			ContainerName: name,
 			MinAllowed: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("10m"),
-				corev1.ResourceMemory: resource.MustParse("25Mi"),
+				corev1.ResourceCPU:    resource.MustParse("5m"),
+				corev1.ResourceMemory: resource.MustParse("10Mi"),
 			},
 			MaxAllowed: corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse("150m"),
-				corev1.ResourceMemory: resource.MustParse("1Gi"),
+				corev1.ResourceMemory: resource.MustParse("250Mi"),
 			},
 		},
 	}

@@ -17,12 +17,12 @@ var (
 		{
 			ContainerName: resources.EtcdStatefulSetName,
 			MinAllowed: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("50m"),
-				corev1.ResourceMemory: resource.MustParse("200Mi"),
+				corev1.ResourceMemory: resource.MustParse("100Mi"),
+				corev1.ResourceCPU:    resource.MustParse("10m"),
 			},
 			MaxAllowed: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("350m"),
-				corev1.ResourceMemory: resource.MustParse("1650Mi"),
+				corev1.ResourceMemory: resource.MustParse("1.5Gi"),
+				corev1.ResourceCPU:    resource.MustParse("300m"),
 			},
 		},
 	}
