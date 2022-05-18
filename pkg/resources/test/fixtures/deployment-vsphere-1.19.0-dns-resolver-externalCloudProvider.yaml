@@ -113,11 +113,11 @@ spec:
           timeoutSeconds: 15
         resources:
           limits:
-            cpu: 10m
-            memory: 25Mi
+            cpu: 100m
+            memory: 128Mi
           requests:
-            cpu: 10m
-            memory: 25Mi
+            cpu: 5m
+            memory: 20Mi
         volumeMounts:
         - mountPath: /etc/coredns
           name: dns-resolver

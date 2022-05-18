@@ -57,11 +57,11 @@ spec:
         name: metrics-server
         resources:
           limits:
-            cpu: 10m
-            memory: 30Mi
+            cpu: "1"
+            memory: 512Mi
           requests:
-            cpu: 10m
-            memory: 30Mi
+            cpu: 100m
+            memory: 200Mi
         volumeMounts:
         - mountPath: /etc/kubernetes/kubeconfig
           name: metrics-server

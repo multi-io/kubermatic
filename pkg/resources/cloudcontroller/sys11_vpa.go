@@ -3,6 +3,7 @@ package cloudcontroller
 import (
 	"k8c.io/kubermatic/v2/pkg/resources"
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
+	"k8c.io/kubermatic/v2/pkg/resources/vpnsidecar"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -17,14 +18,15 @@ var (
 		{
 			ContainerName: ccmContainerName,
 			MinAllowed: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("10m"),
-				corev1.ResourceMemory: resource.MustParse("25Mi"),
+				corev1.ResourceMemory: resource.MustParse("20Mi"),
+				corev1.ResourceCPU:    resource.MustParse("5m"),
 			},
 			MaxAllowed: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("10m"),
-				corev1.ResourceMemory: resource.MustParse("100Mi"),
+				corev1.ResourceMemory: resource.MustParse("50Mi"),
+				corev1.ResourceCPU:    resource.MustParse("20m"),
 			},
 		},
+		vpnsidecar.VpnClientVPAContainerPolicy,
 	}
 	hetznerVPAContainerPolicies = []autoscalingv1beta2.ContainerResourcePolicy{
 		{
@@ -38,6 +40,7 @@ var (
 				corev1.ResourceCPU:    resource.MustParse("20m"),
 			},
 		},
+		vpnsidecar.VpnClientVPAContainerPolicy,
 	}
 
 	vpaContainerPolicies = map[string][]autoscalingv1beta2.ContainerResourcePolicy{

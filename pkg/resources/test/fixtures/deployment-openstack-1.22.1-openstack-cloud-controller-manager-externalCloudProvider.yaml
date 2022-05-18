@@ -72,11 +72,11 @@ spec:
         name: cloud-controller-manager
         resources:
           limits:
-            cpu: 10m
-            memory: 25Mi
+            cpu: 500m
+            memory: 512Mi
           requests:
-            cpu: 10m
-            memory: 25Mi
+            cpu: 100m
+            memory: 100Mi
         volumeMounts:
         - mountPath: /etc/kubernetes/kubeconfig
           name: cloud-controller-manager-kubeconfig
