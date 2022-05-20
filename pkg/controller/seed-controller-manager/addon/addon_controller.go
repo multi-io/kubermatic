@@ -575,7 +575,7 @@ func (r *Reconciler) ensureFinalizerIsSet(ctx context.Context, addon *kubermatic
 // ensureSoftDeletion checks if addon is marked for soft deletion and if so, it removes addon ensure label so that
 // it's ignored in the next reconcile.
 func (r *Reconciler) ensureSoftDeletion(ctx context.Context, addon *kubermaticv1.Addon) error {
-	if addon.Labels[addonEnsureLabelKey] == "true" {
+	if addon.Labels[addonEnsureLabelKey] == "true" && len(addon.Spec.Variables.Raw) > 0 {
 		var m map[string]interface{}
 		if err := json.Unmarshal(addon.Spec.Variables.Raw, &m); err != nil {
 			return fmt.Errorf("failed to unmarshal addon variable: %v", err)
