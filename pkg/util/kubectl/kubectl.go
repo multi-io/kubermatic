@@ -18,6 +18,7 @@ package kubectl
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/Masterminds/semver/v3"
@@ -28,6 +29,10 @@ import (
 // returned if no suitable kubectl can be determined.
 func BinaryForClusterVersion(version *semver.Version) (string, error) {
 	var binary string
+
+	if override, ok := os.LookupEnv("KUBERMATIC_KUBECTL_OVERRIDE"); ok {
+		return override, nil
+	}
 
 	switch version.Minor() {
 	case 19:
