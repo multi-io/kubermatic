@@ -46,8 +46,12 @@ build: $(CMD)
 .PHONY: $(CMD)
 $(CMD): %: $(BUILD_DEST)/%
 
-$(BUILD_DEST)/%: cmd/% download-gocache
+# run the compiler every time to let it figure out which source files changed (e.g. during local development)
+$(BUILD_DEST)/%: download-gocache FORCE
 	GOOS=$(GOOS) go build -tags "$(KUBERMATIC_EDITION)" $(GOTOOLFLAGS) -o $@ ./cmd/$*
+
+# https://www.gnu.org/software/make/manual/html_node/Force-Targets.html
+FORCE:
 
 .PHONY: install
 install:
