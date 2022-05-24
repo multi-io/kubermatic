@@ -363,7 +363,7 @@ func computeReplicas(data etcdStatefulSetCreatorData, set *appsv1.StatefulSet) i
 	if !data.Cluster().Spec.Features[kubermaticv1.ClusterFeatureEtcdLauncher] {
 		return kubermaticv1.DefaultEtcdClusterSize
 	}
-	etcdClusterSize := getClusterSize(data.Cluster().Spec.ComponentsOverride.Etcd)
+	etcdClusterSize := GetClusterSize(data.Cluster().Spec.ComponentsOverride.Etcd)
 	if set.Spec.Replicas == nil { // new replicaset
 		return etcdClusterSize
 	}
@@ -382,7 +382,7 @@ func computeReplicas(data etcdStatefulSetCreatorData, set *appsv1.StatefulSet) i
 	return replicas
 }
 
-func getClusterSize(settings kubermaticv1.EtcdStatefulSetSettings) int32 {
+func GetClusterSize(settings kubermaticv1.EtcdStatefulSetSettings) int32 {
 	if settings.Replicas == nil {
 		return kubermaticv1.DefaultEtcdClusterSize
 	}
