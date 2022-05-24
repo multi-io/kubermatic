@@ -28,6 +28,7 @@ import (
 
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/resources"
+	"k8c.io/kubermatic/v2/pkg/resources/etcd"
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 
 	corev1 "k8s.io/api/core/v1"
@@ -53,6 +54,7 @@ type configTemplateData struct {
 	TemplateData             interface{}
 	APIServerHost            string
 	EtcdTLSConfig            string
+	EtcdAddresses            []string
 	ApiserverTLSConfig       string
 	CustomScrapingConfigs    string
 	CustomRemoteWriteConfigs string
@@ -104,6 +106,12 @@ func ConfigMapCreator(data *resources.TemplateData) reconciling.NamedConfigMapCr
 				return nil, fmt.Errorf("failed to encode etcd TLS config as YAML: %v", err)
 			}
 
+			etcdReplicas := int(etcd.GetClusterSize(data.Cluster().Spec.ComponentsOverride.Etcd))
+			etcdAddresses := make([]string, etcdReplicas)
+			for i := 0; i < etcdReplicas; i++ {
+				etcdAddresses[i] = fmt.Sprintf("etcd-%d.etcd.%s.svc.cluster.local:2379", i, data.Cluster().Status.NamespaceName)
+			}
+
 			apiserverTLSYaml, err := yaml.Marshal(apiserverTLS)
 			if err != nil {
 				return nil, fmt.Errorf("failed to encode apiserver TLS config as YAML: %v", err)
@@ -121,6 +129,7 @@ func ConfigMapCreator(data *resources.TemplateData) reconciling.NamedConfigMapCr
 				APIServerHost:            customData.APIServerHost,
 				CustomScrapingConfigs:    customScrapingConfigs,
 				EtcdTLSConfig:            strings.TrimSpace(string(etcdTLSYaml)),
+				EtcdAddresses:            etcdAddresses,
 				ApiserverTLSConfig:       strings.TrimSpace(string(apiserverTLSYaml)),
 				CustomRemoteWriteConfigs: customRemoteWriteConfigs,
 			}
@@ -223,9 +232,9 @@ scrape_configs:
 
   static_configs:
   - targets:
-    - 'etcd-0.etcd.{{ .TemplateData.Cluster.Status.NamespaceName }}.svc.cluster.local:2379'
-    - 'etcd-1.etcd.{{ .TemplateData.Cluster.Status.NamespaceName }}.svc.cluster.local:2379'
-    - 'etcd-2.etcd.{{ .TemplateData.Cluster.Status.NamespaceName }}.svc.cluster.local:2379'
+{{- range .EtcdAddresses }}
+    - '{{ . }}'
+{{- end }}
 
   relabel_configs:
   - source_labels: [__address__]

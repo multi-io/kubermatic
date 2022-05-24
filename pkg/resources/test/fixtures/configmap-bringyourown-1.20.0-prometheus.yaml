@@ -603,6 +603,18 @@ data:
         for: 30m
         labels:
           severity: warning
+
+    - name: user-cluster-components
+      rules:
+      - record: sli:user_cluster:etcd:up
+        # = 1 iff for 5m the etcd cluster at least once had enough up members to reach quorum
+        # = 0 otherwise (down for >=5m)
+        expr: present_over_time((count(up{job="etcd"} == 1) > (count(up{job="etcd"}) / 2))[5m:]) or vector(0)
+
+      - record: sli:user_cluster:apiserver:up
+        # = 1 iff any apiserver pod was up within 5m
+        # = 0 otherwise (all down for >=5m)
+        expr: max(max_over_time(up{job="apiserver"}[5m]) == 1) or vector(0)
 metadata:
   creationTimestamp: null
   labels:
