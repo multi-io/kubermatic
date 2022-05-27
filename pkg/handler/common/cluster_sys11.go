@@ -173,7 +173,7 @@ func ProviderNotSetAtAllOrHasOpenstackBillingTenant(cloudSpec *kubermaticv1.Clou
 		return cloudSpec.Azure.OpenstackBillingTenant == ""
 	}
 	if cloudSpec.Openstack != nil {
-		return cloudSpec.Openstack.Tenant == "" && cloudSpec.Openstack.ApplicationCredentialID == "" && cloudSpec.Openstack.ApplicationCredentialSecret == ""
+		return cloudSpec.Openstack.Tenant == "" && cloudSpec.Openstack.TenantID == "" && cloudSpec.Openstack.ApplicationCredentialID == "" && cloudSpec.Openstack.ApplicationCredentialSecret == ""
 	}
 	// Provider is not set.
 	// Happens whet patch is send that doesn't update provider's fields.
