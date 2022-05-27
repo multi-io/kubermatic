@@ -27,7 +27,7 @@ import (
 func ClusterRoleBindingCreator() reconciling.NamedClusterRoleBindingCreatorGetter {
 	return func() (string, reconciling.ClusterRoleBindingCreator) {
 		return resources.CSICinderControllerClusterRoleBindingName, func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
-			crb.Labels = resources.BaseAppLabels(Name, nil)
+			crb.Labels = resources.BaseAppLabels(AppName, nil)
 
 			crb.RoleRef = rbacv1.RoleRef{
 				Name:     resources.CSICinderControllerClusterRoleName,

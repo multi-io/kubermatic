@@ -23,15 +23,11 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 )
 
-const (
-	Name = "csi-cinder-controller"
-)
-
 // ClusterRoleCreator returns the func to create/update the ClusterRole for the Cinder CSI controller
 func ClusterRoleCreator() reconciling.NamedClusterRoleCreatorGetter {
 	return func() (string, reconciling.ClusterRoleCreator) {
 		return resources.CSICinderControllerClusterRoleName, func(cr *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
-			cr.Labels = resources.BaseAppLabels(Name, nil)
+			cr.Labels = resources.BaseAppLabels(AppName, nil)
 
 			cr.Rules = []rbacv1.PolicyRule{
 				{
@@ -139,13 +135,6 @@ func ClusterRoleCreator() reconciling.NamedClusterRoleCreatorGetter {
 						"volumeattachments/status",
 					},
 					Verbs: []string{"patch", "update"},
-				},
-				{
-					APIGroups: []string{"coordination.k8s.io"},
-					Resources: []string{
-						"leases",
-					},
-					Verbs: []string{"get", "watch", "list", "delete", "update", "create"},
 				},
 			}
 			return cr, nil

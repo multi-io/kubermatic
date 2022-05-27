@@ -605,9 +605,13 @@ const (
 	// NodeLocalDNSExtraConfigMapName is a configmap where user can place extra configururation for node local dns.
 	NodeLocalDNSExtraConfigMapName = "node-local-dns-extra-configs"
 
-	// CSICinderControllerClusterRoleName is the name of the ClusterRole encoding the csi-cinder-controller's permissions
+	// CSICinderControllerClusterRoleName is the name of the ClusterRole encoding the csi-cinder-controller's cluster-wide permissions
 	CSICinderControllerClusterRoleName        = "csi-cinder-controller"
 	CSICinderControllerClusterRoleBindingName = "csi-cinder-controller"
+
+	// CSICinderControllerRoleName is the name of the Role encoding the csi-cinder-controller's kube-system permissions
+	CSICinderControllerRoleName        = "csi-cinder-controller"
+	CSICinderControllerRoleBindingName = "csi-cinder-controller"
 )
 
 // Resource names and constants for dns autoscaler.

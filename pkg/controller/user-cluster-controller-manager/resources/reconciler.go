@@ -308,6 +308,11 @@ func (r *reconciler) reconcileServiceAccounts(ctx context.Context) error {
 }
 
 func (r *reconciler) reconcileRoles(ctx context.Context) error {
+	var cluster kubermaticv1.Cluster
+	if err := r.seedClient.Get(ctx, ctrlruntimeclient.ObjectKey{Name: r.clusterName}, &cluster); err != nil {
+		return fmt.Errorf("failed to reconcile the Roles: failed to get cluster: %v", err)
+	}
+
 	// kube-system
 	creators := []reconciling.NamedRoleCreatorGetter{
 		machinecontroller.KubeSystemRoleCreator(),
@@ -316,6 +321,10 @@ func (r *reconciler) reconcileRoles(ctx context.Context) error {
 
 	if r.userSSHKeyAgent {
 		creators = append(creators, usersshkeys.RoleCreator())
+	}
+
+	if cluster.Spec.Cloud.Openstack != nil {
+		creators = append(creators, csiopenstack.RoleCreator())
 	}
 
 	if err := reconciling.ReconcileRoles(ctx, creators, metav1.NamespaceSystem, r.Client); err != nil {
@@ -372,6 +381,11 @@ func (r *reconciler) reconcileRoles(ctx context.Context) error {
 }
 
 func (r *reconciler) reconcileRoleBindings(ctx context.Context) error {
+	var cluster kubermaticv1.Cluster
+	if err := r.seedClient.Get(ctx, ctrlruntimeclient.ObjectKey{Name: r.clusterName}, &cluster); err != nil {
+		return fmt.Errorf("failed to reconcile the RoleBindings: failed to get cluster: %v", err)
+	}
+
 	// kube-system
 	creators := []reconciling.NamedRoleBindingCreatorGetter{
 		machinecontroller.KubeSystemRoleBindingCreator(),
@@ -383,6 +397,10 @@ func (r *reconciler) reconcileRoleBindings(ctx context.Context) error {
 
 	if r.userSSHKeyAgent {
 		creators = append(creators, usersshkeys.RoleBindingCreator())
+	}
+
+	if cluster.Spec.Cloud.Openstack != nil {
+		creators = append(creators, csiopenstack.RoleBindingCreator())
 	}
 
 	if err := reconciling.ReconcileRoleBindings(ctx, creators, metav1.NamespaceSystem, r.Client); err != nil {
@@ -437,6 +455,11 @@ func (r *reconciler) reconcileRoleBindings(ctx context.Context) error {
 }
 
 func (r *reconciler) reconcileClusterRoles(ctx context.Context) error {
+	var cluster kubermaticv1.Cluster
+	if err := r.seedClient.Get(ctx, ctrlruntimeclient.ObjectKey{Name: r.clusterName}, &cluster); err != nil {
+		return fmt.Errorf("failed to reconcile the ClusterRoles: failed to get cluster: %v", err)
+	}
+
 	creators := []reconciling.NamedClusterRoleCreatorGetter{
 		kubestatemetrics.ClusterRoleCreator(),
 		prometheus.ClusterRoleCreator(),
@@ -446,7 +469,6 @@ func (r *reconciler) reconcileClusterRoles(ctx context.Context) error {
 		clusterautoscaler.ClusterRoleCreator(),
 		// Sys11 disable kubernetesdashboard.ClusterRoleCreator(),
 		coredns.ClusterRoleCreator(),
-		csiopenstack.ClusterRoleCreator(),
 		dnsautoscaler.ClusterRolereator(),
 	}
 	if r.opaIntegration {
@@ -459,6 +481,9 @@ func (r *reconciler) reconcileClusterRoles(ctx context.Context) error {
 	if r.userClusterMLA.Monitoring {
 		creators = append(creators, userclusterprometheus.ClusterRoleCreator())
 	}
+	if cluster.Spec.Cloud.Openstack != nil {
+		creators = append(creators, csiopenstack.ClusterRoleCreator())
+	}
 
 	if err := reconciling.ReconcileClusterRoles(ctx, creators, "", r.Client); err != nil {
 		return fmt.Errorf("failed to reconcile ClusterRoles: %v", err)
@@ -467,6 +492,11 @@ func (r *reconciler) reconcileClusterRoles(ctx context.Context) error {
 }
 
 func (r *reconciler) reconcileClusterRoleBindings(ctx context.Context) error {
+	var cluster kubermaticv1.Cluster
+	if err := r.seedClient.Get(ctx, ctrlruntimeclient.ObjectKey{Name: r.clusterName}, &cluster); err != nil {
+		return fmt.Errorf("failed to reconcile the ClusterRoleBindings: failed to get cluster: %v", err)
+	}
+
 	creators := []reconciling.NamedClusterRoleBindingCreatorGetter{
 		userauth.ClusterRoleBindingCreator(),
 		kubestatemetrics.ClusterRoleBindingCreator(),
@@ -484,7 +514,6 @@ func (r *reconciler) reconcileClusterRoleBindings(ctx context.Context) error {
 		cloudcontroller.ClusterRoleBindingCreator(),
 		// Sys11 disable kubernetesdashboard.ClusterRoleBindingCreator(),
 		coredns.ClusterRoleBindingCreator(),
-		csiopenstack.ClusterRoleBindingCreator(),
 		dnsautoscaler.ClusterRoleBindingCreator(),
 	}
 	if r.opaIntegration {
@@ -501,6 +530,10 @@ func (r *reconciler) reconcileClusterRoleBindings(ctx context.Context) error {
 
 	if r.isKonnectivityEnabled {
 		creators = append(creators, konnectivity.ClusterRoleBindingCreator())
+	}
+
+	if cluster.Spec.Cloud.Openstack != nil {
+		creators = append(creators, csiopenstack.ClusterRoleBindingCreator())
 	}
 
 	if err := reconciling.ReconcileClusterRoleBindings(ctx, creators, "", r.Client); err != nil {
