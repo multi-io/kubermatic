@@ -1,32 +1,17 @@
-/*
-Copyright 2020 The Kubermatic Kubernetes Platform contributors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package openstack
 
 import (
 	"fmt"
-	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
-	"k8c.io/kubermatic/v2/pkg/resources"
-	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
-	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/util/intstr"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/resources"
+	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 )
 
 var (
@@ -94,42 +79,33 @@ var (
 	}
 )
 
-type csiCinderControllerPluginStatefulSetCreatorData interface {
-	Cluster() *kubermaticv1.Cluster
-	GetPodTemplateLabels(string, []corev1.Volume, map[string]string) (map[string]string, error)
-	ImageRegistry(string) string
-}
+// DeploymentCreator returns the function to create and update the nginx deployment
+func DeploymentCreator(data *resources.TemplateData) reconciling.NamedDeploymentCreatorGetter {
+	return func() (string, reconciling.DeploymentCreator) {
+		return resources.CsiCinderControllerPluginDeploymentName, func(dep *appsv1.Deployment) (*appsv1.Deployment, error) {
 
-// StatefulSetCreator returns the function to reconcile the cinder CSI controller plugin StatefulSet
-func StatefulSetCreator(data csiCinderControllerPluginStatefulSetCreatorData) reconciling.NamedStatefulSetCreatorGetter {
-	return func() (string, reconciling.StatefulSetCreator) {
-		return resources.CsiCinderControllerPluginStatefulSetName, func(set *appsv1.StatefulSet) (*appsv1.StatefulSet, error) {
-
-			set.Name = resources.CsiCinderControllerPluginStatefulSetName
-			set.Spec.Replicas = resources.Int32(1)
-			set.Spec.UpdateStrategy.Type = appsv1.RollingUpdateStatefulSetStrategyType
-			set.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
-			set.Spec.ServiceName = resources.CsiCinderControllerPluginServiceName
-			set.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: resources.ImagePullSecretName}}
+			dep.Name = resources.CsiCinderControllerPluginDeploymentName
+			dep.Spec.Replicas = resources.Int32(1)
+			dep.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: resources.ImagePullSecretName}}
 
 			baseLabels := getBasePodLabels(data.Cluster())
-			set.Spec.Selector = &metav1.LabelSelector{
+			dep.Spec.Selector = &metav1.LabelSelector{
 				MatchLabels: baseLabels,
 			}
 
 			volumes := getVolumes()
-			podLabels, err := data.GetPodTemplateLabels(resources.CsiCinderControllerPluginStatefulSetName, volumes, baseLabels)
+			podLabels, err := data.GetPodTemplateLabels(resources.CsiCinderControllerPluginDeploymentName, volumes, baseLabels)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create pod labels: %v", err)
 			}
 
-			set.Spec.Template.ObjectMeta = metav1.ObjectMeta{
+			dep.Spec.Template.ObjectMeta = metav1.ObjectMeta{
 				Labels: podLabels,
 			}
 
 			driverVersion := getCsiDriverVersion(data.Cluster())
 
-			set.Spec.Template.Spec.Containers = []corev1.Container{
+			dep.Spec.Template.Spec.Containers = []corev1.Container{
 				{
 					Name:            "csi-attacher",
 					Image:           data.ImageRegistry(resources.RegistryQuay) + "/k8scsi/csi-attacher:v3.1.0",
@@ -137,6 +113,8 @@ func StatefulSetCreator(data csiCinderControllerPluginStatefulSetCreatorData) re
 					Args: []string{
 						"--csi-address=/var/lib/csi/sockets/pluginproxy/csi.sock",
 						"--timeout=3m",
+						"--leader-election",
+						"--leader-election-namespace=kube-system",
 						"--kubeconfig=/etc/kubernetes/kubeconfig/kubeconfig",
 					},
 					VolumeMounts: []corev1.VolumeMount{
@@ -158,6 +136,8 @@ func StatefulSetCreator(data csiCinderControllerPluginStatefulSetCreatorData) re
 					Args: []string{
 						"--csi-address=/var/lib/csi/sockets/pluginproxy/csi.sock",
 						"--timeout=3m",
+						"--leader-election",
+						"--leader-election-namespace=kube-system",
 						"--default-fstype=ext4",
 						"--kubeconfig=/etc/kubernetes/kubeconfig/kubeconfig",
 					},
@@ -180,6 +160,8 @@ func StatefulSetCreator(data csiCinderControllerPluginStatefulSetCreatorData) re
 					Args: []string{
 						"--csi-address=/var/lib/csi/sockets/pluginproxy/csi.sock",
 						"--timeout=3m",
+						"--leader-election",
+						"--leader-election-namespace=kube-system",
 						"--kubeconfig=/etc/kubernetes/kubeconfig/kubeconfig",
 					},
 					VolumeMounts: []corev1.VolumeMount{
@@ -201,6 +183,8 @@ func StatefulSetCreator(data csiCinderControllerPluginStatefulSetCreatorData) re
 					Args: []string{
 						"--csi-address=/var/lib/csi/sockets/pluginproxy/csi.sock",
 						"--timeout=3m",
+						"--leader-election",
+						"--leader-election-namespace=kube-system",
 						"--handle-volume-inuse-error=false",
 						"--kubeconfig=/etc/kubernetes/kubeconfig/kubeconfig",
 					},
@@ -277,14 +261,14 @@ func StatefulSetCreator(data csiCinderControllerPluginStatefulSetCreatorData) re
 				},
 			}
 
-			err = resources.SetResourceRequirements(set.Spec.Template.Spec.Containers, set.Annotations, defaultResourceRequirements, nil)
+			err = resources.SetResourceRequirements(dep.Spec.Template.Spec.Containers, dep.Annotations, defaultResourceRequirements, nil)
 			if err != nil {
 				return nil, fmt.Errorf("failed to set resource requirements: %v", err)
 			}
 
-			set.Spec.Template.Spec.Volumes = volumes
+			dep.Spec.Template.Spec.Volumes = volumes
 
-			return set, nil
+			return dep, nil
 		}
 	}
 }
@@ -332,7 +316,7 @@ func getBasePodLabels(cluster *kubermaticv1.Cluster) map[string]string {
 	additionalLabels := map[string]string{
 		"cluster": cluster.Name,
 	}
-	return resources.BaseAppLabels(resources.CsiCinderControllerPluginStatefulSetName, additionalLabels)
+	return resources.BaseAppLabels(resources.CsiCinderControllerPluginDeploymentName, additionalLabels)
 }
 
 func getCsiDriverVersion(cluster *kubermaticv1.Cluster) string {
