@@ -106,16 +106,6 @@ type controllerRunOptions struct {
 
 	featureGates features.FeatureGate
 
-	// MLA configuration
-	enableUserClusterMLA  bool
-	mlaNamespace          string
-	grafanaURL            string
-	grafanaHeaderName     string
-	grafanaSecret         string
-	cortexAlertmanagerURL string
-	cortexRulerURL        string
-	lokiRulerURL          string
-
 	// Machine Controller configuration
 	machineControllerImageTag        string
 	machineControllerImageRepository string
@@ -184,14 +174,6 @@ func newControllerRunOptions() (controllerRunOptions, error) {
 	flag.IntVar(&c.addonEnforceInterval, "addon-enforce-interval", 5, "Check and ensure default usercluster addons are deployed every interval in minutes. Set to 0 to disable.")
 	flag.StringVar(&caBundleFile, "ca-bundle", "", "File containing the PEM-encoded CA bundle for all userclusters")
 	flag.Var(&c.tunnelingAgentIP, "tunneling-agent-ip", "The address used by the tunneling agents.")
-	flag.BoolVar(&c.enableUserClusterMLA, "enable-user-cluster-mla", false, "Enables user cluster MLA (Monitoring, Logging & Alerting) stack in the seed.")
-	flag.StringVar(&c.mlaNamespace, "mla-namespace", "mla", "The namespace in which the user cluster MLA stack is running.")
-	flag.StringVar(&c.grafanaURL, "grafana-url", "http://grafana.mla.svc.cluster.local", "The URL of Grafana instance which in running for MLA stack.")
-	flag.StringVar(&c.grafanaHeaderName, "grafana-header-name", "X-Forwarded-Email", "Grafana Auth Proxy HTTP Header that will contain the username or email")
-	flag.StringVar(&c.grafanaSecret, "grafana-secret-name", "mla/grafana", "Grafana secret name in format namespace/secretname, that contains basic auth info")
-	flag.StringVar(&c.cortexAlertmanagerURL, "cortex-alertmanager-url", "http://cortex-alertmanager.mla.svc.cluster.local:8080", "The URL of cortex alertmanager which is running for MLA stack.")
-	flag.StringVar(&c.cortexRulerURL, "cortex-ruler-url", "http://cortex-ruler.mla.svc.cluster.local:8080", "The URL of cortex ruler which is running for MLA stack.")
-	flag.StringVar(&c.lokiRulerURL, "loki-ruler-url", "http://loki-distributed-ruler.mla.svc.cluster.local:3100", "The URL of loki ruler which is running for MLA stack.")
 	flag.StringVar(&c.machineControllerImageTag, "machine-controller-image-tag", "", "The Machine Controller image tag.")
 	flag.StringVar(&c.machineControllerImageRepository, "machine-controller-image-repository", "", "The Machine Controller image repository.")
 	c.admissionWebhook.AddFlags(flag.CommandLine, true)

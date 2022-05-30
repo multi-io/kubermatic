@@ -6,8 +6,6 @@ type AddonExpansion interface{}
 
 type AddonConfigExpansion interface{}
 
-type AlertmanagerExpansion interface{}
-
 type AllowedRegistryExpansion interface{}
 
 type ClusterExpansion interface{}
@@ -28,13 +26,9 @@ type ExternalClusterExpansion interface{}
 
 type KubermaticSettingExpansion interface{}
 
-type MLAAdminSettingExpansion interface{}
-
 type MachineDeploymentRequestExpansion interface{}
 
 type ProjectExpansion interface{}
-
-type RuleGroupExpansion interface{}
 
 type UserExpansion interface{}
 

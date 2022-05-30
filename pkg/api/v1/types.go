@@ -807,9 +807,6 @@ type ClusterSpec struct {
 	// By default it is disabled.
 	OPAIntegration *kubermaticv1.OPAIntegrationSettings `json:"opaIntegration,omitempty"`
 
-	// MLA contains monitoring, logging and alerting related settings for the user cluster.
-	MLA *kubermaticv1.MLASettings `json:"mla,omitempty"`
-
 	// ClusterNetwork contains network settings.
 	ClusterNetwork *kubermaticv1.ClusterNetworkingConfig `json:"clusterNetwork,omitempty"`
 
@@ -835,7 +832,6 @@ func (cs *ClusterSpec) MarshalJSON() ([]byte, error) {
 		PodNodeSelectorAdmissionPluginConfig map[string]string                      `json:"podNodeSelectorAdmissionPluginConfig,omitempty"`
 		ServiceAccount                       *kubermaticv1.ServiceAccountSettings   `json:"serviceAccount,omitempty"`
 		OPAIntegration                       *kubermaticv1.OPAIntegrationSettings   `json:"opaIntegration,omitempty"`
-		MLA                                  *kubermaticv1.MLASettings              `json:"mla,omitempty"`
 		ContainerRuntime                     string                                 `json:"containerRuntime,omitempty"`
 		ClusterNetwork                       *kubermaticv1.ClusterNetworkingConfig  `json:"clusterNetwork,omitempty"`
 	}{
@@ -868,7 +864,6 @@ func (cs *ClusterSpec) MarshalJSON() ([]byte, error) {
 		PodNodeSelectorAdmissionPluginConfig: cs.PodNodeSelectorAdmissionPluginConfig,
 		ServiceAccount:                       cs.ServiceAccount,
 		OPAIntegration:                       cs.OPAIntegration,
-		MLA:                                  cs.MLA,
 		ContainerRuntime:                     cs.ContainerRuntime,
 		ClusterNetwork:                       cs.ClusterNetwork,
 	})
@@ -2193,8 +2188,6 @@ type SeedSpec struct {
 	ProxySettings *kubermaticv1.ProxySettings `json:"proxy_settings,omitempty"`
 	// Optional: ExposeStrategy explicitly sets the expose strategy for this seed cluster, if not set, the default provided by the master is used.
 	ExposeStrategy kubermaticv1.ExposeStrategy `json:"expose_strategy,omitempty"`
-	// Optional: MLA allows configuring seed level MLA (Monitoring, Logging & Alerting) stack settings.
-	MLA *kubermaticv1.SeedMLASettings `json:"mla,omitempty"`
 	// Optional: BackupRestore when set, enables backup and restore controllers with given configuration.
 	BackupRestore *kubermaticv1.SeedBackupRestoreConfiguration `json:"backupRestore,omitempty"`
 }

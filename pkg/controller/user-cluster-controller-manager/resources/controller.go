@@ -23,7 +23,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"reflect"
 	"sync"
 
 	"github.com/Masterminds/semver/v3"
@@ -61,13 +60,6 @@ const (
 	controllerName = "user-cluster-controller"
 )
 
-type UserClusterMLA struct {
-	Logging                      bool
-	Monitoring                   bool
-	MLAGatewayURL                string
-	PrometheusScrapeConfigPrefix string
-}
-
 // Add creates a new user cluster controller.
 func Add(
 	mgr manager.Manager,
@@ -90,7 +82,6 @@ func Add(
 	userSSHKeyAgent bool,
 	opaWebhookTimeout int,
 	caBundle resources.CABundle,
-	userClusterMLA UserClusterMLA,
 	clusterName string,
 	konnectivity bool,
 	ccmMigration bool,
@@ -115,7 +106,6 @@ func Add(
 		versions:              versions,
 		caBundle:              caBundle,
 		clusterDNSDomain:      clusterDNSDomain,
-		userClusterMLA:        userClusterMLA,
 		cloudProvider:         kubermaticv1.ProviderType(cloudProviderName),
 		clusterName:           clusterName,
 		isKonnectivityEnabled: konnectivity,
@@ -203,27 +193,6 @@ func Add(
 		}
 	}
 
-	// Watch cluster if user cluster MLA is enabled so that controller can get resource requirements for user cluster MLA components.
-	if r.userClusterMLA.Monitoring || r.userClusterMLA.Logging {
-		seedWatch := &source.Kind{Type: &kubermaticv1.Cluster{}}
-		if err := seedWatch.InjectCache(seedMgr.GetCache()); err != nil {
-			return fmt.Errorf("failed to inject cache in seed cluster watch for cluster: %w", err)
-		}
-		clusterPredicate := predicate.Funcs{
-			// For Update event, only trigger reconciliation when Resource Requirements change.
-			UpdateFunc: func(event event.UpdateEvent) bool {
-				oldCluster := event.ObjectOld.(*kubermaticv1.Cluster)
-				newCluster := event.ObjectNew.(*kubermaticv1.Cluster)
-				oldResourceRequirements := oldCluster.GetUserClusterMLAResourceRequirements()
-				newResourceRequirements := newCluster.GetUserClusterMLAResourceRequirements()
-				return !reflect.DeepEqual(oldResourceRequirements, newResourceRequirements)
-			},
-		}
-		if err := c.Watch(seedWatch, mapFn, clusterPredicate); err != nil {
-			return fmt.Errorf("failed to watch cluster in seed: %w", err)
-		}
-	}
-
 	// A very simple but limited way to express the first successful reconciling to the seed cluster
 	return registerReconciledCheck(fmt.Sprintf("%s-%s", controllerName, "reconciled_successfully_once"), func(_ *http.Request) error {
 		r.rLock.Lock()
@@ -258,7 +227,6 @@ type reconciler struct {
 	userSSHKeyAgent       bool
 	versions              kubermatic.Versions
 	caBundle              resources.CABundle
-	userClusterMLA        UserClusterMLA
 	cloudProvider         kubermaticv1.ProviderType
 	clusterName           string
 	isKonnectivityEnabled bool
@@ -301,10 +269,6 @@ func (r *reconciler) openVPNCA(ctx context.Context) (*resources.ECDSAKeyPair, er
 	return resources.GetOpenVPNCA(ctx, r.namespace, r.seedClient)
 }
 
-func (r *reconciler) mlaGatewayCA(ctx context.Context) (*resources.ECDSAKeyPair, error) {
-	return resources.GetMLAGatewayCA(ctx, r.namespace, r.seedClient)
-}
-
 func (r *reconciler) userSSHKeys(ctx context.Context) (map[string][]byte, error) {
 	secret := &corev1.Secret{}
 	if err := r.seedClient.Get(
@@ -331,14 +295,4 @@ func (r *reconciler) cloudConfig(ctx context.Context, cloudConfigConfigmapName s
 		return nil, fmt.Errorf("cloud-config configmap contains no data for key %s", resources.CloudConfigConfigMapKey)
 	}
 	return []byte(value), nil
-}
-
-func (r *reconciler) mlaResourceRequirements(ctx context.Context) (monitoring, logging *corev1.ResourceRequirements, err error) {
-	cluster := &kubermaticv1.Cluster{}
-	if err = r.seedClient.Get(ctx, types.NamespacedName{
-		Name: r.clusterName,
-	}, cluster); err != nil {
-		return nil, nil, fmt.Errorf("failed to get cluster: %w", err)
-	}
-	return cluster.Spec.MLA.MonitoringResources, cluster.Spec.MLA.LoggingResources, nil
 }

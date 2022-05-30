@@ -477,7 +477,6 @@ func convertInternalClusterTemplatetoExternal(template *kubermaticv1.ClusterTemp
 				OPAIntegration:                       template.Spec.OPAIntegration,
 				PodNodeSelectorAdmissionPluginConfig: template.Spec.PodNodeSelectorAdmissionPluginConfig,
 				ServiceAccount:                       template.Spec.ServiceAccount,
-				MLA:                                  template.Spec.MLA,
 				ContainerRuntime:                     template.Spec.ContainerRuntime,
 			},
 		},

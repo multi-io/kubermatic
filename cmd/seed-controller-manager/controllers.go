@@ -35,7 +35,6 @@ import (
 	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/initialmachinedeployment"
 	kubernetescontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/kubernetes"
 	localstoragepvwatcher "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/localstorage-pvwatcher"
-	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/mla"
 	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/monitoring"
 	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/pvwatcher"
 	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/rancher"
@@ -69,7 +68,6 @@ var AllControllers = map[string]controllerCreator{
 	localstoragepvwatcher.ControllerName:          createLocalStoragePVController,
 	constrainttemplatecontroller.ControllerName:   createConstraintTemplateController,
 	initialmachinedeployment.ControllerName:       createInitialMachineDeploymentController,
-	mla.ControllerName:                            createMLAController,
 	clustertemplatecontroller.ControllerName:      createClusterTemplateController,
 }
 
@@ -195,7 +193,6 @@ func createKubernetesController(ctrlCtx *controllerContext) error {
 		ctrlCtx.runOptions.inClusterPrometheusDisableDefaultScrapingConfigs,
 		ctrlCtx.runOptions.inClusterPrometheusScrapingConfigsFile,
 		ctrlCtx.runOptions.inClusterPrometheusRemoteWriteConfigsFile,
-		userClusterMLAEnabled(ctrlCtx),
 		ctrlCtx.dockerPullConfigJSON,
 		ctrlCtx.runOptions.concurrentClusterUpdate,
 		ctrlCtx.runOptions.enableEtcdBackupRestoreController,
@@ -420,33 +417,6 @@ func createLocalStoragePVController(ctrlCtx *controllerContext) error {
 		ctrlCtx.log,
 		ctrlCtx.mgr,
 		ctrlCtx.runOptions.workerCount)
-}
-
-func createMLAController(ctrlCtx *controllerContext) error {
-	if !ctrlCtx.runOptions.featureGates.Enabled(features.UserClusterMLA) {
-		return nil
-	}
-	return mla.Add(
-		ctrlCtx.ctx,
-		ctrlCtx.mgr,
-		ctrlCtx.log,
-		ctrlCtx.runOptions.workerCount,
-		ctrlCtx.runOptions.workerName,
-		ctrlCtx.versions,
-		ctrlCtx.runOptions.mlaNamespace,
-		ctrlCtx.runOptions.grafanaURL,
-		ctrlCtx.runOptions.grafanaHeaderName,
-		ctrlCtx.runOptions.grafanaSecret,
-		ctrlCtx.runOptions.overwriteRegistry,
-		ctrlCtx.runOptions.cortexAlertmanagerURL,
-		ctrlCtx.runOptions.cortexRulerURL,
-		ctrlCtx.runOptions.lokiRulerURL,
-		ctrlCtx.runOptions.enableUserClusterMLA,
-	)
-}
-
-func userClusterMLAEnabled(ctrlCtx *controllerContext) bool {
-	return ctrlCtx.runOptions.featureGates.Enabled(features.UserClusterMLA) && ctrlCtx.runOptions.enableUserClusterMLA
 }
 
 func createConstraintController(ctrlCtx *controllerContext) error {

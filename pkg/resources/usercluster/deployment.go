@@ -63,11 +63,9 @@ type userclusterControllerData interface {
 	Cluster() *kubermaticv1.Cluster
 	NodeLocalDNSCacheEnabled() bool
 	GetOpenVPNServerPort() (int32, error)
-	GetMLAGatewayPort() (int32, error)
 	KubermaticAPIImage() string
 	KubermaticDockerTag() string
 	GetCloudProviderName() (string, error)
-	UserClusterMLAEnabled() bool
 	IsKonnectivityEnabled() bool
 }
 
@@ -180,23 +178,6 @@ func DeploymentCreator(data userclusterControllerData) reconciling.NamedDeployme
 
 			if data.Cluster().Spec.OPAIntegration != nil && data.Cluster().Spec.OPAIntegration.Enabled {
 				args = append(args, fmt.Sprintf("-enable-mutation=%t", data.Cluster().Spec.OPAIntegration.ExperimentalEnableMutation))
-			}
-
-			if data.UserClusterMLAEnabled() && data.Cluster().Spec.MLA != nil {
-				args = append(args, fmt.Sprintf("-user-cluster-monitoring=%t", data.Cluster().Spec.MLA.MonitoringEnabled))
-				args = append(args, fmt.Sprintf("-user-cluster-logging=%t", data.Cluster().Spec.MLA.LoggingEnabled))
-
-				if data.Cluster().Spec.MLA.MonitoringEnabled || data.Cluster().Spec.MLA.LoggingEnabled {
-					mlaGatewayPort, err := data.GetMLAGatewayPort()
-					if err != nil {
-						return nil, err
-					}
-					mlaEndpoint := fmt.Sprintf("%s:%d", data.Cluster().Address.ExternalName, mlaGatewayPort)
-					if data.Cluster().Spec.ExposeStrategy == kubermaticv1.ExposeStrategyTunneling {
-						mlaEndpoint = resources.MLAGatewaySNIPrefix + mlaEndpoint
-					}
-					args = append(args, "-mla-gateway-url", "https://"+mlaEndpoint)
-				}
 			}
 
 			if helper.NeedCCMMigration(data.Cluster()) {

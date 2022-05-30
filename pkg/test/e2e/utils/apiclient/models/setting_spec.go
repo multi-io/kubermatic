@@ -39,12 +39,6 @@ type SettingSpec struct {
 	// enable o ID c kubeconfig
 	EnableOIDCKubeconfig bool `json:"enableOIDCKubeconfig,omitempty"`
 
-	// mla alertmanager prefix
-	MlaAlertmanagerPrefix string `json:"mlaAlertmanagerPrefix,omitempty"`
-
-	// mla grafana prefix
-	MlaGrafanaPrefix string `json:"mlaGrafanaPrefix,omitempty"`
-
 	// restrict project creation
 	RestrictProjectCreation bool `json:"restrictProjectCreation,omitempty"`
 
@@ -62,9 +56,6 @@ type SettingSpec struct {
 
 	// machine deployment VM resource quota
 	MachineDeploymentVMResourceQuota *MachineDeploymentVMResourceQuota `json:"machineDeploymentVMResourceQuota,omitempty"`
-
-	// mla options
-	MlaOptions *MlaOptions `json:"mlaOptions,omitempty"`
 
 	// opa options
 	OpaOptions *OpaOptions `json:"opaOptions,omitempty"`
@@ -87,10 +78,6 @@ func (m *SettingSpec) Validate(formats strfmt.Registry) error {
 	}
 
 	if err := m.validateMachineDeploymentVMResourceQuota(formats); err != nil {
-		res = append(res, err)
-	}
-
-	if err := m.validateMlaOptions(formats); err != nil {
 		res = append(res, err)
 	}
 
@@ -168,23 +155,6 @@ func (m *SettingSpec) validateMachineDeploymentVMResourceQuota(formats strfmt.Re
 	return nil
 }
 
-func (m *SettingSpec) validateMlaOptions(formats strfmt.Registry) error {
-	if swag.IsZero(m.MlaOptions) { // not required
-		return nil
-	}
-
-	if m.MlaOptions != nil {
-		if err := m.MlaOptions.Validate(formats); err != nil {
-			if ve, ok := err.(*errors.Validation); ok {
-				return ve.ValidateName("mlaOptions")
-			}
-			return err
-		}
-	}
-
-	return nil
-}
-
 func (m *SettingSpec) validateOpaOptions(formats strfmt.Registry) error {
 	if swag.IsZero(m.OpaOptions) { // not required
 		return nil
@@ -219,10 +189,6 @@ func (m *SettingSpec) ContextValidate(ctx context.Context, formats strfmt.Regist
 	}
 
 	if err := m.contextValidateMachineDeploymentVMResourceQuota(ctx, formats); err != nil {
-		res = append(res, err)
-	}
-
-	if err := m.contextValidateMlaOptions(ctx, formats); err != nil {
 		res = append(res, err)
 	}
 
@@ -280,20 +246,6 @@ func (m *SettingSpec) contextValidateMachineDeploymentVMResourceQuota(ctx contex
 		if err := m.MachineDeploymentVMResourceQuota.ContextValidate(ctx, formats); err != nil {
 			if ve, ok := err.(*errors.Validation); ok {
 				return ve.ValidateName("machineDeploymentVMResourceQuota")
-			}
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (m *SettingSpec) contextValidateMlaOptions(ctx context.Context, formats strfmt.Registry) error {
-
-	if m.MlaOptions != nil {
-		if err := m.MlaOptions.ContextValidate(ctx, formats); err != nil {
-			if ve, ok := err.(*errors.Validation); ok {
-				return ve.ValidateName("mlaOptions")
 			}
 			return err
 		}

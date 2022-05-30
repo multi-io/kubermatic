@@ -308,10 +308,6 @@ func TestLoadFiles(t *testing.T) {
 							ServiceAccount: &kubermaticv1.ServiceAccountSettings{
 								TokenVolumeProjectionEnabled: true,
 							},
-							MLA: &kubermaticv1.MLASettings{
-								MonitoringEnabled: true,
-								LoggingEnabled:    false,
-							},
 						},
 						Address: kubermaticv1.ClusterAddress{
 							ExternalName: "jh8j81chn.europe-west3-c.dev.kubermatic.io",
@@ -636,20 +632,6 @@ func TestLoadFiles(t *testing.T) {
 									ClusterIP: "192.0.2.14",
 								},
 							},
-							&corev1.Service{
-								ObjectMeta: metav1.ObjectMeta{
-									Name:      resources.MLAGatewayExternalServiceName,
-									Namespace: cluster.Status.NamespaceName,
-								},
-								Spec: corev1.ServiceSpec{
-									Ports: []corev1.ServicePort{
-										{
-											NodePort: 30005,
-										},
-									},
-									ClusterIP: "192.0.2.15",
-								},
-							},
 						).Build()
 
 					var group wait.Group
@@ -694,9 +676,6 @@ func TestLoadFiles(t *testing.T) {
 								ProxySettings: &kubermaticv1.ProxySettings{
 									HTTPProxy: kubermaticv1.NewProxyValue("http://my-corp"),
 								},
-								MLA: &kubermaticv1.SeedMLASettings{
-									UserClusterMLAEnabled: true,
-								},
 							},
 						}).
 						WithNodeAccessNetwork("192.0.2.0/24").
@@ -704,7 +683,6 @@ func TestLoadFiles(t *testing.T) {
 						WithBackupPeriod(20 * time.Minute).
 						WithMonitoringScrapeAnnotationPrefix("kubermatic_io_monitoring").
 						WithInClusterPrometheusScrapingConfigsFile(promTmpFilePath).
-						WithUserClusterMLAEnabled(true).
 						WithCABundle(caBundle).
 						WithOIDCIssuerURL("https://dev.kubermatic.io/dex").
 						WithOIDCIssuerClientID("kubermaticIssuer").
