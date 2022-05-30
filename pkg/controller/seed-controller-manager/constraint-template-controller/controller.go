@@ -195,14 +195,16 @@ func (r *reconciler) syncAllClusters(
 	}
 
 	for _, userCluster := range clusterList.Items {
-		if userCluster.Spec.Pause {
-			log.Debugw("Cluster paused, skipping", "cluster", userCluster.Spec.HumanReadableName)
-			continue
-		}
-		// skip 1.18 because 2.18 does not support it. The change is to be reverted later.
-		if v := userCluster.Spec.Version; v.Version != nil && v.Major() == 1 && v.Minor() <= 18 {
-			log.Debugw("Cluster is 1.18, skipping", "cluster", userCluster.Spec.HumanReadableName)
-			continue
+		if !userCluster.DeletionTimestamp.IsZero() {
+			if userCluster.Spec.Pause {
+				log.Debugw("Cluster paused, skipping", "cluster", userCluster.Spec.HumanReadableName)
+				continue
+			}
+			// skip 1.18 because 2.18 does not support it. The change is to be reverted later.
+			if v := userCluster.Spec.Version; v.Version != nil && v.Major() == 1 && v.Minor() <= 18 {
+				log.Debugw("Cluster is 1.18, skipping", "cluster", userCluster.Spec.HumanReadableName)
+				continue
+			}
 		}
 
 		if userCluster.Spec.OPAIntegration != nil && userCluster.Spec.OPAIntegration.Enabled {

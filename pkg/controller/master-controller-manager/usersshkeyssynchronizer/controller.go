@@ -169,7 +169,7 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, requ
 		return nil
 	}
 
-	if cluster.Spec.Pause {
+	if cluster.Spec.Pause && cluster.DeletionTimestamp.IsZero() {
 		log.Debug("Skipping cluster reconciling because it was set to paused")
 		return nil
 	}
