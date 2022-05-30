@@ -106,8 +106,8 @@ const (
 	EtcdStatefulSetName = "etcd"
 	// EtcdDefaultBackupConfigName is the name for the default (preinstalled) EtcdBackupConfig of a cluster.
 	EtcdDefaultBackupConfigName = "default-backups"
-	// CsiCinderControllerPluginStatefulSetName is the name for the CSI cinder controller plugin StatefulSet
-	CsiCinderControllerPluginStatefulSetName = "csi-cinder-controllerplugin"
+	// CsiCinderControllerPluginDeploymentName is the name for the CSI cinder controller plugin deployment
+	CsiCinderControllerPluginDeploymentName = "csi-cinder-controllerplugin"
 	// CsiCinderControllerPluginServiceName is the name for the CSI cinder controller plugin service
 	CsiCinderControllerPluginServiceName = "csi-cinder-controller-service"
 

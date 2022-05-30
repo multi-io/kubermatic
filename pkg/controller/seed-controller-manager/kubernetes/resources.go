@@ -28,7 +28,7 @@ import (
 	"k8c.io/kubermatic/v2/pkg/resources/clusterautoscaler"
 	"k8c.io/kubermatic/v2/pkg/resources/clusterproxy"
 	"k8c.io/kubermatic/v2/pkg/resources/controllermanager"
-	"k8c.io/kubermatic/v2/pkg/resources/csi/openstack"
+	csiopenstack "k8c.io/kubermatic/v2/pkg/resources/csi/openstack"
 	"k8c.io/kubermatic/v2/pkg/resources/dns"
 	"k8c.io/kubermatic/v2/pkg/resources/etcd"
 	"k8c.io/kubermatic/v2/pkg/resources/gatekeeper"
@@ -283,7 +283,7 @@ func GetServiceCreators(data *resources.TemplateData) []reconciling.NamedService
 	}
 
 	if resources.ExternalCloudProviderEnabled(data.Cluster()) && data.Cluster().Spec.Cloud.Openstack != nil {
-		creators = append(creators, openstack.ServiceCreator(data))
+		creators = append(creators, csiopenstack.ServiceCreator(data))
 	}
 
 	return creators
@@ -320,6 +320,10 @@ func GetDeploymentCreators(data *resources.TemplateData, enableAPIserverOIDCAuth
 		(!metav1.HasAnnotation(data.Cluster().ObjectMeta, kubermaticv1.CCMMigrationNeededAnnotation) ||
 			data.KCMCloudControllersDeactivated()) {
 		deployments = append(deployments, cloudcontroller.DeploymentCreator(data))
+	}
+
+	if resources.ExternalCloudProviderEnabled(data.Cluster()) && data.Cluster().Spec.Cloud.Openstack != nil {
+		deployments = append(deployments, csiopenstack.DeploymentCreator(data))
 	}
 
 	return deployments
@@ -563,9 +567,6 @@ func GetStatefulSetCreators(data *resources.TemplateData, enableDataCorruptionCh
 	}
 	if flag := data.Cluster().Spec.Features[kubermaticv1.ClusterFeatureRancherIntegration]; flag {
 		creators = append(creators, rancherserver.StatefulSetCreator(data))
-	}
-	if resources.ExternalCloudProviderEnabled(data.Cluster()) && data.Cluster().Spec.Cloud.Openstack != nil {
-		creators = append(creators, openstack.StatefulSetCreator(data))
 	}
 	return creators
 }

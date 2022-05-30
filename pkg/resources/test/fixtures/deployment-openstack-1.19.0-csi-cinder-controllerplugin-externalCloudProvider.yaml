@@ -4,13 +4,12 @@ metadata:
   creationTimestamp: null
   name: csi-cinder-controllerplugin
 spec:
-  podManagementPolicy: OrderedReady
   replicas: 1
   selector:
     matchLabels:
       app: csi-cinder-controllerplugin
       cluster: de-test-01
-  serviceName: csi-cinder-controller-service
+  strategy: {}
   template:
     metadata:
       creationTimestamp: null
@@ -25,6 +24,8 @@ spec:
       - args:
         - --csi-address=/var/lib/csi/sockets/pluginproxy/csi.sock
         - --timeout=3m
+        - --leader-election
+        - --leader-election-namespace=kube-system
         - --kubeconfig=/etc/kubernetes/kubeconfig/kubeconfig
         image: quay.io/k8scsi/csi-attacher:v3.1.0
         imagePullPolicy: IfNotPresent
@@ -45,6 +46,8 @@ spec:
       - args:
         - --csi-address=/var/lib/csi/sockets/pluginproxy/csi.sock
         - --timeout=3m
+        - --leader-election
+        - --leader-election-namespace=kube-system
         - --default-fstype=ext4
         - --kubeconfig=/etc/kubernetes/kubeconfig/kubeconfig
         image: quay.io/k8scsi/csi-provisioner:v2.1.0
@@ -66,6 +69,8 @@ spec:
       - args:
         - --csi-address=/var/lib/csi/sockets/pluginproxy/csi.sock
         - --timeout=3m
+        - --leader-election
+        - --leader-election-namespace=kube-system
         - --kubeconfig=/etc/kubernetes/kubeconfig/kubeconfig
         image: quay.io/k8scsi/csi-snapshotter:v2.1.4
         imagePullPolicy: IfNotPresent
@@ -86,6 +91,8 @@ spec:
       - args:
         - --csi-address=/var/lib/csi/sockets/pluginproxy/csi.sock
         - --timeout=3m
+        - --leader-election
+        - --leader-election-namespace=kube-system
         - --handle-volume-inuse-error=false
         - --kubeconfig=/etc/kubernetes/kubeconfig/kubeconfig
         image: quay.io/k8scsi/csi-resizer:v1.1.0
@@ -128,7 +135,7 @@ spec:
         - --endpoint=unix://csi/csi.sock
         - --cloud-config=/etc/config/config
         - --cluster=de-test-01
-        image: public.ecr.aws/n1k6e5t7/k8scloudprovider/cinder-csi-plugin:v1.20.3
+        image: public.ecr.aws/n1k6e5t7/k8scloudprovider/cinder-csi-plugin:v1.19.0
         imagePullPolicy: IfNotPresent
         livenessProbe:
           failureThreshold: 5
@@ -172,7 +179,4 @@ spec:
       - name: csi-cinder-controller-kubeconfig
         secret:
           secretName: csi-cinder-controller-kubeconfig
-  updateStrategy:
-    type: RollingUpdate
-status:
-  replicas: 0
+status: {}
