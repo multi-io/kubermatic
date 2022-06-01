@@ -84,7 +84,7 @@ func main() {
 		return true, nil
 	})
 	if err != nil {
-		log.Fatalw("Failed waiting for the API server to be alive", zap.Error(err))
+		log.Fatalw("Timed out waiting for the API server to be alive")
 	}
 
 	// 8080 is already in use by the insecure port of the apiserver
