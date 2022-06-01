@@ -143,8 +143,6 @@ type PresetProvider struct {
 // SeedSettings represents settings for a Seed cluster
 // swagger:model SeedSettings
 type SeedSettings struct {
-	// the Seed level metering settings
-	Metering crdapiv1.MeteringConfigurations `json:"metering"`
 	// the Seed level seed dns overwrite
 	SeedDNSOverwrite string `json:"seedDNSOverwrite,omitempty"`
 }

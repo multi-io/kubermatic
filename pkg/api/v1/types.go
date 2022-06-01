@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/Masterminds/semver/v3"
 
@@ -2200,18 +2199,6 @@ type SeedCluster struct {
 	SeedName  string
 	ClusterID string
 }
-
-// MeteringReport holds objects names and metadata for available reports
-// swagger:model MeteringReport
-type MeteringReport struct {
-	Name         string    `json:"name"`
-	LastModified time.Time `json:"lastModified"`
-	Size         int64     `json:"size"`
-}
-
-// ReportURL represent an S3 pre signed URL to download a report
-// swagger:model MeteringReportURL
-type ReportURL string
 
 const (
 	// NodeDeletionFinalizer indicates that the nodes still need cleanup

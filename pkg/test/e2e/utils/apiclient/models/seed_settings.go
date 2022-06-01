@@ -20,39 +20,15 @@ type SeedSettings struct {
 
 	// the Seed level seed dns overwrite
 	SeedDNSOverwrite string `json:"seedDNSOverwrite,omitempty"`
-
-	// metering
-	Metering *MeteringConfigurations `json:"metering,omitempty"`
 }
 
 // Validate validates this seed settings
 func (m *SeedSettings) Validate(formats strfmt.Registry) error {
 	var res []error
 
-	if err := m.validateMetering(formats); err != nil {
-		res = append(res, err)
-	}
-
 	if len(res) > 0 {
 		return errors.CompositeValidationError(res...)
 	}
-	return nil
-}
-
-func (m *SeedSettings) validateMetering(formats strfmt.Registry) error {
-	if swag.IsZero(m.Metering) { // not required
-		return nil
-	}
-
-	if m.Metering != nil {
-		if err := m.Metering.Validate(formats); err != nil {
-			if ve, ok := err.(*errors.Validation); ok {
-				return ve.ValidateName("metering")
-			}
-			return err
-		}
-	}
-
 	return nil
 }
 
@@ -60,27 +36,9 @@ func (m *SeedSettings) validateMetering(formats strfmt.Registry) error {
 func (m *SeedSettings) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
 	var res []error
 
-	if err := m.contextValidateMetering(ctx, formats); err != nil {
-		res = append(res, err)
-	}
-
 	if len(res) > 0 {
 		return errors.CompositeValidationError(res...)
 	}
-	return nil
-}
-
-func (m *SeedSettings) contextValidateMetering(ctx context.Context, formats strfmt.Registry) error {
-
-	if m.Metering != nil {
-		if err := m.Metering.ContextValidate(ctx, formats); err != nil {
-			if ve, ok := err.(*errors.Validation); ok {
-				return ve.ValidateName("metering")
-			}
-			return err
-		}
-	}
-
 	return nil
 }
 

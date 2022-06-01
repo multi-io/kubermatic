@@ -26,7 +26,6 @@ import (
 	"k8c.io/kubermatic/v2/pkg/controller/operator/common"
 	"k8c.io/kubermatic/v2/pkg/controller/operator/common/vpa"
 	kubermaticseed "k8c.io/kubermatic/v2/pkg/controller/operator/seed/resources/kubermatic"
-	"k8c.io/kubermatic/v2/pkg/controller/operator/seed/resources/metering"
 	"k8c.io/kubermatic/v2/pkg/controller/operator/seed/resources/nodeportproxy"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	operatorv1alpha1 "k8c.io/kubermatic/v2/pkg/crd/operator/v1alpha1"
@@ -261,12 +260,6 @@ func (r *Reconciler) reconcileResources(ctx context.Context, cfg *operatorv1alph
 
 	if err := r.reconcileAdmissionWebhooks(ctx, cfg, seed, client, log); err != nil {
 		return err
-	}
-
-	if seed.Spec.Metering != nil && seed.Spec.Metering.Enabled {
-		if err := metering.ReconcileMeteringResources(ctx, client, seed); err != nil {
-			return err
-		}
 	}
 
 	return nil
