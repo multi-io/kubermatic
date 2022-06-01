@@ -43,36 +43,6 @@ func TestGetSeedSettingsEndpoint(t *testing.T) {
 		expectedResponse       apiv2.SeedSettings
 	}{
 		{
-			name:     "scenario 1: user can get seed settings with mla disabled",
-			seedName: "us-central1",
-			existingKubermaticObjs: []ctrlruntimeclient.Object{
-				test.GenDefaultUser(),
-				test.GenTestSeed(),
-			},
-			existingAPIUser:    test.GenDefaultAPIUser(),
-			expectedHTTPStatus: http.StatusOK,
-			expectedResponse: apiv2.SeedSettings{
-				MLA: apiv2.MLA{
-					UserClusterMLAEnabled: false,
-				},
-			},
-		},
-		{
-			name:     "scenario 2: user can get seed settings with mla enabled",
-			seedName: "us-central1",
-			existingKubermaticObjs: []ctrlruntimeclient.Object{
-				test.GenDefaultUser(),
-				genMLASeed(true),
-			},
-			existingAPIUser:    test.GenDefaultAPIUser(),
-			expectedHTTPStatus: http.StatusOK,
-			expectedResponse: apiv2.SeedSettings{
-				MLA: apiv2.MLA{
-					UserClusterMLAEnabled: true,
-				},
-			},
-		},
-		{
 			name:     "scenario 3: user can get seed settings with metering enabled",
 			seedName: "us-central1",
 			existingKubermaticObjs: []ctrlruntimeclient.Object{
@@ -132,14 +102,6 @@ func TestGetSeedSettingsEndpoint(t *testing.T) {
 			}
 		})
 	}
-}
-
-func genMLASeed(mlaEnabled bool) *kubermaticv1.Seed {
-	seed := test.GenTestSeed()
-	seed.Spec.MLA = &kubermaticv1.SeedMLASettings{
-		UserClusterMLAEnabled: mlaEnabled,
-	}
-	return seed
 }
 
 func genMeteringSeed(enabled bool) *kubermaticv1.Seed {

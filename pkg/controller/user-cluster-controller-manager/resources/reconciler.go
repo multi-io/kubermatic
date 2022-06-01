@@ -38,9 +38,6 @@ import (
 	kubestatemetrics "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/kube-state-metrics"
 	machinecontroller "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/machine-controller"
 	metricsserver "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/metrics-server"
-	"k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/mla"
-	userclusterprometheus "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/mla/prometheus"
-	"k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/mla/promtail"
 	nodelocaldns "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/node-local-dns"
 	"k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/openvpn"
 	"k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/resources/resources/prometheus"
@@ -54,7 +51,6 @@ import (
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -95,17 +91,6 @@ func (r *reconciler) reconcile(ctx context.Context) error {
 		cloudConfig:    cloudConfig,
 		csiCloudConfig: CSICloudConfig,
 		ccmMigration:   r.ccmMigration || r.ccmMigrationCompleted,
-	}
-
-	if r.userClusterMLA.Monitoring || r.userClusterMLA.Logging {
-		data.mlaGatewayCACert, err = r.mlaGatewayCA(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to get MLA Gateway CA cert: %v", err)
-		}
-		data.monitoringRequirements, data.loggingRequirements, err = r.mlaResourceRequirements(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to get MLA resource requirements: %w", err)
-		}
 	}
 
 	var errs []error
@@ -193,22 +178,6 @@ func (r *reconciler) reconcile(ctx context.Context) error {
 		}
 	}
 
-	if !r.userClusterMLA.Logging {
-		if err := r.ensurePromtailIsRemoved(ctx); err != nil {
-			errs = append(errs, err)
-		}
-	}
-	if !r.userClusterMLA.Monitoring {
-		if err := r.ensureUserClusterPrometheusIsRemoved(ctx); err != nil {
-			errs = append(errs, err)
-		}
-	}
-	if !r.userClusterMLA.Logging && !r.userClusterMLA.Monitoring {
-		if err := r.ensureMLAIsRemoved(ctx); err != nil {
-			errs = append(errs, err)
-		}
-	}
-
 	if r.isKonnectivityEnabled {
 		if err := r.reconcileKonnectivityDeployments(ctx); err != nil {
 			return err
@@ -283,24 +252,6 @@ func (r *reconciler) reconcileServiceAccounts(ctx context.Context) error {
 		}
 		if err := reconciling.ReconcileServiceAccounts(ctx, creators, metav1.NamespaceSystem, r.Client); err != nil {
 			return fmt.Errorf("failed to reconcile ServiceAccounts in the namespace %s: %v", metav1.NamespaceSystem, err)
-		}
-	}
-
-	creators = []reconciling.NamedServiceAccountCreatorGetter{}
-	if r.userClusterMLA.Logging {
-		creators = append(creators,
-			promtail.ServiceAccountCreator(),
-		)
-	}
-	if r.userClusterMLA.Monitoring {
-		creators = append(creators,
-			userclusterprometheus.ServiceAccountCreator(),
-		)
-	}
-
-	if len(creators) != 0 {
-		if err := reconciling.ReconcileServiceAccounts(ctx, creators, resources.UserClusterMLANamespace, r.Client); err != nil {
-			return fmt.Errorf("failed to reconcile ServiceAccounts in the namespace %s: %v", resources.UserClusterMLANamespace, err)
 		}
 	}
 
@@ -475,12 +426,6 @@ func (r *reconciler) reconcileClusterRoles(ctx context.Context) error {
 		creators = append(creators, gatekeeper.ClusterRoleCreator())
 	}
 
-	if r.userClusterMLA.Logging {
-		creators = append(creators, promtail.ClusterRoleCreator())
-	}
-	if r.userClusterMLA.Monitoring {
-		creators = append(creators, userclusterprometheus.ClusterRoleCreator())
-	}
 	if cluster.Spec.Cloud.Openstack != nil {
 		creators = append(creators, csiopenstack.ClusterRoleCreator())
 	}
@@ -518,14 +463,6 @@ func (r *reconciler) reconcileClusterRoleBindings(ctx context.Context) error {
 	}
 	if r.opaIntegration {
 		creators = append(creators, gatekeeper.ClusterRoleBindingCreator())
-	}
-
-	if r.userClusterMLA.Logging {
-		creators = append(creators, promtail.ClusterRoleBindingCreator())
-	}
-
-	if r.userClusterMLA.Monitoring {
-		creators = append(creators, userclusterprometheus.ClusterRoleBindingCreator())
 	}
 
 	if r.isKonnectivityEnabled {
@@ -678,24 +615,6 @@ func (r *reconciler) reconcileConfigMaps(ctx context.Context, data reconcileData
 		return fmt.Errorf("failed to reconcile ConfigMaps in kube-system namespace: %v", err)
 	}
 
-	if r.userClusterMLA.Monitoring {
-		customScrapeConfigs, err := r.getUserClusterPrometheusCustomScrapeConfigs(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to get user cluster prometheus custom scrape configs: %w", err)
-		}
-		creators = []reconciling.NamedConfigMapCreatorGetter{
-			userclusterprometheus.ConfigMapCreator(userclusterprometheus.Config{
-				MLAGatewayURL:       r.userClusterMLA.MLAGatewayURL + "/api/v1/push",
-				TLSCertFile:         fmt.Sprintf("%s/%s", resources.UserClusterPrometheusClientCertMountPath, resources.UserClusterPrometheusClientCertSecretKey),
-				TLSKeyFile:          fmt.Sprintf("%s/%s", resources.UserClusterPrometheusClientCertMountPath, resources.UserClusterPrometheusClientKeySecretKey),
-				TLSCACertFile:       fmt.Sprintf("%s/%s", resources.UserClusterPrometheusClientCertMountPath, resources.MLAGatewayCACertKey),
-				CustomScrapeConfigs: customScrapeConfigs,
-			}),
-		}
-		if err := reconciling.ReconcileConfigMaps(ctx, creators, resources.UserClusterMLANamespace, r.Client); err != nil {
-			return fmt.Errorf("failed to reconcile ConfigMap in namespace %s: %v", resources.UserClusterMLANamespace, err)
-		}
-	}
 	return nil
 }
 
@@ -741,29 +660,6 @@ func (r *reconciler) reconcileSecrets(ctx context.Context, data reconcileData) e
 		}
 	}
 
-	if r.userClusterMLA.Monitoring {
-		creators = []reconciling.NamedSecretCreatorGetter{
-			userclusterprometheus.ClientCertificateCreator(data.mlaGatewayCACert),
-		}
-		if err := reconciling.ReconcileSecrets(ctx, creators, resources.UserClusterMLANamespace, r.Client); err != nil {
-			return fmt.Errorf("failed to reconcile Secrets in namespace %s: %v", resources.UserClusterMLANamespace, err)
-		}
-	}
-	if r.userClusterMLA.Logging {
-		creators = []reconciling.NamedSecretCreatorGetter{
-			promtail.SecretCreator(promtail.Config{
-				MLAGatewayURL: r.userClusterMLA.MLAGatewayURL + "/loki/api/v1/push",
-				TLSCertFile:   fmt.Sprintf("%s/%s", resources.PromtailClientCertMountPath, resources.PromtailClientCertSecretKey),
-				TLSKeyFile:    fmt.Sprintf("%s/%s", resources.PromtailClientCertMountPath, resources.PromtailClientKeySecretKey),
-				TLSCACertFile: fmt.Sprintf("%s/%s", resources.PromtailClientCertMountPath, resources.MLAGatewayCACertKey),
-			}),
-			promtail.ClientCertificateCreator(data.mlaGatewayCACert),
-		}
-		if err := reconciling.ReconcileSecrets(ctx, creators, resources.UserClusterMLANamespace, r.Client); err != nil {
-			return fmt.Errorf("failed to reconcile Secrets in namespace %s: %v", resources.UserClusterMLANamespace, err)
-		}
-	}
-
 	return nil
 }
 
@@ -793,14 +689,6 @@ func (r *reconciler) reconcileDaemonSet(ctx context.Context, data reconcileData)
 		return fmt.Errorf("failed to reconcile the DaemonSet: %v", err)
 	}
 
-	if r.userClusterMLA.Logging {
-		dsCreators = []reconciling.NamedDaemonSetCreatorGetter{
-			promtail.DaemonSetCreator(data.loggingRequirements),
-		}
-		if err := reconciling.ReconcileDaemonSets(ctx, dsCreators, resources.UserClusterMLANamespace, r.Client); err != nil {
-			return fmt.Errorf("failed to reconcile the DaemonSet: %v", err)
-		}
-	}
 	return nil
 }
 
@@ -813,9 +701,6 @@ func (r *reconciler) reconcileNamespaces(ctx context.Context) error {
 	if r.opaIntegration {
 		creators = append(creators, gatekeeper.NamespaceCreator)
 		creators = append(creators, gatekeeper.KubeSystemLabeler)
-	}
-	if r.userClusterMLA.Logging || r.userClusterMLA.Monitoring {
-		creators = append(creators, mla.NamespaceCreator)
 	}
 	if err := reconciling.ReconcileNamespaces(ctx, creators, "", r.Client); err != nil {
 		return fmt.Errorf("failed to reconcile namespaces: %v", err)
@@ -859,15 +744,6 @@ func (r *reconciler) reconcileDeployments(ctx context.Context, data reconcileDat
 		}
 	}
 
-	if r.userClusterMLA.Monitoring {
-		creators := []reconciling.NamedDeploymentCreatorGetter{
-			userclusterprometheus.DeploymentCreator(data.monitoringRequirements),
-		}
-		if err := reconciling.ReconcileDeployments(ctx, creators, resources.UserClusterMLANamespace, r.Client); err != nil {
-			return fmt.Errorf("failed to reconcile Deployments in namespace %s: %v", resources.UserClusterMLANamespace, err)
-		}
-	}
-
 	return nil
 }
 
@@ -898,16 +774,13 @@ func (r *reconciler) reconcilePodDisruptionBudgets(ctx context.Context) error {
 }
 
 type reconcileData struct {
-	caCert           *triple.KeyPair
-	openVPNCACert    *resources.ECDSAKeyPair
-	mlaGatewayCACert *resources.ECDSAKeyPair
-	userSSHKeys      map[string][]byte
-	cloudConfig      []byte
+	caCert        *triple.KeyPair
+	openVPNCACert *resources.ECDSAKeyPair
+	userSSHKeys   map[string][]byte
+	cloudConfig   []byte
 	// csiCloudConfig is currently used only by vSphere, whose needs it to properly configure the external CSI driver
-	csiCloudConfig         []byte
-	ccmMigration           bool
-	monitoringRequirements *corev1.ResourceRequirements
-	loggingRequirements    *corev1.ResourceRequirements
+	csiCloudConfig []byte
+	ccmMigration   bool
 }
 
 func (r *reconciler) ensureOPAIntegrationIsRemoved(ctx context.Context) error {
@@ -975,51 +848,4 @@ func (r *reconciler) getGatekeeperHealth(ctx context.Context) (
 			fmt.Errorf("failed to get dep health %q: %v", resources.GatekeeperAuditDeploymentName, err)
 	}
 	return ctlrHealth, auditHealth, nil
-}
-
-func (r *reconciler) ensurePromtailIsRemoved(ctx context.Context) error {
-	for _, resource := range promtail.ResourcesOnDeletion() {
-		if err := r.Client.Delete(ctx, resource); err != nil && !errors.IsNotFound(err) {
-			return fmt.Errorf("failed to ensure promtail is removed/not present: %v", err)
-		}
-	}
-	return nil
-}
-
-func (r *reconciler) ensureUserClusterPrometheusIsRemoved(ctx context.Context) error {
-	for _, resource := range userclusterprometheus.ResourcesOnDeletion() {
-		if err := r.Client.Delete(ctx, resource); err != nil && !errors.IsNotFound(err) {
-			return fmt.Errorf("failed to ensure user cluster prometheus is removed/not present: %v", err)
-		}
-	}
-	return nil
-}
-
-func (r *reconciler) ensureMLAIsRemoved(ctx context.Context) error {
-	for _, resource := range mla.ResourcesOnDeletion() {
-		if err := r.Client.Delete(ctx, resource); err != nil && !errors.IsNotFound(err) {
-			return fmt.Errorf("failed to ensure mla is removed/not present: %v", err)
-		}
-	}
-	return nil
-}
-
-func (r *reconciler) getUserClusterPrometheusCustomScrapeConfigs(ctx context.Context) (string, error) {
-	if r.userClusterMLA.PrometheusScrapeConfigPrefix == "" {
-		return "", nil
-	}
-	configMapList := &corev1.ConfigMapList{}
-	if err := r.List(ctx, configMapList, ctrlruntimeclient.InNamespace(resources.UserClusterMLANamespace)); err != nil {
-		return "", fmt.Errorf("failed to list the configmap: %w", err)
-	}
-	customScrapeConfigs := ""
-	for _, configMap := range configMapList.Items {
-		if !strings.HasPrefix(configMap.GetName(), r.userClusterMLA.PrometheusScrapeConfigPrefix) {
-			continue
-		}
-		for _, v := range configMap.Data {
-			customScrapeConfigs += strings.TrimSpace(v) + "\n"
-		}
-	}
-	return customScrapeConfigs, nil
 }

@@ -140,31 +140,13 @@ type PresetProvider struct {
 	Enabled bool                  `json:"enabled"`
 }
 
-// Alertmanager represents an Alertmanager Configuration
-// swagger:model Alertmanager
-type Alertmanager struct {
-	Spec AlertmanagerSpec `json:"spec"`
-}
-
-type AlertmanagerSpec struct {
-	// Config contains the alertmanager configuration in YAML
-	Config []byte `json:"config"`
-}
-
 // SeedSettings represents settings for a Seed cluster
 // swagger:model SeedSettings
 type SeedSettings struct {
-	// the Seed level MLA (Monitoring, Logging, and Alerting) stack settings
-	MLA MLA `json:"mla"`
 	// the Seed level metering settings
 	Metering crdapiv1.MeteringConfigurations `json:"metering"`
 	// the Seed level seed dns overwrite
 	SeedDNSOverwrite string `json:"seedDNSOverwrite,omitempty"`
-}
-
-type MLA struct {
-	// whether the user cluster MLA (Monitoring, Logging & Alerting) stack is enabled in the seed
-	UserClusterMLAEnabled bool `json:"user_cluster_mla_enabled"`
 }
 
 // ClusterTemplate represents a ClusterTemplate object
@@ -198,15 +180,6 @@ type ClusterTemplateInstance struct {
 	Name string `json:"name"`
 
 	Spec crdapiv1.ClusterTemplateInstanceSpec `json:"spec"`
-}
-
-// RuleGroup represents a rule group of recording and alerting rules.
-// swagger:model RuleGroup
-type RuleGroup struct {
-	// contains the RuleGroup data. Ref: https://prometheus.io/docs/prometheus/latest/configuration/recording_rules/#rule_group
-	Data []byte `json:"data"`
-	// the type of this ruleGroup applies to. It can be `Metrics`.
-	Type crdapiv1.RuleGroupType `json:"type"`
 }
 
 // AllowedRegistry represents a object containing a allowed image registry prefix
@@ -329,13 +302,4 @@ type BackupCredentials struct {
 type S3BackupCredentials struct {
 	AccessKeyID     string `json:"accessKeyId,omitempty"`
 	SecretAccessKey string `json:"secretAccessKey,omitempty"`
-}
-
-// MLAAdminSetting represents an object holding admin setting options for user cluster MLA (Monitoring, Logging and Alerting).
-// swagger:model MLAAdminSetting
-type MLAAdminSetting struct {
-	// MonitoringRateLimits contains rate-limiting configuration for monitoring in the user cluster.
-	MonitoringRateLimits *crdapiv1.MonitoringRateLimitSettings `json:"monitoringRateLimits,omitempty"`
-	// LoggingRateLimits contains rate-limiting configuration logging in the user cluster.
-	LoggingRateLimits *crdapiv1.LoggingRateLimitSettings `json:"loggingRateLimits,omitempty"`
 }

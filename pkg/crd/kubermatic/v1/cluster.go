@@ -171,9 +171,6 @@ type ClusterSpec struct {
 	// ServiceAccount contains service account related settings for the kube-apiserver of user cluster.
 	ServiceAccount *ServiceAccountSettings `json:"serviceAccount,omitempty"`
 
-	// MLA contains monitoring, logging and alerting related settings for the user cluster.
-	MLA *MLASettings `json:"mla,omitempty"`
-
 	// ContainerRuntime to use, i.e. Docker or containerd. By default containerd will be used.
 	ContainerRuntime string `json:"containerRuntime,omitempty"`
 
@@ -251,7 +248,6 @@ const (
 	ClusterConditionUpdateControllerReconcilingSuccess            ClusterConditionType = "UpdateControllerReconciledSuccessfully"
 	ClusterConditionMonitoringControllerReconcilingSuccess        ClusterConditionType = "MonitoringControllerReconciledSuccessfully"
 	ClusterConditionMachineDeploymentControllerReconcilingSuccess ClusterConditionType = "MachineDeploymentReconciledSuccessfully"
-	ClusterConditionMLAControllerReconcilingSuccess               ClusterConditionType = "MLAControllerReconciledSuccessfully"
 	ClusterConditionClusterInitialized                            ClusterConditionType = "ClusterInitialized"
 
 	ClusterConditionRancherInitialized     ClusterConditionType = "RancherInitializedSuccessfully"
@@ -400,17 +396,6 @@ type ServiceAccountSettings struct {
 	// APIAudiences are the Identifiers of the API
 	// If this is not specified, it will be set to a single element list containing the issuer URL
 	APIAudiences []string `json:"apiAudiences,omitempty"`
-}
-
-type MLASettings struct {
-	// MonitoringEnabled is the flag for enabling monitoring in user cluster.
-	MonitoringEnabled bool `json:"monitoringEnabled,omitempty"`
-	// LoggingEnabled is the flag for enabling logging in user cluster.
-	LoggingEnabled bool `json:"loggingEnabled,omitempty"`
-	// MonitoringResources is the resource requirements for user cluster prometheus.
-	MonitoringResources *corev1.ResourceRequirements `json:"monitoringResources,omitempty"`
-	// LoggingResources is the resource requirements for user cluster promtail.
-	LoggingResources *corev1.ResourceRequirements `json:"loggingResources,omitempty"`
 }
 
 type ComponentSettings struct {
@@ -923,14 +908,4 @@ func (cluster *Cluster) GetSecretName() string {
 		return fmt.Sprintf("%s-anexia-%s", CredentialPrefix, cluster.Name)
 	}
 	return ""
-}
-
-func (cluster *Cluster) GetUserClusterMLAResourceRequirements() map[string]*corev1.ResourceRequirements {
-	if cluster.Spec.MLA == nil {
-		return nil
-	}
-	return map[string]*corev1.ResourceRequirements{
-		"monitoring": cluster.Spec.MLA.MonitoringResources,
-		"logging":    cluster.Spec.MLA.LoggingResources,
-	}
 }

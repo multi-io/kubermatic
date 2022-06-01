@@ -96,7 +96,6 @@ type Reconciler struct {
 	inClusterPrometheusRemoteWriteConfigsFile        string
 	monitoringEnvironmentLabel                       string
 	monitoringScrapeAnnotationPrefix                 string
-	userClusterMLAEnabled                            bool
 	dockerPullConfigJSON                             []byte
 	kubermaticImage                                  string
 	etcdLauncherImage                                string
@@ -139,7 +138,6 @@ func Add(
 	inClusterPrometheusDisableDefaultScrapingConfigs bool,
 	inClusterPrometheusScrapingConfigsFile string,
 	inClusterPrometheusRemoteWriteConfigsFile string,
-	userClusterMLAEnabled bool,
 	dockerPullConfigJSON []byte,
 	concurrentClusterUpdates int,
 	etcdBackupRestoreController bool,
@@ -179,7 +177,6 @@ func Add(
 		inClusterPrometheusRemoteWriteConfigsFile:        inClusterPrometheusRemoteWriteConfigsFile,
 		monitoringEnvironmentLabel:                       monitoringEnvironmentLabel,
 		monitoringScrapeAnnotationPrefix:                 monitoringScrapeAnnotationPrefix,
-		userClusterMLAEnabled:                            userClusterMLAEnabled,
 		dockerPullConfigJSON:                             dockerPullConfigJSON,
 		kubermaticImage:                                  kubermaticImage,
 		etcdLauncherImage:                                etcdLauncherImage,

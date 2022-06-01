@@ -41,8 +41,6 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Kubermatic().V1().Addons().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("addonconfigs"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Kubermatic().V1().AddonConfigs().Informer()}, nil
-	case v1.SchemeGroupVersion.WithResource("alertmanagers"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Kubermatic().V1().Alertmanagers().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("allowedregistries"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Kubermatic().V1().AllowedRegistries().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("clusters"):
@@ -63,14 +61,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Kubermatic().V1().ExternalClusters().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("kubermaticsettings"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Kubermatic().V1().KubermaticSettings().Informer()}, nil
-	case v1.SchemeGroupVersion.WithResource("mlaadminsettings"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Kubermatic().V1().MLAAdminSettings().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("machinedeploymentrequests"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Kubermatic().V1().MachineDeploymentRequests().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("projects"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Kubermatic().V1().Projects().Informer()}, nil
-	case v1.SchemeGroupVersion.WithResource("rulegroups"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Kubermatic().V1().RuleGroups().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("users"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Kubermatic().V1().Users().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("userprojectbindings"):

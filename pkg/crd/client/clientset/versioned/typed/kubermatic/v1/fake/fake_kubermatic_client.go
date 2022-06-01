@@ -20,10 +20,6 @@ func (c *FakeKubermaticV1) AddonConfigs() v1.AddonConfigInterface {
 	return &FakeAddonConfigs{c}
 }
 
-func (c *FakeKubermaticV1) Alertmanagers(namespace string) v1.AlertmanagerInterface {
-	return &FakeAlertmanagers{c, namespace}
-}
-
 func (c *FakeKubermaticV1) AllowedRegistries() v1.AllowedRegistryInterface {
 	return &FakeAllowedRegistries{c}
 }
@@ -64,20 +60,12 @@ func (c *FakeKubermaticV1) KubermaticSettings() v1.KubermaticSettingInterface {
 	return &FakeKubermaticSettings{c}
 }
 
-func (c *FakeKubermaticV1) MLAAdminSettings(namespace string) v1.MLAAdminSettingInterface {
-	return &FakeMLAAdminSettings{c, namespace}
-}
-
 func (c *FakeKubermaticV1) MachineDeploymentRequests(namespace string) v1.MachineDeploymentRequestInterface {
 	return &FakeMachineDeploymentRequests{c, namespace}
 }
 
 func (c *FakeKubermaticV1) Projects() v1.ProjectInterface {
 	return &FakeProjects{c}
-}
-
-func (c *FakeKubermaticV1) RuleGroups(namespace string) v1.RuleGroupInterface {
-	return &FakeRuleGroups{c, namespace}
 }
 
 func (c *FakeKubermaticV1) Users() v1.UserInterface {

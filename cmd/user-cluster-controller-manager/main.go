@@ -19,7 +19,6 @@ package main
 import (
 	"encoding/json"
 	"flag"
-	"fmt"
 	"net/url"
 	"strings"
 
@@ -45,7 +44,6 @@ import (
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
 	"k8c.io/kubermatic/v2/pkg/pprof"
-	"k8c.io/kubermatic/v2/pkg/resources"
 	"k8c.io/kubermatic/v2/pkg/resources/certificates"
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 	"k8c.io/kubermatic/v2/pkg/util/cli"
@@ -69,38 +67,36 @@ const (
 )
 
 type controllerRunOptions struct {
-	clusterDNSDomain             string
-	metricsListenAddr            string
-	healthListenAddr             string
-	version                      string
-	networks                     networkFlags
-	namespace                    string
-	clusterURL                   string
-	clusterName                  string
-	openvpnServerPort            int
-	kasSecurePort                int
-	tunnelingAgentIP             flagopts.IPValue
-	overwriteRegistry            string
-	cloudProviderName            string
-	nodelabels                   string
-	seedKubeconfig               string
-	ownerEmail                   string
-	updateWindowStart            string
-	updateWindowLength           string
-	dnsClusterIP                 string
-	nodeLocalDNSCache            bool
-	opaIntegration               bool
-	opaEnableMutation            bool
-	opaWebhookTimeout            int
-	useSSHKeyAgent               bool
-	caBundleFile                 string
-	mlaGatewayURL                string
-	userClusterLogging           bool
-	userClusterMonitoring        bool
-	prometheusScrapeConfigPrefix string
-	ccmMigration                 bool
-	ccmMigrationCompleted        bool
-	isKonnectivityEnabled        bool
+	clusterDNSDomain      string
+	metricsListenAddr     string
+	healthListenAddr      string
+	version               string
+	networks              networkFlags
+	namespace             string
+	clusterURL            string
+	clusterName           string
+	openvpnServerPort     int
+	kasSecurePort         int
+	tunnelingAgentIP      flagopts.IPValue
+	overwriteRegistry     string
+	cloudProviderName     string
+	nodelabels            string
+	seedKubeconfig        string
+	ownerEmail            string
+	updateWindowStart     string
+	updateWindowLength    string
+	dnsClusterIP          string
+	nodeLocalDNSCache     bool
+	opaIntegration        bool
+	opaEnableMutation     bool
+	opaWebhookTimeout     int
+	useSSHKeyAgent        bool
+	caBundleFile          string
+	userClusterLogging    bool
+	userClusterMonitoring bool
+	ccmMigration          bool
+	ccmMigrationCompleted bool
+	isKonnectivityEnabled bool
 }
 
 func main() {
@@ -136,10 +132,8 @@ func main() {
 	flag.IntVar(&runOp.opaWebhookTimeout, "opa-webhook-timeout", 1, "Timeout for OPA Integration validating webhook, in seconds")
 	flag.BoolVar(&runOp.useSSHKeyAgent, "enable-ssh-key-agent", false, "Enable UserSSHKeyAgent integration in user cluster")
 	flag.StringVar(&runOp.caBundleFile, "ca-bundle", "", "The path to the cluster's CA bundle (PEM-encoded).")
-	flag.StringVar(&runOp.mlaGatewayURL, "mla-gateway-url", "", "The URL of MLA (Monitoring, Logging, and Alerting) gateway endpoint.")
 	flag.BoolVar(&runOp.userClusterLogging, "user-cluster-logging", false, "Enable logging in user cluster.")
 	flag.BoolVar(&runOp.userClusterMonitoring, "user-cluster-monitoring", false, "Enable monitoring in user cluster.")
-	flag.StringVar(&runOp.prometheusScrapeConfigPrefix, "prometheus-scrape-config-prefix", "prometheus-scraping", fmt.Sprintf("The name prefix of ConfigMaps in namespace %s, which will be used to add customized scrape configs for user cluster Prometheus.", resources.UserClusterMLANamespace))
 	flag.BoolVar(&runOp.ccmMigration, "ccm-migration", false, "Enable ccm migration in user cluster.")
 	flag.BoolVar(&runOp.ccmMigrationCompleted, "ccm-migration-completed", false, "cluster has been successfully migrated.")
 	flag.BoolVar(&runOp.isKonnectivityEnabled, "konnectivity-enabled", false, "Enable Konnectivity.")
@@ -182,11 +176,6 @@ func main() {
 	}
 	if len(runOp.caBundleFile) == 0 {
 		log.Fatal("-ca-bundle must be set")
-	}
-	if runOp.userClusterLogging || runOp.userClusterMonitoring {
-		if runOp.mlaGatewayURL == "" {
-			log.Fatal("-mla-gateway-url must be set when enabling user cluster logging or monitoring")
-		}
 	}
 
 	nodeLabels := map[string]string{}
@@ -282,12 +271,6 @@ func main() {
 		runOp.useSSHKeyAgent,
 		runOp.opaWebhookTimeout,
 		caBundle,
-		usercluster.UserClusterMLA{
-			Logging:                      runOp.userClusterLogging,
-			Monitoring:                   runOp.userClusterMonitoring,
-			MLAGatewayURL:                runOp.mlaGatewayURL,
-			PrometheusScrapeConfigPrefix: runOp.prometheusScrapeConfigPrefix,
-		},
 		runOp.clusterName,
 		runOp.isKonnectivityEnabled,
 		runOp.ccmMigration,

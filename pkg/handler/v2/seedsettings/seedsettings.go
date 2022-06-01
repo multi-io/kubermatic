@@ -71,9 +71,6 @@ func GetSeedSettingsEndpoint(seedsGetter provider.SeedsGetter) endpoint.Endpoint
 
 func convertSeedToSeedSettings(seed *kubermaticv1.Seed) *apiv2.SeedSettings {
 	seedSettings := &apiv2.SeedSettings{}
-	if seed.Spec.MLA != nil && seed.Spec.MLA.UserClusterMLAEnabled {
-		seedSettings.MLA.UserClusterMLAEnabled = true
-	}
 
 	if seed.Spec.Metering != nil {
 		seedSettings.Metering.Enabled = seed.Spec.Metering.Enabled

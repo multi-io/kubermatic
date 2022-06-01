@@ -102,8 +102,6 @@ type ClientService interface {
 
 	DetachSSHKeyFromClusterV2(params *DetachSSHKeyFromClusterV2Params, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*DetachSSHKeyFromClusterV2OK, error)
 
-	GetAlertmanager(params *GetAlertmanagerParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*GetAlertmanagerOK, error)
-
 	GetCluster(params *GetClusterParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*GetClusterOK, error)
 
 	GetClusterEvents(params *GetClusterEventsParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*GetClusterEventsOK, error)
@@ -248,8 +246,6 @@ type ClientService interface {
 
 	PatchRole(params *PatchRoleParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*PatchRoleOK, error)
 
-	ResetAlertmanager(params *ResetAlertmanagerParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ResetAlertmanagerOK, error)
-
 	RestartMachineDeployment(params *RestartMachineDeploymentParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*RestartMachineDeploymentOK, error)
 
 	RevokeClusterAdminToken(params *RevokeClusterAdminTokenParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*RevokeClusterAdminTokenOK, error)
@@ -267,8 +263,6 @@ type ClientService interface {
 	UnbindUserFromRoleBinding(params *UnbindUserFromRoleBindingParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*UnbindUserFromRoleBindingOK, error)
 
 	UnbindUserFromRoleBindingV2(params *UnbindUserFromRoleBindingV2Params, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*UnbindUserFromRoleBindingV2OK, error)
-
-	UpdateAlertmanager(params *UpdateAlertmanagerParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*UpdateAlertmanagerOK, error)
 
 	UpdateExternalCluster(params *UpdateExternalClusterParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*UpdateExternalClusterOK, error)
 
@@ -1688,44 +1682,6 @@ func (a *Client) DetachSSHKeyFromClusterV2(params *DetachSSHKeyFromClusterV2Para
 	}
 	// unexpected success response
 	unexpectedSuccess := result.(*DetachSSHKeyFromClusterV2Default)
-	return nil, runtime.NewAPIError("unexpected success response: content available as default response in error", unexpectedSuccess, unexpectedSuccess.Code())
-}
-
-/*
-  GetAlertmanager gets the alertmanager configuration for the specified cluster
-*/
-func (a *Client) GetAlertmanager(params *GetAlertmanagerParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*GetAlertmanagerOK, error) {
-	// TODO: Validate the params before sending
-	if params == nil {
-		params = NewGetAlertmanagerParams()
-	}
-	op := &runtime.ClientOperation{
-		ID:                 "getAlertmanager",
-		Method:             "GET",
-		PathPattern:        "/api/v2/projects/{project_id}/clusters/{cluster_id}/alertmanager/config",
-		ProducesMediaTypes: []string{"application/json"},
-		ConsumesMediaTypes: []string{"application/json"},
-		Schemes:            []string{"https"},
-		Params:             params,
-		Reader:             &GetAlertmanagerReader{formats: a.formats},
-		AuthInfo:           authInfo,
-		Context:            params.Context,
-		Client:             params.HTTPClient,
-	}
-	for _, opt := range opts {
-		opt(op)
-	}
-
-	result, err := a.transport.Submit(op)
-	if err != nil {
-		return nil, err
-	}
-	success, ok := result.(*GetAlertmanagerOK)
-	if ok {
-		return success, nil
-	}
-	// unexpected success response
-	unexpectedSuccess := result.(*GetAlertmanagerDefault)
 	return nil, runtime.NewAPIError("unexpected success response: content available as default response in error", unexpectedSuccess, unexpectedSuccess.Code())
 }
 
@@ -4476,44 +4432,6 @@ func (a *Client) PatchRole(params *PatchRoleParams, authInfo runtime.ClientAuthI
 }
 
 /*
-  ResetAlertmanager resets the alertmanager configuration to default for the specified cluster
-*/
-func (a *Client) ResetAlertmanager(params *ResetAlertmanagerParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ResetAlertmanagerOK, error) {
-	// TODO: Validate the params before sending
-	if params == nil {
-		params = NewResetAlertmanagerParams()
-	}
-	op := &runtime.ClientOperation{
-		ID:                 "resetAlertmanager",
-		Method:             "DELETE",
-		PathPattern:        "/api/v2/projects/{project_id}/clusters/{cluster_id}/alertmanager/config",
-		ProducesMediaTypes: []string{"application/json"},
-		ConsumesMediaTypes: []string{"application/json"},
-		Schemes:            []string{"https"},
-		Params:             params,
-		Reader:             &ResetAlertmanagerReader{formats: a.formats},
-		AuthInfo:           authInfo,
-		Context:            params.Context,
-		Client:             params.HTTPClient,
-	}
-	for _, opt := range opts {
-		opt(op)
-	}
-
-	result, err := a.transport.Submit(op)
-	if err != nil {
-		return nil, err
-	}
-	success, ok := result.(*ResetAlertmanagerOK)
-	if ok {
-		return success, nil
-	}
-	// unexpected success response
-	unexpectedSuccess := result.(*ResetAlertmanagerDefault)
-	return nil, runtime.NewAPIError("unexpected success response: content available as default response in error", unexpectedSuccess, unexpectedSuccess.Code())
-}
-
-/*
   RestartMachineDeployment schedules rolling restart of a machine deployment that is assigned to the given cluster
 */
 func (a *Client) RestartMachineDeployment(params *RestartMachineDeploymentParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*RestartMachineDeploymentOK, error) {
@@ -4852,44 +4770,6 @@ func (a *Client) UnbindUserFromRoleBindingV2(params *UnbindUserFromRoleBindingV2
 	}
 	// unexpected success response
 	unexpectedSuccess := result.(*UnbindUserFromRoleBindingV2Default)
-	return nil, runtime.NewAPIError("unexpected success response: content available as default response in error", unexpectedSuccess, unexpectedSuccess.Code())
-}
-
-/*
-  UpdateAlertmanager Updates an alertmanager configuration for the given cluster
-*/
-func (a *Client) UpdateAlertmanager(params *UpdateAlertmanagerParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*UpdateAlertmanagerOK, error) {
-	// TODO: Validate the params before sending
-	if params == nil {
-		params = NewUpdateAlertmanagerParams()
-	}
-	op := &runtime.ClientOperation{
-		ID:                 "updateAlertmanager",
-		Method:             "PUT",
-		PathPattern:        "/api/v2/projects/{project_id}/clusters/{cluster_id}/alertmanager/config",
-		ProducesMediaTypes: []string{"application/json"},
-		ConsumesMediaTypes: []string{"application/json"},
-		Schemes:            []string{"https"},
-		Params:             params,
-		Reader:             &UpdateAlertmanagerReader{formats: a.formats},
-		AuthInfo:           authInfo,
-		Context:            params.Context,
-		Client:             params.HTTPClient,
-	}
-	for _, opt := range opts {
-		opt(op)
-	}
-
-	result, err := a.transport.Submit(op)
-	if err != nil {
-		return nil, err
-	}
-	success, ok := result.(*UpdateAlertmanagerOK)
-	if ok {
-		return success, nil
-	}
-	// unexpected success response
-	unexpectedSuccess := result.(*UpdateAlertmanagerDefault)
 	return nil, runtime.NewAPIError("unexpected success response: content available as default response in error", unexpectedSuccess, unexpectedSuccess.Code())
 }
 

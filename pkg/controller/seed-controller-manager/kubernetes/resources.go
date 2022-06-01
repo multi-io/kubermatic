@@ -213,7 +213,6 @@ func (r *Reconciler) getClusterTemplateData(ctx context.Context, cluster *kuberm
 		WithInClusterPrometheusRemoteWriteConfigsFile(r.inClusterPrometheusRemoteWriteConfigsFile).
 		WithExternalURL(r.externalURL).
 		WithKeycloakFacade(r.keycloakFacade).
-		WithUserClusterMLAEnabled(r.userClusterMLAEnabled).
 		WithKonnectivityEnabled(r.features.Konnectivity && cluster.Spec.ClusterNetwork.KonnectivityEnabled).
 		WithCABundle(r.caBundle).
 		WithOIDCIssuerURL(r.oidcIssuerURL).

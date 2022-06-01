@@ -92,7 +92,6 @@ type TemplateData struct {
 	ExternalURL                                      string
 	KeycloakFacade                                   keycloak.Facade
 
-	userClusterMLAEnabled bool
 	isKonnectivityEnabled bool
 }
 
@@ -191,11 +190,6 @@ func (td *TemplateDataBuilder) WithInClusterPrometheusDefaultScrapingConfigsDisa
 
 func (td *TemplateDataBuilder) WithInClusterPrometheusScrapingConfigsFile(file string) *TemplateDataBuilder {
 	td.data.inClusterPrometheusScrapingConfigsFile = file
-	return td
-}
-
-func (td *TemplateDataBuilder) WithUserClusterMLAEnabled(enabled bool) *TemplateDataBuilder {
-	td.data.userClusterMLAEnabled = enabled
 	return td
 }
 
@@ -369,11 +363,6 @@ func (d *TemplateData) InClusterPrometheusRemoteWriteConfigsFile() string {
 	return d.inClusterPrometheusRemoteWriteConfigsFile
 }
 
-// UserClusterMLAEnabled returns userClusterMLAEnabled
-func (d *TemplateData) UserClusterMLAEnabled() bool {
-	return d.userClusterMLAEnabled
-}
-
 // IsKonnectivityEnabled returns isKonnectivityEnabled
 func (d *TemplateData) IsKonnectivityEnabled() bool {
 	return d.isKonnectivityEnabled
@@ -483,11 +472,6 @@ func (d *TemplateData) GetOpenVPNCA() (*ECDSAKeyPair, error) {
 	return GetOpenVPNCA(d.ctx, d.cluster.Status.NamespaceName, d.client)
 }
 
-// GetMLAGatewayCA returns the root CA for the MLA Gateway
-func (d *TemplateData) GetMLAGatewayCA() (*ECDSAKeyPair, error) {
-	return GetMLAGatewayCA(d.ctx, d.cluster.Status.NamespaceName, d.client)
-}
-
 // GetPodTemplateLabels returns a set of labels for a Pod including the revisions of depending secrets and configmaps.
 // This will force pods being restarted as soon as one of the secrets/configmaps get updated.
 func (d *TemplateData) GetPodTemplateLabels(appName string, volumes []corev1.Volume, additionalLabels map[string]string) (map[string]string, error) {
@@ -504,21 +488,6 @@ func (d *TemplateData) GetOpenVPNServerPort() (int32, error) {
 	key := types.NamespacedName{Namespace: d.cluster.Status.NamespaceName, Name: OpenVPNServerServiceName}
 	if err := d.client.Get(d.ctx, key, service); err != nil {
 		return 0, fmt.Errorf("failed to get NodePort for openvpn server service: %v", err)
-	}
-
-	return service.Spec.Ports[0].NodePort, nil
-}
-
-// GetMLAGatewayPort returns the NodePort of the external MLA Gateway service
-func (d *TemplateData) GetMLAGatewayPort() (int32, error) {
-	// When using tunneling expose strategy the port is fixed and equal to apiserver port
-	if d.Cluster().Spec.ExposeStrategy == kubermaticv1.ExposeStrategyTunneling {
-		return d.Cluster().Address.Port, nil
-	}
-	service := &corev1.Service{}
-	key := types.NamespacedName{Namespace: d.cluster.Status.NamespaceName, Name: MLAGatewayExternalServiceName}
-	if err := d.client.Get(d.ctx, key, service); err != nil {
-		return 0, fmt.Errorf("failed to get NodePort for MLA Gateway service: %v", err)
 	}
 
 	return service.Spec.Ports[0].NodePort, nil

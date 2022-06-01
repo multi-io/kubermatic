@@ -14,14 +14,6 @@ type AddonNamespaceListerExpansion interface{}
 // AddonConfigLister.
 type AddonConfigListerExpansion interface{}
 
-// AlertmanagerListerExpansion allows custom methods to be added to
-// AlertmanagerLister.
-type AlertmanagerListerExpansion interface{}
-
-// AlertmanagerNamespaceListerExpansion allows custom methods to be added to
-// AlertmanagerNamespaceLister.
-type AlertmanagerNamespaceListerExpansion interface{}
-
 // AllowedRegistryListerExpansion allows custom methods to be added to
 // AllowedRegistryLister.
 type AllowedRegistryListerExpansion interface{}
@@ -74,14 +66,6 @@ type ExternalClusterListerExpansion interface{}
 // KubermaticSettingLister.
 type KubermaticSettingListerExpansion interface{}
 
-// MLAAdminSettingListerExpansion allows custom methods to be added to
-// MLAAdminSettingLister.
-type MLAAdminSettingListerExpansion interface{}
-
-// MLAAdminSettingNamespaceListerExpansion allows custom methods to be added to
-// MLAAdminSettingNamespaceLister.
-type MLAAdminSettingNamespaceListerExpansion interface{}
-
 // MachineDeploymentRequestListerExpansion allows custom methods to be added to
 // MachineDeploymentRequestLister.
 type MachineDeploymentRequestListerExpansion interface{}
@@ -93,14 +77,6 @@ type MachineDeploymentRequestNamespaceListerExpansion interface{}
 // ProjectListerExpansion allows custom methods to be added to
 // ProjectLister.
 type ProjectListerExpansion interface{}
-
-// RuleGroupListerExpansion allows custom methods to be added to
-// RuleGroupLister.
-type RuleGroupListerExpansion interface{}
-
-// RuleGroupNamespaceListerExpansion allows custom methods to be added to
-// RuleGroupNamespaceLister.
-type RuleGroupNamespaceListerExpansion interface{}
 
 // UserListerExpansion allows custom methods to be added to
 // UserLister.

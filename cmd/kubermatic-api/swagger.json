@@ -10271,154 +10271,6 @@
         }
       }
     },
-    "/api/v2/projects/{project_id}/clusters/{cluster_id}/alertmanager/config": {
-      "get": {
-        "produces": [
-          "application/json"
-        ],
-        "tags": [
-          "project"
-        ],
-        "summary": "Gets the alertmanager configuration for the specified cluster.",
-        "operationId": "getAlertmanager",
-        "parameters": [
-          {
-            "type": "string",
-            "x-go-name": "ProjectID",
-            "name": "project_id",
-            "in": "path",
-            "required": true
-          },
-          {
-            "type": "string",
-            "x-go-name": "ClusterID",
-            "name": "cluster_id",
-            "in": "path",
-            "required": true
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Alertmanager",
-            "schema": {
-              "$ref": "#/definitions/Alertmanager"
-            }
-          },
-          "401": {
-            "$ref": "#/responses/empty"
-          },
-          "403": {
-            "$ref": "#/responses/empty"
-          },
-          "default": {
-            "description": "errorResponse",
-            "schema": {
-              "$ref": "#/definitions/errorResponse"
-            }
-          }
-        }
-      },
-      "put": {
-        "description": "Updates an alertmanager configuration for the given cluster",
-        "consumes": [
-          "application/json"
-        ],
-        "produces": [
-          "application/json"
-        ],
-        "tags": [
-          "project"
-        ],
-        "operationId": "updateAlertmanager",
-        "parameters": [
-          {
-            "type": "string",
-            "x-go-name": "ProjectID",
-            "name": "project_id",
-            "in": "path",
-            "required": true
-          },
-          {
-            "type": "string",
-            "x-go-name": "ClusterID",
-            "name": "cluster_id",
-            "in": "path",
-            "required": true
-          },
-          {
-            "name": "Body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/Alertmanager"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Alertmanager",
-            "schema": {
-              "$ref": "#/definitions/Alertmanager"
-            }
-          },
-          "401": {
-            "$ref": "#/responses/empty"
-          },
-          "403": {
-            "$ref": "#/responses/empty"
-          },
-          "default": {
-            "description": "errorResponse",
-            "schema": {
-              "$ref": "#/definitions/errorResponse"
-            }
-          }
-        }
-      },
-      "delete": {
-        "produces": [
-          "application/json"
-        ],
-        "tags": [
-          "project"
-        ],
-        "summary": "Resets the alertmanager configuration to default for the specified cluster.",
-        "operationId": "resetAlertmanager",
-        "parameters": [
-          {
-            "type": "string",
-            "x-go-name": "ProjectID",
-            "name": "project_id",
-            "in": "path",
-            "required": true
-          },
-          {
-            "type": "string",
-            "x-go-name": "ClusterID",
-            "name": "cluster_id",
-            "in": "path",
-            "required": true
-          }
-        ],
-        "responses": {
-          "200": {
-            "$ref": "#/responses/empty"
-          },
-          "401": {
-            "$ref": "#/responses/empty"
-          },
-          "403": {
-            "$ref": "#/responses/empty"
-          },
-          "default": {
-            "description": "errorResponse",
-            "schema": {
-              "$ref": "#/definitions/errorResponse"
-            }
-          }
-        }
-      }
-    },
     "/api/v2/projects/{project_id}/clusters/{cluster_id}/bindings": {
       "get": {
         "description": "List role binding",
@@ -12568,211 +12420,6 @@
         }
       }
     },
-    "/api/v2/projects/{project_id}/clusters/{cluster_id}/mlaadminsetting": {
-      "get": {
-        "produces": [
-          "application/json"
-        ],
-        "tags": [
-          "mlaadminsetting"
-        ],
-        "summary": "Gets MLA Admin settings for the given cluster.",
-        "operationId": "getMLAAdminSetting",
-        "parameters": [
-          {
-            "type": "string",
-            "x-go-name": "ProjectID",
-            "name": "project_id",
-            "in": "path",
-            "required": true
-          },
-          {
-            "type": "string",
-            "x-go-name": "ClusterID",
-            "name": "cluster_id",
-            "in": "path",
-            "required": true
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "MLAAdminSetting",
-            "schema": {
-              "$ref": "#/definitions/MLAAdminSetting"
-            }
-          },
-          "401": {
-            "$ref": "#/responses/empty"
-          },
-          "403": {
-            "$ref": "#/responses/empty"
-          },
-          "default": {
-            "description": "errorResponse",
-            "schema": {
-              "$ref": "#/definitions/errorResponse"
-            }
-          }
-        }
-      },
-      "put": {
-        "consumes": [
-          "application/json"
-        ],
-        "produces": [
-          "application/json"
-        ],
-        "tags": [
-          "mlaadminsetting"
-        ],
-        "summary": "Updates the MLA admin setting for the given cluster.",
-        "operationId": "updateMLAAdminSetting",
-        "parameters": [
-          {
-            "type": "string",
-            "x-go-name": "ProjectID",
-            "name": "project_id",
-            "in": "path",
-            "required": true
-          },
-          {
-            "type": "string",
-            "x-go-name": "ClusterID",
-            "name": "cluster_id",
-            "in": "path",
-            "required": true
-          },
-          {
-            "name": "Body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/MLAAdminSetting"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "MLAAdminSetting",
-            "schema": {
-              "$ref": "#/definitions/MLAAdminSetting"
-            }
-          },
-          "401": {
-            "$ref": "#/responses/empty"
-          },
-          "403": {
-            "$ref": "#/responses/empty"
-          },
-          "default": {
-            "description": "errorResponse",
-            "schema": {
-              "$ref": "#/definitions/errorResponse"
-            }
-          }
-        }
-      },
-      "post": {
-        "description": "Creates MLA admin setting that will belong to the given cluster",
-        "consumes": [
-          "application/json"
-        ],
-        "produces": [
-          "application/json"
-        ],
-        "tags": [
-          "mlaadminsetting"
-        ],
-        "operationId": "createMLAAdminSetting",
-        "parameters": [
-          {
-            "type": "string",
-            "x-go-name": "ProjectID",
-            "name": "project_id",
-            "in": "path",
-            "required": true
-          },
-          {
-            "type": "string",
-            "x-go-name": "ClusterID",
-            "name": "cluster_id",
-            "in": "path",
-            "required": true
-          },
-          {
-            "name": "Body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/MLAAdminSetting"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "MLAAdminSetting",
-            "schema": {
-              "$ref": "#/definitions/MLAAdminSetting"
-            }
-          },
-          "401": {
-            "$ref": "#/responses/empty"
-          },
-          "403": {
-            "$ref": "#/responses/empty"
-          },
-          "default": {
-            "description": "errorResponse",
-            "schema": {
-              "$ref": "#/definitions/errorResponse"
-            }
-          }
-        }
-      },
-      "delete": {
-        "produces": [
-          "application/json"
-        ],
-        "tags": [
-          "mlaadminsetting"
-        ],
-        "summary": "Deletes the MLA admin setting that belongs to the cluster.",
-        "operationId": "deleteMLAAdminSetting",
-        "parameters": [
-          {
-            "type": "string",
-            "x-go-name": "ProjectID",
-            "name": "project_id",
-            "in": "path",
-            "required": true
-          },
-          {
-            "type": "string",
-            "x-go-name": "ClusterID",
-            "name": "cluster_id",
-            "in": "path",
-            "required": true
-          }
-        ],
-        "responses": {
-          "200": {
-            "$ref": "#/responses/empty"
-          },
-          "401": {
-            "$ref": "#/responses/empty"
-          },
-          "403": {
-            "$ref": "#/responses/empty"
-          },
-          "default": {
-            "description": "errorResponse",
-            "schema": {
-              "$ref": "#/definitions/errorResponse"
-            }
-          }
-        }
-      }
-    },
     "/api/v2/projects/{project_id}/clusters/{cluster_id}/namespaces": {
       "get": {
         "description": "Lists all namespaces in the cluster",
@@ -14379,289 +14026,6 @@
             "schema": {
               "$ref": "#/definitions/RoleBinding"
             }
-          },
-          "401": {
-            "$ref": "#/responses/empty"
-          },
-          "403": {
-            "$ref": "#/responses/empty"
-          },
-          "default": {
-            "description": "errorResponse",
-            "schema": {
-              "$ref": "#/definitions/errorResponse"
-            }
-          }
-        }
-      }
-    },
-    "/api/v2/projects/{project_id}/clusters/{cluster_id}/rulegroups": {
-      "get": {
-        "description": "Lists rule groups that belong to the given cluster",
-        "produces": [
-          "application/json"
-        ],
-        "tags": [
-          "rulegroup"
-        ],
-        "operationId": "listRuleGroups",
-        "parameters": [
-          {
-            "type": "string",
-            "x-go-name": "ProjectID",
-            "name": "project_id",
-            "in": "path",
-            "required": true
-          },
-          {
-            "type": "string",
-            "x-go-name": "ClusterID",
-            "name": "cluster_id",
-            "in": "path",
-            "required": true
-          },
-          {
-            "type": "string",
-            "x-go-name": "Type",
-            "name": "type",
-            "in": "query"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "RuleGroup",
-            "schema": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/RuleGroup"
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/responses/empty"
-          },
-          "403": {
-            "$ref": "#/responses/empty"
-          },
-          "default": {
-            "description": "errorResponse",
-            "schema": {
-              "$ref": "#/definitions/errorResponse"
-            }
-          }
-        }
-      },
-      "post": {
-        "description": "Creates a rule group that will belong to the given cluster",
-        "consumes": [
-          "application/json"
-        ],
-        "produces": [
-          "application/json"
-        ],
-        "tags": [
-          "rulegroup"
-        ],
-        "operationId": "createRuleGroup",
-        "parameters": [
-          {
-            "type": "string",
-            "x-go-name": "ProjectID",
-            "name": "project_id",
-            "in": "path",
-            "required": true
-          },
-          {
-            "type": "string",
-            "x-go-name": "ClusterID",
-            "name": "cluster_id",
-            "in": "path",
-            "required": true
-          },
-          {
-            "name": "Body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/RuleGroup"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "RuleGroup",
-            "schema": {
-              "$ref": "#/definitions/RuleGroup"
-            }
-          },
-          "401": {
-            "$ref": "#/responses/empty"
-          },
-          "403": {
-            "$ref": "#/responses/empty"
-          },
-          "default": {
-            "description": "errorResponse",
-            "schema": {
-              "$ref": "#/definitions/errorResponse"
-            }
-          }
-        }
-      }
-    },
-    "/api/v2/projects/{project_id}/clusters/{cluster_id}/rulegroups/{rulegroup_id}": {
-      "get": {
-        "produces": [
-          "application/json"
-        ],
-        "tags": [
-          "rulegroup"
-        ],
-        "summary": "Gets a specified rule group for the given cluster.",
-        "operationId": "getRuleGroup",
-        "parameters": [
-          {
-            "type": "string",
-            "x-go-name": "ProjectID",
-            "name": "project_id",
-            "in": "path",
-            "required": true
-          },
-          {
-            "type": "string",
-            "x-go-name": "ClusterID",
-            "name": "cluster_id",
-            "in": "path",
-            "required": true
-          },
-          {
-            "type": "string",
-            "x-go-name": "RuleGroupID",
-            "name": "rulegroup_id",
-            "in": "path",
-            "required": true
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "RuleGroup",
-            "schema": {
-              "$ref": "#/definitions/RuleGroup"
-            }
-          },
-          "401": {
-            "$ref": "#/responses/empty"
-          },
-          "403": {
-            "$ref": "#/responses/empty"
-          },
-          "default": {
-            "description": "errorResponse",
-            "schema": {
-              "$ref": "#/definitions/errorResponse"
-            }
-          }
-        }
-      },
-      "put": {
-        "consumes": [
-          "application/json"
-        ],
-        "produces": [
-          "application/json"
-        ],
-        "tags": [
-          "rulegroup"
-        ],
-        "summary": "Updates the specified rule group for the given cluster.",
-        "operationId": "updateRuleGroup",
-        "parameters": [
-          {
-            "type": "string",
-            "x-go-name": "ProjectID",
-            "name": "project_id",
-            "in": "path",
-            "required": true
-          },
-          {
-            "type": "string",
-            "x-go-name": "ClusterID",
-            "name": "cluster_id",
-            "in": "path",
-            "required": true
-          },
-          {
-            "type": "string",
-            "x-go-name": "RuleGroupID",
-            "name": "rulegroup_id",
-            "in": "path",
-            "required": true
-          },
-          {
-            "name": "Body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/RuleGroup"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "RuleGroup",
-            "schema": {
-              "$ref": "#/definitions/RuleGroup"
-            }
-          },
-          "401": {
-            "$ref": "#/responses/empty"
-          },
-          "403": {
-            "$ref": "#/responses/empty"
-          },
-          "default": {
-            "description": "errorResponse",
-            "schema": {
-              "$ref": "#/definitions/errorResponse"
-            }
-          }
-        }
-      },
-      "delete": {
-        "produces": [
-          "application/json"
-        ],
-        "tags": [
-          "rulegroup"
-        ],
-        "summary": "Deletes the given rule group that belongs to the cluster.",
-        "operationId": "deleteRuleGroup",
-        "parameters": [
-          {
-            "type": "string",
-            "x-go-name": "ProjectID",
-            "name": "project_id",
-            "in": "path",
-            "required": true
-          },
-          {
-            "type": "string",
-            "x-go-name": "ClusterID",
-            "name": "cluster_id",
-            "in": "path",
-            "required": true
-          },
-          {
-            "type": "string",
-            "x-go-name": "RuleGroupID",
-            "name": "rulegroup_id",
-            "in": "path",
-            "required": true
-          }
-        ],
-        "responses": {
-          "200": {
-            "$ref": "#/responses/empty"
           },
           "401": {
             "$ref": "#/responses/empty"
@@ -17210,31 +16574,6 @@
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
     },
-    "Alertmanager": {
-      "description": "Alertmanager represents an Alertmanager Configuration",
-      "type": "object",
-      "properties": {
-        "spec": {
-          "$ref": "#/definitions/AlertmanagerSpec"
-        }
-      },
-      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
-    },
-    "AlertmanagerSpec": {
-      "type": "object",
-      "properties": {
-        "config": {
-          "description": "Config contains the alertmanager configuration in YAML",
-          "type": "array",
-          "items": {
-            "type": "integer",
-            "format": "uint8"
-          },
-          "x-go-name": "Config"
-        }
-      },
-      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
-    },
     "AlibabaCloudSpec": {
       "type": "object",
       "title": "AlibabaCloudSpec specifies the access data to Alibaba.",
@@ -18225,9 +17564,6 @@
             "$ref": "#/definitions/MachineNetworkingConfig"
           },
           "x-go-name": "MachineNetworks"
-        },
-        "mla": {
-          "$ref": "#/definitions/MLASettings"
         },
         "oidc": {
           "$ref": "#/definitions/OIDCSettings"
@@ -20481,83 +19817,6 @@
       },
       "x-go-package": "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/limits"
     },
-    "LoggingRateLimitSettings": {
-      "type": "object",
-      "title": "LoggingRateLimitSettings contains rate-limiting configuration for logging in the user cluster.",
-      "properties": {
-        "ingestionBurstSize": {
-          "description": "IngestionBurstSize represents ingestion burst size in number of requests (nginx `burst`).",
-          "type": "integer",
-          "format": "int32",
-          "x-go-name": "IngestionBurstSize"
-        },
-        "ingestionRate": {
-          "description": "IngestionRate represents ingestion rate limit in requests per second (nginx `rate` in `r/s`).",
-          "type": "integer",
-          "format": "int32",
-          "x-go-name": "IngestionRate"
-        },
-        "queryBurstSize": {
-          "description": "QueryBurstSize represents query burst size in number of requests (nginx `burst`).",
-          "type": "integer",
-          "format": "int32",
-          "x-go-name": "QueryBurstSize"
-        },
-        "queryRate": {
-          "description": "QueryRate represents query request rate limit per second (nginx `rate` in `r/s`).",
-          "type": "integer",
-          "format": "int32",
-          "x-go-name": "QueryRate"
-        }
-      },
-      "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
-    },
-    "MLA": {
-      "type": "object",
-      "properties": {
-        "user_cluster_mla_enabled": {
-          "description": "whether the user cluster MLA (Monitoring, Logging \u0026 Alerting) stack is enabled in the seed",
-          "type": "boolean",
-          "x-go-name": "UserClusterMLAEnabled"
-        }
-      },
-      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
-    },
-    "MLAAdminSetting": {
-      "type": "object",
-      "title": "MLAAdminSetting represents an object holding admin setting options for user cluster MLA (Monitoring, Logging and Alerting).",
-      "properties": {
-        "loggingRateLimits": {
-          "$ref": "#/definitions/LoggingRateLimitSettings"
-        },
-        "monitoringRateLimits": {
-          "$ref": "#/definitions/MonitoringRateLimitSettings"
-        }
-      },
-      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
-    },
-    "MLASettings": {
-      "type": "object",
-      "properties": {
-        "loggingEnabled": {
-          "description": "LoggingEnabled is the flag for enabling logging in user cluster.",
-          "type": "boolean",
-          "x-go-name": "LoggingEnabled"
-        },
-        "loggingResources": {
-          "$ref": "#/definitions/ResourceRequirements"
-        },
-        "monitoringEnabled": {
-          "description": "MonitoringEnabled is the flag for enabling monitoring in user cluster.",
-          "type": "boolean",
-          "x-go-name": "MonitoringEnabled"
-        },
-        "monitoringResources": {
-          "$ref": "#/definitions/ResourceRequirements"
-        }
-      },
-      "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
-    },
     "MachineDeploymentStatus": {
       "description": "[MachineDeploymentStatus]\nMachineDeploymentStatus defines the observed state of MachineDeployment",
       "type": "object",
@@ -20800,83 +20059,6 @@
       "type": "string",
       "x-go-name": "ReportURL",
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
-    },
-    "MlaOptions": {
-      "type": "object",
-      "properties": {
-        "loggingEnabled": {
-          "type": "boolean",
-          "x-go-name": "LoggingEnabled"
-        },
-        "loggingEnforced": {
-          "type": "boolean",
-          "x-go-name": "LoggingEnforced"
-        },
-        "monitoringEnabled": {
-          "type": "boolean",
-          "x-go-name": "MonitoringEnabled"
-        },
-        "monitoringEnforced": {
-          "type": "boolean",
-          "x-go-name": "MonitoringEnforced"
-        }
-      },
-      "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
-    },
-    "MonitoringRateLimitSettings": {
-      "type": "object",
-      "title": "MonitoringRateLimitSettings contains rate-limiting configuration for monitoring in the user cluster.",
-      "properties": {
-        "ingestionBurstSize": {
-          "description": "IngestionBurstSize represents ingestion burst size in samples per second (Cortex `ingestion_burst_size`).",
-          "type": "integer",
-          "format": "int32",
-          "x-go-name": "IngestionBurstSize"
-        },
-        "ingestionRate": {
-          "description": "IngestionRate represents the ingestion rate limit in samples per second (Cortex `ingestion_rate`).",
-          "type": "integer",
-          "format": "int32",
-          "x-go-name": "IngestionRate"
-        },
-        "maxSamplesPerQuery": {
-          "description": "MaxSamplesPerQuery represents maximum number of samples during a query (Cortex `max_samples_per_query`).",
-          "type": "integer",
-          "format": "int32",
-          "x-go-name": "MaxSamplesPerQuery"
-        },
-        "maxSeriesPerMetric": {
-          "description": "MaxSeriesPerMetric represents maximum number of series per metric (Cortex `max_series_per_metric`).",
-          "type": "integer",
-          "format": "int32",
-          "x-go-name": "MaxSeriesPerMetric"
-        },
-        "maxSeriesPerQuery": {
-          "description": "MaxSeriesPerQuery represents maximum number of timeseries during a query (Cortex `max_series_per_query`).",
-          "type": "integer",
-          "format": "int32",
-          "x-go-name": "MaxSeriesPerQuery"
-        },
-        "maxSeriesTotal": {
-          "description": "MaxSeriesTotal represents maximum number of series per this user cluster (Cortex `max_series_per_user`).",
-          "type": "integer",
-          "format": "int32",
-          "x-go-name": "MaxSeriesTotal"
-        },
-        "queryBurstSize": {
-          "description": "QueryBurstSize represents query burst size in number of requests (nginx `burst`).",
-          "type": "integer",
-          "format": "int32",
-          "x-go-name": "QueryBurstSize"
-        },
-        "queryRate": {
-          "description": "QueryRate represents  query request rate limit per second (nginx `rate` in `r/s`).",
-          "type": "integer",
-          "format": "int32",
-          "x-go-name": "QueryRate"
-        }
-      },
-      "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
     },
     "Names": {
       "type": "object",
@@ -22481,12 +21663,6 @@
       "title": "PublicVSphereCloudSpec is a public counterpart of apiv1.VSphereCloudSpec.",
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
     },
-    "Quantity": {
-      "description": "The serialization format is:\n\n\u003cquantity\u003e        ::= \u003csignedNumber\u003e\u003csuffix\u003e\n(Note that \u003csuffix\u003e may be empty, from the \"\" case in \u003cdecimalSI\u003e.)\n\u003cdigit\u003e           ::= 0 | 1 | ... | 9\n\u003cdigits\u003e          ::= \u003cdigit\u003e | \u003cdigit\u003e\u003cdigits\u003e\n\u003cnumber\u003e          ::= \u003cdigits\u003e | \u003cdigits\u003e.\u003cdigits\u003e | \u003cdigits\u003e. | .\u003cdigits\u003e\n\u003csign\u003e            ::= \"+\" | \"-\"\n\u003csignedNumber\u003e    ::= \u003cnumber\u003e | \u003csign\u003e\u003cnumber\u003e\n\u003csuffix\u003e          ::= \u003cbinarySI\u003e | \u003cdecimalExponent\u003e | \u003cdecimalSI\u003e\n\u003cbinarySI\u003e        ::= Ki | Mi | Gi | Ti | Pi | Ei\n(International System of units; See: http://physics.nist.gov/cuu/Units/binary.html)\n\u003cdecimalSI\u003e       ::= m | \"\" | k | M | G | T | P | E\n(Note that 1024 = 1Ki but 1000 = 1k; I didn't choose the capitalization.)\n\u003cdecimalExponent\u003e ::= \"e\" \u003csignedNumber\u003e | \"E\" \u003csignedNumber\u003e\n\nNo matter which of the three exponent forms is used, no quantity may represent\na number greater than 2^63-1 in magnitude, nor may it have more than 3 decimal\nplaces. Numbers larger or more precise will be capped or rounded up.\n(E.g.: 0.1m will rounded up to 1m.)\nThis may be extended in the future if we require larger or smaller quantities.\n\nWhen a Quantity is parsed from a string, it will remember the type of suffix\nit had, and will use the same type again when it is serialized.\n\nBefore serializing, Quantity will be put in \"canonical form\".\nThis means that Exponent/suffix will be adjusted up or down (with a\ncorresponding increase or decrease in Mantissa) such that:\na. No precision is lost\nb. No fractional digits will be emitted\nc. The exponent (or suffix) is as large as possible.\nThe sign will be omitted unless the number is negative.\n\nExamples:\n1.5 will be serialized as \"1500m\"\n1.5Gi will be serialized as \"1536Mi\"\n\nNote that the quantity will NEVER be internally represented by a\nfloating point number. That is the whole point of this exercise.\n\nNon-canonical values will still parse as long as they are well formed,\nbut will be re-emitted in their canonical form. (So always use canonical\nform, or don't diff.)\n\nThis format is intended to make it difficult to use these numbers without\nwriting some sort of special handling code in the hopes that that will\ncause implementors to also use a fixed point implementation.\n\n+protobuf=true\n+protobuf.embed=string\n+protobuf.options.marshal=false\n+protobuf.options.(gogoproto.goproto_stringer)=false\n+k8s:deepcopy-gen=true\n+k8s:openapi-gen=true",
-      "type": "object",
-      "title": "Quantity is a fixed-point representation of a number.\nIt provides convenient marshaling/unmarshaling in JSON and YAML,\nin addition to String() and AsInt64() accessors.",
-      "x-go-package": "k8s.io/apimachinery/pkg/api/resource"
-    },
     "Quotas": {
       "type": "object",
       "title": "Quotas is a struct that contains the response of a Quotas query.",
@@ -22551,27 +21727,6 @@
         "$ref": "#/definitions/LabelKeyList"
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
-    },
-    "ResourceList": {
-      "type": "object",
-      "title": "ResourceList is a set of (resource name, quantity) pairs.",
-      "additionalProperties": {
-        "$ref": "#/definitions/Quantity"
-      },
-      "x-go-package": "k8s.io/api/core/v1"
-    },
-    "ResourceRequirements": {
-      "type": "object",
-      "title": "ResourceRequirements describes the compute resource requirements.",
-      "properties": {
-        "limits": {
-          "$ref": "#/definitions/ResourceList"
-        },
-        "requests": {
-          "$ref": "#/definitions/ResourceList"
-        }
-      },
-      "x-go-package": "k8s.io/api/core/v1"
     },
     "ResourceType": {
       "type": "string",
@@ -22686,29 +21841,6 @@
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
     },
-    "RuleGroup": {
-      "type": "object",
-      "title": "RuleGroup represents a rule group of recording and alerting rules.",
-      "properties": {
-        "data": {
-          "description": "contains the RuleGroup data. Ref: https://prometheus.io/docs/prometheus/latest/configuration/recording_rules/#rule_group",
-          "type": "array",
-          "items": {
-            "type": "integer",
-            "format": "uint8"
-          },
-          "x-go-name": "Data"
-        },
-        "type": {
-          "$ref": "#/definitions/RuleGroupType"
-        }
-      },
-      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v2"
-    },
-    "RuleGroupType": {
-      "type": "string",
-      "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
-    },
     "S3BackupCredentials": {
       "description": "S3BackupCredentials contains credentials for S3 etcd backups",
       "type": "object",
@@ -22822,9 +21954,6 @@
           "type": "string",
           "x-go-name": "Location"
         },
-        "mla": {
-          "$ref": "#/definitions/SeedMLASettings"
-        },
         "name": {
           "description": "Name represents human readable name for the resource",
           "type": "string",
@@ -22858,18 +21987,6 @@
       },
       "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
     },
-    "SeedMLASettings": {
-      "type": "object",
-      "title": "SeedMLASettings allow configuring seed level MLA (Monitoring, Logging \u0026 Alerting) stack settings.",
-      "properties": {
-        "user_cluster_mla_enabled": {
-          "description": "Optional: UserClusterMLAEnabled controls whether the user cluster MLA (Monitoring, Logging \u0026 Alerting) stack is enabled in the seed.",
-          "type": "boolean",
-          "x-go-name": "UserClusterMLAEnabled"
-        }
-      },
-      "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
-    },
     "SeedNamesList": {
       "type": "array",
       "items": {
@@ -22883,9 +22000,6 @@
       "properties": {
         "metering": {
           "$ref": "#/definitions/MeteringConfigurations"
-        },
-        "mla": {
-          "$ref": "#/definitions/MLA"
         },
         "seedDNSOverwrite": {
           "description": "the Seed level seed dns overwrite",
@@ -22925,9 +22039,6 @@
           "description": "Optional: Detailed location of the cluster, like \"Hamburg\" or \"Datacenter 7\".\nFor informational purposes in the Kubermatic dashboard only.",
           "type": "string",
           "x-go-name": "Location"
-        },
-        "mla": {
-          "$ref": "#/definitions/SeedMLASettings"
         },
         "proxy_settings": {
           "$ref": "#/definitions/ProxySettings"
@@ -23106,17 +22217,6 @@
         },
         "machineDeploymentVMResourceQuota": {
           "$ref": "#/definitions/MachineDeploymentVMResourceQuota"
-        },
-        "mlaAlertmanagerPrefix": {
-          "type": "string",
-          "x-go-name": "MlaAlertmanagerPrefix"
-        },
-        "mlaGrafanaPrefix": {
-          "type": "string",
-          "x-go-name": "MlaGrafanaPrefix"
-        },
-        "mlaOptions": {
-          "$ref": "#/definitions/MlaOptions"
         },
         "opaOptions": {
           "$ref": "#/definitions/OpaOptions"

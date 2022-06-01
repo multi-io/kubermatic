@@ -31,13 +31,11 @@ import (
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/hetzner"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/metering"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/metric"
-	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/mlaadminsetting"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/openstack"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/operations"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/packet"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/preset"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/project"
-	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/rulegroup"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/seed"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/serviceaccounts"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/settings"
@@ -111,13 +109,11 @@ func New(transport runtime.ClientTransport, formats strfmt.Registry) *MetaKubeAP
 	cli.Hetzner = hetzner.New(transport, formats)
 	cli.Metering = metering.New(transport, formats)
 	cli.Metric = metric.New(transport, formats)
-	cli.Mlaadminsetting = mlaadminsetting.New(transport, formats)
 	cli.Openstack = openstack.New(transport, formats)
 	cli.Operations = operations.New(transport, formats)
 	cli.Packet = packet.New(transport, formats)
 	cli.Preset = preset.New(transport, formats)
 	cli.Project = project.New(transport, formats)
-	cli.Rulegroup = rulegroup.New(transport, formats)
 	cli.Seed = seed.New(transport, formats)
 	cli.Serviceaccounts = serviceaccounts.New(transport, formats)
 	cli.Settings = settings.New(transport, formats)
@@ -212,8 +208,6 @@ type MetaKubeAPI struct {
 
 	Metric metric.ClientService
 
-	Mlaadminsetting mlaadminsetting.ClientService
-
 	Openstack openstack.ClientService
 
 	Operations operations.ClientService
@@ -223,8 +217,6 @@ type MetaKubeAPI struct {
 	Preset preset.ClientService
 
 	Project project.ClientService
-
-	Rulegroup rulegroup.ClientService
 
 	Seed seed.ClientService
 
@@ -269,13 +261,11 @@ func (c *MetaKubeAPI) SetTransport(transport runtime.ClientTransport) {
 	c.Hetzner.SetTransport(transport)
 	c.Metering.SetTransport(transport)
 	c.Metric.SetTransport(transport)
-	c.Mlaadminsetting.SetTransport(transport)
 	c.Openstack.SetTransport(transport)
 	c.Operations.SetTransport(transport)
 	c.Packet.SetTransport(transport)
 	c.Preset.SetTransport(transport)
 	c.Project.SetTransport(transport)
-	c.Rulegroup.SetTransport(transport)
 	c.Seed.SetTransport(transport)
 	c.Serviceaccounts.SetTransport(transport)
 	c.Settings.SetTransport(transport)

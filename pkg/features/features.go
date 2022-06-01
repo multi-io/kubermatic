@@ -51,9 +51,6 @@ const (
 	// control plane.
 	TunnelingExposeStrategy = "TunnelingExposeStrategy"
 
-	// UserClusterMLA if enabled MonitoringLoggingAlerting stack will be deployed with corresponding controller
-	UserClusterMLA = "UserClusterMLA"
-
 	// KonnectivityService enables the deployment of Konnectivity proxy for the
 	// control plane to cluster communication, instead of relying on the legacy
 	// solution based on OpenVPN.

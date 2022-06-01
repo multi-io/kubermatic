@@ -23,9 +23,6 @@ type SeedSettings struct {
 
 	// metering
 	Metering *MeteringConfigurations `json:"metering,omitempty"`
-
-	// mla
-	Mla *MLA `json:"mla,omitempty"`
 }
 
 // Validate validates this seed settings
@@ -33,10 +30,6 @@ func (m *SeedSettings) Validate(formats strfmt.Registry) error {
 	var res []error
 
 	if err := m.validateMetering(formats); err != nil {
-		res = append(res, err)
-	}
-
-	if err := m.validateMla(formats); err != nil {
 		res = append(res, err)
 	}
 
@@ -63,32 +56,11 @@ func (m *SeedSettings) validateMetering(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *SeedSettings) validateMla(formats strfmt.Registry) error {
-	if swag.IsZero(m.Mla) { // not required
-		return nil
-	}
-
-	if m.Mla != nil {
-		if err := m.Mla.Validate(formats); err != nil {
-			if ve, ok := err.(*errors.Validation); ok {
-				return ve.ValidateName("mla")
-			}
-			return err
-		}
-	}
-
-	return nil
-}
-
 // ContextValidate validate this seed settings based on the context it is used
 func (m *SeedSettings) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
 	var res []error
 
 	if err := m.contextValidateMetering(ctx, formats); err != nil {
-		res = append(res, err)
-	}
-
-	if err := m.contextValidateMla(ctx, formats); err != nil {
 		res = append(res, err)
 	}
 
@@ -104,20 +76,6 @@ func (m *SeedSettings) contextValidateMetering(ctx context.Context, formats strf
 		if err := m.Metering.ContextValidate(ctx, formats); err != nil {
 			if ve, ok := err.(*errors.Validation); ok {
 				return ve.ValidateName("metering")
-			}
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (m *SeedSettings) contextValidateMla(ctx context.Context, formats strfmt.Registry) error {
-
-	if m.Mla != nil {
-		if err := m.Mla.ContextValidate(ctx, formats); err != nil {
-			if ve, ok := err.(*errors.Validation); ok {
-				return ve.ValidateName("mla")
 			}
 			return err
 		}

@@ -194,10 +194,8 @@ type newRoutingFunc func(
 	privilegedExternalClusterProvider provider.PrivilegedExternalClusterProvider,
 	constraintTemplateProvider provider.ConstraintTemplateProvider,
 	constraintProviderGetter provider.ConstraintProviderGetter,
-	alertmanagerProviderGetter provider.AlertmanagerProviderGetter,
 	clusterTemplateProvider provider.ClusterTemplateProvider,
 	clusterTemplateInstanceProviderGetter provider.ClusterTemplateInstanceProviderGetter,
-	ruleGroupProviderGetter provider.RuleGroupProviderGetter,
 	kubermaticVersions kubermatic.Versions,
 	defaultConstraintProvider provider.DefaultConstraintProvider,
 	privilegedAllowedRegistryProvider provider.PrivilegedAllowedRegistryProvider,
@@ -206,7 +204,6 @@ type newRoutingFunc func(
 	etcdBackupConfigProjectProviderGetter provider.EtcdBackupConfigProjectProviderGetter,
 	etcdRestoreProjectProviderGetter provider.EtcdRestoreProjectProviderGetter,
 	backupCredentialsProviderGetter provider.BackupCredentialsProviderGetter,
-	privilegedMLAAdminSettingProviderGetter provider.PrivilegedMLAAdminSettingProviderGetter,
 	masterClient client.Client,
 ) http.Handler
 
@@ -401,27 +398,9 @@ func initTestEndpoint(user apiv1.User, seedsGetter provider.SeedsGetter, kubeObj
 		return nil, fmt.Errorf("can not find constraintprovider for cluster %q", seed.Name)
 	}
 
-	alertmanagerProvider := kubernetes.NewAlertmanagerProvider(fakeImpersonationClient, fakeClient)
-	alertmanagerProviders := map[string]provider.AlertmanagerProvider{"us-central1": alertmanagerProvider}
-	alertmanagerProviderGetter := func(seed *kubermaticv1.Seed) (provider.AlertmanagerProvider, error) {
-		if alertmanager, exists := alertmanagerProviders[seed.Name]; exists {
-			return alertmanager, nil
-		}
-		return nil, fmt.Errorf("can not find alertmanagerprovider for cluster %q", seed.Name)
-	}
-
 	clusterTemplateProvider, err := kubernetes.NewClusterTemplateProvider(fakeImpersonationClient, fakeClient)
 	if err != nil {
 		return nil, nil, err
-	}
-
-	ruleGroupProvider := kubernetes.NewRuleGroupProvider(fakeImpersonationClient, fakeClient)
-	ruleGroupProviders := map[string]provider.RuleGroupProvider{"us-central1": ruleGroupProvider}
-	ruleGroupProviderGetter := func(seed *kubermaticv1.Seed) (provider.RuleGroupProvider, error) {
-		if ruleGroup, exists := ruleGroupProviders[seed.Name]; exists {
-			return ruleGroup, nil
-		}
-		return nil, fmt.Errorf("can not find ruleGroupProvider for cluster %q", seed.Name)
 	}
 
 	clusterTemplateInstanceProvider := kubernetes.NewClusterTemplateInstanceProvider(fakeImpersonationClient, fakeClient)
@@ -472,15 +451,6 @@ func initTestEndpoint(user apiv1.User, seedsGetter provider.SeedsGetter, kubeObj
 			return backupCredentials, nil
 		}
 		return nil, fmt.Errorf("can not find backupCredentialsProvider for cluster %q", seed.Name)
-	}
-
-	privilegedMLAAdminSettingProvider := kubernetes.NewPrivilegedMLAAdminSettingProvider(fakeClient)
-	privilegedMLAAdminSettingProviders := map[string]provider.PrivilegedMLAAdminSettingProvider{"us-central1": privilegedMLAAdminSettingProvider}
-	privilegedMLAAdminSettingProviderGetter := func(seed *kubermaticv1.Seed) (provider.PrivilegedMLAAdminSettingProvider, error) {
-		if privilegedMLAAdminSetting, exists := privilegedMLAAdminSettingProviders[seed.Name]; exists {
-			return privilegedMLAAdminSetting, nil
-		}
-		return nil, fmt.Errorf("can not find privilegedMLAAdminSettingProvider for cluster %q", seed.Name)
 	}
 
 	eventRecorderProvider := kubernetes.NewEventRecorder()
@@ -540,10 +510,8 @@ func initTestEndpoint(user apiv1.User, seedsGetter provider.SeedsGetter, kubeObj
 		externalClusterProvider,
 		fakeConstraintTemplateProvider,
 		constraintProviderGetter,
-		alertmanagerProviderGetter,
 		clusterTemplateProvider,
 		clusterTemplateInstanceProviderGetter,
-		ruleGroupProviderGetter,
 		kubermaticVersions,
 		fakeDefaultConstraintProvider,
 		fakePrivilegedAllowedRegistryProvider,
@@ -552,7 +520,6 @@ func initTestEndpoint(user apiv1.User, seedsGetter provider.SeedsGetter, kubeObj
 		etcdBackupConfigProjectProviderGetter,
 		etcdRestoreProjectProviderGetter,
 		backupCredentialsProviderGetter,
-		privilegedMLAAdminSettingProviderGetter,
 		fakeClient,
 	)
 
@@ -1280,12 +1247,6 @@ func GenDefaultGlobalSettings() *kubermaticv1.KubermaticSetting {
 				Enabled:  true,
 				Enforced: true,
 			},
-			MlaOptions: kubermaticv1.MlaOptions{
-				LoggingEnabled:     true,
-				LoggingEnforced:    true,
-				MonitoringEnabled:  true,
-				MonitoringEnforced: true,
-			},
 		},
 	}
 }
@@ -1747,32 +1708,6 @@ func GenDefaultAPIConstraint(name, kind string) apiv2.Constraint {
 	}
 }
 
-func GenAlertmanager(namespace, configSecretName string) *kubermaticv1.Alertmanager {
-	return &kubermaticv1.Alertmanager{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      resources.AlertmanagerName,
-			Namespace: namespace,
-		},
-		Spec: kubermaticv1.AlertmanagerSpec{
-			ConfigSecret: corev1.LocalObjectReference{
-				Name: configSecretName,
-			},
-		},
-	}
-}
-
-func GenAlertmanagerConfigSecret(name, namespace string, config []byte) *corev1.Secret {
-	return &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
-		Data: map[string][]byte{
-			resources.AlertmanagerConfigSecretKey: config,
-		},
-	}
-}
-
 func GenClusterTemplate(name, id, projectID, scope, userEmail string) *kubermaticv1.ClusterTemplate {
 	return &kubermaticv1.ClusterTemplate{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1805,51 +1740,6 @@ func GenClusterTemplateInstance(projectID, templateID string, replicas int64) *k
 			Replicas:          replicas,
 		},
 	}
-}
-
-func GenRuleGroup(name, clusterName string, ruleGroupType kubermaticv1.RuleGroupType) *kubermaticv1.RuleGroup {
-	return &kubermaticv1.RuleGroup{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: "cluster-" + clusterName,
-		},
-		TypeMeta: metav1.TypeMeta{
-			Kind:       kubermaticv1.RuleGroupKindName,
-			APIVersion: kubermaticv1.SchemeGroupVersion.String(),
-		},
-		Spec: kubermaticv1.RuleGroupSpec{
-			RuleGroupType: ruleGroupType,
-			Cluster: corev1.ObjectReference{
-				Kind:       kubermaticv1.ClusterKindName,
-				Namespace:  "",
-				Name:       clusterName,
-				APIVersion: kubermaticv1.SchemeGroupVersion.String(),
-			},
-			Data: GenerateTestRuleGroupData(name),
-		},
-	}
-}
-
-func GenAPIRuleGroup(name string, ruleGroupType kubermaticv1.RuleGroupType) *apiv2.RuleGroup {
-	return &apiv2.RuleGroup{
-		Data: GenerateTestRuleGroupData(name),
-		Type: ruleGroupType,
-	}
-}
-
-func GenerateTestRuleGroupData(ruleGroupName string) []byte {
-	return []byte(fmt.Sprintf(`
-name: %s
-rules:
-# Alert for any instance that is unreachable for >5 minutes.
-- alert: InstanceDown
-  expr: up == 0
-  for: 5m
-  labels:
-    severity: page
-  annotations:
-    summary: "Instance  down"
-`, ruleGroupName))
 }
 
 func GenDefaultAPIAllowedRegistry(name, registryPrefix string) apiv2.AllowedRegistry {
@@ -1963,59 +1853,6 @@ func GenDefaultBackupCredentials() *corev1.Secret {
 		StringData: map[string]string{
 			resources.EtcdBackupAndRestoreS3AccessKeyIDKey:        resources.AWSAccessKeyID,
 			resources.EtcdBackupAndRestoreS3SecretKeyAccessKeyKey: resources.AWSSecretAccessKey,
-		},
-	}
-}
-
-func GenMLAAdminSetting(name, clusterName string, value int32) *kubermaticv1.MLAAdminSetting {
-	return &kubermaticv1.MLAAdminSetting{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: "cluster-" + clusterName,
-		},
-		TypeMeta: metav1.TypeMeta{
-			Kind:       kubermaticv1.MLAAdminSettingKindName,
-			APIVersion: kubermaticv1.SchemeGroupVersion.String(),
-		},
-		Spec: kubermaticv1.MLAAdminSettingSpec{
-			ClusterName: clusterName,
-			MonitoringRateLimits: &kubermaticv1.MonitoringRateLimitSettings{
-				IngestionRate:      value,
-				IngestionBurstSize: value,
-				MaxSeriesPerMetric: value,
-				MaxSeriesTotal:     value,
-				QueryRate:          value,
-				QueryBurstSize:     value,
-				MaxSamplesPerQuery: value,
-				MaxSeriesPerQuery:  value,
-			},
-			LoggingRateLimits: &kubermaticv1.LoggingRateLimitSettings{
-				IngestionRate:      value,
-				IngestionBurstSize: value,
-				QueryRate:          value,
-				QueryBurstSize:     value,
-			},
-		},
-	}
-}
-
-func GenAPIMLAAdminSetting(value int32) *apiv2.MLAAdminSetting {
-	return &apiv2.MLAAdminSetting{
-		MonitoringRateLimits: &kubermaticv1.MonitoringRateLimitSettings{
-			IngestionRate:      value,
-			IngestionBurstSize: value,
-			MaxSeriesPerMetric: value,
-			MaxSeriesTotal:     value,
-			QueryRate:          value,
-			QueryBurstSize:     value,
-			MaxSamplesPerQuery: value,
-			MaxSeriesPerQuery:  value,
-		},
-		LoggingRateLimits: &kubermaticv1.LoggingRateLimitSettings{
-			IngestionRate:      value,
-			IngestionBurstSize: value,
-			QueryRate:          value,
-			QueryBurstSize:     value,
 		},
 	}
 }

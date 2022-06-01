@@ -27,7 +27,6 @@ import (
 	"k8c.io/kubermatic/v2/pkg/handler/middleware"
 	"k8c.io/kubermatic/v2/pkg/handler/v1/common"
 	"k8c.io/kubermatic/v2/pkg/handler/v2/addon"
-	"k8c.io/kubermatic/v2/pkg/handler/v2/alertmanager"
 	allowedregistry "k8c.io/kubermatic/v2/pkg/handler/v2/allowed_registry"
 	"k8c.io/kubermatic/v2/pkg/handler/v2/backupcredentials"
 	"k8c.io/kubermatic/v2/pkg/handler/v2/cluster"
@@ -40,10 +39,8 @@ import (
 	"k8c.io/kubermatic/v2/pkg/handler/v2/gatekeeperconfig"
 	kubernetesdashboard "k8c.io/kubermatic/v2/pkg/handler/v2/kubernetes-dashboard"
 	"k8c.io/kubermatic/v2/pkg/handler/v2/machine"
-	mlaadminsetting "k8c.io/kubermatic/v2/pkg/handler/v2/mla_admin_setting"
 	"k8c.io/kubermatic/v2/pkg/handler/v2/preset"
 	"k8c.io/kubermatic/v2/pkg/handler/v2/provider"
-	"k8c.io/kubermatic/v2/pkg/handler/v2/rulegroup"
 	"k8c.io/kubermatic/v2/pkg/handler/v2/seedsettings"
 	"k8c.io/kubermatic/v2/pkg/handler/v2/version"
 )
@@ -364,19 +361,6 @@ func (r Routing) RegisterV2(mux *mux.Router, metrics common.ServerMetrics) {
 		Path("/projects/{project_id}/clusters/{cluster_id}/addons/{addon_id}").
 		Handler(r.deleteAddon())
 
-	// Defines a set of HTTP endpoints for managing alertmanager
-	mux.Methods(http.MethodGet).
-		Path("/projects/{project_id}/clusters/{cluster_id}/alertmanager/config").
-		Handler(r.getAlertmanager())
-
-	mux.Methods(http.MethodPut).
-		Path("/projects/{project_id}/clusters/{cluster_id}/alertmanager/config").
-		Handler(r.updateAlertmanager())
-
-	mux.Methods(http.MethodDelete).
-		Path("/projects/{project_id}/clusters/{cluster_id}/alertmanager/config").
-		Handler(r.resetAlertmanager())
-
 	// Defines a set of HTTP endpoints for various cloud providers
 	// Note that these endpoints don't require credentials as opposed to the ones defined under /providers/*
 	mux.Methods(http.MethodGet).
@@ -556,27 +540,6 @@ func (r Routing) RegisterV2(mux *mux.Router, metrics common.ServerMetrics) {
 		Path("/projects/{project_id}/clustertemplates/{template_id}/instances").
 		Handler(r.createClusterTemplateInstance())
 
-	// Defines a set of HTTP endpoints for managing rule groups
-	mux.Methods(http.MethodGet).
-		Path("/projects/{project_id}/clusters/{cluster_id}/rulegroups/{rulegroup_id}").
-		Handler(r.getRuleGroup())
-
-	mux.Methods(http.MethodGet).
-		Path("/projects/{project_id}/clusters/{cluster_id}/rulegroups").
-		Handler(r.listRuleGroups())
-
-	mux.Methods(http.MethodPost).
-		Path("/projects/{project_id}/clusters/{cluster_id}/rulegroups").
-		Handler(r.createRuleGroup())
-
-	mux.Methods(http.MethodPut).
-		Path("/projects/{project_id}/clusters/{cluster_id}/rulegroups/{rulegroup_id}").
-		Handler(r.updateRuleGroup())
-
-	mux.Methods(http.MethodDelete).
-		Path("/projects/{project_id}/clusters/{cluster_id}/rulegroups/{rulegroup_id}").
-		Handler(r.deleteRuleGroup())
-
 	// Defines a set of HTTP endpoints for managing allowed registries
 	mux.Methods(http.MethodPost).
 		Path("/allowedregistries").
@@ -648,23 +611,6 @@ func (r Routing) RegisterV2(mux *mux.Router, metrics common.ServerMetrics) {
 	mux.Methods(http.MethodPut).
 		Path("/seeds/{seed_name}/backupcredentials").
 		Handler(r.createOrUpdateBackupCredentials())
-
-	// Defines a set of HTTP endpoints for managing MLA admin setting
-	mux.Methods(http.MethodGet).
-		Path("/projects/{project_id}/clusters/{cluster_id}/mlaadminsetting").
-		Handler(r.getMLAAdminSetting())
-
-	mux.Methods(http.MethodPost).
-		Path("/projects/{project_id}/clusters/{cluster_id}/mlaadminsetting").
-		Handler(r.createMLAAdminSetting())
-
-	mux.Methods(http.MethodPut).
-		Path("/projects/{project_id}/clusters/{cluster_id}/mlaadminsetting").
-		Handler(r.updateMLAAdminSetting())
-
-	mux.Methods(http.MethodDelete).
-		Path("/projects/{project_id}/clusters/{cluster_id}/mlaadminsetting").
-		Handler(r.deleteMLAAdminSetting())
 }
 
 // swagger:route POST /api/v2/projects/{project_id}/clusters project createClusterV2
@@ -3603,95 +3549,6 @@ func (r Routing) listVersionsByProvider() http.Handler {
 	)
 }
 
-// swagger:route GET /api/v2/projects/{project_id}/clusters/{cluster_id}/alertmanager/config project getAlertmanager
-//
-//     Gets the alertmanager configuration for the specified cluster.
-//
-//
-//     Produces:
-//     - application/json
-//
-//     Responses:
-//       default: errorResponse
-//       200: Alertmanager
-//       401: empty
-//       403: empty
-func (r Routing) getAlertmanager() http.Handler {
-	return httptransport.NewServer(
-		endpoint.Chain(
-			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
-			middleware.UserSaver(r.userProvider),
-			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-			middleware.Alertmanagers(r.clusterProviderGetter, r.alertmanagerProviderGetter, r.seedsGetter),
-			middleware.PrivilegedAlertmanagers(r.clusterProviderGetter, r.alertmanagerProviderGetter, r.seedsGetter),
-		)(alertmanager.GetEndpoint(r.userInfoGetter, r.projectProvider, r.privilegedProjectProvider)),
-		alertmanager.DecodeGetAlertmanagerReq,
-		handler.EncodeJSON,
-		r.defaultServerOptions()...,
-	)
-}
-
-// swagger:route PUT /api/v2/projects/{project_id}/clusters/{cluster_id}/alertmanager/config project updateAlertmanager
-//
-//     Updates an alertmanager configuration for the given cluster
-//
-//     Consumes:
-//     - application/json
-//
-//     Produces:
-//     - application/json
-//
-//     Responses:
-//       default: errorResponse
-//       200: Alertmanager
-//       401: empty
-//       403: empty
-func (r Routing) updateAlertmanager() http.Handler {
-	return httptransport.NewServer(
-		endpoint.Chain(
-			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
-			middleware.UserSaver(r.userProvider),
-			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-			middleware.Alertmanagers(r.clusterProviderGetter, r.alertmanagerProviderGetter, r.seedsGetter),
-			middleware.PrivilegedAlertmanagers(r.clusterProviderGetter, r.alertmanagerProviderGetter, r.seedsGetter),
-		)(alertmanager.UpdateEndpoint(r.userInfoGetter, r.projectProvider, r.privilegedProjectProvider)),
-		alertmanager.DecodeUpdateAlertmanagerReq,
-		handler.EncodeJSON,
-		r.defaultServerOptions()...,
-	)
-}
-
-// swagger:route DELETE /api/v2/projects/{project_id}/clusters/{cluster_id}/alertmanager/config project resetAlertmanager
-//
-//     Resets the alertmanager configuration to default for the specified cluster.
-//
-//
-//     Produces:
-//     - application/json
-//
-//     Responses:
-//       default: errorResponse
-//       200: empty
-//       401: empty
-//       403: empty
-func (r Routing) resetAlertmanager() http.Handler {
-	return httptransport.NewServer(
-		endpoint.Chain(
-			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
-			middleware.UserSaver(r.userProvider),
-			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-			middleware.Alertmanagers(r.clusterProviderGetter, r.alertmanagerProviderGetter, r.seedsGetter),
-			middleware.PrivilegedAlertmanagers(r.clusterProviderGetter, r.alertmanagerProviderGetter, r.seedsGetter),
-		)(alertmanager.ResetEndpoint(r.userInfoGetter, r.projectProvider, r.privilegedProjectProvider)),
-		alertmanager.DecodeResetAlertmanagerReq,
-		handler.EncodeJSON,
-		r.defaultServerOptions()...,
-	)
-}
-
 // swagger:route GET /api/v2/seeds/{seed_name}/settings seed getSeedSettings
 //
 //     Gets the seed settings.
@@ -3849,152 +3706,6 @@ func (r Routing) createClusterTemplateInstance() http.Handler {
 		)(clustertemplate.CreateInstanceEndpoint(r.projectProvider, r.privilegedProjectProvider, r.userInfoGetter, r.clusterTemplateProvider, r.seedsGetter, r.clusterTemplateInstanceProviderGetter)),
 		clustertemplate.DecodeCreateInstanceReq,
 		handler.SetStatusCreatedHeader(handler.EncodeJSON),
-		r.defaultServerOptions()...,
-	)
-}
-
-// swagger:route GET /api/v2/projects/{project_id}/clusters/{cluster_id}/rulegroups/{rulegroup_id} rulegroup getRuleGroup
-//
-//     Gets a specified rule group for the given cluster.
-//
-//     Produces:
-//     - application/json
-//
-//     Responses:
-//       default: errorResponse
-//       200: RuleGroup
-//       401: empty
-//       403: empty
-func (r Routing) getRuleGroup() http.Handler {
-	return httptransport.NewServer(
-		endpoint.Chain(
-			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
-			middleware.UserSaver(r.userProvider),
-			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-			middleware.RuleGroups(r.clusterProviderGetter, r.ruleGroupProviderGetter, r.seedsGetter),
-			middleware.PrivilegedRuleGroups(r.clusterProviderGetter, r.ruleGroupProviderGetter, r.seedsGetter),
-		)(rulegroup.GetEndpoint(r.userInfoGetter, r.projectProvider, r.privilegedProjectProvider)),
-		rulegroup.DecodeGetReq,
-		handler.EncodeJSON,
-		r.defaultServerOptions()...,
-	)
-}
-
-// swagger:route GET /api/v2/projects/{project_id}/clusters/{cluster_id}/rulegroups rulegroup listRuleGroups
-//
-//     Lists rule groups that belong to the given cluster
-//
-//     Produces:
-//     - application/json
-//
-//     Responses:
-//       default: errorResponse
-//       200: []RuleGroup
-//       401: empty
-//       403: empty
-func (r Routing) listRuleGroups() http.Handler {
-	return httptransport.NewServer(
-		endpoint.Chain(
-			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
-			middleware.UserSaver(r.userProvider),
-			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-			middleware.RuleGroups(r.clusterProviderGetter, r.ruleGroupProviderGetter, r.seedsGetter),
-			middleware.PrivilegedRuleGroups(r.clusterProviderGetter, r.ruleGroupProviderGetter, r.seedsGetter),
-		)(rulegroup.ListEndpoint(r.userInfoGetter, r.projectProvider, r.privilegedProjectProvider)),
-		rulegroup.DecodeListReq,
-		handler.EncodeJSON,
-		r.defaultServerOptions()...,
-	)
-}
-
-// swagger:route POST /api/v2/projects/{project_id}/clusters/{cluster_id}/rulegroups rulegroup createRuleGroup
-//
-//     Creates a rule group that will belong to the given cluster
-//
-//     Consumes:
-//     - application/json
-//
-//     Produces:
-//     - application/json
-//
-//     Responses:
-//       default: errorResponse
-//       201: RuleGroup
-//       401: empty
-//       403: empty
-func (r Routing) createRuleGroup() http.Handler {
-	return httptransport.NewServer(
-		endpoint.Chain(
-			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
-			middleware.UserSaver(r.userProvider),
-			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-			middleware.RuleGroups(r.clusterProviderGetter, r.ruleGroupProviderGetter, r.seedsGetter),
-			middleware.PrivilegedRuleGroups(r.clusterProviderGetter, r.ruleGroupProviderGetter, r.seedsGetter),
-		)(rulegroup.CreateEndpoint(r.userInfoGetter, r.projectProvider, r.privilegedProjectProvider)),
-		rulegroup.DecodeCreateReq,
-		handler.SetStatusCreatedHeader(handler.EncodeJSON),
-		r.defaultServerOptions()...,
-	)
-}
-
-// swagger:route PUT /api/v2/projects/{project_id}/clusters/{cluster_id}/rulegroups/{rulegroup_id} rulegroup updateRuleGroup
-//
-//     Updates the specified rule group for the given cluster.
-//
-//     Consumes:
-//     - application/json
-//
-//     Produces:
-//     - application/json
-//
-//     Responses:
-//       default: errorResponse
-//       200: RuleGroup
-//       401: empty
-//       403: empty
-func (r Routing) updateRuleGroup() http.Handler {
-	return httptransport.NewServer(
-		endpoint.Chain(
-			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
-			middleware.UserSaver(r.userProvider),
-			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-			middleware.RuleGroups(r.clusterProviderGetter, r.ruleGroupProviderGetter, r.seedsGetter),
-			middleware.PrivilegedRuleGroups(r.clusterProviderGetter, r.ruleGroupProviderGetter, r.seedsGetter),
-		)(rulegroup.UpdateEndpoint(r.userInfoGetter, r.projectProvider, r.privilegedProjectProvider)),
-		rulegroup.DecodeUpdateReq,
-		handler.EncodeJSON,
-		r.defaultServerOptions()...,
-	)
-}
-
-// swagger:route DELETE /api/v2/projects/{project_id}/clusters/{cluster_id}/rulegroups/{rulegroup_id} rulegroup deleteRuleGroup
-//
-//    Deletes the given rule group that belongs to the cluster.
-//
-//     Produces:
-//     - application/json
-//
-//     Responses:
-//       default: errorResponse
-//       200: empty
-//       401: empty
-//       403: empty
-func (r Routing) deleteRuleGroup() http.Handler {
-	return httptransport.NewServer(
-		endpoint.Chain(
-			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
-			middleware.UserSaver(r.userProvider),
-			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-			middleware.RuleGroups(r.clusterProviderGetter, r.ruleGroupProviderGetter, r.seedsGetter),
-			middleware.PrivilegedRuleGroups(r.clusterProviderGetter, r.ruleGroupProviderGetter, r.seedsGetter),
-		)(rulegroup.DeleteEndpoint(r.userInfoGetter, r.projectProvider, r.privilegedProjectProvider)),
-		rulegroup.DecodeDeleteReq,
-		handler.EncodeJSON,
 		r.defaultServerOptions()...,
 	)
 }
@@ -4484,120 +4195,6 @@ func (r Routing) createOrUpdateBackupCredentials() http.Handler {
 			middleware.BackupCredentials(r.backupCredentialsProviderGetter, r.seedsGetter),
 		)(backupcredentials.CreateOrUpdateEndpoint(r.userInfoGetter)),
 		backupcredentials.DecodeBackupCredentialsReq,
-		handler.EncodeJSON,
-		r.defaultServerOptions()...,
-	)
-}
-
-// swagger:route GET /api/v2/projects/{project_id}/clusters/{cluster_id}/mlaadminsetting mlaadminsetting getMLAAdminSetting
-//
-//     Gets MLA Admin settings for the given cluster.
-//
-//     Produces:
-//     - application/json
-//
-//     Responses:
-//       default: errorResponse
-//       200: MLAAdminSetting
-//       401: empty
-//       403: empty
-func (r Routing) getMLAAdminSetting() http.Handler {
-	return httptransport.NewServer(
-		endpoint.Chain(
-			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
-			middleware.UserSaver(r.userProvider),
-			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-			middleware.PrivilegedMLAAdminSetting(r.clusterProviderGetter, r.privilegedMLAAdminSettingProviderGetter, r.seedsGetter),
-		)(mlaadminsetting.GetEndpoint(r.userInfoGetter, r.projectProvider, r.privilegedProjectProvider)),
-		mlaadminsetting.DecodeGetReq,
-		handler.EncodeJSON,
-		r.defaultServerOptions()...,
-	)
-}
-
-// swagger:route POST /api/v2/projects/{project_id}/clusters/{cluster_id}/mlaadminsetting mlaadminsetting createMLAAdminSetting
-//
-//     Creates MLA admin setting that will belong to the given cluster
-//
-//     Consumes:
-//     - application/json
-//
-//     Produces:
-//     - application/json
-//
-//     Responses:
-//       default: errorResponse
-//       201: MLAAdminSetting
-//       401: empty
-//       403: empty
-func (r Routing) createMLAAdminSetting() http.Handler {
-	return httptransport.NewServer(
-		endpoint.Chain(
-			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
-			middleware.UserSaver(r.userProvider),
-			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-			middleware.PrivilegedMLAAdminSetting(r.clusterProviderGetter, r.privilegedMLAAdminSettingProviderGetter, r.seedsGetter),
-		)(mlaadminsetting.CreateEndpoint(r.userInfoGetter, r.projectProvider, r.privilegedProjectProvider)),
-		mlaadminsetting.DecodeCreateReq,
-		handler.SetStatusCreatedHeader(handler.EncodeJSON),
-		r.defaultServerOptions()...,
-	)
-}
-
-// swagger:route PUT /api/v2/projects/{project_id}/clusters/{cluster_id}/mlaadminsetting mlaadminsetting updateMLAAdminSetting
-//
-//     Updates the MLA admin setting for the given cluster.
-//
-//     Consumes:
-//     - application/json
-//
-//     Produces:
-//     - application/json
-//
-//     Responses:
-//       default: errorResponse
-//       200: MLAAdminSetting
-//       401: empty
-//       403: empty
-func (r Routing) updateMLAAdminSetting() http.Handler {
-	return httptransport.NewServer(
-		endpoint.Chain(
-			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
-			middleware.UserSaver(r.userProvider),
-			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-			middleware.PrivilegedMLAAdminSetting(r.clusterProviderGetter, r.privilegedMLAAdminSettingProviderGetter, r.seedsGetter),
-		)(mlaadminsetting.UpdateEndpoint(r.userInfoGetter, r.projectProvider, r.privilegedProjectProvider)),
-		mlaadminsetting.DecodeUpdateReq,
-		handler.EncodeJSON,
-		r.defaultServerOptions()...,
-	)
-}
-
-// swagger:route DELETE /api/v2/projects/{project_id}/clusters/{cluster_id}/mlaadminsetting mlaadminsetting deleteMLAAdminSetting
-//
-//    Deletes the MLA admin setting that belongs to the cluster.
-//
-//     Produces:
-//     - application/json
-//
-//     Responses:
-//       default: errorResponse
-//       200: empty
-//       401: empty
-//       403: empty
-func (r Routing) deleteMLAAdminSetting() http.Handler {
-	return httptransport.NewServer(
-		endpoint.Chain(
-			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
-			middleware.UserSaver(r.userProvider),
-			middleware.SetClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
-			middleware.PrivilegedMLAAdminSetting(r.clusterProviderGetter, r.privilegedMLAAdminSettingProviderGetter, r.seedsGetter),
-		)(mlaadminsetting.DeleteEndpoint(r.userInfoGetter, r.projectProvider, r.privilegedProjectProvider)),
-		mlaadminsetting.DecodeDeleteReq,
 		handler.EncodeJSON,
 		r.defaultServerOptions()...,
 	)

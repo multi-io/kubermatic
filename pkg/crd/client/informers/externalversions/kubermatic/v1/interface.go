@@ -12,8 +12,6 @@ type Interface interface {
 	Addons() AddonInformer
 	// AddonConfigs returns a AddonConfigInformer.
 	AddonConfigs() AddonConfigInformer
-	// Alertmanagers returns a AlertmanagerInformer.
-	Alertmanagers() AlertmanagerInformer
 	// AllowedRegistries returns a AllowedRegistryInformer.
 	AllowedRegistries() AllowedRegistryInformer
 	// Clusters returns a ClusterInformer.
@@ -34,14 +32,10 @@ type Interface interface {
 	ExternalClusters() ExternalClusterInformer
 	// KubermaticSettings returns a KubermaticSettingInformer.
 	KubermaticSettings() KubermaticSettingInformer
-	// MLAAdminSettings returns a MLAAdminSettingInformer.
-	MLAAdminSettings() MLAAdminSettingInformer
 	// MachineDeploymentRequests returns a MachineDeploymentRequestInformer.
 	MachineDeploymentRequests() MachineDeploymentRequestInformer
 	// Projects returns a ProjectInformer.
 	Projects() ProjectInformer
-	// RuleGroups returns a RuleGroupInformer.
-	RuleGroups() RuleGroupInformer
 	// Users returns a UserInformer.
 	Users() UserInformer
 	// UserProjectBindings returns a UserProjectBindingInformer.
@@ -69,11 +63,6 @@ func (v *version) Addons() AddonInformer {
 // AddonConfigs returns a AddonConfigInformer.
 func (v *version) AddonConfigs() AddonConfigInformer {
 	return &addonConfigInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
-}
-
-// Alertmanagers returns a AlertmanagerInformer.
-func (v *version) Alertmanagers() AlertmanagerInformer {
-	return &alertmanagerInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // AllowedRegistries returns a AllowedRegistryInformer.
@@ -126,11 +115,6 @@ func (v *version) KubermaticSettings() KubermaticSettingInformer {
 	return &kubermaticSettingInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
-// MLAAdminSettings returns a MLAAdminSettingInformer.
-func (v *version) MLAAdminSettings() MLAAdminSettingInformer {
-	return &mLAAdminSettingInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
-}
-
 // MachineDeploymentRequests returns a MachineDeploymentRequestInformer.
 func (v *version) MachineDeploymentRequests() MachineDeploymentRequestInformer {
 	return &machineDeploymentRequestInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
@@ -139,11 +123,6 @@ func (v *version) MachineDeploymentRequests() MachineDeploymentRequestInformer {
 // Projects returns a ProjectInformer.
 func (v *version) Projects() ProjectInformer {
 	return &projectInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
-}
-
-// RuleGroups returns a RuleGroupInformer.
-func (v *version) RuleGroups() RuleGroupInformer {
-	return &ruleGroupInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // Users returns a UserInformer.

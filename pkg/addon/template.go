@@ -149,11 +149,7 @@ func NewTemplateData(
 				ProxyMode:         cluster.Spec.ClusterNetwork.ProxyMode,
 				StrictArp:         *cluster.Spec.ClusterNetwork.IPVS.StrictArp,
 			},
-			CNIPlugin: cniPlugin,
-			MLA: MLASettings{
-				MonitoringEnabled: cluster.Spec.MLA != nil && cluster.Spec.MLA.MonitoringEnabled,
-				LoggingEnabled:    cluster.Spec.MLA != nil && cluster.Spec.MLA.LoggingEnabled,
-			},
+			CNIPlugin:     cniPlugin,
 			StoragePolicy: storagePolicy,
 			CSIMigration:  csiMigration,
 		},
@@ -212,8 +208,6 @@ type ClusterData struct {
 	CloudSpec kubermaticv1.CloudSpec
 	// CNIPlugin contains the CNIPlugin settings
 	CNIPlugin CNIPlugin
-	// MLA contains monitoring, logging and alerting related settings for the user cluster.
-	MLA MLASettings
 	// StoragePolicy is the storage policy to use for vsphere csi addon
 	StoragePolicy string
 	// CSIMigration indicates if the cluster needed the CSIMigration
@@ -235,13 +229,6 @@ type ClusterNetwork struct {
 type CNIPlugin struct {
 	Type    string
 	Version string
-}
-
-type MLASettings struct {
-	// MonitoringEnabled is the flag for enabling monitoring in user cluster.
-	MonitoringEnabled bool
-	// LoggingEnabled is the flag for enabling logging in user cluster.
-	LoggingEnabled bool
 }
 
 func ParseFromFolder(log *zap.SugaredLogger, overwriteRegistry string, manifestPath string, data *TemplateData) ([]runtime.RawExtension, error) {
