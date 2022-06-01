@@ -119,12 +119,16 @@ func Add(
 }
 
 func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+	r.log.Debug("Start reconciliation")
 	// Add a wrapping here so we can emit an event on error
 	err := r.syncDnatRules(ctx)
 	if err != nil {
 		r.log.Errorw("Failed reconciling", zap.Error(err))
+		return reconcile.Result{}, err
 	}
-	return reconcile.Result{}, err
+
+	r.log.Debug("Finished reconciliation")
+	return reconcile.Result{}, nil
 }
 
 func (r *Reconciler) getDesiredRules(nodes []corev1.Node) []string {
@@ -154,6 +158,7 @@ func (r *Reconciler) syncDnatRules(ctx context.Context) error {
 
 	// Create the set of rules from all listed nodes.
 	desiredRules := r.getDesiredRules(nodeList.Items)
+	r.log.Debugw("Calculated desired rules", "count", len(desiredRules))
 
 	// Get the actual state (current iptable rules)
 	allActualRules, err := execSave()
@@ -162,13 +167,17 @@ func (r *Reconciler) syncDnatRules(ctx context.Context) error {
 	}
 	// filter out everything that's not relevant for us
 	actualRules, haveJump, haveMasquerade := r.filterDnatRules(allActualRules, r.nodeTranslationChainName)
+	r.log.Debugw("Filtered existing relevant rules", "count", len(actualRules), "jump", haveJump, "masq", haveMasquerade)
 
-	if !equality.Semantic.DeepEqual(actualRules, desiredRules) || !haveJump || !haveMasquerade {
-		// Need to update chain in kernel.
-		r.log.Debugw("Updating iptables chain in kernel", "rules-count", len(desiredRules))
-		if err := r.applyDNATRules(desiredRules, haveJump, haveMasquerade); err != nil {
-			return fmt.Errorf("failed to apply iptable rules: %v", err)
-		}
+	if equality.Semantic.DeepEqual(actualRules, desiredRules) && haveJump && haveMasquerade {
+		r.log.Debug("No rules to update")
+		return nil
+	}
+
+	// Need to update chain in kernel.
+	r.log.Debugw("Updating iptables chain in kernel", "rules-count", len(desiredRules))
+	if err := r.applyDNATRules(desiredRules, haveJump, haveMasquerade); err != nil {
+		return fmt.Errorf("failed to apply iptable rules: %v", err)
 	}
 
 	return nil
