@@ -72,12 +72,6 @@ func GetSeedSettingsEndpoint(seedsGetter provider.SeedsGetter) endpoint.Endpoint
 func convertSeedToSeedSettings(seed *kubermaticv1.Seed) *apiv2.SeedSettings {
 	seedSettings := &apiv2.SeedSettings{}
 
-	if seed.Spec.Metering != nil {
-		seedSettings.Metering.Enabled = seed.Spec.Metering.Enabled
-		seedSettings.Metering.StorageClassName = seed.Spec.Metering.StorageClassName
-		seedSettings.Metering.StorageSize = seed.Spec.Metering.StorageSize
-	}
-
 	if len(seed.Spec.SeedDNSOverwrite) > 0 {
 		seedSettings.SeedDNSOverwrite = seed.Spec.SeedDNSOverwrite
 	}

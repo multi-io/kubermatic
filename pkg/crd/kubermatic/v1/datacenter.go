@@ -91,8 +91,6 @@ type SeedSpec struct {
 	ExposeStrategy ExposeStrategy `json:"expose_strategy,omitempty"`
 	// DefaultComponentSettings are default values to set for newly created clusters.
 	DefaultComponentSettings ComponentSettings `json:"defaultComponentSettings,omitempty"`
-	// Metering configures the metering tool on user clusters across the seed.
-	Metering *MeteringConfigurations `json:"metering,omitempty"`
 	// BackupRestore when set, enables backup and restore controllers with given configuration.
 	BackupRestore *SeedBackupRestoreConfiguration `json:"backupRestore,omitempty"`
 }
@@ -421,14 +419,4 @@ type NodeSettings struct {
 	// Optional: The hyperkube image to use. Currently only Flatcar
 	// makes use of this option.
 	HyperkubeImage string `json:"hyperkube_image,omitempty"`
-}
-
-// MeteringConfigurations contains all the configurations for the metering tool.
-type MeteringConfigurations struct {
-	Enabled bool `json:"enabled"`
-	// StorageClassName is the name of the storage class that the metering tool uses to save processed files before
-	// exporting it to s3 bucket. Default value is kubermatic-fast.
-	StorageClassName string `json:"storageClassName"`
-	// StorageSize is the size of the storage class. Default value is 100Gi.
-	StorageSize string `json:"storageSize"`
 }

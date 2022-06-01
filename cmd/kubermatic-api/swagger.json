@@ -409,157 +409,6 @@
         }
       }
     },
-    "/api/v1/admin/metering/configurations": {
-      "put": {
-        "description": "Configures KKP metering tool. Only available in Kubermatic Enterprise Edition",
-        "produces": [
-          "application/json"
-        ],
-        "tags": [
-          "admin"
-        ],
-        "operationId": "createOrUpdateMeteringConfigurations",
-        "responses": {
-          "200": {
-            "$ref": "#/responses/empty"
-          },
-          "401": {
-            "$ref": "#/responses/empty"
-          },
-          "403": {
-            "$ref": "#/responses/empty"
-          },
-          "default": {
-            "description": "errorResponse",
-            "schema": {
-              "$ref": "#/definitions/errorResponse"
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/admin/metering/credentials": {
-      "put": {
-        "description": "Creates or updates the metering tool credentials. Only available in Kubermatic Enterprise Edition",
-        "produces": [
-          "application/json"
-        ],
-        "tags": [
-          "admin"
-        ],
-        "operationId": "createOrUpdateMeteringCredentials",
-        "responses": {
-          "200": {
-            "$ref": "#/responses/empty"
-          },
-          "401": {
-            "$ref": "#/responses/empty"
-          },
-          "403": {
-            "$ref": "#/responses/empty"
-          },
-          "default": {
-            "description": "errorResponse",
-            "schema": {
-              "$ref": "#/definitions/errorResponse"
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/admin/metering/reports": {
-      "get": {
-        "description": "List metering reports. Only available in Kubermatic Enterprise Edition",
-        "produces": [
-          "application/json"
-        ],
-        "tags": [
-          "metering",
-          "reports"
-        ],
-        "operationId": "listMeteringReports",
-        "parameters": [
-          {
-            "type": "string",
-            "x-go-name": "StartAfter",
-            "name": "start_after",
-            "in": "query"
-          },
-          {
-            "type": "integer",
-            "format": "int64",
-            "x-go-name": "MaxKeys",
-            "name": "max_keys",
-            "in": "query"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "MeteringReport",
-            "schema": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/MeteringReport"
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/responses/empty"
-          },
-          "403": {
-            "$ref": "#/responses/empty"
-          },
-          "default": {
-            "description": "errorResponse",
-            "schema": {
-              "$ref": "#/definitions/errorResponse"
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/admin/metering/reports/{report_name}": {
-      "get": {
-        "description": "Download a specific metering report. Provides an S3 pre signed URL valid for 1 hour. Only available in Kubermatic Enterprise Edition",
-        "produces": [
-          "application/json"
-        ],
-        "tags": [
-          "metering",
-          "report"
-        ],
-        "operationId": "getMeteringReport",
-        "parameters": [
-          {
-            "type": "string",
-            "x-go-name": "ReportName",
-            "name": "report_name",
-            "in": "path",
-            "required": true
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "MeteringReportURL",
-            "schema": {
-              "$ref": "#/definitions/MeteringReportURL"
-            }
-          },
-          "401": {
-            "$ref": "#/responses/empty"
-          },
-          "403": {
-            "$ref": "#/responses/empty"
-          },
-          "default": {
-            "description": "errorResponse",
-            "schema": {
-              "$ref": "#/definitions/errorResponse"
-            }
-          }
-        }
-      }
-    },
     "/api/v1/admin/seeds": {
       "get": {
         "produces": [
@@ -12911,6 +12760,13 @@
         "parameters": [
           {
             "type": "string",
+            "x-go-name": "Architecture",
+            "description": "architecture query parameter. Supports: arm64 and x64 types.",
+            "name": "architecture",
+            "in": "query"
+          },
+          {
+            "type": "string",
             "x-go-name": "ProjectID",
             "name": "project_id",
             "in": "path",
@@ -12922,13 +12778,6 @@
             "name": "cluster_id",
             "in": "path",
             "required": true
-          },
-          {
-            "type": "string",
-            "x-go-name": "Architecture",
-            "description": "architecture query parameter. Supports: arm64 and x64 types.",
-            "name": "architecture",
-            "in": "query"
           }
         ],
         "responses": {
@@ -20012,54 +19861,6 @@
       "x-go-name": "KubermaticVersions",
       "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
     },
-    "MeteringConfigurations": {
-      "type": "object",
-      "title": "MeteringConfigurations contains all the configurations for the metering tool.",
-      "properties": {
-        "enabled": {
-          "type": "boolean",
-          "x-go-name": "Enabled"
-        },
-        "storageClassName": {
-          "description": "StorageClassName is the name of the storage class that the metering tool uses to save processed files before\nexporting it to s3 bucket. Default value is kubermatic-fast.",
-          "type": "string",
-          "x-go-name": "StorageClassName"
-        },
-        "storageSize": {
-          "description": "StorageSize is the size of the storage class. Default value is 100Gi.",
-          "type": "string",
-          "x-go-name": "StorageSize"
-        }
-      },
-      "x-go-package": "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
-    },
-    "MeteringReport": {
-      "description": "MeteringReport holds objects names and metadata for available reports",
-      "type": "object",
-      "properties": {
-        "lastModified": {
-          "type": "string",
-          "format": "date-time",
-          "x-go-name": "LastModified"
-        },
-        "name": {
-          "type": "string",
-          "x-go-name": "Name"
-        },
-        "size": {
-          "type": "integer",
-          "format": "int64",
-          "x-go-name": "Size"
-        }
-      },
-      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
-    },
-    "MeteringReportURL": {
-      "description": "ReportURL represent an S3 pre signed URL to download a report",
-      "type": "string",
-      "x-go-name": "ReportURL",
-      "x-go-package": "k8c.io/kubermatic/v2/pkg/api/v1"
-    },
     "Names": {
       "type": "object",
       "properties": {
@@ -21998,9 +21799,6 @@
       "description": "SeedSettings represents settings for a Seed cluster",
       "type": "object",
       "properties": {
-        "metering": {
-          "$ref": "#/definitions/MeteringConfigurations"
-        },
         "seedDNSOverwrite": {
           "description": "the Seed level seed dns overwrite",
           "type": "string",
