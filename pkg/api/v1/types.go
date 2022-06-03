@@ -2237,8 +2237,6 @@ const (
 	ClusterRoleBindingsCleanupFinalizer = "kubermatic.io/cleanup-cluster-role-bindings"
 	// ClusterTemplateSeedCleanupFinalizer indicates that synced cluster template on seed clusters need cleanup
 	ClusterTemplateSeedCleanupFinalizer = "kubermatic.io/cleanup-seed-cluster-template"
-	// AllowedRegistryCleanupFinalizer indicates that allowed registry Constraints need to be cleaned up
-	AllowedRegistryCleanupFinalizer = "kubermatic.io/cleanup-allowed-registry"
 	// ClusterTemplateSeedCleanupFinalizer indicates that cluster template instance on seed clusters need cleanup
 	SeedClusterTemplateInstanceFinalizer = "kubermatic.io/cleanup-seed-cluster-template-instance"
 )

@@ -186,7 +186,6 @@ type RoutingParams struct {
 	ConstraintProviderGetter              provider.ConstraintProviderGetter
 	ClusterTemplateProvider               provider.ClusterTemplateProvider
 	ClusterTemplateInstanceProviderGetter provider.ClusterTemplateInstanceProviderGetter
-	PrivilegedAllowedRegistryProvider     provider.PrivilegedAllowedRegistryProvider
 	EtcdBackupConfigProviderGetter        provider.EtcdBackupConfigProviderGetter
 	EtcdRestoreProviderGetter             provider.EtcdRestoreProviderGetter
 	EtcdBackupConfigProjectProviderGetter provider.EtcdBackupConfigProjectProviderGetter

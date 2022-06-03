@@ -27,7 +27,6 @@ import (
 	"k8c.io/kubermatic/v2/pkg/handler/middleware"
 	"k8c.io/kubermatic/v2/pkg/handler/v1/common"
 	"k8c.io/kubermatic/v2/pkg/handler/v2/addon"
-	allowedregistry "k8c.io/kubermatic/v2/pkg/handler/v2/allowed_registry"
 	"k8c.io/kubermatic/v2/pkg/handler/v2/backupcredentials"
 	"k8c.io/kubermatic/v2/pkg/handler/v2/cluster"
 	clustertemplate "k8c.io/kubermatic/v2/pkg/handler/v2/cluster_template"
@@ -539,27 +538,6 @@ func (r Routing) RegisterV2(mux *mux.Router, metrics common.ServerMetrics) {
 	mux.Methods(http.MethodPost).
 		Path("/projects/{project_id}/clustertemplates/{template_id}/instances").
 		Handler(r.createClusterTemplateInstance())
-
-	// Defines a set of HTTP endpoints for managing allowed registries
-	mux.Methods(http.MethodPost).
-		Path("/allowedregistries").
-		Handler(r.createAllowedRegistry())
-
-	mux.Methods(http.MethodGet).
-		Path("/allowedregistries").
-		Handler(r.listAllowedRegistries())
-
-	mux.Methods(http.MethodGet).
-		Path("/allowedregistries/{allowed_registry}").
-		Handler(r.getAllowedRegistry())
-
-	mux.Methods(http.MethodDelete).
-		Path("/allowedregistries/{allowed_registry}").
-		Handler(r.deleteAllowedRegistry())
-
-	mux.Methods(http.MethodPatch).
-		Path("/allowedregistries/{allowed_registry}").
-		Handler(r.patchAllowedRegistry())
 
 	// Defines a set of HTTP endpoints for managing etcd backup configs
 	mux.Methods(http.MethodPost).
@@ -3731,134 +3709,6 @@ func (r Routing) migrateClusterToExternalCCM() http.Handler {
 			middleware.SetPrivilegedClusterProvider(r.clusterProviderGetter, r.seedsGetter),
 		)(cluster.MigrateEndpointToExternalCCM(r.projectProvider, r.privilegedProjectProvider, r.seedsGetter, r.userInfoGetter, r.supportManager)),
 		cluster.DecodeGetClusterReq,
-		handler.EncodeJSON,
-		r.defaultServerOptions()...,
-	)
-}
-
-// swagger:route POST /api/v2/allowedregistries allowedregistry createAllowedRegistry
-//
-//     Creates a allowed registry
-//
-//     Consumes:
-//     - application/json
-//
-//     Produces:
-//     - application/json
-//
-//     Responses:
-//       default: errorResponse
-//       201: AllowedRegistry
-//       401: empty
-//       403: empty
-func (r Routing) createAllowedRegistry() http.Handler {
-	return httptransport.NewServer(
-		endpoint.Chain(
-			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
-			middleware.UserSaver(r.userProvider),
-		)(allowedregistry.CreateEndpoint(r.userInfoGetter, r.privilegedAllowedRegistryProvider)),
-		allowedregistry.DecodeCreateAllowedRegistryRequest,
-		handler.SetStatusCreatedHeader(handler.EncodeJSON),
-		r.defaultServerOptions()...,
-	)
-}
-
-// swagger:route GET /api/v2/allowedregistries allowedregistry listAllowedRegistries
-//
-//     List allowed registries.
-//
-//
-//     Produces:
-//     - application/json
-//
-//     Responses:
-//       default: errorResponse
-//       200: []AllowedRegistry
-//       401: empty
-//       403: empty
-func (r Routing) listAllowedRegistries() http.Handler {
-	return httptransport.NewServer(
-		endpoint.Chain(
-			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
-			middleware.UserSaver(r.userProvider),
-		)(allowedregistry.ListEndpoint(r.userInfoGetter, r.privilegedAllowedRegistryProvider)),
-		common.DecodeEmptyReq,
-		handler.EncodeJSON,
-		r.defaultServerOptions()...,
-	)
-}
-
-// swagger:route GET /api/v2/allowedregistries/{allowed_registry} allowedregistries getAllowedRegistry
-//
-//     Get allowed registries specified by name
-//
-//
-//     Produces:
-//     - application/json
-//
-//     Responses:
-//       default: errorResponse
-//       200: AllowedRegistry
-//       401: empty
-//       403: empty
-func (r Routing) getAllowedRegistry() http.Handler {
-	return httptransport.NewServer(
-		endpoint.Chain(
-			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
-			middleware.UserSaver(r.userProvider),
-		)(allowedregistry.GetEndpoint(r.userInfoGetter, r.privilegedAllowedRegistryProvider)),
-		allowedregistry.DecodeGetAllowedRegistryRequest,
-		handler.EncodeJSON,
-		r.defaultServerOptions()...,
-	)
-}
-
-// swagger:route DELETE /api/v2/allowedregistries/{allowed_registry} allowedregistries deleteAllowedRegistry
-//
-//    Deletes the given allowed registry.
-//
-//     Produces:
-//     - application/json
-//
-//     Responses:
-//       default: errorResponse
-//       200: empty
-//       401: empty
-//       403: empty
-func (r Routing) deleteAllowedRegistry() http.Handler {
-	return httptransport.NewServer(
-		endpoint.Chain(
-			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
-			middleware.UserSaver(r.userProvider),
-		)(allowedregistry.DeleteEndpoint(r.userInfoGetter, r.privilegedAllowedRegistryProvider)),
-		allowedregistry.DecodeGetAllowedRegistryRequest,
-		handler.EncodeJSON,
-		r.defaultServerOptions()...,
-	)
-}
-
-// swagger:route PATCH /api/v2/allowedregistries/{allowed_registry} allowedregistries patchAllowedRegistry
-//
-//     Patch a specified allowed registry
-//
-//     Consumes:
-//     - application/json
-//
-//     Produces:
-//     - application/json
-//
-//     Responses:
-//       default: errorResponse
-//       200: ConstraintTemplate
-//       401: empty
-//       403: empty
-func (r Routing) patchAllowedRegistry() http.Handler {
-	return httptransport.NewServer(
-		endpoint.Chain(
-			middleware.TokenVerifier(r.tokenVerifiers, r.userProvider),
-			middleware.UserSaver(r.userProvider),
-		)(allowedregistry.PatchEndpoint(r.userInfoGetter, r.privilegedAllowedRegistryProvider)),
-		allowedregistry.DecodePatchAllowedRegistryReq,
 		handler.EncodeJSON,
 		r.defaultServerOptions()...,
 	)

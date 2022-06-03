@@ -20,10 +20,6 @@ func (c *FakeKubermaticV1) AddonConfigs() v1.AddonConfigInterface {
 	return &FakeAddonConfigs{c}
 }
 
-func (c *FakeKubermaticV1) AllowedRegistries() v1.AllowedRegistryInterface {
-	return &FakeAllowedRegistries{c}
-}
-
 func (c *FakeKubermaticV1) Clusters() v1.ClusterInterface {
 	return &FakeClusters{c}
 }

@@ -180,14 +180,6 @@ type ClusterTemplateInstance struct {
 	Spec crdapiv1.ClusterTemplateInstanceSpec `json:"spec"`
 }
 
-// AllowedRegistry represents a object containing a allowed image registry prefix
-// swagger:model AllowedRegistry
-type AllowedRegistry struct {
-	Name string `json:"name"`
-
-	Spec crdapiv1.AllowedRegistrySpec `json:"spec"`
-}
-
 // EtcdBackupConfig represents an object holding the configuration for etcd backups
 // swagger:model EtcdBackupConfig
 type EtcdBackupConfig struct {

@@ -14,10 +14,6 @@ type AddonNamespaceListerExpansion interface{}
 // AddonConfigLister.
 type AddonConfigListerExpansion interface{}
 
-// AllowedRegistryListerExpansion allows custom methods to be added to
-// AllowedRegistryLister.
-type AllowedRegistryListerExpansion interface{}
-
 // ClusterListerExpansion allows custom methods to be added to
 // ClusterLister.
 type ClusterListerExpansion interface{}

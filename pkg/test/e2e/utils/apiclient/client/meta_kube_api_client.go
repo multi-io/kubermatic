@@ -13,8 +13,6 @@ import (
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/addon"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/admin"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/alibaba"
-	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/allowedregistries"
-	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/allowedregistry"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/anexia"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/aws"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/azure"
@@ -90,8 +88,6 @@ func New(transport runtime.ClientTransport, formats strfmt.Registry) *MetaKubeAP
 	cli.Addon = addon.New(transport, formats)
 	cli.Admin = admin.New(transport, formats)
 	cli.Alibaba = alibaba.New(transport, formats)
-	cli.Allowedregistries = allowedregistries.New(transport, formats)
-	cli.Allowedregistry = allowedregistry.New(transport, formats)
 	cli.Anexia = anexia.New(transport, formats)
 	cli.Aws = aws.New(transport, formats)
 	cli.Azure = azure.New(transport, formats)
@@ -170,10 +166,6 @@ type MetaKubeAPI struct {
 
 	Alibaba alibaba.ClientService
 
-	Allowedregistries allowedregistries.ClientService
-
-	Allowedregistry allowedregistry.ClientService
-
 	Anexia anexia.ClientService
 
 	Aws aws.ClientService
@@ -239,8 +231,6 @@ func (c *MetaKubeAPI) SetTransport(transport runtime.ClientTransport) {
 	c.Addon.SetTransport(transport)
 	c.Admin.SetTransport(transport)
 	c.Alibaba.SetTransport(transport)
-	c.Allowedregistries.SetTransport(transport)
-	c.Allowedregistry.SetTransport(transport)
 	c.Anexia.SetTransport(transport)
 	c.Aws.SetTransport(transport)
 	c.Azure.SetTransport(transport)

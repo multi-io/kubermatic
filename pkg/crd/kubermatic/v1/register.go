@@ -89,8 +89,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ClusterTemplateList{},
 		&ClusterTemplateInstance{},
 		&ClusterTemplateInstanceList{},
-		&AllowedRegistry{},
-		&AllowedRegistryList{},
 	)
 
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)

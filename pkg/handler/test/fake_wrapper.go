@@ -422,36 +422,6 @@ func (k NewClusterTemplateSliceWrapper) EqualOrDie(expected NewClusterTemplateSl
 	}
 }
 
-// NewAllowedRegistrySliceWrapper wraps []apiv2.AllowedRegistry
-// to provide convenient methods for tests
-type NewAllowedRegistrySliceWrapper []*apiv2.AllowedRegistry
-
-// DecodeOrDie reads and decodes json data from the reader
-func (k *NewAllowedRegistrySliceWrapper) DecodeOrDie(r io.Reader, t *testing.T) *NewAllowedRegistrySliceWrapper {
-	t.Helper()
-	dec := json.NewDecoder(r)
-	err := dec.Decode(k)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return k
-}
-
-// Sort sorts the collection by Name
-func (k NewAllowedRegistrySliceWrapper) Sort() {
-	sort.Slice(k, func(i, j int) bool {
-		return k[i].Name < k[j].Name
-	})
-}
-
-// EqualOrDie compares whether expected collection is equal to the actual one
-func (k NewAllowedRegistrySliceWrapper) EqualOrDie(expected NewAllowedRegistrySliceWrapper, t *testing.T) {
-	t.Helper()
-	if diff := deep.Equal(k, expected); diff != nil {
-		t.Errorf("actual slice is different that the expected one. Diff: %v", diff)
-	}
-}
-
 // NewEtcdBackupConfigSliceWrapper wraps []apiv2.EtcdBackupConfig
 // to provide convenient methods for tests
 type NewEtcdBackupConfigSliceWrapper []*apiv2.EtcdBackupConfig

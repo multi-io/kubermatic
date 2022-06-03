@@ -1,3 +1,4 @@
+//go:build create
 // +build create
 
 /*

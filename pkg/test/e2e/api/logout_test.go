@@ -1,3 +1,4 @@
+//go:build logout
 // +build logout
 
 /*

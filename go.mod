@@ -43,15 +43,15 @@ require (
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/securecookie v1.1.1
 	github.com/gorilla/websocket v1.4.2
-	github.com/grafana/grafana v6.1.6+incompatible
+	github.com/grafana/grafana v6.1.6+incompatible // indirect
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hetznercloud/hcloud-go v1.32.0
 	github.com/inconshreveable/log15 v0.0.0-20201112154412-8562bdadbbac // indirect
 	github.com/jetstack/cert-manager v1.1.0
-	github.com/kubermatic/grafanasdk v0.9.10
+	github.com/kubermatic/grafanasdk v0.9.10 // indirect
 	github.com/kubermatic/machine-controller v1.35.2
 	github.com/minio/minio-go v6.0.14+incompatible
-	github.com/minio/minio-go/v7 v7.0.13
+	github.com/minio/minio-go/v7 v7.0.13 // indirect
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.16.0
 	github.com/open-policy-agent/frameworks/constraint v0.0.0-20210802220920-c000ec35322e
@@ -76,7 +76,7 @@ require (
 	golang.org/x/tools v0.1.2
 	gomodules.xyz/jsonpatch/v2 v2.2.0
 	google.golang.org/api v0.36.0
-	google.golang.org/genproto v0.0.0-20210602131652-f16073e35f0c
+	google.golang.org/genproto v0.0.0-20210602131652-f16073e35f0c // indirect
 	google.golang.org/grpc v1.38.0
 	google.golang.org/protobuf v1.27.1
 	gopkg.in/fsnotify.v1 v1.4.7

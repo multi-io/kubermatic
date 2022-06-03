@@ -12,7 +12,6 @@ type KubermaticV1Interface interface {
 	RESTClient() rest.Interface
 	AddonsGetter
 	AddonConfigsGetter
-	AllowedRegistriesGetter
 	ClustersGetter
 	ClusterTemplatesGetter
 	ClusterTemplateInstancesGetter
@@ -40,10 +39,6 @@ func (c *KubermaticV1Client) Addons(namespace string) AddonInterface {
 
 func (c *KubermaticV1Client) AddonConfigs() AddonConfigInterface {
 	return newAddonConfigs(c)
-}
-
-func (c *KubermaticV1Client) AllowedRegistries() AllowedRegistryInterface {
-	return newAllowedRegistries(c)
 }
 
 func (c *KubermaticV1Client) Clusters() ClusterInterface {

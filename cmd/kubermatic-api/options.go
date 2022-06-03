@@ -20,8 +20,10 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"k8c.io/kubermatic/v2/pkg/watcher"
 	"strings"
+
+	"k8c.io/kubermatic/v2/pkg/watcher"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/features"
@@ -30,8 +32,6 @@ import (
 	"k8c.io/kubermatic/v2/pkg/resources/certificates"
 	"k8c.io/kubermatic/v2/pkg/serviceaccount"
 	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
-
-	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 type serverRunOptions struct {
@@ -178,7 +178,6 @@ type providers struct {
 	constraintProviderGetter              provider.ConstraintProviderGetter
 	clusterTemplateProvider               provider.ClusterTemplateProvider
 	clusterTemplateInstanceProviderGetter provider.ClusterTemplateInstanceProviderGetter
-	privilegedAllowedRegistryProvider     provider.PrivilegedAllowedRegistryProvider
 	etcdBackupConfigProviderGetter        provider.EtcdBackupConfigProviderGetter
 	etcdRestoreProviderGetter             provider.EtcdRestoreProviderGetter
 	etcdBackupConfigProjectProviderGetter provider.EtcdBackupConfigProjectProviderGetter

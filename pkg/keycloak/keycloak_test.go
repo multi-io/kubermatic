@@ -1,3 +1,4 @@
+//go:build keycloaktest
 // +build keycloaktest
 
 package keycloak
