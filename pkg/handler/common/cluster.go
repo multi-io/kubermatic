@@ -443,7 +443,6 @@ func PatchEndpoint(ctx context.Context, userInfoGetter provider.UserInfoGetter, 
 	newInternalCluster.Spec.AuditLogging = patchedCluster.Spec.AuditLogging
 	newInternalCluster.Spec.Sys11Auth = patchedCluster.Spec.Sys11Auth
 	newInternalCluster.Spec.UpdateWindow = patchedCluster.Spec.UpdateWindow
-	newInternalCluster.Spec.OPAIntegration = patchedCluster.Spec.OPAIntegration
 	newInternalCluster.Spec.PodNodeSelectorAdmissionPluginConfig = patchedCluster.Spec.PodNodeSelectorAdmissionPluginConfig
 	newInternalCluster.Spec.ServiceAccount = patchedCluster.Spec.ServiceAccount
 	newInternalCluster.Spec.ContainerRuntime = patchedCluster.Spec.ContainerRuntime
@@ -550,8 +549,6 @@ func HealthEndpoint(ctx context.Context, userInfoGetter provider.UserInfoGetter,
 		Etcd:                         existingCluster.Status.ExtendedHealth.Etcd,
 		CloudProviderInfrastructure:  existingCluster.Status.ExtendedHealth.CloudProviderInfrastructure,
 		UserClusterControllerManager: existingCluster.Status.ExtendedHealth.UserClusterControllerManager,
-		GatekeeperController:         existingCluster.Status.ExtendedHealth.GatekeeperController,
-		GatekeeperAudit:              existingCluster.Status.ExtendedHealth.GatekeeperAudit,
 	}, nil
 }
 
@@ -959,7 +956,6 @@ func ConvertInternalClusterToExternal(internalCluster *kubermaticv1.Cluster, dat
 			UsePodNodeSelectorAdmissionPlugin:    internalCluster.Spec.UsePodNodeSelectorAdmissionPlugin,
 			EnableUserSSHKeyAgent:                internalCluster.Spec.EnableUserSSHKeyAgent,
 			AdmissionPlugins:                     internalCluster.Spec.AdmissionPlugins,
-			OPAIntegration:                       internalCluster.Spec.OPAIntegration,
 			PodNodeSelectorAdmissionPluginConfig: internalCluster.Spec.PodNodeSelectorAdmissionPluginConfig,
 			ServiceAccount:                       internalCluster.Spec.ServiceAccount,
 			ContainerRuntime:                     internalCluster.Spec.ContainerRuntime,

@@ -77,9 +77,6 @@ func (r *Reconciler) reconcileCluster(ctx context.Context, cluster *kubermaticv1
 
 	}
 
-	if !kuberneteshelper.HasFinalizer(cluster, kubermaticapiv1.KubermaticConstraintCleanupFinalizer) {
-		finalizers = append(finalizers, kubermaticapiv1.KubermaticConstraintCleanupFinalizer)
-	}
 	if !kuberneteshelper.HasFinalizer(cluster, kubermaticapiv1.ClusterRoleBindingsCleanupFinalizer) {
 		finalizers = append(finalizers, kubermaticapiv1.ClusterRoleBindingsCleanupFinalizer)
 	}

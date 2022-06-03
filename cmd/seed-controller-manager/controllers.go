@@ -30,8 +30,6 @@ import (
 	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/addoninstaller"
 	cloudcontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/cloud"
 	clustertemplatecontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/cluster-template-controller"
-	seedconstraintsynchronizer "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/constraint-controller"
-	constrainttemplatecontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/constraint-template-controller"
 	etcdbackupcontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/etcdbackup"
 	etcdrestorecontroller "k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/etcdrestore"
 	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/initialmachinedeployment"
@@ -64,9 +62,7 @@ var AllControllers = map[string]controllerCreator{
 	seedresourcesuptodatecondition.ControllerName: createSeedConditionUpToDateController,
 	rancher.ControllerName:                        createRancherController,
 	pvwatcher.ControllerName:                      createPvWatcherController,
-	seedconstraintsynchronizer.ControllerName:     createConstraintController,
 	localstoragepvwatcher.ControllerName:          createLocalStoragePVController,
-	constrainttemplatecontroller.ControllerName:   createConstraintTemplateController,
 	initialmachinedeployment.ControllerName:       createInitialMachineDeploymentController,
 	clustertemplatecontroller.ControllerName:      createClusterTemplateController,
 }
@@ -389,16 +385,6 @@ func createPvWatcherController(ctrlCtx *controllerContext) error {
 	)
 }
 
-func createConstraintTemplateController(ctrlCtx *controllerContext) error {
-	return constrainttemplatecontroller.Add(
-		ctrlCtx.mgr,
-		ctrlCtx.clientProvider,
-		ctrlCtx.log,
-		ctrlCtx.runOptions.workerName,
-		ctrlCtx.runOptions.workerCount,
-	)
-}
-
 func createInitialMachineDeploymentController(ctrlCtx *controllerContext) error {
 	return initialmachinedeployment.Add(
 		ctrlCtx.ctx,
@@ -417,17 +403,6 @@ func createLocalStoragePVController(ctrlCtx *controllerContext) error {
 		ctrlCtx.log,
 		ctrlCtx.mgr,
 		ctrlCtx.runOptions.workerCount)
-}
-
-func createConstraintController(ctrlCtx *controllerContext) error {
-	return seedconstraintsynchronizer.Add(
-		ctrlCtx.ctx,
-		ctrlCtx.mgr,
-		ctrlCtx.log,
-		ctrlCtx.runOptions.workerName,
-		ctrlCtx.runOptions.namespace,
-		ctrlCtx.runOptions.workerCount,
-	)
 }
 
 func createClusterTemplateController(ctrlCtx *controllerContext) error {

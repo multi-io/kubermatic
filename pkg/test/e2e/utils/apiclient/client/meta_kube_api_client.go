@@ -17,9 +17,6 @@ import (
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/aws"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/azure"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/backupcredentials"
-	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/constraint"
-	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/constraints"
-	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/constrainttemplates"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/credentials"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/datacenter"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/digitalocean"
@@ -92,9 +89,6 @@ func New(transport runtime.ClientTransport, formats strfmt.Registry) *MetaKubeAP
 	cli.Aws = aws.New(transport, formats)
 	cli.Azure = azure.New(transport, formats)
 	cli.Backupcredentials = backupcredentials.New(transport, formats)
-	cli.Constraint = constraint.New(transport, formats)
-	cli.Constraints = constraints.New(transport, formats)
-	cli.Constrainttemplates = constrainttemplates.New(transport, formats)
 	cli.Credentials = credentials.New(transport, formats)
 	cli.Datacenter = datacenter.New(transport, formats)
 	cli.Digitalocean = digitalocean.New(transport, formats)
@@ -174,12 +168,6 @@ type MetaKubeAPI struct {
 
 	Backupcredentials backupcredentials.ClientService
 
-	Constraint constraint.ClientService
-
-	Constraints constraints.ClientService
-
-	Constrainttemplates constrainttemplates.ClientService
-
 	Credentials credentials.ClientService
 
 	Datacenter datacenter.ClientService
@@ -235,9 +223,6 @@ func (c *MetaKubeAPI) SetTransport(transport runtime.ClientTransport) {
 	c.Aws.SetTransport(transport)
 	c.Azure.SetTransport(transport)
 	c.Backupcredentials.SetTransport(transport)
-	c.Constraint.SetTransport(transport)
-	c.Constraints.SetTransport(transport)
-	c.Constrainttemplates.SetTransport(transport)
 	c.Credentials.SetTransport(transport)
 	c.Datacenter.SetTransport(transport)
 	c.Digitalocean.SetTransport(transport)

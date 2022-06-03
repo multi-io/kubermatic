@@ -801,11 +801,6 @@ type ClusterSpec struct {
 	// ServiceAccount contains service account related settings for the kube-apiserver of user cluster.
 	ServiceAccount *kubermaticv1.ServiceAccountSettings `json:"serviceAccount,omitempty"`
 
-	// OPAIntegration is a preview feature that enables OPA integration with Kubermatic for the cluster.
-	// Enabling it causes gatekeeper and its resources to be deployed on the user cluster.
-	// By default it is disabled.
-	OPAIntegration *kubermaticv1.OPAIntegrationSettings `json:"opaIntegration,omitempty"`
-
 	// ClusterNetwork contains network settings.
 	ClusterNetwork *kubermaticv1.ClusterNetworkingConfig `json:"clusterNetwork,omitempty"`
 
@@ -830,7 +825,6 @@ func (cs *ClusterSpec) MarshalJSON() ([]byte, error) {
 		AdmissionPlugins                     []string                               `json:"admissionPlugins,omitempty"`
 		PodNodeSelectorAdmissionPluginConfig map[string]string                      `json:"podNodeSelectorAdmissionPluginConfig,omitempty"`
 		ServiceAccount                       *kubermaticv1.ServiceAccountSettings   `json:"serviceAccount,omitempty"`
-		OPAIntegration                       *kubermaticv1.OPAIntegrationSettings   `json:"opaIntegration,omitempty"`
 		ContainerRuntime                     string                                 `json:"containerRuntime,omitempty"`
 		ClusterNetwork                       *kubermaticv1.ClusterNetworkingConfig  `json:"clusterNetwork,omitempty"`
 	}{
@@ -862,7 +856,6 @@ func (cs *ClusterSpec) MarshalJSON() ([]byte, error) {
 		AdmissionPlugins:                     cs.AdmissionPlugins,
 		PodNodeSelectorAdmissionPluginConfig: cs.PodNodeSelectorAdmissionPluginConfig,
 		ServiceAccount:                       cs.ServiceAccount,
-		OPAIntegration:                       cs.OPAIntegration,
 		ContainerRuntime:                     cs.ContainerRuntime,
 		ClusterNetwork:                       cs.ClusterNetwork,
 	})
@@ -1089,8 +1082,6 @@ type ClusterHealth struct {
 	Etcd                         kubermaticv1.HealthStatus `json:"etcd"`
 	CloudProviderInfrastructure  kubermaticv1.HealthStatus `json:"cloudProviderInfrastructure"`
 	UserClusterControllerManager kubermaticv1.HealthStatus `json:"userClusterControllerManager"`
-	GatekeeperController         kubermaticv1.HealthStatus `json:"gatekeeperController,omitempty"`
-	GatekeeperAudit              kubermaticv1.HealthStatus `json:"gatekeeperAudit,omitempty"`
 }
 
 // AccessibleAddons represents an array of addons that can be configured in the user clusters.
@@ -2215,18 +2206,8 @@ const (
 	EtcdBackupConfigCleanupFinalizer = "kubermatic.io/cleanup-etcdbackupconfigs"
 	// ExternalClusterKubeconfigCleanupFinalizer indicates that secrets for kubeconfig still need cleanup
 	ExternalClusterKubeconfigCleanupFinalizer = "kubermatic.io/cleanup-kubeconfig-secret"
-	// GatekeeperConstraintTemplateCleanupFinalizer indicates that synced gatekeeper Constraint Templates on user cluster need cleanup
-	GatekeeperConstraintTemplateCleanupFinalizer = "kubermatic.io/cleanup-gatekeeper-constraint-templates"
-	// GatekeeperSeedConstraintTemplateCleanupFinalizer indicates that synced gatekeeper Constraint Templates on seed clusters need cleanup
-	GatekeeperSeedConstraintTemplateCleanupFinalizer = "kubermatic.io/cleanup-gatekeeper-master-constraint-templates"
-	// GatekeeperSeedConstraintCleanupFinalizer indicates that synced gatekeeper Constraint on seed clusters need cleanup
-	GatekeeperSeedConstraintCleanupFinalizer = "kubermatic.io/cleanup-gatekeeper-seed-constraint"
-	// GatekeeperConstraintCleanupFinalizer indicates that gatkeeper constraints on the user cluster need cleanup
-	GatekeeperConstraintCleanupFinalizer = "kubermatic.io/cleanup-gatekeeper-constraints"
 	// KubermaticUserClusterNsDefaultConstraintCleanupFinalizer indicates that kubermatic constraints on the user cluster namespace need cleanup
 	KubermaticUserClusterNsDefaultConstraintCleanupFinalizer = "kubermatic.io/cleanup-kubermatic-usercluster-ns-default-constraints"
-	// KubermaticConstraintCleanupFinalizer indicates that Kubermatic constraints for the cluster need cleanup
-	KubermaticConstraintCleanupFinalizer = "kubermatic.io/cleanup-kubermatic-constraints"
 	// SeedProjectCleanupFinalizer indicates that Kubermatic Projects on the seed clusters need cleanup
 	SeedProjectCleanupFinalizer = "kubermatic.io/cleanup-seed-projects"
 	// SeedUserProjectBindingCleanupFinalizer indicates that Kubermatic UserProjectBindings on the seed clusters need cleanup

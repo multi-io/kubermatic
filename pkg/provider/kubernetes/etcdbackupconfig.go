@@ -36,7 +36,7 @@ type EtcdBackupConfigProvider struct {
 	clientPrivileged             ctrlruntimeclient.Client
 }
 
-// NewEtcdBackupConfigProvider returns a constraint provider
+// NewEtcdBackupConfigProvider returns a backup config provider
 func NewEtcdBackupConfigProvider(createSeedImpersonatedClient ImpersonationClient, client ctrlruntimeclient.Client) *EtcdBackupConfigProvider {
 	return &EtcdBackupConfigProvider{
 		clientPrivileged:             client,

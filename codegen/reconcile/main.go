@@ -157,27 +157,12 @@ func main() {
 				ResourceImportPath: "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1",
 			},
 			{
-				ResourceName:       "ConstraintTemplate",
-				ImportAlias:        "gatekeeperv1beta1",
-				ResourceImportPath: "github.com/open-policy-agent/frameworks/constraint/pkg/apis/templates/v1beta1",
-			},
-			{
-				ResourceName:     "ConstraintTemplate",
-				ImportAlias:      "kubermaticv1",
-				APIVersionPrefix: "KubermaticV1",
-			},
-			{
 				ResourceName:     "Project",
 				ImportAlias:      "kubermaticv1",
 				APIVersionPrefix: "KubermaticV1",
 			},
 			{
 				ResourceName:     "UserProjectBinding",
-				ImportAlias:      "kubermaticv1",
-				APIVersionPrefix: "KubermaticV1",
-			},
-			{
-				ResourceName:     "Constraint",
 				ImportAlias:      "kubermaticv1",
 				APIVersionPrefix: "KubermaticV1",
 			},

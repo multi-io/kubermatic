@@ -24,7 +24,6 @@ import (
 	"net/url"
 	"time"
 
-	constrainttemplatev1beta1 "github.com/open-policy-agent/frameworks/constraint/pkg/apis/templates/v1beta1"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
@@ -156,9 +155,6 @@ func GetClients() (ctrlruntimeclient.Client, rest.Interface, *rest.Config, error
 		return nil, nil, nil, err
 	}
 	if err := kubermaticv1.AddToScheme(scheme); err != nil {
-		return nil, nil, nil, err
-	}
-	if err := constrainttemplatev1beta1.AddToScheme(scheme); err != nil {
 		return nil, nil, nil, err
 	}
 

@@ -63,9 +63,6 @@ type AddonProviderGetter = func(seed *kubermaticv1.Seed) (AddonProvider, error)
 // MachineDeploymentRequestProviderGetter is used to get an MachineDeploymentRequestProvider
 type MachineDeploymentRequestProviderGetter = func(seed *kubermaticv1.Seed) (MachineDeploymentRequestProvider, error)
 
-// ConstraintProviderGetter is used to get a ConstraintProvider
-type ConstraintProviderGetter = func(seed *kubermaticv1.Seed) (ConstraintProvider, error)
-
 // ClusterTemplateInstanceProviderGetter is used to get a ClusterTemplateInstanceProvider
 type ClusterTemplateInstanceProviderGetter = func(seed *kubermaticv1.Seed) (ClusterTemplateInstanceProvider, error)
 

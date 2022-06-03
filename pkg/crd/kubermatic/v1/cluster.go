@@ -163,11 +163,6 @@ type ClusterSpec struct {
 
 	AuditLogging *AuditLoggingSettings `json:"auditLogging,omitempty"`
 
-	// OPAIntegration is a preview feature that enables OPA integration with Kubermatic for the cluster.
-	// Enabling it causes gatekeeper and its resources to be deployed on the user cluster.
-	// By default it is disabled.
-	OPAIntegration *OPAIntegrationSettings `json:"opaIntegration,omitempty"`
-
 	// ServiceAccount contains service account related settings for the kube-apiserver of user cluster.
 	ServiceAccount *ServiceAccountSettings `json:"serviceAccount,omitempty"`
 
@@ -376,16 +371,6 @@ type OIDCSettings struct {
 
 type AuditLoggingSettings struct {
 	Enabled bool `json:"enabled,omitempty"`
-}
-
-type OPAIntegrationSettings struct {
-	// Enabled is the flag for enabling OPA integration
-	Enabled bool `json:"enabled,omitempty"`
-	// WebhookTimeout is the timeout that is set for the gatekeeper validating webhook admission review calls.
-	// By default 10 seconds.
-	WebhookTimeoutSeconds *int32 `json:"webhookTimeoutSeconds,omitempty"`
-	// Enable mutation
-	ExperimentalEnableMutation bool `json:"experimentalEnableMutation,omitempty"`
 }
 
 type ServiceAccountSettings struct {
@@ -815,12 +800,9 @@ type ExtendedClusterHealth struct {
 	OpenVPN                      HealthStatus `json:"openvpn"`
 	CloudProviderInfrastructure  HealthStatus `json:"cloudProviderInfrastructure"`
 	UserClusterControllerManager HealthStatus `json:"userClusterControllerManager"`
-	GatekeeperController         HealthStatus `json:"gatekeeperController,omitempty"`
-	GatekeeperAudit              HealthStatus `json:"gatekeeperAudit,omitempty"`
 }
 
-// AllHealthy returns if all components are healthy. Gatekeeper components not included as they are optional and not
-// crucial for cluster functioning
+// AllHealthy returns if all components are healthy.
 func (h *ExtendedClusterHealth) AllHealthy() bool {
 	return h.Etcd == HealthStatusUp &&
 		h.MachineController == HealthStatusUp &&

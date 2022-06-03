@@ -47,10 +47,6 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Kubermatic().V1().ClusterTemplates().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("clustertemplateinstances"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Kubermatic().V1().ClusterTemplateInstances().Informer()}, nil
-	case v1.SchemeGroupVersion.WithResource("constraints"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Kubermatic().V1().Constraints().Informer()}, nil
-	case v1.SchemeGroupVersion.WithResource("constrainttemplates"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Kubermatic().V1().ConstraintTemplates().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("etcdbackupconfigs"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Kubermatic().V1().EtcdBackupConfigs().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("etcdrestores"):

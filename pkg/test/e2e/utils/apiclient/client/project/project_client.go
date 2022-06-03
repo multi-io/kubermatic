@@ -50,11 +50,7 @@ type ClientService interface {
 
 	CreateClusterV2(params *CreateClusterV2Params, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*CreateClusterV2Created, error)
 
-	CreateConstraint(params *CreateConstraintParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*CreateConstraintOK, error)
-
 	CreateExternalCluster(params *CreateExternalClusterParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*CreateExternalClusterCreated, error)
-
-	CreateGatekeeperConfig(params *CreateGatekeeperConfigParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*CreateGatekeeperConfigCreated, error)
 
 	CreateMachineDeployment(params *CreateMachineDeploymentParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*CreateMachineDeploymentCreated, error)
 
@@ -76,11 +72,7 @@ type ClientService interface {
 
 	DeleteClusterV2(params *DeleteClusterV2Params, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*DeleteClusterV2OK, error)
 
-	DeleteConstraint(params *DeleteConstraintParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*DeleteConstraintOK, error)
-
 	DeleteExternalCluster(params *DeleteExternalClusterParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*DeleteExternalClusterOK, error)
-
-	DeleteGatekeeperConfig(params *DeleteGatekeeperConfigParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*DeleteGatekeeperConfigOK, error)
 
 	DeleteMachineDeployment(params *DeleteMachineDeploymentParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*DeleteMachineDeploymentOK, error)
 
@@ -132,15 +124,11 @@ type ClientService interface {
 
 	GetClusterV2(params *GetClusterV2Params, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*GetClusterV2OK, error)
 
-	GetConstraint(params *GetConstraintParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*GetConstraintOK, error)
-
 	GetExternalCluster(params *GetExternalClusterParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*GetExternalClusterOK, error)
 
 	GetExternalClusterMetrics(params *GetExternalClusterMetricsParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*GetExternalClusterMetricsOK, error)
 
 	GetExternalClusterNode(params *GetExternalClusterNodeParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*GetExternalClusterNodeOK, error)
-
-	GetGatekeeperConfig(params *GetGatekeeperConfigParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*GetGatekeeperConfigOK, error)
 
 	GetKubeLoginClusterKubeconfig(params *GetKubeLoginClusterKubeconfigParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*GetKubeLoginClusterKubeconfigOK, error)
 
@@ -177,8 +165,6 @@ type ClientService interface {
 	ListClustersForProject(params *ListClustersForProjectParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListClustersForProjectOK, error)
 
 	ListClustersV2(params *ListClustersV2Params, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListClustersV2OK, error)
-
-	ListConstraints(params *ListConstraintsParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListConstraintsOK, error)
 
 	ListExternalClusterEvents(params *ListExternalClusterEventsParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListExternalClusterEventsOK, error)
 
@@ -233,10 +219,6 @@ type ClientService interface {
 	PatchClusterRole(params *PatchClusterRoleParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*PatchClusterRoleOK, error)
 
 	PatchClusterV2(params *PatchClusterV2Params, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*PatchClusterV2OK, error)
-
-	PatchConstraint(params *PatchConstraintParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*PatchConstraintOK, error)
-
-	PatchGatekeeperConfig(params *PatchGatekeeperConfigParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*PatchGatekeeperConfigOK, error)
 
 	PatchMachineDeployment(params *PatchMachineDeploymentParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*PatchMachineDeploymentOK, error)
 
@@ -694,44 +676,6 @@ func (a *Client) CreateClusterV2(params *CreateClusterV2Params, authInfo runtime
 }
 
 /*
-  CreateConstraint creates a given constraint for the specified cluster
-*/
-func (a *Client) CreateConstraint(params *CreateConstraintParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*CreateConstraintOK, error) {
-	// TODO: Validate the params before sending
-	if params == nil {
-		params = NewCreateConstraintParams()
-	}
-	op := &runtime.ClientOperation{
-		ID:                 "createConstraint",
-		Method:             "POST",
-		PathPattern:        "/api/v2/projects/{project_id}/clusters/{cluster_id}/constraints",
-		ProducesMediaTypes: []string{"application/json"},
-		ConsumesMediaTypes: []string{"application/json"},
-		Schemes:            []string{"https"},
-		Params:             params,
-		Reader:             &CreateConstraintReader{formats: a.formats},
-		AuthInfo:           authInfo,
-		Context:            params.Context,
-		Client:             params.HTTPClient,
-	}
-	for _, opt := range opts {
-		opt(op)
-	}
-
-	result, err := a.transport.Submit(op)
-	if err != nil {
-		return nil, err
-	}
-	success, ok := result.(*CreateConstraintOK)
-	if ok {
-		return success, nil
-	}
-	// unexpected success response
-	unexpectedSuccess := result.(*CreateConstraintDefault)
-	return nil, runtime.NewAPIError("unexpected success response: content available as default response in error", unexpectedSuccess, unexpectedSuccess.Code())
-}
-
-/*
   CreateExternalCluster creates an external cluster for the given project
 */
 func (a *Client) CreateExternalCluster(params *CreateExternalClusterParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*CreateExternalClusterCreated, error) {
@@ -766,44 +710,6 @@ func (a *Client) CreateExternalCluster(params *CreateExternalClusterParams, auth
 	}
 	// unexpected success response
 	unexpectedSuccess := result.(*CreateExternalClusterDefault)
-	return nil, runtime.NewAPIError("unexpected success response: content available as default response in error", unexpectedSuccess, unexpectedSuccess.Code())
-}
-
-/*
-  CreateGatekeeperConfig Creates a gatekeeper config for the given cluster
-*/
-func (a *Client) CreateGatekeeperConfig(params *CreateGatekeeperConfigParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*CreateGatekeeperConfigCreated, error) {
-	// TODO: Validate the params before sending
-	if params == nil {
-		params = NewCreateGatekeeperConfigParams()
-	}
-	op := &runtime.ClientOperation{
-		ID:                 "createGatekeeperConfig",
-		Method:             "POST",
-		PathPattern:        "/api/v2/projects/{project_id}/clusters/{cluster_id}/gatekeeper/config",
-		ProducesMediaTypes: []string{"application/json"},
-		ConsumesMediaTypes: []string{"application/json"},
-		Schemes:            []string{"https"},
-		Params:             params,
-		Reader:             &CreateGatekeeperConfigReader{formats: a.formats},
-		AuthInfo:           authInfo,
-		Context:            params.Context,
-		Client:             params.HTTPClient,
-	}
-	for _, opt := range opts {
-		opt(op)
-	}
-
-	result, err := a.transport.Submit(op)
-	if err != nil {
-		return nil, err
-	}
-	success, ok := result.(*CreateGatekeeperConfigCreated)
-	if ok {
-		return success, nil
-	}
-	// unexpected success response
-	unexpectedSuccess := result.(*CreateGatekeeperConfigDefault)
 	return nil, runtime.NewAPIError("unexpected success response: content available as default response in error", unexpectedSuccess, unexpectedSuccess.Code())
 }
 
@@ -1190,44 +1096,6 @@ func (a *Client) DeleteClusterV2(params *DeleteClusterV2Params, authInfo runtime
 }
 
 /*
-  DeleteConstraint deletes a specified constraint for the given cluster
-*/
-func (a *Client) DeleteConstraint(params *DeleteConstraintParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*DeleteConstraintOK, error) {
-	// TODO: Validate the params before sending
-	if params == nil {
-		params = NewDeleteConstraintParams()
-	}
-	op := &runtime.ClientOperation{
-		ID:                 "deleteConstraint",
-		Method:             "DELETE",
-		PathPattern:        "/api/v2/projects/{project_id}/clusters/{cluster_id}/constraints/{constraint_name}",
-		ProducesMediaTypes: []string{"application/json"},
-		ConsumesMediaTypes: []string{"application/json"},
-		Schemes:            []string{"https"},
-		Params:             params,
-		Reader:             &DeleteConstraintReader{formats: a.formats},
-		AuthInfo:           authInfo,
-		Context:            params.Context,
-		Client:             params.HTTPClient,
-	}
-	for _, opt := range opts {
-		opt(op)
-	}
-
-	result, err := a.transport.Submit(op)
-	if err != nil {
-		return nil, err
-	}
-	success, ok := result.(*DeleteConstraintOK)
-	if ok {
-		return success, nil
-	}
-	// unexpected success response
-	unexpectedSuccess := result.(*DeleteConstraintDefault)
-	return nil, runtime.NewAPIError("unexpected success response: content available as default response in error", unexpectedSuccess, unexpectedSuccess.Code())
-}
-
-/*
   DeleteExternalCluster Deletes the specified external cluster
 */
 func (a *Client) DeleteExternalCluster(params *DeleteExternalClusterParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*DeleteExternalClusterOK, error) {
@@ -1262,44 +1130,6 @@ func (a *Client) DeleteExternalCluster(params *DeleteExternalClusterParams, auth
 	}
 	// unexpected success response
 	unexpectedSuccess := result.(*DeleteExternalClusterDefault)
-	return nil, runtime.NewAPIError("unexpected success response: content available as default response in error", unexpectedSuccess, unexpectedSuccess.Code())
-}
-
-/*
-  DeleteGatekeeperConfig deletes the gatekeeper sync config for the specified cluster
-*/
-func (a *Client) DeleteGatekeeperConfig(params *DeleteGatekeeperConfigParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*DeleteGatekeeperConfigOK, error) {
-	// TODO: Validate the params before sending
-	if params == nil {
-		params = NewDeleteGatekeeperConfigParams()
-	}
-	op := &runtime.ClientOperation{
-		ID:                 "deleteGatekeeperConfig",
-		Method:             "DELETE",
-		PathPattern:        "/api/v2/projects/{project_id}/clusters/{cluster_id}/gatekeeper/config",
-		ProducesMediaTypes: []string{"application/json"},
-		ConsumesMediaTypes: []string{"application/json"},
-		Schemes:            []string{"https"},
-		Params:             params,
-		Reader:             &DeleteGatekeeperConfigReader{formats: a.formats},
-		AuthInfo:           authInfo,
-		Context:            params.Context,
-		Client:             params.HTTPClient,
-	}
-	for _, opt := range opts {
-		opt(op)
-	}
-
-	result, err := a.transport.Submit(op)
-	if err != nil {
-		return nil, err
-	}
-	success, ok := result.(*DeleteGatekeeperConfigOK)
-	if ok {
-		return success, nil
-	}
-	// unexpected success response
-	unexpectedSuccess := result.(*DeleteGatekeeperConfigDefault)
 	return nil, runtime.NewAPIError("unexpected success response: content available as default response in error", unexpectedSuccess, unexpectedSuccess.Code())
 }
 
@@ -2256,44 +2086,6 @@ func (a *Client) GetClusterV2(params *GetClusterV2Params, authInfo runtime.Clien
 }
 
 /*
-  GetConstraint gets an specified constraint for the given cluster
-*/
-func (a *Client) GetConstraint(params *GetConstraintParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*GetConstraintOK, error) {
-	// TODO: Validate the params before sending
-	if params == nil {
-		params = NewGetConstraintParams()
-	}
-	op := &runtime.ClientOperation{
-		ID:                 "getConstraint",
-		Method:             "GET",
-		PathPattern:        "/api/v2/projects/{project_id}/clusters/{cluster_id}/constraints/{constraint_name}",
-		ProducesMediaTypes: []string{"application/json"},
-		ConsumesMediaTypes: []string{"application/json"},
-		Schemes:            []string{"https"},
-		Params:             params,
-		Reader:             &GetConstraintReader{formats: a.formats},
-		AuthInfo:           authInfo,
-		Context:            params.Context,
-		Client:             params.HTTPClient,
-	}
-	for _, opt := range opts {
-		opt(op)
-	}
-
-	result, err := a.transport.Submit(op)
-	if err != nil {
-		return nil, err
-	}
-	success, ok := result.(*GetConstraintOK)
-	if ok {
-		return success, nil
-	}
-	// unexpected success response
-	unexpectedSuccess := result.(*GetConstraintDefault)
-	return nil, runtime.NewAPIError("unexpected success response: content available as default response in error", unexpectedSuccess, unexpectedSuccess.Code())
-}
-
-/*
   GetExternalCluster gets an external cluster for the given project
 */
 func (a *Client) GetExternalCluster(params *GetExternalClusterParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*GetExternalClusterOK, error) {
@@ -2404,44 +2196,6 @@ func (a *Client) GetExternalClusterNode(params *GetExternalClusterNodeParams, au
 	}
 	// unexpected success response
 	unexpectedSuccess := result.(*GetExternalClusterNodeDefault)
-	return nil, runtime.NewAPIError("unexpected success response: content available as default response in error", unexpectedSuccess, unexpectedSuccess.Code())
-}
-
-/*
-  GetGatekeeperConfig gets the gatekeeper sync config for the specified cluster
-*/
-func (a *Client) GetGatekeeperConfig(params *GetGatekeeperConfigParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*GetGatekeeperConfigOK, error) {
-	// TODO: Validate the params before sending
-	if params == nil {
-		params = NewGetGatekeeperConfigParams()
-	}
-	op := &runtime.ClientOperation{
-		ID:                 "getGatekeeperConfig",
-		Method:             "GET",
-		PathPattern:        "/api/v2/projects/{project_id}/clusters/{cluster_id}/gatekeeper/config",
-		ProducesMediaTypes: []string{"application/json"},
-		ConsumesMediaTypes: []string{"application/json"},
-		Schemes:            []string{"https"},
-		Params:             params,
-		Reader:             &GetGatekeeperConfigReader{formats: a.formats},
-		AuthInfo:           authInfo,
-		Context:            params.Context,
-		Client:             params.HTTPClient,
-	}
-	for _, opt := range opts {
-		opt(op)
-	}
-
-	result, err := a.transport.Submit(op)
-	if err != nil {
-		return nil, err
-	}
-	success, ok := result.(*GetGatekeeperConfigOK)
-	if ok {
-		return success, nil
-	}
-	// unexpected success response
-	unexpectedSuccess := result.(*GetGatekeeperConfigDefault)
 	return nil, runtime.NewAPIError("unexpected success response: content available as default response in error", unexpectedSuccess, unexpectedSuccess.Code())
 }
 
@@ -3126,44 +2880,6 @@ func (a *Client) ListClustersV2(params *ListClustersV2Params, authInfo runtime.C
 	}
 	// unexpected success response
 	unexpectedSuccess := result.(*ListClustersV2Default)
-	return nil, runtime.NewAPIError("unexpected success response: content available as default response in error", unexpectedSuccess, unexpectedSuccess.Code())
-}
-
-/*
-  ListConstraints lists constraints for the specified cluster
-*/
-func (a *Client) ListConstraints(params *ListConstraintsParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListConstraintsOK, error) {
-	// TODO: Validate the params before sending
-	if params == nil {
-		params = NewListConstraintsParams()
-	}
-	op := &runtime.ClientOperation{
-		ID:                 "listConstraints",
-		Method:             "GET",
-		PathPattern:        "/api/v2/projects/{project_id}/clusters/{cluster_id}/constraints",
-		ProducesMediaTypes: []string{"application/json"},
-		ConsumesMediaTypes: []string{"application/json"},
-		Schemes:            []string{"https"},
-		Params:             params,
-		Reader:             &ListConstraintsReader{formats: a.formats},
-		AuthInfo:           authInfo,
-		Context:            params.Context,
-		Client:             params.HTTPClient,
-	}
-	for _, opt := range opts {
-		opt(op)
-	}
-
-	result, err := a.transport.Submit(op)
-	if err != nil {
-		return nil, err
-	}
-	success, ok := result.(*ListConstraintsOK)
-	if ok {
-		return success, nil
-	}
-	// unexpected success response
-	unexpectedSuccess := result.(*ListConstraintsDefault)
 	return nil, runtime.NewAPIError("unexpected success response: content available as default response in error", unexpectedSuccess, unexpectedSuccess.Code())
 }
 
@@ -4198,82 +3914,6 @@ func (a *Client) PatchClusterV2(params *PatchClusterV2Params, authInfo runtime.C
 	}
 	// unexpected success response
 	unexpectedSuccess := result.(*PatchClusterV2Default)
-	return nil, runtime.NewAPIError("unexpected success response: content available as default response in error", unexpectedSuccess, unexpectedSuccess.Code())
-}
-
-/*
-  PatchConstraint patches a given constraint for the specified cluster
-*/
-func (a *Client) PatchConstraint(params *PatchConstraintParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*PatchConstraintOK, error) {
-	// TODO: Validate the params before sending
-	if params == nil {
-		params = NewPatchConstraintParams()
-	}
-	op := &runtime.ClientOperation{
-		ID:                 "patchConstraint",
-		Method:             "PATCH",
-		PathPattern:        "/api/v2/projects/{project_id}/clusters/{cluster_id}/constraints/{constraint_name}",
-		ProducesMediaTypes: []string{"application/json"},
-		ConsumesMediaTypes: []string{"application/json"},
-		Schemes:            []string{"https"},
-		Params:             params,
-		Reader:             &PatchConstraintReader{formats: a.formats},
-		AuthInfo:           authInfo,
-		Context:            params.Context,
-		Client:             params.HTTPClient,
-	}
-	for _, opt := range opts {
-		opt(op)
-	}
-
-	result, err := a.transport.Submit(op)
-	if err != nil {
-		return nil, err
-	}
-	success, ok := result.(*PatchConstraintOK)
-	if ok {
-		return success, nil
-	}
-	// unexpected success response
-	unexpectedSuccess := result.(*PatchConstraintDefault)
-	return nil, runtime.NewAPIError("unexpected success response: content available as default response in error", unexpectedSuccess, unexpectedSuccess.Code())
-}
-
-/*
-  PatchGatekeeperConfig patches the gatekeeper config for the specified cluster
-*/
-func (a *Client) PatchGatekeeperConfig(params *PatchGatekeeperConfigParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*PatchGatekeeperConfigOK, error) {
-	// TODO: Validate the params before sending
-	if params == nil {
-		params = NewPatchGatekeeperConfigParams()
-	}
-	op := &runtime.ClientOperation{
-		ID:                 "patchGatekeeperConfig",
-		Method:             "PATCH",
-		PathPattern:        "/api/v2/projects/{project_id}/clusters/{cluster_id}/gatekeeper/config",
-		ProducesMediaTypes: []string{"application/json"},
-		ConsumesMediaTypes: []string{"application/json"},
-		Schemes:            []string{"https"},
-		Params:             params,
-		Reader:             &PatchGatekeeperConfigReader{formats: a.formats},
-		AuthInfo:           authInfo,
-		Context:            params.Context,
-		Client:             params.HTTPClient,
-	}
-	for _, opt := range opts {
-		opt(op)
-	}
-
-	result, err := a.transport.Submit(op)
-	if err != nil {
-		return nil, err
-	}
-	success, ok := result.(*PatchGatekeeperConfigOK)
-	if ok {
-		return success, nil
-	}
-	// unexpected success response
-	unexpectedSuccess := result.(*PatchGatekeeperConfigDefault)
 	return nil, runtime.NewAPIError("unexpected success response: content available as default response in error", unexpectedSuccess, unexpectedSuccess.Code())
 }
 

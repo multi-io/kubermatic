@@ -32,7 +32,6 @@ import (
 	csiopenstack "k8c.io/kubermatic/v2/pkg/resources/csi/openstack"
 	"k8c.io/kubermatic/v2/pkg/resources/dns"
 	"k8c.io/kubermatic/v2/pkg/resources/etcd"
-	"k8c.io/kubermatic/v2/pkg/resources/gatekeeper"
 	"k8c.io/kubermatic/v2/pkg/resources/konnectivity"
 	"k8c.io/kubermatic/v2/pkg/resources/machinecontroller"
 	metricsserver "k8c.io/kubermatic/v2/pkg/resources/metrics-server"
@@ -175,11 +174,6 @@ func (r *Reconciler) ensureResourcesAreDeployed(ctx context.Context, cluster *ku
 		if err := nodeportproxy.EnsureResources(ctx, r.Client, data); err != nil {
 			return fmt.Errorf("failed to ensure NodePortProxy resources: %v", err)
 		}
-	}
-
-	// Remove possible leftovers of older version of Gatekeeper, remove this in 1.19
-	if err := r.ensureOldOPAIntegrationIsRemoved(ctx, data); err != nil {
-		return err
 	}
 
 	return nil
@@ -769,14 +763,4 @@ func (r *Reconciler) ensureEtcdBackupConfigs(ctx context.Context, c *kubermaticv
 	creators := GetEtcdBackupConfigCreators(data)
 
 	return reconciling.ReconcileEtcdBackupConfigs(ctx, creators, c.Status.NamespaceName, r.Client, reconciling.OwnerRefWrapper(resources.GetClusterRef(c)))
-}
-
-func (r *Reconciler) ensureOldOPAIntegrationIsRemoved(ctx context.Context, data *resources.TemplateData) error {
-	for _, resource := range gatekeeper.GetResourcesToRemoveOnDelete(data.Cluster().Status.NamespaceName) {
-		if err := r.Client.Delete(ctx, resource); err != nil && !errors.IsNotFound(err) {
-			return fmt.Errorf("failed to ensure old OPA integration version resources are removed/not present: %v", err)
-		}
-	}
-
-	return nil
 }

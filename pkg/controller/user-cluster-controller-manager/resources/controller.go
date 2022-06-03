@@ -76,11 +76,8 @@ func Add(
 	registerReconciledCheck func(name string, check healthz.Checker) error,
 	dnsClusterIP string,
 	nodeLocalDNSCache bool,
-	opaIntegration bool,
-	opaEnableMutation bool,
 	versions kubermatic.Versions,
 	userSSHKeyAgent bool,
-	opaWebhookTimeout int,
 	caBundle resources.CABundle,
 	clusterName string,
 	konnectivity bool,
@@ -99,9 +96,6 @@ func Add(
 		log:                   log,
 		dnsClusterIP:          dnsClusterIP,
 		nodeLocalDNSCache:     nodeLocalDNSCache,
-		opaIntegration:        opaIntegration,
-		opaEnableMutation:     opaEnableMutation,
-		opaWebhookTimeout:     opaWebhookTimeout,
 		userSSHKeyAgent:       userSSHKeyAgent,
 		versions:              versions,
 		caBundle:              caBundle,
@@ -221,9 +215,6 @@ type reconciler struct {
 	clusterDNSDomain      string
 	dnsClusterIP          string
 	nodeLocalDNSCache     bool
-	opaIntegration        bool
-	opaEnableMutation     bool
-	opaWebhookTimeout     int
 	userSSHKeyAgent       bool
 	versions              kubermatic.Versions
 	caBundle              resources.CABundle

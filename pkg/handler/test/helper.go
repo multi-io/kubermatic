@@ -33,8 +33,6 @@ import (
 	"k8c.io/kubermatic/v2/pkg/keycloak"
 
 	ver "github.com/Masterminds/semver/v3"
-	constrainttemplatev1beta1 "github.com/open-policy-agent/frameworks/constraint/pkg/apis/templates/v1beta1"
-	gatekeeperconfigv1alpha1 "github.com/open-policy-agent/gatekeeper/apis/config/v1alpha1"
 	prometheusapi "github.com/prometheus/client_golang/api"
 
 	clusterv1alpha1 "github.com/kubermatic/machine-controller/pkg/apis/cluster/v1alpha1"
@@ -91,9 +89,6 @@ func init() {
 	}
 	if err := apiextensionv1.SchemeBuilder.AddToScheme(scheme.Scheme); err != nil {
 		kubermaticlog.Logger.Fatalw("failed to register scheme apiextension/v1beta1", "error", err)
-	}
-	if err := gatekeeperconfigv1alpha1.SchemeBuilder.AddToScheme(scheme.Scheme); err != nil {
-		kubermaticlog.Logger.Fatalw("failed to register scheme gatekeeperconfig/v1alpha1", "error", err)
 	}
 }
 
@@ -193,12 +188,9 @@ type newRoutingFunc func(
 	userWatcher watcher.UserWatcher,
 	externalClusterProvider provider.ExternalClusterProvider,
 	privilegedExternalClusterProvider provider.PrivilegedExternalClusterProvider,
-	constraintTemplateProvider provider.ConstraintTemplateProvider,
-	constraintProviderGetter provider.ConstraintProviderGetter,
 	clusterTemplateProvider provider.ClusterTemplateProvider,
 	clusterTemplateInstanceProviderGetter provider.ClusterTemplateInstanceProviderGetter,
 	kubermaticVersions kubermatic.Versions,
-	defaultConstraintProvider provider.DefaultConstraintProvider,
 	etcdBackupConfigProviderGetter provider.EtcdBackupConfigProviderGetter,
 	etcdRestoreProviderGetter provider.EtcdRestoreProviderGetter,
 	etcdBackupConfigProjectProviderGetter provider.EtcdBackupConfigProjectProviderGetter,
@@ -359,36 +351,6 @@ func initTestEndpoint(user apiv1.User, seedsGetter provider.SeedsGetter, kubeObj
 		FakeClient: fakeClient,
 	}
 
-	constraintTemplateProvider, err := kubernetes.NewConstraintTemplateProvider(fakeImpersonationClient, fakeClient)
-	if err != nil {
-		return nil, nil, err
-	}
-	fakeConstraintTemplateProvider := &FakeConstraintTemplateProvider{
-		Provider:   constraintTemplateProvider,
-		FakeClient: fakeClient,
-	}
-
-	defaultConstraintProvider, err := kubernetes.NewDefaultConstraintProvider(fakeImpersonationClient, fakeClient, KubermaticNamespace)
-	if err != nil {
-		return nil, nil, err
-	}
-	fakeDefaultConstraintProvider := &FakeDefaultConstraintProvider{
-		Provider:   defaultConstraintProvider,
-		FakeClient: fakeClient,
-	}
-
-	constraintProvider, err := kubernetes.NewConstraintProvider(fakeImpersonationClient, fakeClient)
-	if err != nil {
-		return nil, nil, err
-	}
-	constraintProviders := map[string]provider.ConstraintProvider{"us-central1": constraintProvider}
-	constraintProviderGetter := func(seed *kubermaticv1.Seed) (provider.ConstraintProvider, error) {
-		if constraint, exists := constraintProviders[seed.Name]; exists {
-			return constraint, nil
-		}
-		return nil, fmt.Errorf("can not find constraintprovider for cluster %q", seed.Name)
-	}
-
 	clusterTemplateProvider, err := kubernetes.NewClusterTemplateProvider(fakeImpersonationClient, fakeClient)
 	if err != nil {
 		return nil, nil, err
@@ -499,12 +461,9 @@ func initTestEndpoint(user apiv1.User, seedsGetter provider.SeedsGetter, kubeObj
 		userWatcher,
 		fakeExternalClusterProvider,
 		externalClusterProvider,
-		fakeConstraintTemplateProvider,
-		constraintProviderGetter,
 		clusterTemplateProvider,
 		clusterTemplateInstanceProviderGetter,
 		kubermaticVersions,
-		fakeDefaultConstraintProvider,
 		etcdBackupConfigProviderGetter,
 		etcdRestoreProviderGetter,
 		etcdBackupConfigProjectProviderGetter,
@@ -1233,10 +1192,6 @@ func GenDefaultGlobalSettings() *kubermaticv1.KubermaticSetting {
 			DisplayAPIDocs:              true,
 			DisplayTermsOfService:       true,
 			EnableExternalClusterImport: true,
-			OpaOptions: kubermaticv1.OpaOptions{
-				Enabled:  true,
-				Enforced: true,
-			},
 		},
 	}
 }
@@ -1361,133 +1316,10 @@ func GenDefaultExternalClusterNode() (*corev1.Node, error) {
 	}, nil
 }
 
-func GenDefaultConstraintTemplate(name string) apiv2.ConstraintTemplate {
-	return apiv2.ConstraintTemplate{
-		Name: name,
-		Spec: kubermaticv1.ConstraintTemplateSpec{
-			CRD: constrainttemplatev1beta1.CRD{
-				Spec: constrainttemplatev1beta1.CRDSpec{
-					Names: constrainttemplatev1beta1.Names{
-						Kind:       "labelconstraint",
-						ShortNames: []string{"lc"},
-					},
-					Validation: &constrainttemplatev1beta1.Validation{
-						OpenAPIV3Schema: &apiextensionv1.JSONSchemaProps{
-							Properties: map[string]apiextensionv1.JSONSchemaProps{
-								"labels": {
-									Type: "array",
-									Items: &apiextensionv1.JSONSchemaPropsOrArray{
-										Schema: &apiextensionv1.JSONSchemaProps{
-											Type: "string",
-										},
-									},
-								},
-							},
-							Required: []string{"labels"},
-						},
-					},
-				},
-			},
-			Targets: []constrainttemplatev1beta1.Target{
-				{
-					Target: "admission.k8s.gatekeeper.sh",
-					Rego: `
-		package k8srequiredlabels
-
-        deny[{"msg": msg, "details": {"missing_labels": missing}}] {
-          provided := {label | input.review.object.metadata.labels[label]}
-          required := {label | label := input.parameters.labels[_]}
-          missing := required - provided
-          count(missing) > 0
-          msg := sprintf("you must provide labels: %v", [missing])
-        }`,
-				},
-			},
-			Selector: kubermaticv1.ConstraintTemplateSelector{
-				Providers: []string{"aws", "gcp"},
-				LabelSelector: metav1.LabelSelector{
-					MatchExpressions: []metav1.LabelSelectorRequirement{
-						{
-							Key:      "cluster",
-							Operator: metav1.LabelSelectorOpExists,
-						},
-					},
-					MatchLabels: map[string]string{
-						"deployment": "prod",
-						"domain":     "sales",
-					},
-				},
-			},
-		},
-	}
-}
-
 func GenAdminUser(name, email string, isAdmin bool) *kubermaticv1.User {
 	user := GenUser("", name, email)
 	user.Spec.IsAdmin = isAdmin
 	return user
-}
-
-func GenConstraintTemplate(name string) *kubermaticv1.ConstraintTemplate {
-	ct := &kubermaticv1.ConstraintTemplate{}
-	ct.Name = name
-	ct.Spec = kubermaticv1.ConstraintTemplateSpec{
-		CRD: constrainttemplatev1beta1.CRD{
-			Spec: constrainttemplatev1beta1.CRDSpec{
-				Names: constrainttemplatev1beta1.Names{
-					Kind:       "labelconstraint",
-					ShortNames: []string{"lc"},
-				},
-				Validation: &constrainttemplatev1beta1.Validation{
-					OpenAPIV3Schema: &apiextensionv1.JSONSchemaProps{
-						Properties: map[string]apiextensionv1.JSONSchemaProps{
-							"labels": {
-								Type: "array",
-								Items: &apiextensionv1.JSONSchemaPropsOrArray{
-									Schema: &apiextensionv1.JSONSchemaProps{
-										Type: "string",
-									},
-								},
-							},
-						},
-						Required: []string{"labels"},
-					},
-				},
-			},
-		},
-		Targets: []constrainttemplatev1beta1.Target{
-			{
-				Target: "admission.k8s.gatekeeper.sh",
-				Rego: `
-		package k8srequiredlabels
-
-        deny[{"msg": msg, "details": {"missing_labels": missing}}] {
-          provided := {label | input.review.object.metadata.labels[label]}
-          required := {label | label := input.parameters.labels[_]}
-          missing := required - provided
-          count(missing) > 0
-          msg := sprintf("you must provide labels: %v", [missing])
-        }`,
-			},
-		},
-		Selector: kubermaticv1.ConstraintTemplateSelector{
-			Providers: []string{"aws", "gcp"},
-			LabelSelector: metav1.LabelSelector{
-				MatchExpressions: []metav1.LabelSelectorRequirement{
-					{
-						Key:      "cluster",
-						Operator: metav1.LabelSelectorOpExists,
-					},
-				},
-				MatchLabels: map[string]string{
-					"deployment": "prod",
-					"domain":     "sales",
-				},
-			},
-		},
-	}
-
-	return ct
 }
 
 func GenDefaultRole(name, namespace string) *rbacv1.Role {
@@ -1609,93 +1441,6 @@ func CreateRawVariables(t *testing.T, in map[string]interface{}) *runtime.RawExt
 	}
 	result.Raw = raw
 	return result
-}
-
-func GenConstraint(name, namespace, kind string) *kubermaticv1.Constraint {
-	ct := &kubermaticv1.Constraint{}
-	ct.Kind = kubermaticv1.ConstraintKind
-	ct.APIVersion = kubermaticv1.SchemeGroupVersion.String()
-	ct.Name = name
-	ct.Namespace = namespace
-	ct.Spec = kubermaticv1.ConstraintSpec{
-		ConstraintType: kind,
-		Match: kubermaticv1.Match{
-			Kinds: []kubermaticv1.Kind{
-				{Kinds: []string{"namespace"}, APIGroups: []string{""}},
-			},
-		},
-		Parameters: kubermaticv1.Parameters{
-			"labels": []interface{}{"gatekeeper", "opa"},
-		},
-		Selector: kubermaticv1.ConstraintSelector{
-			Providers: []string{"aws", "gcp"},
-			LabelSelector: metav1.LabelSelector{
-				MatchExpressions: []metav1.LabelSelectorRequirement{
-					{
-						Key:      "cluster",
-						Operator: metav1.LabelSelectorOpExists,
-					},
-				},
-				MatchLabels: map[string]string{
-					"deployment": "prod",
-					"domain":     "sales",
-				},
-			},
-		},
-	}
-
-	return ct
-}
-
-func GenDefaultAPIConstraint(name, kind string) apiv2.Constraint {
-	return apiv2.Constraint{
-		Name: name,
-		Spec: kubermaticv1.ConstraintSpec{
-			ConstraintType: kind,
-			Match: kubermaticv1.Match{
-				Kinds: []kubermaticv1.Kind{
-					{Kinds: []string{"namespace"}, APIGroups: []string{""}},
-				},
-			},
-			Parameters: kubermaticv1.Parameters{
-				"labels": []interface{}{"gatekeeper", "opa"},
-			},
-			Selector: kubermaticv1.ConstraintSelector{
-				Providers: []string{"aws", "gcp"},
-				LabelSelector: metav1.LabelSelector{
-					MatchExpressions: []metav1.LabelSelectorRequirement{
-						{
-							Key:      "cluster",
-							Operator: metav1.LabelSelectorOpExists,
-						},
-					},
-					MatchLabels: map[string]string{
-						"deployment": "prod",
-						"domain":     "sales",
-					},
-				},
-			},
-		},
-		Status: &apiv2.ConstraintStatus{
-			Enforcement:    "true",
-			AuditTimestamp: "2019-05-11T01:46:13Z",
-			Violations: []apiv2.Violation{
-				{
-					EnforcementAction: "deny",
-					Kind:              "Namespace",
-					Message:           "'you must provide labels: {\"gatekeeper\"}'",
-					Name:              "default",
-				},
-				{
-					EnforcementAction: "deny",
-					Kind:              "Namespace",
-					Message:           "'you must provide labels: {\"gatekeeper\"}'",
-					Name:              "gatekeeper",
-				},
-			},
-			Synced: pointer.BoolPtr(true),
-		},
-	}
 }
 
 func GenClusterTemplate(name, id, projectID, scope, userEmail string) *kubermaticv1.ClusterTemplate {
