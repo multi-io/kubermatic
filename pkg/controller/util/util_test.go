@@ -18,13 +18,13 @@ package util
 
 import (
 	"context"
-	"k8c.io/kubermatic/v2/pkg/semver"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"testing"
 
-	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
-
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrlruntimefakeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/semver"
 )
 
 func TestConcurrencyLimitReached(t *testing.T) {

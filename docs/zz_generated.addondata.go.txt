@@ -62,12 +62,12 @@ type ClusterData struct {
 	CloudSpec kubermaticv1.CloudSpec
 	// CNIPlugin contains the CNIPlugin settings
 	CNIPlugin CNIPlugin
-	// MLA contains monitoring, logging and alerting related settings for the user cluster.
-	MLA MLASettings
 	// StoragePolicy is the storage policy to use for vsphere csi addon
 	StoragePolicy string
 	// CSIMigration indicates if the cluster needed the CSIMigration
 	CSIMigration bool
+
+	ComponentsOverride kubermaticv1.ComponentSettings
 }
 
 type ClusterNetwork struct {
@@ -105,11 +105,140 @@ type CNIPlugin struct {
 	Version string
 }
 
-type MLASettings struct {
-	// MonitoringEnabled is the flag for enabling monitoring in user cluster.
-	MonitoringEnabled bool
-	// LoggingEnabled is the flag for enabling logging in user cluster.
-	LoggingEnabled bool
+type ComponentSettings struct {
+	Apiserver         APIServerSettings       `json:"apiserver"`
+	ControllerManager ControllerSettings      `json:"controllerManager"`
+	Scheduler         ControllerSettings      `json:"scheduler"`
+	Etcd              EtcdStatefulSetSettings `json:"etcd"`
+	Prometheus        StatefulSetSettings     `json:"prometheus"`
+	OpenVPN           OpenVPNSettings         `json:"openvpn"`
+	NodeLocalDNS      NodeLocalDNSSettings    `json:"nodeLocalDNS"`
+
+	Openstack OpenstackSettings `json:"openstack"`
+}
+
+type APIServerSettings struct {
+	DeploymentSettings `json:",inline"`
+
+	EndpointReconcilingDisabled *bool  `json:"endpointReconcilingDisabled,omitempty"`
+	NodePortRange               string `json:"nodePortRange,omitempty"`
+}
+
+type DeploymentSettings struct {
+	Replicas    *int32                       `json:"replicas,omitempty"`
+	Resources   *corev1.ResourceRequirements `json:"resources,omitempty"`
+	Tolerations []corev1.Toleration          `json:"tolerations,omitempty"`
+}
+
+type ControllerSettings struct {
+	DeploymentSettings     `json:",inline"`
+	LeaderElectionSettings `json:"leaderElection,omitempty"`
+}
+
+type DeploymentSettings struct {
+	Replicas    *int32                       `json:"replicas,omitempty"`
+	Resources   *corev1.ResourceRequirements `json:"resources,omitempty"`
+	Tolerations []corev1.Toleration          `json:"tolerations,omitempty"`
+}
+
+type LeaderElectionSettings struct {
+	// LeaseDurationSeconds is the duration in seconds that non-leader candidates
+	// will wait to force acquire leadership. This is measured against time of
+	// last observed ack.
+	// +optional
+	LeaseDurationSeconds *int32 `json:"leaseDurationSeconds,omitempty"`
+	// RenewDeadlineSeconds is the duration in seconds that the acting controlplane
+	// will retry refreshing leadership before giving up.
+	// +optional
+	RenewDeadlineSeconds *int32 `json:"renewDeadlineSeconds,omitempty"`
+	// RetryPeriodSeconds is the duration in seconds the LeaderElector clients
+	// should wait between tries of actions.
+	// +optional
+	RetryPeriodSeconds *int32 `json:"retryPeriodSeconds,omitempty"`
+}
+
+type ControllerSettings struct {
+	DeploymentSettings     `json:",inline"`
+	LeaderElectionSettings `json:"leaderElection,omitempty"`
+}
+
+type DeploymentSettings struct {
+	Replicas    *int32                       `json:"replicas,omitempty"`
+	Resources   *corev1.ResourceRequirements `json:"resources,omitempty"`
+	Tolerations []corev1.Toleration          `json:"tolerations,omitempty"`
+}
+
+type LeaderElectionSettings struct {
+	// LeaseDurationSeconds is the duration in seconds that non-leader candidates
+	// will wait to force acquire leadership. This is measured against time of
+	// last observed ack.
+	// +optional
+	LeaseDurationSeconds *int32 `json:"leaseDurationSeconds,omitempty"`
+	// RenewDeadlineSeconds is the duration in seconds that the acting controlplane
+	// will retry refreshing leadership before giving up.
+	// +optional
+	RenewDeadlineSeconds *int32 `json:"renewDeadlineSeconds,omitempty"`
+	// RetryPeriodSeconds is the duration in seconds the LeaderElector clients
+	// should wait between tries of actions.
+	// +optional
+	RetryPeriodSeconds *int32 `json:"retryPeriodSeconds,omitempty"`
+}
+
+type EtcdStatefulSetSettings struct {
+	DeploymentSettings `json:",inline"`
+	StorageClass       string             `json:"storageClass,omitempty"`
+	DiskSize           *resource.Quantity `json:"diskSize,omitempty"`
+}
+
+type DeploymentSettings struct {
+	Replicas    *int32                       `json:"replicas,omitempty"`
+	Resources   *corev1.ResourceRequirements `json:"resources,omitempty"`
+	Tolerations []corev1.Toleration          `json:"tolerations,omitempty"`
+}
+
+type StatefulSetSettings struct {
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+type OpenVPNSettings struct {
+	Server                OpenVPNServerSettings                `json:"server"`
+	Client                OpenVPNClientSettings                `json:"client"`
+	DnatController        OpenVPNDnatControllerSettings        `json:"dnatController"`
+	IPFixup               OpenVPNIPFixupSettings               `json:"ipFixup"`
+	Exporter              OpenVPNExporterSettings              `json:"exporter"`
+	IPTablesInitContainer OpenVPNIPTablesInitContainerSettings `json:"ipTablesInitContainer"`
+}
+
+type OpenVPNServerSettings struct {
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+type OpenVPNClientSettings struct {
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+type OpenVPNDnatControllerSettings struct {
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+type OpenVPNIPFixupSettings struct {
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+type OpenVPNExporterSettings struct {
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+type OpenVPNIPTablesInitContainerSettings struct {
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+type NodeLocalDNSSettings struct {
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+type OpenstackSettings struct {
+	EnableIngressHostname bool `json:"enableIngressHostname,omitempty"`
 }
 
 type Credentials struct {

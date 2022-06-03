@@ -264,31 +264,6 @@ func (p *FakeDefaultConstraintProvider) Update(constraint *kubermaticapiv1.Const
 	return p.Provider.Update(constraint)
 }
 
-type FakePrivilegedAllowedRegistryProvider struct {
-	Provider   *kubernetes.PrivilegedAllowedRegistryProvider
-	FakeClient ctrlruntimeclient.Client
-}
-
-func (p *FakePrivilegedAllowedRegistryProvider) CreateUnsecured(wr *kubermaticapiv1.AllowedRegistry) (*kubermaticapiv1.AllowedRegistry, error) {
-	return p.Provider.CreateUnsecured(wr)
-}
-
-func (p *FakePrivilegedAllowedRegistryProvider) GetUnsecured(name string) (*kubermaticapiv1.AllowedRegistry, error) {
-	return p.Provider.GetUnsecured(name)
-}
-
-func (p *FakePrivilegedAllowedRegistryProvider) ListUnsecured() (*kubermaticapiv1.AllowedRegistryList, error) {
-	return p.Provider.ListUnsecured()
-}
-
-func (p *FakePrivilegedAllowedRegistryProvider) UpdateUnsecured(wr *kubermaticapiv1.AllowedRegistry) (*kubermaticapiv1.AllowedRegistry, error) {
-	return p.Provider.UpdateUnsecured(wr)
-}
-
-func (p *FakePrivilegedAllowedRegistryProvider) DeleteUnsecured(name string) error {
-	return p.Provider.DeleteUnsecured(name)
-}
-
 type FakeEtcdBackupConfigProvider struct {
 	Provider   *kubernetes.EtcdBackupConfigProvider
 	FakeClient ctrlruntimeclient.Client

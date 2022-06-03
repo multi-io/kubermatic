@@ -22,7 +22,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	allowedregistrycontroller "k8c.io/kubermatic/v2/pkg/controller/master-controller-manager/allowed-registry-controller"
 	clustertemplatesynchronizer "k8c.io/kubermatic/v2/pkg/controller/master-controller-manager/cluster-template-synchronizer"
 	externalcluster "k8c.io/kubermatic/v2/pkg/controller/master-controller-manager/external-cluster"
 	masterconstraintsynchronizer "k8c.io/kubermatic/v2/pkg/controller/master-controller-manager/master-constraint-controller"
@@ -100,9 +99,6 @@ func createAllControllers(ctrlCtx *controllerContext) error {
 	}
 	if err := userprojectbindingsync.Add(ctrlCtx.mgr, ctrlCtx.log, 1, ctrlCtx.seedKubeconfigGetter); err != nil {
 		return fmt.Errorf("failed to create userprojectbindingsync controller: %v", err)
-	}
-	if err := allowedregistrycontroller.Add(ctrlCtx.mgr, ctrlCtx.log, 1, ctrlCtx.namespace); err != nil {
-		return fmt.Errorf("failed to create allowedregistry controller: %v", err)
 	}
 
 	return nil

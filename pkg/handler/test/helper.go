@@ -23,13 +23,14 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"k8c.io/kubermatic/v2/pkg/keycloak"
 	"net/http"
 	"net/http/httptest"
 	"sort"
 	"strings"
 	"testing"
 	"time"
+
+	"k8c.io/kubermatic/v2/pkg/keycloak"
 
 	ver "github.com/Masterminds/semver/v3"
 	constrainttemplatev1beta1 "github.com/open-policy-agent/frameworks/constraint/pkg/apis/templates/v1beta1"
@@ -198,7 +199,6 @@ type newRoutingFunc func(
 	clusterTemplateInstanceProviderGetter provider.ClusterTemplateInstanceProviderGetter,
 	kubermaticVersions kubermatic.Versions,
 	defaultConstraintProvider provider.DefaultConstraintProvider,
-	privilegedAllowedRegistryProvider provider.PrivilegedAllowedRegistryProvider,
 	etcdBackupConfigProviderGetter provider.EtcdBackupConfigProviderGetter,
 	etcdRestoreProviderGetter provider.EtcdRestoreProviderGetter,
 	etcdBackupConfigProjectProviderGetter provider.EtcdBackupConfigProjectProviderGetter,
@@ -368,15 +368,6 @@ func initTestEndpoint(user apiv1.User, seedsGetter provider.SeedsGetter, kubeObj
 		FakeClient: fakeClient,
 	}
 
-	privilegedAllowedRegistryProvider, err := kubernetes.NewAllowedRegistryPrivilegedProvider(fakeClient)
-	if err != nil {
-		return nil, nil, err
-	}
-	fakePrivilegedAllowedRegistryProvider := &FakePrivilegedAllowedRegistryProvider{
-		Provider:   privilegedAllowedRegistryProvider,
-		FakeClient: fakeClient,
-	}
-
 	defaultConstraintProvider, err := kubernetes.NewDefaultConstraintProvider(fakeImpersonationClient, fakeClient, KubermaticNamespace)
 	if err != nil {
 		return nil, nil, err
@@ -514,7 +505,6 @@ func initTestEndpoint(user apiv1.User, seedsGetter provider.SeedsGetter, kubeObj
 		clusterTemplateInstanceProviderGetter,
 		kubermaticVersions,
 		fakeDefaultConstraintProvider,
-		fakePrivilegedAllowedRegistryProvider,
 		etcdBackupConfigProviderGetter,
 		etcdRestoreProviderGetter,
 		etcdBackupConfigProjectProviderGetter,
@@ -1740,24 +1730,6 @@ func GenClusterTemplateInstance(projectID, templateID string, replicas int64) *k
 			Replicas:          replicas,
 		},
 	}
-}
-
-func GenDefaultAPIAllowedRegistry(name, registryPrefix string) apiv2.AllowedRegistry {
-	return apiv2.AllowedRegistry{
-		Name: name,
-		Spec: kubermaticv1.AllowedRegistrySpec{
-			RegistryPrefix: registryPrefix,
-		},
-	}
-}
-
-func GenAllowedRegistry(name, registryPrefix string) *kubermaticv1.AllowedRegistry {
-	wr := &kubermaticv1.AllowedRegistry{}
-	wr.Name = name
-	wr.Spec = kubermaticv1.AllowedRegistrySpec{
-		RegistryPrefix: registryPrefix,
-	}
-	return wr
 }
 
 func GenAPIEtcdBackupConfig(name, clusterID string) *apiv2.EtcdBackupConfig {

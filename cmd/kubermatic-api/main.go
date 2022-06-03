@@ -297,11 +297,6 @@ func createInitProviders(ctx context.Context, options serverRunOptions, masterCf
 		return providers{}, fmt.Errorf("failed to create cluster template provider due to %v", err)
 	}
 
-	privilegedAllowedRegistryProvider, err := kubernetesprovider.NewAllowedRegistryPrivilegedProvider(mgr.GetClient())
-	if err != nil {
-		return providers{}, fmt.Errorf("failed to create allowed registry provider due to %v", err)
-	}
-
 	constraintProviderGetter := kubernetesprovider.ConstraintProviderFactory(mgr.GetRESTMapper(), seedKubeconfigGetter)
 
 	kubeMasterInformerFactory.Start(wait.NeverStop)
@@ -371,7 +366,6 @@ func createInitProviders(ctx context.Context, options serverRunOptions, masterCf
 		constraintProviderGetter:              constraintProviderGetter,
 		clusterTemplateProvider:               clusterTemplateProvider,
 		clusterTemplateInstanceProviderGetter: clusterTemplateInstanceProviderGetter,
-		privilegedAllowedRegistryProvider:     privilegedAllowedRegistryProvider,
 		etcdBackupConfigProviderGetter:        etcdBackupConfigProviderGetter,
 		etcdRestoreProviderGetter:             etcdRestoreProviderGetter,
 		etcdBackupConfigProjectProviderGetter: etcdBackupConfigProjectProviderGetter,
@@ -489,7 +483,6 @@ func createAPIHandler(options serverRunOptions, prov providers, oidcIssuerVerifi
 		ConstraintProviderGetter:              prov.constraintProviderGetter,
 		ClusterTemplateProvider:               prov.clusterTemplateProvider,
 		ClusterTemplateInstanceProviderGetter: prov.clusterTemplateInstanceProviderGetter,
-		PrivilegedAllowedRegistryProvider:     prov.privilegedAllowedRegistryProvider,
 		EtcdBackupConfigProviderGetter:        prov.etcdBackupConfigProviderGetter,
 		EtcdRestoreProviderGetter:             prov.etcdRestoreProviderGetter,
 		EtcdBackupConfigProjectProviderGetter: prov.etcdBackupConfigProjectProviderGetter,

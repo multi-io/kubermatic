@@ -20,26 +20,25 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	openstack "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/openstack/types"
-	"k8c.io/kubermatic/v2/pkg/resources/cloudconfig"
 	"strconv"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
-
 	clusterv1alpha1 "github.com/kubermatic/machine-controller/pkg/apis/cluster/v1alpha1"
+	openstack "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/openstack/types"
 	providerconfig "github.com/kubermatic/machine-controller/pkg/providerconfig/types"
-	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
-	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
-	"k8c.io/kubermatic/v2/pkg/resources"
-	"k8c.io/kubermatic/v2/pkg/validation"
-	"k8c.io/kubermatic/v2/pkg/validation/nodeupdate"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
+
+	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/resources"
+	"k8c.io/kubermatic/v2/pkg/resources/cloudconfig"
+	"k8c.io/kubermatic/v2/pkg/validation"
+	"k8c.io/kubermatic/v2/pkg/validation/nodeupdate"
 )
 
 // Deployment returns a Machine Deployment object for the given Node Deployment spec.

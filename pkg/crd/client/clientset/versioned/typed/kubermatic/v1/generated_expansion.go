@@ -6,8 +6,6 @@ type AddonExpansion interface{}
 
 type AddonConfigExpansion interface{}
 
-type AllowedRegistryExpansion interface{}
-
 type ClusterExpansion interface{}
 
 type ClusterTemplateExpansion interface{}

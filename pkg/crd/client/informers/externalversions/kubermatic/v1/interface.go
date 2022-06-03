@@ -12,8 +12,6 @@ type Interface interface {
 	Addons() AddonInformer
 	// AddonConfigs returns a AddonConfigInformer.
 	AddonConfigs() AddonConfigInformer
-	// AllowedRegistries returns a AllowedRegistryInformer.
-	AllowedRegistries() AllowedRegistryInformer
 	// Clusters returns a ClusterInformer.
 	Clusters() ClusterInformer
 	// ClusterTemplates returns a ClusterTemplateInformer.
@@ -63,11 +61,6 @@ func (v *version) Addons() AddonInformer {
 // AddonConfigs returns a AddonConfigInformer.
 func (v *version) AddonConfigs() AddonConfigInformer {
 	return &addonConfigInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
-}
-
-// AllowedRegistries returns a AllowedRegistryInformer.
-func (v *version) AllowedRegistries() AllowedRegistryInformer {
-	return &allowedRegistryInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // Clusters returns a ClusterInformer.

@@ -245,9 +245,15 @@ spec:
       resources: null
       storageClass: ""
       tolerations: null
+    nodeLocalDNS:
+      resources: null
     openstack:
       enableIngressHostname: false
     openvpn:
+      client:
+        resources: null
+      dnatController:
+        resources: null
       exporter:
         resources: null
       ipFixup:
@@ -315,8 +321,6 @@ spec:
     storageClassName: kubermatic-fast
     # StorageSize is the size of the storage class. Default value is 100Gi.
     storageSize: 100Gi
-  # Optional: MLA allows configuring seed level MLA (Monitoring, Logging & Alerting) stack settings.
-  mla: null
   # NodeportProxy can be used to configure the NodePort proxy service that is
   # responsible for making user-cluster control planes accessible from the outside.
   nodeport_proxy:

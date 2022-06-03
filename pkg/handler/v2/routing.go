@@ -86,7 +86,6 @@ type Routing struct {
 	constraintProviderGetter              provider.ConstraintProviderGetter
 	clusterTemplateProvider               provider.ClusterTemplateProvider
 	clusterTemplateInstanceProviderGetter provider.ClusterTemplateInstanceProviderGetter
-	privilegedAllowedRegistryProvider     provider.PrivilegedAllowedRegistryProvider
 	etcdBackupConfigProviderGetter        provider.EtcdBackupConfigProviderGetter
 	etcdRestoreProviderGetter             provider.EtcdRestoreProviderGetter
 	etcdBackupConfigProjectProviderGetter provider.EtcdBackupConfigProjectProviderGetter
@@ -144,7 +143,6 @@ func NewV2Routing(routingParams handler.RoutingParams) Routing {
 		constraintProviderGetter:              routingParams.ConstraintProviderGetter,
 		clusterTemplateProvider:               routingParams.ClusterTemplateProvider,
 		clusterTemplateInstanceProviderGetter: routingParams.ClusterTemplateInstanceProviderGetter,
-		privilegedAllowedRegistryProvider:     routingParams.PrivilegedAllowedRegistryProvider,
 		etcdBackupConfigProviderGetter:        routingParams.EtcdBackupConfigProviderGetter,
 		etcdRestoreProviderGetter:             routingParams.EtcdRestoreProviderGetter,
 		etcdBackupConfigProjectProviderGetter: routingParams.EtcdBackupConfigProjectProviderGetter,
