@@ -228,11 +228,6 @@ func (r *reconciler) reconcile(ctx context.Context, constraint *kubermaticv1.Con
 		return fmt.Errorf("failed listing clusters: %w", err)
 	}
 
-	desiredClusters, unwantedClusters, err := r.filterClustersForConstraint(ctx, constraint, clusterList)
-	if err != nil {
-		return fmt.Errorf("failed listing clusters: %w", err)
-	}
-
 	// constraint deletion
 	if !constraint.DeletionTimestamp.IsZero() {
 
@@ -240,7 +235,7 @@ func (r *reconciler) reconcile(ctx context.Context, constraint *kubermaticv1.Con
 			return nil
 		}
 
-		if err := r.cleanupConstraint(ctx, log, constraint, desiredClusters); err != nil {
+		if err := r.cleanupConstraint(ctx, log, constraint, clusterList.Items); err != nil {
 			return err
 		}
 
@@ -258,11 +253,7 @@ func (r *reconciler) reconcile(ctx context.Context, constraint *kubermaticv1.Con
 		}
 	}
 
-	if err = r.cleanupConstraint(ctx, log, constraint, unwantedClusters); err != nil {
-		return err
-	}
-
-	if err = r.ensureConstraint(ctx, log, constraint, desiredClusters); err != nil {
+	if err := r.ensureConstraint(ctx, log, constraint, clusterList.Items); err != nil {
 		return err
 	}
 
