@@ -18,10 +18,6 @@ type Interface interface {
 	ClusterTemplates() ClusterTemplateInformer
 	// ClusterTemplateInstances returns a ClusterTemplateInstanceInformer.
 	ClusterTemplateInstances() ClusterTemplateInstanceInformer
-	// Constraints returns a ConstraintInformer.
-	Constraints() ConstraintInformer
-	// ConstraintTemplates returns a ConstraintTemplateInformer.
-	ConstraintTemplates() ConstraintTemplateInformer
 	// EtcdBackupConfigs returns a EtcdBackupConfigInformer.
 	EtcdBackupConfigs() EtcdBackupConfigInformer
 	// EtcdRestores returns a EtcdRestoreInformer.
@@ -76,16 +72,6 @@ func (v *version) ClusterTemplates() ClusterTemplateInformer {
 // ClusterTemplateInstances returns a ClusterTemplateInstanceInformer.
 func (v *version) ClusterTemplateInstances() ClusterTemplateInstanceInformer {
 	return &clusterTemplateInstanceInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
-}
-
-// Constraints returns a ConstraintInformer.
-func (v *version) Constraints() ConstraintInformer {
-	return &constraintInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
-}
-
-// ConstraintTemplates returns a ConstraintTemplateInformer.
-func (v *version) ConstraintTemplates() ConstraintTemplateInformer {
-	return &constraintTemplateInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // EtcdBackupConfigs returns a EtcdBackupConfigInformer.

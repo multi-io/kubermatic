@@ -590,7 +590,7 @@ func generateVerbsForNamedResourceInNamespace(groupName, resourceKind, namespace
 
 func generateVerbsForClusterNamespaceResource(cluster *kubermaticv1.Cluster, groupName, kind string) ([]string, error) {
 	if strings.HasPrefix(groupName, ViewerGroupNamePrefix) &&
-		(kind == kubermaticv1.AddonKindName || kind == kubermaticv1.ConstraintKind || kind == kubermaticv1.EtcdBackupConfigKindName || kind == kubermaticv1.EtcdRestoreKindName) {
+		(kind == kubermaticv1.AddonKindName || kind == kubermaticv1.EtcdBackupConfigKindName || kind == kubermaticv1.EtcdRestoreKindName) {
 		return []string{"get", "list"}, nil
 	}
 

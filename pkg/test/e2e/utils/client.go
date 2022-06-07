@@ -35,9 +35,6 @@ import (
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	apiclient "k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/admin"
-	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/constraint"
-	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/constraints"
-	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/constrainttemplates"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/credentials"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/datacenter"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/gcp"
@@ -626,8 +623,6 @@ func (r *TestClient) GetClusterHealthStatus(projectID, dc, clusterID string) (*a
 	apiClusterHealth.MachineController = convertHealthStatus(response.Payload.MachineController)
 	apiClusterHealth.Scheduler = convertHealthStatus(response.Payload.Scheduler)
 	apiClusterHealth.UserClusterControllerManager = convertHealthStatus(response.Payload.UserClusterControllerManager)
-	apiClusterHealth.GatekeeperController = convertHealthStatus(response.Payload.GatekeeperController)
-	apiClusterHealth.GatekeeperAudit = convertHealthStatus(response.Payload.GatekeeperAudit)
 
 	return apiClusterHealth, nil
 }
@@ -646,26 +641,6 @@ func (r *TestClient) WaitForClusterHealthy(projectID, dc, clusterID string) erro
 	}
 
 	r.test.Logf("Cluster became healthy after %v", time.Since(before))
-	return nil
-}
-
-func (r *TestClient) WaitForOPAEnabledClusterHealthy(projectID, dc, clusterID string) error {
-	timeout := 5 * time.Minute
-	before := time.Now()
-
-	r.test.Logf("Waiting %v for OPA enabled cluster %s to become healthy...", timeout, clusterID)
-
-	if !WaitFor(5*time.Second, timeout, func() bool {
-		healthStatus, _ := r.GetClusterHealthStatus(projectID, dc, clusterID)
-		return IsHealthyCluster(healthStatus) &&
-			healthStatus.GatekeeperController == kubermaticv1.HealthStatusUp &&
-			healthStatus.GatekeeperAudit == kubermaticv1.HealthStatusUp
-
-	}) {
-		return errors.New("OPA enabled cluster did not become healthy")
-	}
-
-	r.test.Logf("OPA enabled cluster became healthy after %v", time.Since(before))
 	return nil
 }
 
@@ -937,10 +912,6 @@ func convertGlobalSettings(gSettings *models.GlobalSettings) *apiv1.GlobalSettin
 		DisplayTermsOfService: gSettings.DisplayTermsOfService,
 		EnableOIDCKubeconfig:  gSettings.EnableOIDCKubeconfig,
 		EnableDashboard:       gSettings.EnableDashboard,
-		OpaOptions: kubermaticv1.OpaOptions{
-			Enabled:  gSettings.OpaOptions.Enabled,
-			Enforced: gSettings.OpaOptions.Enforced,
-		},
 	}
 }
 
@@ -1425,172 +1396,6 @@ func (r *TestClient) GetUserClusterClient(dc, projectID, clusterID string) (ctrl
 	}
 
 	return ctrlruntimeclient.New(config, ctrlruntimeclient.Options{Scheme: scheme.Scheme})
-}
-
-// GetConstraint gets the constraint with the given name, project and cluster; it does not perform any
-// retries if the API returns errors.
-func (r *TestClient) GetConstraint(projectID, clusterID, name string) (*apiv2.Constraint, error) {
-	params := &project.GetConstraintParams{
-		ProjectID: projectID,
-		ClusterID: clusterID,
-		Name:      name,
-	}
-
-	SetupRetryParams(r.test, params, Backoff{
-		Duration: 1 * time.Second,
-		Steps:    4,
-		Factor:   1.5,
-	})
-
-	project, err := r.client.Project.GetConstraint(params, r.bearerToken)
-	if err != nil {
-		return nil, err
-	}
-
-	return convertConstraint(project.Payload)
-}
-
-func (r *TestClient) CreateConstraint(name, ctKind string) (*kubermaticv1.Constraint, error) {
-
-	kind := &models.Kind{
-		Kinds: []string{"ConfigMap"}, APIGroups: []string{""},
-	}
-	spec := &models.ConstraintSpec{
-		ConstraintType: ctKind,
-		Match: &models.Match{
-			Kinds: []*models.Kind{kind},
-		},
-		Parameters: models.Parameters{
-			"rawJSON": `{"labels":["gatekeeper"]}`,
-		},
-	}
-
-	params := &constraint.CreateDefaultConstraintParams{
-		Body: &models.ConstraintBody{
-			Name: name,
-			Spec: spec,
-		},
-	}
-	SetupRetryParams(r.test, params, Backoff{
-		Duration: 1 * time.Second,
-		Steps:    4,
-		Factor:   1.5,
-	})
-
-	constraint, err := r.client.Constraint.CreateDefaultConstraint(params, r.bearerToken)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return convertDefaultConstraint(constraint.Payload)
-}
-
-func convertConstraint(constraint *models.Constraint) (*apiv2.Constraint, error) {
-	apiConstraint := &apiv2.Constraint{}
-	apiConstraint.Name = constraint.Name
-	apiConstraint.Spec = kubermaticv1.ConstraintSpec{
-		ConstraintType: constraint.Spec.ConstraintType,
-	}
-
-	return apiConstraint, nil
-}
-
-func convertDefaultConstraint(constraint *models.Constraint) (*kubermaticv1.Constraint, error) {
-	Constraint := &kubermaticv1.Constraint{}
-	Constraint.Name = constraint.Name
-	return Constraint, nil
-}
-
-func (r *TestClient) CreateCT(name, ctKind string) (*kubermaticv1.ConstraintTemplate, error) {
-
-	spec := models.ConstraintTemplateSpec{
-		Crd: &models.CRD{
-			Spec: &models.CRDSpec{
-				Names: &models.Names{
-					Kind: ctKind,
-				},
-				Validation: &models.Validation{
-					OpenAPIV3Schema: &models.JSONSchemaProps{
-						Properties: map[string]models.JSONSchemaProps{
-							"labels": {
-								Type: "array",
-								Items: &models.JSONSchemaPropsOrArray{
-									Schema: &models.JSONSchemaProps{
-										Type: "string",
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		Targets: []*models.Target{
-			{
-				Target: "admission.k8s.gatekeeper.sh",
-				Rego:   "package requiredlabels\nviolation[{\"msg\": msg, \"details\": {\"missing_labels\": missing}}] {\n  provided := {label | input.review.object.metadata.labels[label]}\n  required := {label | label := input.parameters.labels[_]}\n  missing := required - provided\n  count(missing) > 0\n  msg := sprintf(\"you must provide labels: %v\", [missing])\n}",
-			},
-		},
-	}
-	params := &constrainttemplates.CreateConstraintTemplateParams{
-		Body: &models.CtBody{
-			Name: name,
-			Spec: &spec,
-		},
-	}
-	SetupRetryParams(r.test, params, Backoff{
-		Duration: 1 * time.Second,
-		Steps:    4,
-		Factor:   1.5,
-	})
-
-	r.test.Logf("Creating constraint template %s...", name)
-	ct, err := r.client.Constrainttemplates.CreateConstraintTemplate(params, r.bearerToken)
-	if err != nil {
-		return nil, err
-	}
-	return convertDefaultConstraintTemplate(ct.Payload)
-}
-
-func convertDefaultConstraintTemplate(constraintTemplate *models.ConstraintTemplate) (*kubermaticv1.ConstraintTemplate, error) {
-	Constraint := &kubermaticv1.ConstraintTemplate{}
-	Constraint.Name = constraintTemplate.Name
-	return Constraint, nil
-}
-
-func (r *TestClient) DeleteConstraintTemplate(name string) error {
-	r.test.Log("Deleting constraint template...")
-
-	params := &constrainttemplates.DeleteConstraintTemplateParams{
-		Name: name,
-	}
-	SetupParams(r.test, params, 1*time.Second, 3*time.Minute, http.StatusConflict)
-
-	_, err := r.client.Constrainttemplates.DeleteConstraintTemplate(params, r.bearerToken)
-	if err != nil {
-		return err
-	}
-
-	r.test.Log("Constraint template deleted successfully")
-	return nil
-}
-
-func (r *TestClient) DeleteConstraint(name string) error {
-	r.test.Log("Deleting constraint...")
-
-	params := &constraints.DeleteDefaultConstraintParams{
-		Name: name,
-	}
-	SetupParams(r.test, params, 1*time.Second, 3*time.Minute, http.StatusConflict)
-
-	_, err := r.client.Constraints.DeleteDefaultConstraint(params, r.bearerToken)
-	if err != nil {
-		return err
-	}
-
-	r.test.Log("Constraint deleted successfully")
-	return nil
 }
 
 // CreateClusterTemplate method creates cluster template object

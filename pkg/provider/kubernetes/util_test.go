@@ -25,7 +25,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/open-policy-agent/frameworks/constraint/pkg/apis/templates/v1beta1"
 	"gopkg.in/square/go-jose.v2/jwt"
 
 	"k8c.io/kubermatic/v2/pkg/controller/seed-controller-manager/cloud"
@@ -276,53 +275,4 @@ func genCluster(name, clusterType, projectID, workerName, userEmail string) *kub
 
 	cluster.Spec = *genClusterSpec(name)
 	return cluster
-}
-
-func genConstraintTemplate(name string) *kubermaticv1.ConstraintTemplate {
-	ct := &kubermaticv1.ConstraintTemplate{}
-	ct.Kind = "ConstraintTemplate"
-	ct.APIVersion = kubermaticv1.SchemeGroupVersion.String()
-	ct.Name = name
-	ct.Spec = kubermaticv1.ConstraintTemplateSpec{
-		CRD: v1beta1.CRD{
-			Spec: v1beta1.CRDSpec{
-				Names: v1beta1.Names{
-					Kind:       "labelconstraint",
-					ShortNames: []string{"lc"},
-				},
-			},
-		},
-		Targets: []v1beta1.Target{
-			{
-				Target: "admission.k8s.gatekeeper.sh",
-				Rego: `
-		package k8srequiredlabels
-
-        deny[{"msg": msg, "details": {"missing_labels": missing}}] {
-          provided := {label | input.review.object.metadata.labels[label]}
-          required := {label | label := input.parameters.labels[_]}
-          missing := required - provided
-          count(missing) > 0
-          msg := sprintf("you must provide labels: %v", [missing])
-        }`,
-			},
-		},
-		Selector: kubermaticv1.ConstraintTemplateSelector{
-			Providers: []string{"aws", "gcp"},
-			LabelSelector: metav1.LabelSelector{
-				MatchExpressions: []metav1.LabelSelectorRequirement{
-					{
-						Key:      "cluster",
-						Operator: metav1.LabelSelectorOpExists,
-					},
-				},
-				MatchLabels: map[string]string{
-					"deployment": "prod",
-					"domain":     "sales",
-				},
-			},
-		},
-	}
-
-	return ct
 }

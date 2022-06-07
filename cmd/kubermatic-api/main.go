@@ -58,7 +58,6 @@ import (
 
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
-	gatekeeperconfigv1alpha1 "github.com/open-policy-agent/gatekeeper/apis/config/v1alpha1"
 	prometheusapi "github.com/prometheus/client_golang/api"
 	"go.uber.org/zap"
 
@@ -125,9 +124,6 @@ func main() {
 	}
 	if err := v1beta1.AddToScheme(scheme.Scheme); err != nil {
 		kubermaticlog.Logger.Fatalw("failed to register scheme", zap.Stringer("api", v1beta1.SchemeGroupVersion), zap.Error(err))
-	}
-	if err := gatekeeperconfigv1alpha1.AddToScheme(scheme.Scheme); err != nil {
-		kubermaticlog.Logger.Fatalw("failed to register scheme", zap.Stringer("api", gatekeeperconfigv1alpha1.GroupVersion), zap.Error(err))
 	}
 
 	masterCfg, err := ctrlruntime.GetConfig()
@@ -282,22 +278,10 @@ func createInitProviders(ctx context.Context, options serverRunOptions, masterCf
 		return providers{}, fmt.Errorf("failed to create external cluster provider due to %v", err)
 	}
 
-	defaultConstraintProvider, err := kubernetesprovider.NewDefaultConstraintProvider(defaultImpersonationClient.CreateImpersonatedClient, mgr.GetClient(), options.namespace)
-	if err != nil {
-		return providers{}, fmt.Errorf("failed to create default constraint provider due to %w", err)
-	}
-
-	constraintTemplateProvider, err := kubernetesprovider.NewConstraintTemplateProvider(defaultImpersonationClient.CreateImpersonatedClient, mgr.GetClient())
-	if err != nil {
-		return providers{}, fmt.Errorf("failed to create constraint template provider due to %v", err)
-	}
-
 	clusterTemplateProvider, err := kubernetesprovider.NewClusterTemplateProvider(defaultImpersonationClient.CreateImpersonatedClient, client)
 	if err != nil {
 		return providers{}, fmt.Errorf("failed to create cluster template provider due to %v", err)
 	}
-
-	constraintProviderGetter := kubernetesprovider.ConstraintProviderFactory(mgr.GetRESTMapper(), seedKubeconfigGetter)
 
 	kubeMasterInformerFactory.Start(wait.NeverStop)
 	kubeMasterInformerFactory.WaitForCacheSync(wait.NeverStop)
@@ -361,9 +345,6 @@ func createInitProviders(ctx context.Context, options serverRunOptions, masterCf
 		userWatcher:                           userWatcher,
 		externalClusterProvider:               externalClusterProvider,
 		privilegedExternalClusterProvider:     externalClusterProvider,
-		constraintTemplateProvider:            constraintTemplateProvider,
-		defaultConstraintProvider:             defaultConstraintProvider,
-		constraintProviderGetter:              constraintProviderGetter,
 		clusterTemplateProvider:               clusterTemplateProvider,
 		clusterTemplateInstanceProviderGetter: clusterTemplateInstanceProviderGetter,
 		etcdBackupConfigProviderGetter:        etcdBackupConfigProviderGetter,
@@ -478,9 +459,6 @@ func createAPIHandler(options serverRunOptions, prov providers, oidcIssuerVerifi
 		UserWatcher:                           prov.userWatcher,
 		ExternalClusterProvider:               prov.externalClusterProvider,
 		PrivilegedExternalClusterProvider:     prov.privilegedExternalClusterProvider,
-		ConstraintTemplateProvider:            prov.constraintTemplateProvider,
-		DefaultConstraintProvider:             prov.defaultConstraintProvider,
-		ConstraintProviderGetter:              prov.constraintProviderGetter,
 		ClusterTemplateProvider:               prov.clusterTemplateProvider,
 		ClusterTemplateInstanceProviderGetter: prov.clusterTemplateInstanceProviderGetter,
 		EtcdBackupConfigProviderGetter:        prov.etcdBackupConfigProviderGetter,

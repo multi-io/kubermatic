@@ -63,9 +63,6 @@ type ClusterSpec struct {
 	// oidc
 	Oidc *OIDCSettings `json:"oidc,omitempty"`
 
-	// opa integration
-	OpaIntegration *OPAIntegrationSettings `json:"opaIntegration,omitempty"`
-
 	// service account
 	ServiceAccount *ServiceAccountSettings `json:"serviceAccount,omitempty"`
 
@@ -100,10 +97,6 @@ func (m *ClusterSpec) Validate(formats strfmt.Registry) error {
 	}
 
 	if err := m.validateOidc(formats); err != nil {
-		res = append(res, err)
-	}
-
-	if err := m.validateOpaIntegration(formats); err != nil {
 		res = append(res, err)
 	}
 
@@ -217,23 +210,6 @@ func (m *ClusterSpec) validateOidc(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *ClusterSpec) validateOpaIntegration(formats strfmt.Registry) error {
-	if swag.IsZero(m.OpaIntegration) { // not required
-		return nil
-	}
-
-	if m.OpaIntegration != nil {
-		if err := m.OpaIntegration.Validate(formats); err != nil {
-			if ve, ok := err.(*errors.Validation); ok {
-				return ve.ValidateName("opaIntegration")
-			}
-			return err
-		}
-	}
-
-	return nil
-}
-
 func (m *ClusterSpec) validateServiceAccount(formats strfmt.Registry) error {
 	if swag.IsZero(m.ServiceAccount) { // not required
 		return nil
@@ -306,10 +282,6 @@ func (m *ClusterSpec) ContextValidate(ctx context.Context, formats strfmt.Regist
 	}
 
 	if err := m.contextValidateOidc(ctx, formats); err != nil {
-		res = append(res, err)
-	}
-
-	if err := m.contextValidateOpaIntegration(ctx, formats); err != nil {
 		res = append(res, err)
 	}
 
@@ -397,20 +369,6 @@ func (m *ClusterSpec) contextValidateOidc(ctx context.Context, formats strfmt.Re
 		if err := m.Oidc.ContextValidate(ctx, formats); err != nil {
 			if ve, ok := err.(*errors.Validation); ok {
 				return ve.ValidateName("oidc")
-			}
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (m *ClusterSpec) contextValidateOpaIntegration(ctx context.Context, formats strfmt.Registry) error {
-
-	if m.OpaIntegration != nil {
-		if err := m.OpaIntegration.ContextValidate(ctx, formats); err != nil {
-			if ve, ok := err.(*errors.Validation); ok {
-				return ve.ValidateName("opaIntegration")
 			}
 			return err
 		}

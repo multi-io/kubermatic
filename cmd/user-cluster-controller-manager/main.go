@@ -32,7 +32,6 @@ import (
 	sys11nodereadiness "k8c.io/kubermatic/v2/pkg/controller/sys11-node-readiness"
 
 	clusterrolelabeler "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/cluster-role-labeler"
-	constraintsyncer "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/constraint-syncer"
 	"k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/flatcar"
 	"k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/ipam"
 	nodelabeler "k8c.io/kubermatic/v2/pkg/controller/user-cluster-controller-manager/node-labeler"
@@ -87,9 +86,6 @@ type controllerRunOptions struct {
 	updateWindowLength    string
 	dnsClusterIP          string
 	nodeLocalDNSCache     bool
-	opaIntegration        bool
-	opaEnableMutation     bool
-	opaWebhookTimeout     int
 	useSSHKeyAgent        bool
 	caBundleFile          string
 	userClusterLogging    bool
@@ -127,9 +123,6 @@ func main() {
 	flag.StringVar(&runOp.ownerEmail, "owner-email", "", "An email address of the user who created the cluster. Used as default subject for the admin cluster role binding")
 	flag.StringVar(&runOp.updateWindowStart, "update-window-start", "", "The start time of the update window, e.g. 02:00")
 	flag.StringVar(&runOp.updateWindowLength, "update-window-length", "", "The length of the update window, e.g. 1h")
-	flag.BoolVar(&runOp.opaIntegration, "opa-integration", false, "Enable OPA integration in user cluster")
-	flag.BoolVar(&runOp.opaEnableMutation, "enable-mutation", false, "Enable OPA experimental mutation in user cluster")
-	flag.IntVar(&runOp.opaWebhookTimeout, "opa-webhook-timeout", 1, "Timeout for OPA Integration validating webhook, in seconds")
 	flag.BoolVar(&runOp.useSSHKeyAgent, "enable-ssh-key-agent", false, "Enable UserSSHKeyAgent integration in user cluster")
 	flag.StringVar(&runOp.caBundleFile, "ca-bundle", "", "The path to the cluster's CA bundle (PEM-encoded).")
 	flag.BoolVar(&runOp.userClusterLogging, "user-cluster-logging", false, "Enable logging in user cluster.")
@@ -265,11 +258,8 @@ func main() {
 		mgr.AddReadyzCheck,
 		runOp.dnsClusterIP,
 		runOp.nodeLocalDNSCache,
-		runOp.opaIntegration,
-		runOp.opaEnableMutation,
 		versions,
 		runOp.useSSHKeyAgent,
-		runOp.opaWebhookTimeout,
 		caBundle,
 		runOp.clusterName,
 		runOp.isKonnectivityEnabled,
@@ -350,13 +340,6 @@ func main() {
 			log.Fatalw("failed to register ccm-csi-migrator controller", zap.Error(err))
 		}
 		log.Info("registered ccm-csi-migrator controller")
-	}
-
-	if runOp.opaIntegration {
-		if err := constraintsyncer.Add(rootCtx, log, seedMgr, mgr, runOp.namespace, isPausedChecker); err != nil {
-			log.Fatalw("Failed to register constraintsyncer controller", zap.Error(err))
-		}
-		log.Info("Registered constraintsyncer controller")
 	}
 
 	if err := mgr.Start(rootCtx); err != nil {

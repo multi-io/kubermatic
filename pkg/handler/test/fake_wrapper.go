@@ -302,66 +302,6 @@ func (k NewRoleNameSliceWrapper) EqualOrDie(expected NewRoleNameSliceWrapper, t 
 	}
 }
 
-// NewConstraintTemplateV1SliceWrapper wraps []apiv1.ConstraintTemplate
-// to provide convenient methods for tests
-type NewConstraintTemplateV1SliceWrapper []apiv2.ConstraintTemplate
-
-// DecodeOrDie reads and decodes json data from the reader
-func (k *NewConstraintTemplateV1SliceWrapper) DecodeOrDie(r io.Reader, t *testing.T) *NewConstraintTemplateV1SliceWrapper {
-	t.Helper()
-	dec := json.NewDecoder(r)
-	err := dec.Decode(k)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return k
-}
-
-// Sort sorts the collection by Name
-func (k NewConstraintTemplateV1SliceWrapper) Sort() {
-	sort.Slice(k, func(i, j int) bool {
-		return k[i].Name < (k[j].Name)
-	})
-}
-
-// EqualOrDie compares whether expected collection is equal to the actual one
-func (k NewConstraintTemplateV1SliceWrapper) EqualOrDie(expected NewConstraintTemplateV1SliceWrapper, t *testing.T) {
-	t.Helper()
-	if diff := deep.Equal(k, expected); diff != nil {
-		t.Errorf("actual slice is different that the expected one. Diff: %v", diff)
-	}
-}
-
-// NewConstraintsSliceWrapper wraps []apiv2.Constraints
-// to provide convenient methods for tests
-type NewConstraintsSliceWrapper []apiv2.Constraint
-
-// DecodeOrDie reads and decodes json data from the reader
-func (k *NewConstraintsSliceWrapper) DecodeOrDie(r io.Reader, t *testing.T) *NewConstraintsSliceWrapper {
-	t.Helper()
-	dec := json.NewDecoder(r)
-	err := dec.Decode(k)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return k
-}
-
-// Sort sorts the collection by Name
-func (k NewConstraintsSliceWrapper) Sort() {
-	sort.Slice(k, func(i, j int) bool {
-		return k[i].Name < (k[j].Name)
-	})
-}
-
-// EqualOrDie compares whether expected collection is equal to the actual one
-func (k NewConstraintsSliceWrapper) EqualOrDie(expected NewConstraintsSliceWrapper, t *testing.T) {
-	t.Helper()
-	if diff := deep.Equal(k, expected); diff != nil {
-		t.Errorf("actual slice is different that the expected one. Diff: %v", diff)
-	}
-}
-
 // NodeDeploymentSliceWrapper wraps []apiv1.NodeDeployment
 // to provide convenient methods for tests
 type NodeDeploymentSliceWrapper []apiv1.NodeDeployment

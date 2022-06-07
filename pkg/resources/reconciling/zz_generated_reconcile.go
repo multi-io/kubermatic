@@ -7,7 +7,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	gatekeeperv1beta1 "github.com/open-policy-agent/frameworks/constraint/pkg/apis/templates/v1beta1"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	operatorv1alpha1 "k8c.io/kubermatic/v2/pkg/crd/operator/v1alpha1"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
@@ -969,88 +968,6 @@ func ReconcileEtcdBackupConfigs(ctx context.Context, namedGetters []NamedEtcdBac
 	return EnsureNamedObjectsConcurrent(ctx, client, objs)
 }
 
-// ConstraintTemplateCreator defines an interface to create/update ConstraintTemplates
-type ConstraintTemplateCreator = func(existing *gatekeeperv1beta1.ConstraintTemplate) (*gatekeeperv1beta1.ConstraintTemplate, error)
-
-// NamedConstraintTemplateCreatorGetter returns the name of the resource and the corresponding creator function
-type NamedConstraintTemplateCreatorGetter = func() (name string, create ConstraintTemplateCreator)
-
-// ConstraintTemplateObjectWrapper adds a wrapper so the ConstraintTemplateCreator matches ObjectCreator.
-// This is needed as Go does not support function interface matching.
-func ConstraintTemplateObjectWrapper(create ConstraintTemplateCreator) ObjectCreator {
-	return func(existing ctrlruntimeclient.Object) (ctrlruntimeclient.Object, error) {
-		if existing != nil {
-			return create(existing.(*gatekeeperv1beta1.ConstraintTemplate))
-		}
-		return create(&gatekeeperv1beta1.ConstraintTemplate{})
-	}
-}
-
-// ReconcileConstraintTemplates will create and update the ConstraintTemplates coming from the passed ConstraintTemplateCreator slice
-func ReconcileConstraintTemplates(ctx context.Context, namedGetters []NamedConstraintTemplateCreatorGetter, namespace string, client ctrlruntimeclient.Client, objectModifiers ...ObjectModifier) error {
-	var objs []EnsureObject
-	for _, get := range namedGetters {
-		name, create := get()
-		createObject := ConstraintTemplateObjectWrapper(create)
-		createObject = createWithNamespace(createObject, namespace)
-		createObject = createWithName(createObject, name)
-
-		for _, objectModifier := range objectModifiers {
-			createObject = objectModifier(createObject)
-		}
-
-		objs = append(objs, EnsureObject{
-			Name:             types.NamespacedName{Namespace: namespace, Name: name},
-			Creator:          createObject,
-			EmptyObj:         &gatekeeperv1beta1.ConstraintTemplate{},
-			RequiresRecreate: false,
-		})
-	}
-
-	return EnsureNamedObjectsConcurrent(ctx, client, objs)
-}
-
-// KubermaticV1ConstraintTemplateCreator defines an interface to create/update ConstraintTemplates
-type KubermaticV1ConstraintTemplateCreator = func(existing *kubermaticv1.ConstraintTemplate) (*kubermaticv1.ConstraintTemplate, error)
-
-// NamedKubermaticV1ConstraintTemplateCreatorGetter returns the name of the resource and the corresponding creator function
-type NamedKubermaticV1ConstraintTemplateCreatorGetter = func() (name string, create KubermaticV1ConstraintTemplateCreator)
-
-// KubermaticV1ConstraintTemplateObjectWrapper adds a wrapper so the KubermaticV1ConstraintTemplateCreator matches ObjectCreator.
-// This is needed as Go does not support function interface matching.
-func KubermaticV1ConstraintTemplateObjectWrapper(create KubermaticV1ConstraintTemplateCreator) ObjectCreator {
-	return func(existing ctrlruntimeclient.Object) (ctrlruntimeclient.Object, error) {
-		if existing != nil {
-			return create(existing.(*kubermaticv1.ConstraintTemplate))
-		}
-		return create(&kubermaticv1.ConstraintTemplate{})
-	}
-}
-
-// ReconcileKubermaticV1ConstraintTemplates will create and update the KubermaticV1ConstraintTemplates coming from the passed KubermaticV1ConstraintTemplateCreator slice
-func ReconcileKubermaticV1ConstraintTemplates(ctx context.Context, namedGetters []NamedKubermaticV1ConstraintTemplateCreatorGetter, namespace string, client ctrlruntimeclient.Client, objectModifiers ...ObjectModifier) error {
-	var objs []EnsureObject
-	for _, get := range namedGetters {
-		name, create := get()
-		createObject := KubermaticV1ConstraintTemplateObjectWrapper(create)
-		createObject = createWithNamespace(createObject, namespace)
-		createObject = createWithName(createObject, name)
-
-		for _, objectModifier := range objectModifiers {
-			createObject = objectModifier(createObject)
-		}
-
-		objs = append(objs, EnsureObject{
-			Name:             types.NamespacedName{Namespace: namespace, Name: name},
-			Creator:          createObject,
-			EmptyObj:         &kubermaticv1.ConstraintTemplate{},
-			RequiresRecreate: false,
-		})
-	}
-
-	return EnsureNamedObjectsConcurrent(ctx, client, objs)
-}
-
 // KubermaticV1ProjectCreator defines an interface to create/update Projects
 type KubermaticV1ProjectCreator = func(existing *kubermaticv1.Project) (*kubermaticv1.Project, error)
 
@@ -1126,47 +1043,6 @@ func ReconcileKubermaticV1UserProjectBindings(ctx context.Context, namedGetters 
 			Name:             types.NamespacedName{Namespace: namespace, Name: name},
 			Creator:          createObject,
 			EmptyObj:         &kubermaticv1.UserProjectBinding{},
-			RequiresRecreate: false,
-		})
-	}
-
-	return EnsureNamedObjectsConcurrent(ctx, client, objs)
-}
-
-// KubermaticV1ConstraintCreator defines an interface to create/update Constraints
-type KubermaticV1ConstraintCreator = func(existing *kubermaticv1.Constraint) (*kubermaticv1.Constraint, error)
-
-// NamedKubermaticV1ConstraintCreatorGetter returns the name of the resource and the corresponding creator function
-type NamedKubermaticV1ConstraintCreatorGetter = func() (name string, create KubermaticV1ConstraintCreator)
-
-// KubermaticV1ConstraintObjectWrapper adds a wrapper so the KubermaticV1ConstraintCreator matches ObjectCreator.
-// This is needed as Go does not support function interface matching.
-func KubermaticV1ConstraintObjectWrapper(create KubermaticV1ConstraintCreator) ObjectCreator {
-	return func(existing ctrlruntimeclient.Object) (ctrlruntimeclient.Object, error) {
-		if existing != nil {
-			return create(existing.(*kubermaticv1.Constraint))
-		}
-		return create(&kubermaticv1.Constraint{})
-	}
-}
-
-// ReconcileKubermaticV1Constraints will create and update the KubermaticV1Constraints coming from the passed KubermaticV1ConstraintCreator slice
-func ReconcileKubermaticV1Constraints(ctx context.Context, namedGetters []NamedKubermaticV1ConstraintCreatorGetter, namespace string, client ctrlruntimeclient.Client, objectModifiers ...ObjectModifier) error {
-	var objs []EnsureObject
-	for _, get := range namedGetters {
-		name, create := get()
-		createObject := KubermaticV1ConstraintObjectWrapper(create)
-		createObject = createWithNamespace(createObject, namespace)
-		createObject = createWithName(createObject, name)
-
-		for _, objectModifier := range objectModifiers {
-			createObject = objectModifier(createObject)
-		}
-
-		objs = append(objs, EnsureObject{
-			Name:             types.NamespacedName{Namespace: namespace, Name: name},
-			Creator:          createObject,
-			EmptyObj:         &kubermaticv1.Constraint{},
 			RequiresRecreate: false,
 		})
 	}
