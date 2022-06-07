@@ -119,6 +119,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 }
 
 func (r *Reconciler) reconcile(ctx context.Context, cluster *kubermaticv1.Cluster) (*reconcile.Result, error) {
+	// there's no finalizers that need to be processed
+	if !cluster.ObjectMeta.DeletionTimestamp.IsZero() {
+		return &reconcile.Result{}, nil
+	}
+
 	if !cluster.Status.ExtendedHealth.AllHealthy() {
 		// Cluster not healthy yet. Nothing to do.
 		// If it gets healthy we'll get notified by the event. No need to requeue

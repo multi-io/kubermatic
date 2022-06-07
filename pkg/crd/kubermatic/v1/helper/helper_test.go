@@ -17,13 +17,19 @@ limitations under the License.
 package helper
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/semver"
 	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	controllerruntimefake "sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 func TestGetClusterCondition(t *testing.T) {
@@ -206,4 +212,64 @@ func getCluster(condition *kubermaticv1.ClusterCondition) *kubermaticv1.Cluster 
 		c.Status.Conditions = []kubermaticv1.ClusterCondition{*condition}
 	}
 	return c
+}
+
+func TestClusterReconcileWrapper(t *testing.T) {
+	tests := []struct {
+		name          string
+		cluster       *kubermaticv1.Cluster
+		wantReconcile bool
+	}{
+		{
+			name: "never skip deleted clusters",
+			cluster: &kubermaticv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					DeletionTimestamp: &metav1.Time{Time: time.Now()},
+				},
+				Spec: kubermaticv1.ClusterSpec{
+					Pause:   true,
+					Version: *semver.NewSemverOrDie("1.17.0"),
+				},
+			},
+			wantReconcile: true,
+		},
+		{
+			name: "skip paused clusters",
+			cluster: &kubermaticv1.Cluster{
+				Spec: kubermaticv1.ClusterSpec{
+					Pause:   true,
+					Version: *semver.NewSemverOrDie("1.22.5"),
+				},
+			},
+			wantReconcile: false,
+		},
+		{
+			name: "skip unsupported clusters",
+			cluster: &kubermaticv1.Cluster{
+				Spec: kubermaticv1.ClusterSpec{
+					Version: *semver.NewSemverOrDie("1.17.0"),
+				},
+			},
+			wantReconcile: false,
+		},
+		{
+			name: "reconcile unpaused, supported clusters",
+			cluster: &kubermaticv1.Cluster{
+				Spec: kubermaticv1.ClusterSpec{
+					Version: *semver.NewSemverOrDie("1.22.5"),
+				},
+			},
+			wantReconcile: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, _ = ClusterReconcileWrapper(context.Background(), controllerruntimefake.NewClientBuilder().Build(), "", tt.cluster, kubermatic.Versions{}, kubermaticv1.ClusterConditionNone, func() (*reconcile.Result, error) {
+				if !tt.wantReconcile {
+					t.Error("expected reconciliation to be skipped")
+				}
+				return nil, nil
+			})
+		})
+	}
 }

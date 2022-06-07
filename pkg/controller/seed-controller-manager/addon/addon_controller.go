@@ -245,6 +245,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 }
 
 func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, addon *kubermaticv1.Addon, cluster *kubermaticv1.Cluster) (*reconcile.Result, error) {
+	// there's no finalizers that need to be processed
+	if !cluster.ObjectMeta.DeletionTimestamp.IsZero() {
+		return &reconcile.Result{}, nil
+	}
+
 	if cluster.Status.ExtendedHealth.Apiserver != kubermaticv1.HealthStatusUp {
 		log.Debug("API server is not running, trying again in 10 seconds")
 		return &reconcile.Result{RequeueAfter: kubermaticv1.ControllerRequeueAddonReconcileOnClusterNotReadyPeriod}, nil

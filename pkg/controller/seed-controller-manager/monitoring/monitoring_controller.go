@@ -234,6 +234,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 }
 
 func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, cluster *kubermaticv1.Cluster) (*reconcile.Result, error) {
+	// there's no finalizers that need to be processed
+	if !cluster.ObjectMeta.DeletionTimestamp.IsZero() {
+		return &reconcile.Result{}, nil
+	}
+
 	log.Debug("Reconciling cluster now")
 
 	data, err := r.getClusterTemplateData(context.Background(), r.Client, cluster)

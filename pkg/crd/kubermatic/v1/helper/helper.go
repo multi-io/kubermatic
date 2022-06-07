@@ -49,11 +49,13 @@ func ClusterReconcileWrapper(
 	if cluster.Labels[kubermaticv1.WorkerNameLabelKey] != workerName {
 		return nil, nil
 	}
-	if cluster.Spec.Pause {
+
+	switch {
+	case !cluster.ObjectMeta.DeletionTimestamp.IsZero():
+		break
+	case cluster.Spec.Pause:
 		return nil, nil
-	}
-	// skip 1.18 because 2.18 does not support it. The change is to be reverted later.
-	if v := cluster.Spec.Version; v.Version != nil && v.Major() == 1 && v.Minor() <= 18 {
+	case clusterVersionUnsupported(cluster):
 		return nil, nil
 	}
 
@@ -72,6 +74,12 @@ func ClusterReconcileWrapper(
 		}
 	}
 	return result, utilerrors.NewAggregate(errs)
+}
+
+// TODO: extract somewhere where it can be used from everywhere
+func clusterVersionUnsupported(cluster *kubermaticv1.Cluster) bool {
+	v := cluster.Spec.Version
+	return v.Version != nil && v.Major() == 1 && v.Minor() <= 18
 }
 
 // GetClusterCondition returns the index of the given condition or -1 and the condition itself

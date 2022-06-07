@@ -166,6 +166,10 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 }
 
 func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, cluster *kubermaticv1.Cluster) (*reconcile.Result, error) {
+	// there's no finalizers that need to be processed
+	if !cluster.ObjectMeta.DeletionTimestamp.IsZero() {
+		return &reconcile.Result{}, nil
+	}
 
 	// Wait until the Apiserver is running to ensure the namespace exists at least.
 	// Just checking for cluster.status.namespaceName is not enough as it gets set before the namespace exists

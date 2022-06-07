@@ -238,6 +238,9 @@ func (r *reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 	}
 	if paused {
 		r.log.Debug("Cluster is paused, not reconciling.")
+		r.rLock.Lock()
+		defer r.rLock.Unlock()
+		r.reconciledSuccessfullyOnce = true
 		return reconcile.Result{}, nil
 	}
 
