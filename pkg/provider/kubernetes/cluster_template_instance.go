@@ -55,7 +55,7 @@ func NewClusterTemplateInstanceProvider(createSeedImpersonatedClient Impersonati
 
 func ClusterTemplateInstanceProviderFactory(mapper meta.RESTMapper, seedKubeconfigGetter provider.SeedKubeconfigGetter) provider.ClusterTemplateInstanceProviderGetter {
 	return func(seed *kubermaticv1.Seed) (provider.ClusterTemplateInstanceProvider, error) {
-		cfg, err := seedKubeconfigGetter(seed)
+		cfg, err := seedKubeconfigGetter(context.TODO(), seed)
 		if err != nil {
 			return nil, err
 		}

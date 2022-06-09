@@ -17,6 +17,7 @@ limitations under the License.
 package provider
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
@@ -31,8 +32,8 @@ import (
 //
 // TODO: Find a way to lift the current requirement of unique datacenter names. It is needed only because we put
 // 	 the datacenter name in the cluster object but not the seed name.
-func DatacenterFromSeedMap(userInfo *UserInfo, seedsGetter SeedsGetter, datacenterName string) (*kubermaticv1.Seed, *kubermaticv1.Datacenter, error) {
-	seeds, err := seedsGetter()
+func DatacenterFromSeedMap(_ *UserInfo, seedsGetter SeedsGetter, datacenterName string) (*kubermaticv1.Seed, *kubermaticv1.Datacenter, error) {
+	seeds, err := seedsGetter(context.TODO())
 	if err != nil {
 		return nil, nil, errors.New(http.StatusInternalServerError, fmt.Sprintf("failed to list seeds: %v", err))
 	}

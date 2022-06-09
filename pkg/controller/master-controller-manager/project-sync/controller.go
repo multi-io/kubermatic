@@ -51,16 +51,13 @@ type reconciler struct {
 	seedClientGetter provider.SeedClientGetter
 }
 
-func Add(mgr manager.Manager,
-	log *zap.SugaredLogger,
-	numWorkers int,
-	seedKubeconfigGetter provider.SeedKubeconfigGetter) error {
-
+func Add(mgr manager.Manager, log *zap.SugaredLogger, numWorkers int) error {
+	client := mgr.GetClient()
 	reconciler := &reconciler{
 		log:              log.Named(ControllerName),
 		recorder:         mgr.GetEventRecorderFor(ControllerName),
-		masterClient:     mgr.GetClient(),
-		seedClientGetter: provider.SeedClientGetterFactory(seedKubeconfigGetter),
+		masterClient:     client,
+		seedClientGetter: provider.SeedClientGetterFactory(client),
 	}
 
 	c, err := controller.New(ControllerName, mgr, controller.Options{Reconciler: reconciler, MaxConcurrentReconciles: numWorkers})
@@ -154,7 +151,7 @@ func (r *reconciler) syncAllSeeds(
 	}
 
 	for _, seed := range seedList.Items {
-		seedClient, err := r.seedClientGetter(&seed)
+		seedClient, err := r.seedClientGetter(ctx, &seed)
 		if err != nil {
 			return fmt.Errorf("failed getting seed client for seed %s: %w", seed.Name, err)
 		}

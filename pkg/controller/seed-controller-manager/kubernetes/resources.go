@@ -52,7 +52,7 @@ import (
 )
 
 func (r *Reconciler) ensureResourcesAreDeployed(ctx context.Context, cluster *kubermaticv1.Cluster) error {
-	seed, err := r.seedGetter()
+	seed, err := r.seedGetter(ctx)
 	if err != nil {
 		return err
 	}

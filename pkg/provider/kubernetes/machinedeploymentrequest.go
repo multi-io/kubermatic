@@ -118,7 +118,7 @@ func (p *MachineDeploymentRequestProvider) Delete(userInfo *provider.UserInfo, c
 
 func MachineDeploymentRequestProviderFactory(mapper meta.RESTMapper, seedKubeconfigGetter provider.SeedKubeconfigGetter) provider.MachineDeploymentRequestProviderGetter {
 	return func(seed *kubermaticv1.Seed) (provider.MachineDeploymentRequestProvider, error) {
-		cfg, err := seedKubeconfigGetter(seed)
+		cfg, err := seedKubeconfigGetter(context.TODO(), seed)
 		if err != nil {
 			return nil, err
 		}
