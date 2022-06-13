@@ -36,7 +36,6 @@ import (
 	"k8c.io/kubermatic/v2/pkg/controller/master-controller-manager/usersshkeyssynchronizer"
 	seedcontrollerlifecycle "k8c.io/kubermatic/v2/pkg/controller/shared/seed-controller-lifecycle"
 	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
-	"k8c.io/kubermatic/v2/pkg/provider"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
@@ -47,8 +46,6 @@ import (
 func createAllControllers(ctrlCtx *controllerContext) error {
 	rbacControllerFactory := rbacControllerFactoryCreator(
 		ctrlCtx.mgr.GetConfig(),
-		ctrlCtx.seedsGetter,
-		ctrlCtx.seedKubeconfigGetter,
 		ctrlCtx.workerCount,
 		ctrlCtx.labelSelectorFunc,
 		ctrlCtx.workerNamePredicate,
@@ -62,8 +59,6 @@ func createAllControllers(ctrlCtx *controllerContext) error {
 		kubermaticlog.Logger,
 		ctrlCtx.mgr,
 		ctrlCtx.namespace,
-		ctrlCtx.seedsGetter,
-		ctrlCtx.seedKubeconfigGetter,
 		rbacControllerFactory,
 		projectLabelSynchronizerFactory,
 		userSSHKeysSynchronizerFactory,
@@ -78,19 +73,19 @@ func createAllControllers(ctrlCtx *controllerContext) error {
 	if err := serviceaccount.Add(ctrlCtx.mgr); err != nil {
 		return fmt.Errorf("failed to create serviceaccount controller: %v", err)
 	}
-	if err := seedsync.Add(ctrlCtx.ctx, ctrlCtx.mgr, 1, ctrlCtx.log, ctrlCtx.namespace, ctrlCtx.seedKubeconfigGetter, ctrlCtx.seedsGetter); err != nil {
+	if err := seedsync.Add(ctrlCtx.ctx, ctrlCtx.mgr, 1, ctrlCtx.log, ctrlCtx.namespace); err != nil {
 		return fmt.Errorf("failed to create seedsync controller: %v", err)
 	}
-	if err := seedproxy.Add(ctrlCtx.ctx, ctrlCtx.mgr, 1, ctrlCtx.log, ctrlCtx.namespace, ctrlCtx.seedsGetter, ctrlCtx.seedKubeconfigGetter); err != nil {
+	if err := seedproxy.Add(ctrlCtx.ctx, ctrlCtx.mgr, 1, ctrlCtx.log, ctrlCtx.namespace); err != nil {
 		return fmt.Errorf("failed to create seedproxy controller: %v", err)
 	}
 	if err := externalcluster.Add(ctrlCtx.ctx, ctrlCtx.mgr, ctrlCtx.log); err != nil {
 		return fmt.Errorf("failed to create external cluster controller: %v", err)
 	}
-	if err := projectsync.Add(ctrlCtx.mgr, ctrlCtx.log, 1, ctrlCtx.seedKubeconfigGetter); err != nil {
+	if err := projectsync.Add(ctrlCtx.mgr, ctrlCtx.log, 1); err != nil {
 		return fmt.Errorf("failed to create projectsync controller: %v", err)
 	}
-	if err := userprojectbindingsync.Add(ctrlCtx.mgr, ctrlCtx.log, 1, ctrlCtx.seedKubeconfigGetter); err != nil {
+	if err := userprojectbindingsync.Add(ctrlCtx.mgr, ctrlCtx.log, 1); err != nil {
 		return fmt.Errorf("failed to create userprojectbindingsync controller: %v", err)
 	}
 
@@ -99,8 +94,6 @@ func createAllControllers(ctrlCtx *controllerContext) error {
 
 func rbacControllerFactoryCreator(
 	mastercfg *rest.Config,
-	seedsGetter provider.SeedsGetter,
-	seedKubeconfigGetter provider.SeedKubeconfigGetter,
 	workerCount int,
 	selectorOps func(*metav1.ListOptions),
 	workerNamePredicate predicate.Predicate,

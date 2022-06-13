@@ -82,7 +82,7 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, seed
 	log.Debug("reconciling")
 
 	// find requested seed
-	seeds, err := r.seedsGetter()
+	seeds, err := r.seedsGetter(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get seeds: %v", err)
 	}
@@ -214,7 +214,7 @@ func (r *Reconciler) reconcileResources(ctx context.Context, cfg *operatorv1alph
 		return fmt.Errorf("failed to get CA bundle ConfigMap: %v", err)
 	}
 
-	if err := r.reconcileNamespaces(ctx, cfg, seed, client, log); err != nil {
+	if err := r.reconcileNamespaces(ctx, cfg, client, log); err != nil {
 		return err
 	}
 
@@ -265,7 +265,7 @@ func (r *Reconciler) reconcileResources(ctx context.Context, cfg *operatorv1alph
 	return nil
 }
 
-func (r *Reconciler) reconcileNamespaces(ctx context.Context, cfg *operatorv1alpha1.KubermaticConfiguration, seed *kubermaticv1.Seed, client ctrlruntimeclient.Client, log *zap.SugaredLogger) error {
+func (r *Reconciler) reconcileNamespaces(ctx context.Context, cfg *operatorv1alpha1.KubermaticConfiguration, client ctrlruntimeclient.Client, log *zap.SugaredLogger) error {
 	log.Debug("reconciling Namespaces")
 
 	creators := []reconciling.NamedNamespaceCreatorGetter{

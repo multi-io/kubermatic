@@ -190,7 +190,7 @@ func AzureSizeWithClusterCredentialsEndpoint(ctx context.Context, userInfoGetter
 	if err != nil {
 		return nil, common.KubernetesErrorToHTTPError(err)
 	}
-	datacenter, err := dc.GetDatacenter(userInfo, seedsGetter, cluster.Spec.Cloud.DatacenterName)
+	datacenter, err := dc.GetDatacenter(ctx, userInfo, seedsGetter, cluster.Spec.Cloud.DatacenterName)
 	if err != nil {
 		return nil, errors.New(http.StatusInternalServerError, err.Error())
 	}
@@ -232,7 +232,7 @@ func AzureAvailabilityZonesWithClusterCredentialsEndpoint(ctx context.Context, u
 	if err != nil {
 		return nil, common.KubernetesErrorToHTTPError(err)
 	}
-	datacenter, err := dc.GetDatacenter(userInfo, seedsGetter, cluster.Spec.Cloud.DatacenterName)
+	datacenter, err := dc.GetDatacenter(ctx, userInfo, seedsGetter, cluster.Spec.Cloud.DatacenterName)
 	if err != nil {
 		return nil, errors.New(http.StatusInternalServerError, err.Error())
 	}

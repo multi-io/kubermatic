@@ -88,7 +88,7 @@ func TestReconcile(t *testing.T) {
 				log:          kubermaticlog.Logger,
 				recorder:     &record.FakeRecorder{},
 				masterClient: tc.masterClient,
-				seedClientGetter: func(seed *kubermaticv1.Seed) (ctrlruntimeclient.Client, error) {
+				seedClientGetter: func(_ context.Context, seed *kubermaticv1.Seed) (ctrlruntimeclient.Client, error) {
 					return tc.seedClient, nil
 				},
 			}

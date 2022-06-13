@@ -194,15 +194,6 @@ func createInitProviders(ctx context.Context, options serverRunOptions, masterCf
 
 	defaultImpersonationClient := kubernetesprovider.NewImpersonationClient(masterCfg, mgr.GetRESTMapper())
 
-	seedsGetter, err := seedsGetterFactory(ctx, client, options)
-	if err != nil {
-		return providers{}, err
-	}
-	seedKubeconfigGetter, err := seedKubeconfigGetterFactory(ctx, client, options)
-	if err != nil {
-		return providers{}, err
-	}
-
 	// Make sure the manager creates a cache for Seeds by requesting an informer
 	if _, err := mgr.GetCache().GetInformer(ctx, &kubermaticv1.Seed{}); err != nil {
 		kubermaticlog.Logger.Fatalw("failed to get seed informer", zap.Error(err))
@@ -219,7 +210,9 @@ func createInitProviders(ctx context.Context, options serverRunOptions, masterCf
 		kubermaticlog.Logger.Fatal("failed to sync mgr cache")
 	}
 
-	seedClientGetter := provider.SeedClientGetterFactory(seedKubeconfigGetter)
+	seedClientGetter := provider.SeedClientGetterFactory(client)
+	seedsGetter := provider.SeedsGetterFactory(client, options.namespace)
+	seedKubeconfigGetter := provider.SeedKubeconfigGetterFactory(client)
 	clusterProviderGetter := clusterProviderFactory(mgr.GetRESTMapper(), seedKubeconfigGetter, seedClientGetter, options)
 
 	presetsProvider, err := kubernetesprovider.NewPresetsProvider(ctx, client, options.presetsFile, options.dynamicPresets)
@@ -229,13 +222,13 @@ func createInitProviders(ctx context.Context, options serverRunOptions, masterCf
 	admissionPluginProvider := kubernetesprovider.NewAdmissionPluginsProvider(ctx, client)
 	// Warm up the restMapper cache. Log but ignore errors encountered here, maybe there are stale seeds
 	go func() {
-		seeds, err := seedsGetter()
+		seeds, err := seedsGetter(ctx)
 		if err != nil {
 			kubermaticlog.Logger.Infow("failed to get seeds when trying to warm up restMapper cache", zap.Error(err))
 			return
 		}
 		for _, seed := range seeds {
-			if _, err := clusterProviderGetter(seed); err != nil {
+			if _, err := clusterProviderGetter(ctx, seed); err != nil {
 				kubermaticlog.Logger.Infow("failed to get clusterProvider when trying to warm up restMapper cache", zap.Error(err), "seed", seed.Name)
 			}
 		}
@@ -557,8 +550,8 @@ func setSecureHeaders(next http.Handler) http.Handler {
 }
 
 func clusterProviderFactory(mapper meta.RESTMapper, seedKubeconfigGetter provider.SeedKubeconfigGetter, seedClientGetter provider.SeedClientGetter, options serverRunOptions) provider.ClusterProviderGetter {
-	return func(seed *kubermaticv1.Seed) (provider.ClusterProvider, error) {
-		cfg, err := seedKubeconfigGetter(seed)
+	return func(ctx context.Context, seed *kubermaticv1.Seed) (provider.ClusterProvider, error) {
+		cfg, err := seedKubeconfigGetter(ctx, seed)
 		if err != nil {
 			return nil, err
 		}
@@ -568,7 +561,7 @@ func clusterProviderFactory(mapper meta.RESTMapper, seedKubeconfigGetter provide
 		}
 		defaultImpersonationClientForSeed := kubernetesprovider.NewImpersonationClient(cfg, mapper)
 
-		seedCtrlruntimeClient, err := seedClientGetter(seed)
+		seedCtrlruntimeClient, err := seedClientGetter(ctx, seed)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create dynamic seed client: %v", err)
 		}

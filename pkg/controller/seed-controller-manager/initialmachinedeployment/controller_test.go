@@ -220,7 +220,7 @@ func TestReconcile(t *testing.T) {
 				userClusterConnectionProvider: newFakeClientProvider(userClusterClient),
 
 				// this dummy seedGetter returns the same dummy hetzner DC for all tests
-				seedGetter: func() (*kubermaticv1.Seed, error) {
+				seedGetter: func(_ context.Context) (*kubermaticv1.Seed, error) {
 					return &kubermaticv1.Seed{
 						Spec: kubermaticv1.SeedSpec{
 							Datacenters: map[string]kubermaticv1.Datacenter{
