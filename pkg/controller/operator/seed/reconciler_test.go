@@ -491,7 +491,7 @@ func createTestReconciler(allSeeds map[string]*kubermaticv1.Seed, cfg *operatorv
 	versions.Kubermatic = "latest"
 	versions.UI = "latest"
 
-	seedsGetter := func() (map[string]*kubermaticv1.Seed, error) {
+	seedsGetter := func(_ context.Context) (map[string]*kubermaticv1.Seed, error) {
 		return masterSeeds, nil
 	}
 

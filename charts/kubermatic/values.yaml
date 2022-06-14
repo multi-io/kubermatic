@@ -27,8 +27,6 @@ kubermatic:
     skipTokenIssuerTLSVerify: "false"
     # the service account signing key. Must be 32 bytes or longer
     serviceAccountKey: ""
-  # base64 encoded datacenters.yaml
-  datacenters: ""
   # external domain for the kubermatic installation. For example 'dev.kubermatic.io'
   domain: ""
   # base64 encoded kubeconfig which gives admin access to all seed clusters
@@ -72,9 +70,6 @@ kubermatic:
 
   # Whether to disable reconciling for the apiserver endpoints
   apiserverEndpointReconcilingDisabled: false
-
-  # Whether to load the datacenters from CRDs dynamically during runtime
-  dynamicDatacenters: false
 
   # Whether to load the presets from CRDs dynamically during runtime
   dynamicPresets: false
@@ -120,7 +115,7 @@ kubermatic:
     # For example:
     # featureGates: "OpenIDAuthPlugin=true,VerticalPodAutoscaler=true"
     featureGates: "EtcdLauncher=true"
-    datacenterName: ""
+    seedName: ""
     # Specifies the NodePort range for customer clusters - this must match the NodePort range of the seed cluster.
     nodeportRange: "30000-32767"
     replicas: 2

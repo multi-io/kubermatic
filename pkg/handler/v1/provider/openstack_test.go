@@ -18,6 +18,7 @@ package provider_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"html/template"
 	"io/ioutil"
@@ -151,7 +152,7 @@ func TeardownOpenstackServer() {
 }
 
 func buildOpenstackDatacenter() provider.SeedsGetter {
-	return func() (map[string]*kubermaticv1.Seed, error) {
+	return func(_ context.Context) (map[string]*kubermaticv1.Seed, error) {
 		return map[string]*kubermaticv1.Seed{
 			"my-seed": {
 				ObjectMeta: metav1.ObjectMeta{

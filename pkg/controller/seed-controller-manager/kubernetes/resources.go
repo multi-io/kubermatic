@@ -19,7 +19,6 @@ package kubernetes
 import (
 	"context"
 	"fmt"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/resources"
@@ -43,6 +42,7 @@ import (
 	"k8c.io/kubermatic/v2/pkg/resources/scheduler"
 	"k8c.io/kubermatic/v2/pkg/resources/usercluster"
 	appsv1 "k8s.io/api/apps/v1"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -53,7 +53,7 @@ import (
 )
 
 func (r *Reconciler) ensureResourcesAreDeployed(ctx context.Context, cluster *kubermaticv1.Cluster, namespace *corev1.Namespace) (*reconcile.Result, error) {
-	seed, err := r.seedGetter()
+	seed, err := r.seedGetter(ctx)
 	if err != nil {
 		return nil, err
 	}

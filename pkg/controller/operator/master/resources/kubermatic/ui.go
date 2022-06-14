@@ -67,6 +67,11 @@ func UIDeploymentCreator(cfg *operatorv1alpha1.KubermaticConfiguration, versions
 							ContainerPort: 8080,
 							Protocol:      corev1.ProtocolTCP,
 						},
+						{
+							Name:          "metrics",
+							ContainerPort: 8090,
+							Protocol:      corev1.ProtocolTCP,
+						},
 					},
 					VolumeMounts: []corev1.VolumeMount{
 						{
@@ -122,13 +127,19 @@ func UIServiceCreator(cfg *operatorv1alpha1.KubermaticConfiguration) reconciling
 			s.Spec.Type = corev1.ServiceTypeNodePort
 			s.Spec.Selector = uiPodLabels()
 
-			if len(s.Spec.Ports) < 1 {
-				s.Spec.Ports = make([]corev1.ServicePort, 1)
+			if len(s.Spec.Ports) < 2 {
+				s.Spec.Ports = make([]corev1.ServicePort, 2)
 			}
 
 			s.Spec.Ports[0].Port = 80
+			s.Spec.Ports[0].Name = "http"
 			s.Spec.Ports[0].TargetPort = intstr.FromInt(8080)
 			s.Spec.Ports[0].Protocol = corev1.ProtocolTCP
+
+			s.Spec.Ports[1].Port = 8090
+			s.Spec.Ports[1].Name = "metrics"
+			s.Spec.Ports[1].TargetPort = intstr.FromInt(8090)
+			s.Spec.Ports[1].Protocol = corev1.ProtocolTCP
 
 			return s, nil
 		}

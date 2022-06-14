@@ -27,7 +27,6 @@ if [[ "${DEBUG}" == "true" ]]; then
     dlv --listen=:2345 --headless=true --api-version=2 --accept-multiclient exec ./_build/master-controller-manager -- \
       -kubeconfig=${CONFIG_DIR}/kubeconfig \
       -internal-address=127.0.0.1:8086 \
-      -dynamic-datacenters=true \
       -worker-count=1 \
       -logtostderr=1 \
       -v=8 "$@"
@@ -35,7 +34,6 @@ else
     ./_build/master-controller-manager \
       -kubeconfig=${CONFIG_DIR}/kubeconfig \
       -internal-address=127.0.0.1:8086 \
-      -dynamic-datacenters=true \
       -logtostderr=1 \
       -v=6 "$@"
 fi

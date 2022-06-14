@@ -196,7 +196,7 @@ func ListGCPDiskTypes(ctx context.Context, sa string, zone string) (apiv1.GCPDis
 }
 
 func ListGCPSubnetworks(ctx context.Context, userInfo *provider.UserInfo, datacenterName string, sa string, networkName string, seedsGetter provider.SeedsGetter) (apiv1.GCPSubnetworkList, error) {
-	datacenter, err := dc.GetDatacenter(userInfo, seedsGetter, datacenterName)
+	datacenter, err := dc.GetDatacenter(ctx, userInfo, seedsGetter, datacenterName)
 	if err != nil {
 		return nil, errors.NewBadRequest("%v", err)
 	}
@@ -276,7 +276,7 @@ func ListGCPNetworks(ctx context.Context, sa string) (apiv1.GCPNetworkList, erro
 }
 
 func ListGCPZones(ctx context.Context, userInfo *provider.UserInfo, sa, datacenterName string, seedsGetter provider.SeedsGetter) (apiv1.GCPZoneList, error) {
-	datacenter, err := dc.GetDatacenter(userInfo, seedsGetter, datacenterName)
+	datacenter, err := dc.GetDatacenter(ctx, userInfo, seedsGetter, datacenterName)
 	if err != nil {
 		return nil, errors.NewBadRequest("%v", err)
 	}

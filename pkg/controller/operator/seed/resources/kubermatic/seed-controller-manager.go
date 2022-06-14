@@ -80,7 +80,7 @@ func SeedControllerManagerDeploymentCreator(workerName string, versions kubermat
 				fmt.Sprintf("-monitoring-environment-label=%s", cfg.Spec.SeedController.MonitoringEnvironmentLabel),
 				fmt.Sprintf("-namespace=%s", cfg.Namespace),
 				fmt.Sprintf("-external-url=%s", cfg.Spec.Ingress.Domain),
-				fmt.Sprintf("-datacenter-name=%s", seed.Name),
+				fmt.Sprintf("-seed-name=%s", seed.Name),
 				fmt.Sprintf("-etcd-disk-size=%s", cfg.Spec.UserCluster.EtcdVolumeSize),
 				fmt.Sprintf("-feature-gates=%s", common.StringifyFeatureGates(cfg)),
 				fmt.Sprintf("-nodeport-range=%s", cfg.Spec.UserCluster.NodePortRange),
@@ -110,11 +110,6 @@ func SeedControllerManagerDeploymentCreator(workerName string, versions kubermat
 			if cfg.Spec.SeedController.BackupRestore.Enabled || seed.Spec.BackupRestore != nil {
 				args = append(args, "-enable-etcd-backups-restores")
 				args = append(args, fmt.Sprintf("-backup-delete-container=/opt/backup/%s", deleteContainerKey))
-			}
-
-			// Only EE does support dynamic-datacenters
-			if versions.KubermaticEdition.IsEE() {
-				args = append(args, "-dynamic-datacenters=true")
 			}
 
 			if cfg.Spec.ImagePullSecret != "" {

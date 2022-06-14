@@ -299,7 +299,7 @@ func initTestEndpoint(user apiv1.User, seedsGetter provider.SeedsGetter, kubeObj
 		kubermaticVersions,
 	)
 	clusterProviders := map[string]provider.ClusterProvider{"us-central1": clusterProvider}
-	clusterProviderGetter := func(seed *kubermaticv1.Seed) (provider.ClusterProvider, error) {
+	clusterProviderGetter := func(_ context.Context, seed *kubermaticv1.Seed) (provider.ClusterProvider, error) {
 		if clusterProvider, exists := clusterProviders[seed.Name]; exists {
 			return clusterProvider, nil
 		}
@@ -335,10 +335,10 @@ func initTestEndpoint(user apiv1.User, seedsGetter provider.SeedsGetter, kubeObj
 	admissionPluginProvider := kubernetes.NewAdmissionPluginsProvider(ctx, fakeClient)
 
 	if seedsGetter == nil {
-		seedsGetter = CreateTestSeedsGetter(ctx, fakeClient)
+		seedsGetter = CreateTestSeedsGetter(fakeClient)
 	}
 
-	seedClientGetter := func(seed *kubermaticv1.Seed) (ctrlruntimeclient.Client, error) {
+	seedClientGetter := func(_ context.Context, seed *kubermaticv1.Seed) (ctrlruntimeclient.Client, error) {
 		return fakeClient, nil
 	}
 
@@ -595,10 +595,10 @@ func GenTestSeed(modifiers ...func(seed *kubermaticv1.Seed)) *kubermaticv1.Seed 
 
 // CreateTestSeedsGetter creates a SeedsGetter only useful for generic tests,
 // as it does not follow the CE/EE conventions and always returns all Seeds.
-func CreateTestSeedsGetter(ctx context.Context, client ctrlruntimeclient.Client) provider.SeedsGetter {
+func CreateTestSeedsGetter(client ctrlruntimeclient.Client) provider.SeedsGetter {
 	listOpts := &ctrlruntimeclient.ListOptions{Namespace: "kubermatic"}
 
-	return func() (map[string]*kubermaticv1.Seed, error) {
+	return func(ctx context.Context) (map[string]*kubermaticv1.Seed, error) {
 		seeds := &kubermaticv1.SeedList{}
 		if err := client.List(ctx, seeds, listOpts); err != nil {
 			return nil, fmt.Errorf("failed to list the seeds: %v", err)

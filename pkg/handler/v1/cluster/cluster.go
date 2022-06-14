@@ -94,14 +94,14 @@ func ListAllEndpoint(projectProvider provider.ProjectProvider, privilegedProject
 		req := request.(common.GetProjectRq)
 		allClusters := make([]*apiv1.Cluster, 0)
 
-		seeds, err := seedsGetter()
+		seeds, err := seedsGetter(ctx)
 		if err != nil {
 			return nil, common.KubernetesErrorToHTTPError(err)
 		}
 
 		for _, seed := range seeds {
 			// if a Seed is bad, do not forward that error to the user, but only log
-			clusterProvider, err := clusterProviderGetter(seed)
+			clusterProvider, err := clusterProviderGetter(ctx, seed)
 			if err != nil {
 				klog.Errorf("failed to create cluster provider for seed %s: %v", seed.Name, err)
 				continue
