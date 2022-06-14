@@ -44,7 +44,7 @@ func NewBackupCredentialsProvider(client ctrlruntimeclient.Client) *BackupCreden
 
 func BackupCredentialsProviderFactory(mapper meta.RESTMapper, seedKubeconfigGetter provider.SeedKubeconfigGetter) provider.BackupCredentialsProviderGetter {
 	return func(seed *kubermaticv1.Seed) (provider.BackupCredentialsProvider, error) {
-		cfg, err := seedKubeconfigGetter(context.TODO(), seed)
+		cfg, err := seedKubeconfigGetter(seed)
 		if err != nil {
 			return nil, err
 		}

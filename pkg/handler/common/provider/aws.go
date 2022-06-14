@@ -108,7 +108,7 @@ func AWSSizeNoCredentialsEndpoint(ctx context.Context, userInfoGetter provider.U
 	if err != nil {
 		return nil, common.KubernetesErrorToHTTPError(err)
 	}
-	dc, err := dc.GetDatacenter(ctx, userInfo, seedsGetter, cluster.Spec.Cloud.DatacenterName)
+	dc, err := dc.GetDatacenter(userInfo, seedsGetter, cluster.Spec.Cloud.DatacenterName)
 	if err != nil {
 		return nil, errors.New(http.StatusInternalServerError, err.Error())
 	}

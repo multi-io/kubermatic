@@ -21,19 +21,20 @@ import (
 	"flag"
 	"fmt"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"go.uber.org/zap"
+
 	operatorv1alpha1 "k8c.io/kubermatic/v2/pkg/crd/operator/v1alpha1"
 	"k8c.io/kubermatic/v2/pkg/features"
 	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
 	"k8c.io/kubermatic/v2/pkg/metrics"
 	metricserver "k8c.io/kubermatic/v2/pkg/metrics/server"
 	"k8c.io/kubermatic/v2/pkg/pprof"
+	"k8c.io/kubermatic/v2/pkg/provider"
 	"k8c.io/kubermatic/v2/pkg/util/cli"
 	"k8c.io/kubermatic/v2/pkg/util/workerlabel"
 	"k8c.io/kubermatic/v2/pkg/webhook"
-	seedwebhook "k8c.io/kubermatic/v2/pkg/webhook/seed"
 
-	"github.com/prometheus/client_golang/prometheus"
-	"go.uber.org/zap"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/klog"
@@ -68,6 +69,8 @@ type controllerContext struct {
 	workerName              string
 	workerNameLabelSelector labels.Selector
 	workerNamePredicate     predicate.Predicate
+	seedsGetter             provider.SeedsGetter
+	seedKubeconfigGetter    provider.SeedKubeconfigGetter
 	labelSelectorFunc       func(*metav1.ListOptions)
 	namespace               string
 }
@@ -89,6 +92,7 @@ func main() {
 		"Enabling this will ensure there is only one active controller manager.")
 	flag.StringVar(&runOpts.leaderElectionNamespace, "leader-election-namespace", "", "Leader election namespace. In-cluster discovery will be attempted in such case.")
 	flag.Var(&runOpts.featureGates, "feature-gates", "A set of key=value pairs that describe feature gates for various features.")
+	addFlags(flag.CommandLine)
 	flag.Parse()
 
 	ctrlruntimelog.SetLogger(ctrlruntimezaplog.New(ctrlruntimezaplog.UseDevMode(false)))
@@ -155,6 +159,14 @@ func main() {
 
 	// these two getters rely on the ctrlruntime manager being started; they
 	// are only used inside controllers
+	ctrlCtx.seedsGetter, err = seedsGetterFactory(ctx, mgr.GetClient(), ctrlCtx.namespace)
+	if err != nil {
+		log.Fatalw("failed to construct seedsGetter", zap.Error(err))
+	}
+	ctrlCtx.seedKubeconfigGetter, err = seedKubeconfigGetterFactory(ctx, mgr.GetClient(), runOpts)
+	if err != nil {
+		log.Fatalw("failed to construct seedKubeconfigGetter", zap.Error(err))
+	}
 
 	if runOpts.admissionWebhook.Configured() {
 		if err := runOpts.admissionWebhook.Configure(mgr.GetWebhookServer()); err != nil {
@@ -162,9 +174,9 @@ func main() {
 		}
 
 		// Register Seed validation handler
-		h, err := seedwebhook.NewSeedAdmissionHandler(mgr.GetClient(), runOpts.featureGates, runOpts.workerName)
+		h, err := seedValidationHandler(ctx, mgr.GetClient(), runOpts)
 		if err != nil {
-			log.Fatalw("Failed to build Seed validation handler", zap.Error(err))
+			log.Fatalw("failed to build Seed validation handler", zap.Error(err))
 		}
 		h.SetupWebhookWithManager(mgr)
 	} else {

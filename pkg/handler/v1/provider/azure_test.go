@@ -121,7 +121,7 @@ func TestAzureSizeEndpoint(t *testing.T) {
 }
 
 func buildAzureDatacenterMeta() provider.SeedsGetter {
-	return func(_ context.Context) (map[string]*kubermaticv1.Seed, error) {
+	return func() (map[string]*kubermaticv1.Seed, error) {
 		return map[string]*kubermaticv1.Seed{
 			"my-seed": {
 				ObjectMeta: metav1.ObjectMeta{

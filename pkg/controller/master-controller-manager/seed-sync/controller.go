@@ -56,12 +56,14 @@ func Add(
 	numWorkers int,
 	log *zap.SugaredLogger,
 	namespace string,
+	seedKubeconfigGetter provider.SeedKubeconfigGetter,
+	seedsGetter provider.SeedsGetter,
 ) error {
 	reconciler := &Reconciler{
 		Client:           mgr.GetClient(),
 		recorder:         mgr.GetEventRecorderFor(ControllerName),
 		log:              log.Named(ControllerName),
-		seedClientGetter: provider.SeedClientGetterFactory(mgr.GetClient()),
+		seedClientGetter: provider.SeedClientGetterFactory(seedKubeconfigGetter),
 	}
 
 	ctrlOptions := controller.Options{Reconciler: reconciler, MaxConcurrentReconciles: numWorkers}
@@ -77,10 +79,9 @@ func Add(
 		return fmt.Errorf("failed to create watcher: %w", err)
 	}
 
-	seedsGetter := provider.SeedsGetterFactory(mgr.GetClient(), namespace)
 	// watch all KubermaticConfigurations in the given namespace
 	configHandler := func(o client.Object) []reconcile.Request {
-		seeds, err := seedsGetter(context.TODO())
+		seeds, err := seedsGetter()
 		if err != nil {
 			log.Errorw("Failed to retrieve seeds", zap.Error(err))
 			return nil

@@ -37,12 +37,10 @@ import (
 	"k8c.io/kubermatic/v2/pkg/metrics"
 	metricserver "k8c.io/kubermatic/v2/pkg/metrics/server"
 	"k8c.io/kubermatic/v2/pkg/pprof"
-	"k8c.io/kubermatic/v2/pkg/provider"
 	"k8c.io/kubermatic/v2/pkg/util/cli"
 	"k8c.io/kubermatic/v2/pkg/version/kubermatic"
 	clustermutation "k8c.io/kubermatic/v2/pkg/webhook/cluster/mutation"
 	clustervalidation "k8c.io/kubermatic/v2/pkg/webhook/cluster/validation"
-	seedwebhook "k8c.io/kubermatic/v2/pkg/webhook/seed"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	autoscalingv1beta2 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1beta2"
@@ -152,7 +150,10 @@ Please install the VerticalPodAutoscaler according to the documentation: https:/
 	}
 
 	rootCtx := context.Background()
-	seedGetter := provider.SeedGetterFactory(mgr.GetClient(), options.seedName, options.namespace)
+	seedGetter, err := seedGetterFactory(rootCtx, mgr.GetClient(), options)
+	if err != nil {
+		log.Fatalw("Unable to create the seed factory", zap.Error(err))
+	}
 
 	var clientProvider *client.Provider
 	if !isInternalConfig(cfg) {
@@ -187,7 +188,7 @@ Please install the VerticalPodAutoscaler according to the documentation: https:/
 			log.Fatalw("Failed to configure admission webhook server", zap.Error(err))
 		}
 		// Register Seed validation admission webhook
-		h, err := seedwebhook.NewSeedAdmissionHandler(mgr.GetClient(), options.featureGates, options.workerName)
+		h, err := seedValidationHandler(rootCtx, mgr.GetClient(), options)
 		if err != nil {
 			log.Fatalw("Failed to build Seed validation handler", zap.Error(err))
 		}
@@ -197,7 +198,11 @@ Please install the VerticalPodAutoscaler according to the documentation: https:/
 		// Setup the validation admission handler for kubermatic Cluster CRDs
 		clustervalidation.NewAdmissionHandler(options.featureGates).SetupWebhookWithManager(mgr)
 		// Setup the mutation admission handler for kubermatic Cluster CRDs
-		seed, err := provider.SeedGetterFactory(mgr.GetAPIReader(), options.seedName, options.namespace)(rootCtx)
+		getter, err := seedGetterFactory(rootCtx, mgr.GetAPIReader(), options)
+		if err != nil {
+			log.Fatalf("make seed getter with api reader: %v", err)
+		}
+		seed, err := getter()
 		if err != nil {
 			log.Fatalf("could not get seed resource: %v", err)
 		}

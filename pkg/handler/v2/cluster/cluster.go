@@ -64,14 +64,14 @@ func ListEndpoint(projectProvider provider.ProjectProvider, privilegedProjectPro
 		req := request.(common.GetProjectRq)
 		allClusters := make([]*apiv1.Cluster, 0)
 
-		seeds, err := seedsGetter(ctx)
+		seeds, err := seedsGetter()
 		if err != nil {
 			return nil, common.KubernetesErrorToHTTPError(err)
 		}
 
 		for _, seed := range seeds {
 			// if a Seed is bad, do not forward that error to the user, but only log
-			clusterProvider, err := clusterProviderGetter(ctx, seed)
+			clusterProvider, err := clusterProviderGetter(seed)
 			if err != nil {
 				klog.Errorf("failed to create cluster provider for seed %s: %v", seed.Name, err)
 				continue
@@ -528,7 +528,7 @@ func FindSeedNameForDatacenter(ctx context.Context, datacenter string) (string, 
 	if !ok {
 		return "", fmt.Errorf("seeds getter is not set")
 	}
-	seeds, err := seedsGetter(ctx)
+	seeds, err := seedsGetter()
 	if err != nil {
 		return "", fmt.Errorf("failed to list seeds: %v", err)
 	}

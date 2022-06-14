@@ -41,7 +41,7 @@ import (
 // ListEndpoint an HTTP endpoint that returns a list of apiv1.Datacenter
 func ListEndpoint(seedsGetter provider.SeedsGetter, userInfoGetter provider.UserInfoGetter) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
-		seeds, err := seedsGetter(ctx)
+		seeds, err := seedsGetter()
 		if err != nil {
 			return nil, errors.New(http.StatusInternalServerError, fmt.Sprintf("failed to list seeds: %v", err))
 		}
@@ -78,7 +78,7 @@ func ListEndpointForProvider(seedsGetter provider.SeedsGetter, userInfoGetter pr
 			return nil, errors.NewBadRequest("invalid request")
 		}
 
-		seeds, err := seedsGetter(ctx)
+		seeds, err := seedsGetter()
 		if err != nil {
 			return nil, errors.New(http.StatusInternalServerError, fmt.Sprintf("failed to list seeds: %v", err))
 		}
@@ -130,13 +130,13 @@ func GetEndpoint(seedsGetter provider.SeedsGetter, userInfoGetter provider.UserI
 			return nil, common.KubernetesErrorToHTTPError(err)
 		}
 
-		return GetDatacenter(ctx, userInfo, seedsGetter, req.DC)
+		return GetDatacenter(userInfo, seedsGetter, req.DC)
 	}
 }
 
 // GetDatacenter a function that gives you a single apiv1.Datacenter object
-func GetDatacenter(ctx context.Context, userInfo *provider.UserInfo, seedsGetter provider.SeedsGetter, datacenterToGet string) (apiv1.Datacenter, error) {
-	seeds, err := seedsGetter(ctx)
+func GetDatacenter(userInfo *provider.UserInfo, seedsGetter provider.SeedsGetter, datacenterToGet string) (apiv1.Datacenter, error) {
+	seeds, err := seedsGetter()
 	if err != nil {
 		return apiv1.Datacenter{}, errors.New(http.StatusInternalServerError, fmt.Sprintf("failed to list seeds: %v", err))
 	}
@@ -162,7 +162,7 @@ func GetEndpointForProvider(seedsGetter provider.SeedsGetter, userInfoGetter pro
 			return nil, errors.NewBadRequest("invalid request")
 		}
 
-		seeds, err := seedsGetter(ctx)
+		seeds, err := seedsGetter()
 		if err != nil {
 			return nil, errors.New(http.StatusInternalServerError, fmt.Sprintf("failed to list seeds: %v", err))
 		}
@@ -286,7 +286,7 @@ func CreateEndpoint(seedsGetter provider.SeedsGetter, userInfoGetter provider.Us
 		}
 
 		// Get the seed in which the dc should be created
-		seeds, err := seedsGetter(ctx)
+		seeds, err := seedsGetter()
 		if err != nil {
 			return nil, errors.New(http.StatusInternalServerError, fmt.Sprintf("failed to list seeds: %v", err))
 		}
@@ -338,7 +338,7 @@ func UpdateEndpoint(seedsGetter provider.SeedsGetter, userInfoGetter provider.Us
 		}
 
 		// Get the seed in which the dc should be updated
-		seeds, err := seedsGetter(ctx)
+		seeds, err := seedsGetter()
 		if err != nil {
 			return nil, errors.New(http.StatusInternalServerError, fmt.Sprintf("failed to list seeds: %v", err))
 		}
@@ -397,7 +397,7 @@ func PatchEndpoint(seedsGetter provider.SeedsGetter, userInfoGetter provider.Use
 		}
 
 		// Get the seed in which the dc should be updated
-		seeds, err := seedsGetter(ctx)
+		seeds, err := seedsGetter()
 		if err != nil {
 			return nil, errors.New(http.StatusInternalServerError, fmt.Sprintf("failed to list seeds: %v", err))
 		}
@@ -486,7 +486,7 @@ func DeleteEndpoint(seedsGetter provider.SeedsGetter, userInfoGetter provider.Us
 		}
 
 		// Get the seed in which the dc should be deleted
-		seeds, err := seedsGetter(ctx)
+		seeds, err := seedsGetter()
 		if err != nil {
 			return nil, errors.New(http.StatusInternalServerError, fmt.Sprintf("failed to list seeds: %v", err))
 		}
@@ -520,7 +520,7 @@ func ListEndpointForSeed(seedsGetter provider.SeedsGetter, userInfoGetter provid
 			return nil, errors.NewBadRequest("invalid request")
 		}
 
-		seeds, err := seedsGetter(ctx)
+		seeds, err := seedsGetter()
 		if err != nil {
 			return nil, errors.New(http.StatusInternalServerError, fmt.Sprintf("failed to list seeds: %v", err))
 		}
@@ -562,7 +562,7 @@ func GetEndpointForSeed(seedsGetter provider.SeedsGetter, userInfoGetter provide
 			return nil, errors.NewBadRequest("invalid request")
 		}
 
-		seeds, err := seedsGetter(ctx)
+		seeds, err := seedsGetter()
 		if err != nil {
 			return nil, errors.New(http.StatusInternalServerError, fmt.Sprintf("failed to list seeds: %v", err))
 		}

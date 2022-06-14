@@ -189,7 +189,7 @@ func (r *Reconciler) parseNodeDeployment(cluster *kubermaticv1.Cluster) (*v1.Nod
 }
 
 func (r *Reconciler) createInitialMachineDeployment(ctx context.Context, nodeDeployment *v1.NodeDeployment, cluster *kubermaticv1.Cluster, client ctrlruntimeclient.Client) error {
-	datacenter, err := r.getTargetDatacenter(ctx, cluster)
+	datacenter, err := r.getTargetDatacenter(cluster)
 	if err != nil {
 		return fmt.Errorf("failed to get target datacenter: %v", err)
 	}
@@ -227,8 +227,8 @@ func (r *Reconciler) createInitialMachineDeployment(ctx context.Context, nodeDep
 	return nil
 }
 
-func (r *Reconciler) getTargetDatacenter(ctx context.Context, cluster *kubermaticv1.Cluster) (*kubermaticv1.Datacenter, error) {
-	seed, err := r.seedGetter(ctx)
+func (r *Reconciler) getTargetDatacenter(cluster *kubermaticv1.Cluster) (*kubermaticv1.Datacenter, error) {
+	seed, err := r.seedGetter()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current Seed cluster: %v", err)
 	}

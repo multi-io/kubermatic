@@ -17,7 +17,6 @@ limitations under the License.
 package monitoring
 
 import (
-	"context"
 	"testing"
 
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
@@ -48,7 +47,7 @@ func newTestReconciler(t *testing.T, objects []ctrlruntimeclient.Object) *Reconc
 	return reconciler
 }
 
-func seed(_ context.Context) (*kubermaticv1.Seed, error) {
+func seed() (*kubermaticv1.Seed, error) {
 	return &kubermaticv1.Seed{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "us-central1",

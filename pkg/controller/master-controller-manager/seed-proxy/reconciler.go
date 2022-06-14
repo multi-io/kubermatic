@@ -66,7 +66,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 }
 
 func (r *Reconciler) reconcile(ctx context.Context, seedName string, log *zap.SugaredLogger) error {
-	seeds, err := r.seedsGetter(ctx)
+	seeds, err := r.seedsGetter()
 	if err != nil {
 		return fmt.Errorf("failed to get seeds: %v", err)
 	}
@@ -81,7 +81,7 @@ func (r *Reconciler) reconcile(ctx context.Context, seedName string, log *zap.Su
 		return fmt.Errorf("didn't find seed %q", seedName)
 	}
 
-	client, err := r.seedClientGetter(ctx, seed)
+	client, err := r.seedClientGetter(seed)
 	if err != nil {
 		return fmt.Errorf("failed to get seed client: %v", err)
 	}
@@ -141,7 +141,7 @@ func (r *Reconciler) garbageCollect(ctx context.Context, seeds map[string]*kuber
 }
 
 func (r *Reconciler) reconcileSeedProxy(ctx context.Context, seed *kubermaticv1.Seed, client ctrlruntimeclient.Client, log *zap.SugaredLogger) error {
-	cfg, err := r.seedKubeconfigGetter(ctx, seed)
+	cfg, err := r.seedKubeconfigGetter(seed)
 	if err != nil {
 		return err
 	}

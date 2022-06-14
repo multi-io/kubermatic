@@ -89,7 +89,7 @@ func Add(
 
 	// watch for changes to KubermaticConfigurations in the master cluster and reconcile all seeds
 	configEventHandler := handler.EnqueueRequestsFromMapFunc(func(a ctrlruntimeclient.Object) []reconcile.Request {
-		seeds, err := seedsGetter(ctx)
+		seeds, err := seedsGetter()
 		if err != nil {
 			log.Errorw("Failed to handle request", zap.Error(err))
 			utilruntime.HandleError(err)
@@ -140,7 +140,7 @@ func Add(
 			return nil
 		}
 
-		seeds, err := seedsGetter(ctx)
+		seeds, err := seedsGetter()
 		if err != nil {
 			log.Errorw("Failed to handle request", zap.Error(err))
 			utilruntime.HandleError(err)

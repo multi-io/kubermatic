@@ -104,7 +104,8 @@ export KUBERMATIC_KUBECTL_OVERRIDE="$(which kubectl)"
 $RUNCMD \
   -ca-bundle=${INSTALLER_DIR}/kubermatic/kubermatic-code/charts/kubermatic-operator/static/ca-bundle.pem \
   -controller-manager-default-replicas=1 \
-  -seed-name=${KUBERMATIC_CLUSTER} \
+  -dynamic-datacenters=true \
+  -datacenter-name=${KUBERMATIC_CLUSTER} \
   -enable-etcd-backups-restores \
   -etcd-disk-size=$(cat "${ENV_CLUSTER_DIR}/kubermatic/variables/kubermatic.yaml" | yq '.customer_etcd_disk_size' -r) \
   -versions="${tmpdir}/versions" \

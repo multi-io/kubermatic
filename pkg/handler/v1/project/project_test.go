@@ -507,14 +507,14 @@ func TestListProjectMethod(t *testing.T) {
 				versions,
 			)
 			clusterProviders := map[string]provider.ClusterProvider{testSeed.Name: clusterProvider}
-			clusterProviderGetter := func(_ context.Context, seed *kubermaticapiv1.Seed) (provider.ClusterProvider, error) {
+			clusterProviderGetter := func(seed *kubermaticapiv1.Seed) (provider.ClusterProvider, error) {
 				if clusterProvider, exists := clusterProviders[seed.Name]; exists {
 					return clusterProvider, nil
 				}
 				return nil, fmt.Errorf("cannot find clusterprovider for cluster %q", seed.Name)
 			}
 
-			endpointFun := project.ListEndpoint(userInfoGetter, test.NewFakeProjectProvider(), test.NewFakePrivilegedProjectProvider(), projectMemberProvider, projectMemberProvider, userProvider, clusterProviderGetter, test.CreateTestSeedsGetter(fakeClient))
+			endpointFun := project.ListEndpoint(userInfoGetter, test.NewFakeProjectProvider(), test.NewFakePrivilegedProjectProvider(), projectMemberProvider, projectMemberProvider, userProvider, clusterProviderGetter, test.CreateTestSeedsGetter(ctx, fakeClient))
 
 			ctx = context.WithValue(ctx, middleware.UserCRContextKey, tc.ExistingAPIUser)
 

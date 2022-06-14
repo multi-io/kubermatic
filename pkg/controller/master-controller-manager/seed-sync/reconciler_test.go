@@ -240,7 +240,7 @@ func TestReconcilingSeed(t *testing.T) {
 				Client:   masterClient,
 				recorder: record.NewFakeRecorder(10),
 				log:      log,
-				seedClientGetter: func(_ context.Context, seed *kubermaticv1.Seed) (ctrlruntimeclient.Client, error) {
+				seedClientGetter: func(seed *kubermaticv1.Seed) (ctrlruntimeclient.Client, error) {
 					return seedClient, nil
 				},
 			}

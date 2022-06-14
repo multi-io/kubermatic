@@ -56,7 +56,7 @@ type controllerRunOptions struct {
 	leaderElectionNamespace string
 
 	externalURL                                      string
-	seedName                                         string
+	dc                                               string
 	workerName                                       string
 	versionsFile                                     string
 	updatesFile                                      string
@@ -130,7 +130,7 @@ func newControllerRunOptions() (controllerRunOptions, error) {
 	flag.StringVar(&c.leaderElectionNamespace, "leader-election-namespace", "", "Leader election namespace. In-cluster discovery will be attempted in such case.")
 	flag.StringVar(&c.internalAddr, "internal-address", "127.0.0.1:8085", "The address on which the internal server is running on")
 	flag.StringVar(&c.externalURL, "external-url", "", "The external url for the apiserver host and the the dc.(Required)")
-	flag.StringVar(&c.seedName, "seed-name", "", "The name of the seed datacenter, the controller is running in. It will be used to build the absolute url for a customer cluster.")
+	flag.StringVar(&c.dc, "datacenter-name", "", "The name of the seed datacenter, the controller is running in. It will be used to build the absolute url for a customer cluster.")
 	flag.StringVar(&c.workerName, "worker-name", "", "The name of the worker that will only processes resources with label=worker-name.")
 	flag.StringVar(&c.versionsFile, "versions", "versions.yaml", "The versions.yaml file path")
 	flag.StringVar(&c.updatesFile, "updates", "updates.yaml", "The updates.yaml file path")
@@ -177,6 +177,7 @@ func newControllerRunOptions() (controllerRunOptions, error) {
 	flag.StringVar(&c.machineControllerImageTag, "machine-controller-image-tag", "", "The Machine Controller image tag.")
 	flag.StringVar(&c.machineControllerImageRepository, "machine-controller-image-repository", "", "The Machine Controller image repository.")
 	c.admissionWebhook.AddFlags(flag.CommandLine, true)
+	addFlags(flag.CommandLine)
 	flag.Parse()
 
 	if err := c.admissionWebhook.Validate(); err != nil {
@@ -230,8 +231,8 @@ func (o controllerRunOptions) validate() error {
 		return fmt.Errorf("external-url is undefined")
 	}
 
-	if o.seedName == "" {
-		return fmt.Errorf("seed-name is undefined")
+	if o.dc == "" {
+		return fmt.Errorf("datacenter-name is undefined")
 	}
 
 	if o.backupContainerFile == "" {

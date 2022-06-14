@@ -360,7 +360,7 @@ func (r *Reconciler) getAddonManifests(ctx context.Context, log *zap.SugaredLogg
 	}
 
 	// Sys11 block
-	seed, err := r.seedGetter(ctx)
+	seed, err := r.seedGetter()
 	if err != nil {
 		return nil, err
 	}
