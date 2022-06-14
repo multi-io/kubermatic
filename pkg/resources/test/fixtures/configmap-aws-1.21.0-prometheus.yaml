@@ -615,6 +615,41 @@ data:
         # = 1 iff any apiserver pod was up within 5m
         # = 0 otherwise (all down for >=5m)
         expr: max(max_over_time(up{job="apiserver"}[5m]) == 1) or vector(0)
+
+      - record: sli:user_cluster:controller_manager:up
+        # = 1 iff any controller-manager pod was up within 5m
+        # = 0 otherwise (all down for >=5m)
+        expr: max(max_over_time(up{job="controller-manager"}[5m]) == 1) or vector(0)
+
+      - record: sli:user_cluster:scheduler:up
+        # = 1 iff any scheduler pod was up within 5m
+        # = 0 otherwise (all down for >=5m)
+        expr: max(max_over_time(up{job="scheduler"}[5m]) == 1) or vector(0)
+
+      - record: sli:user_cluster:machine_controller:up
+        # = 1 iff any machine-controller pod was up within 5m
+        # = 0 otherwise (all down for >=5m)
+        expr: max(max_over_time(up{job="machine-controller"}[5m]) == 1) or vector(0)
+
+      - record: sli:user_cluster:csi_cinder_controllerplugin:up
+        # = 1 iff any csi-cinder-controllerplugin pod was up within 5m
+        # = 0 otherwise (all down for >=5m)
+        expr: max(max_over_time(up{job="csi-cinder-controllerplugin"}[5m]) == 1) or vector(0)
+
+      - record: sli:user_cluster:openstack_cloud_controller_manager:up
+        # = 1 iff any openstack-cloud-controller-manager pod was up within 5m
+        # = 0 otherwise (all down for >=5m)
+        expr: max(max_over_time(up{job="openstack-cloud-controller-manager"}[5m]) == 1) or vector(0)
+
+      - record: sli:user_cluster:usercluster_controller:up
+        # = 1 iff any usercluster-controller pod was up within 5m
+        # = 0 otherwise (all down for >=5m)
+        expr: max(max_over_time(up{job="usercluster-controller"}[5m]) == 1) or vector(0)
+
+      - record: sli:user_cluster:dns_resolver:up
+        # = 1 iff any dns-resolver pod was up within 5m
+        # = 0 otherwise (all down for >=5m)
+        expr: max(max_over_time(up{job="dns-resolver"}[5m]) == 1) or vector(0)
 metadata:
   creationTimestamp: null
   labels:
