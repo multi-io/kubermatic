@@ -108,9 +108,9 @@ func SeedsGetterFactory(client ctrlruntimeclient.Client, namespace string) Seeds
 		}
 
 		result := make(map[string]*kubermaticv1.Seed)
-		for _, s := range seeds.Items {
-			s.SetDefaults()
-			result[s.Name] = &s
+		for i := range seeds.Items {
+			seeds.Items[i].SetDefaults()
+			result[seeds.Items[i].Name] = &seeds.Items[i]
 		}
 		return result, nil
 	}
