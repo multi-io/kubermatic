@@ -100,19 +100,18 @@ func Add(
 	numWorkers int,
 	log *zap.SugaredLogger,
 	namespace string,
-	seedsGetter provider.SeedsGetter,
-	seedKubeconfigGetter provider.SeedKubeconfigGetter,
 ) error {
 	log = log.Named(ControllerName)
 
+	client := mgr.GetClient()
 	reconciler := &Reconciler{
-		Client:               mgr.GetClient(),
+		Client:               client,
 		recorder:             mgr.GetEventRecorderFor(ControllerName),
 		log:                  log,
 		namespace:            namespace,
-		seedsGetter:          seedsGetter,
-		seedKubeconfigGetter: seedKubeconfigGetter,
-		seedClientGetter:     provider.SeedClientGetterFactory(seedKubeconfigGetter),
+		seedsGetter:          provider.SeedsGetterFactory(client, namespace),
+		seedKubeconfigGetter: provider.SeedKubeconfigGetterFactory(client),
+		seedClientGetter:     provider.SeedClientGetterFactory(client),
 	}
 
 	ctrlOptions := controller.Options{Reconciler: reconciler, MaxConcurrentReconciles: numWorkers}
@@ -132,7 +131,7 @@ func Add(
 
 	// watch related resources
 	eventHandler := handler.EnqueueRequestsFromMapFunc(func(a ctrlruntimeclient.Object) []reconcile.Request {
-		seeds, err := seedsGetter()
+		seeds, err := reconciler.seedsGetter(context.TODO())
 		if err != nil {
 			log.Errorw("failed to get seeds", zap.Error(err))
 			return nil

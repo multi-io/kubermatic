@@ -57,7 +57,7 @@ func GetSeedSettingsEndpoint(seedsGetter provider.SeedsGetter) endpoint.Endpoint
 			return nil, k8cerrors.NewBadRequest("invalid request")
 		}
 
-		seedMap, err := seedsGetter()
+		seedMap, err := seedsGetter(ctx)
 		if err != nil {
 			return nil, common.KubernetesErrorToHTTPError(err)
 		}

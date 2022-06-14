@@ -69,7 +69,7 @@ func Keycloak(keycloakFacade keycloak.Facade) endpoint.Middleware {
 func MachineDeploymentRequests(mdrProviderGetter provider.MachineDeploymentRequestProviderGetter, seedsGetter provider.SeedsGetter) endpoint.Middleware {
 	return func(next endpoint.Endpoint) endpoint.Endpoint {
 		return func(ctx context.Context, request interface{}) (response interface{}, err error) {
-			seeds, err := seedsGetter()
+			seeds, err := seedsGetter(ctx)
 			if err != nil {
 				return nil, err
 			}

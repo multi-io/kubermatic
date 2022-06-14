@@ -46,7 +46,7 @@ func NewEtcdRestoreProvider(createSeedImpersonatedClient ImpersonationClient, cl
 
 func EtcdRestoreProviderFactory(mapper meta.RESTMapper, seedKubeconfigGetter provider.SeedKubeconfigGetter) provider.EtcdRestoreProviderGetter {
 	return func(seed *kubermaticv1.Seed) (provider.EtcdRestoreProvider, error) {
-		cfg, err := seedKubeconfigGetter(seed)
+		cfg, err := seedKubeconfigGetter(context.TODO(), seed)
 		if err != nil {
 			return nil, err
 		}
@@ -161,7 +161,7 @@ func EtcdRestoreProjectProviderFactory(mapper meta.RESTMapper, seedKubeconfigGet
 		createSeedImpersonationClients := make(map[string]ImpersonationClient)
 
 		for seedName, seed := range seeds {
-			cfg, err := seedKubeconfigGetter(seed)
+			cfg, err := seedKubeconfigGetter(context.TODO(), seed)
 			if err != nil {
 				return nil, err
 			}

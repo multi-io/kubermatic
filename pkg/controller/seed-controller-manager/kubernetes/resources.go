@@ -53,7 +53,7 @@ import (
 )
 
 func (r *Reconciler) ensureResourcesAreDeployed(ctx context.Context, cluster *kubermaticv1.Cluster, namespace *corev1.Namespace) (*reconcile.Result, error) {
-	seed, err := r.seedGetter()
+	seed, err := r.seedGetter(ctx)
 	if err != nil {
 		return nil, err
 	}

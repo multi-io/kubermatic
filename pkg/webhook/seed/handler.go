@@ -21,10 +21,12 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/go-logr/logr"
-
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
+	"k8c.io/kubermatic/v2/pkg/features"
+	"k8c.io/kubermatic/v2/pkg/provider"
+	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/go-logr/logr"
 	admissionv1 "k8s.io/api/admission/v1"
 	ctrlruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
@@ -46,7 +48,20 @@ type seedAdmissionHandler struct {
 	decoder      *admission.Decoder
 }
 
-var _ AdmissionHandler = &seedAdmissionHandler{}
+// NewSeedAdmissionHandler returns new AdmissionHandler for Seed CRs.
+func NewSeedAdmissionHandler(client ctrlruntimeclient.Client, ftrs features.FeatureGate, workerName string) (AdmissionHandler, error) {
+	sv, err := newSeedValidator(
+		workerName,
+		client,
+		provider.SeedClientGetterFactory(client),
+		ftrs,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error occurred while creating seed validator: %v", err)
+	}
+
+	return &seedAdmissionHandler{validateFunc: sv.Validate}, nil
+}
 
 func (h *seedAdmissionHandler) InjectLogger(l logr.Logger) error {
 	h.log = l.WithName("seed-validation-handler")

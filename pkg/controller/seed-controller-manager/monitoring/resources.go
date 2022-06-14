@@ -38,7 +38,7 @@ import (
 )
 
 func (r *Reconciler) getClusterTemplateData(ctx context.Context, client ctrlruntimeclient.Client, cluster *kubermaticv1.Cluster) (*resources.TemplateData, error) {
-	seed, err := r.seedGetter()
+	seed, err := r.seedGetter(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -205,7 +205,7 @@ func TestEnsureResourcesAreDeployedIdempotency(t *testing.T) {
 		kubermaticImage:      resources.DefaultKubermaticImage,
 		dnatControllerImage:  resources.DefaultDNATControllerImage,
 		etcdLauncherImage:    resources.DefaultEtcdLauncherImage,
-		seedGetter: func() (*kubermaticv1.Seed, error) {
+		seedGetter: func(_ context.Context) (*kubermaticv1.Seed, error) {
 			return &kubermaticv1.Seed{
 				Spec: kubermaticv1.SeedSpec{
 					Datacenters: map[string]kubermaticv1.Datacenter{

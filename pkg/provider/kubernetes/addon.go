@@ -255,7 +255,7 @@ func (p *AddonProvider) DeleteUnsecured(cluster *kubermaticv1.Cluster, addonName
 
 func AddonProviderFactory(mapper meta.RESTMapper, seedKubeconfigGetter provider.SeedKubeconfigGetter, accessibleAddons sets.String) provider.AddonProviderGetter {
 	return func(seed *kubermaticv1.Seed) (provider.AddonProvider, error) {
-		cfg, err := seedKubeconfigGetter(seed)
+		cfg, err := seedKubeconfigGetter(context.TODO(), seed)
 		if err != nil {
 			return nil, err
 		}
