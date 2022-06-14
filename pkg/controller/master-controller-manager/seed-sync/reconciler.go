@@ -60,7 +60,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 		return reconcile.Result{}, fmt.Errorf("failed to get seed: %w", err)
 	}
 
-	client, err := r.seedClientGetter(ctx, seed)
+	client, err := r.seedClientGetter(seed)
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("failed to create client for seed: %w", err)
 	}

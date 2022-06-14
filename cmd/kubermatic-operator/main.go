@@ -89,7 +89,7 @@ func main() {
 	}
 
 	v := kubermatic.NewDefaultVersions()
-	log.With("kubermatic", v.Kubermatic, "ui", v.UI).Info("Moin, moin, I'm the Kubermatic Operator and these are the versions I work with.")
+	log.With("kubermatic", v.Kubermatic, "ui", v.UI).Infof("Moin, moin, I'm the Kubermatic %s Operator and these are the versions I work with.", v.KubermaticEdition)
 
 	mgr, err := manager.New(ctrl.GetConfigOrDie(), manager.Options{
 		MetricsBindAddress: opt.internalAddr,
@@ -108,7 +108,15 @@ func main() {
 		log.Panicw("Failed to register scheme", zap.Stringer("api", operatorv1alpha1.SchemeGroupVersion), zap.Error(err))
 	}
 
-	seedsGetter := provider.SeedsGetterFactory(mgr.GetClient(), opt.namespace)
+	seedsGetter, err := seedsGetterFactory(ctx, mgr.GetClient(), opt)
+	if err != nil {
+		log.Panicw("Failed to construct seedsGetter", zap.Error(err))
+	}
+
+	seedKubeconfigGetter, err := provider.SeedKubeconfigGetterFactory(ctx, mgr.GetClient())
+	if err != nil {
+		log.Panicw("Failed to construct seedKubeconfigGetter", zap.Error(err))
+	}
 
 	if err := masterctrl.Add(ctx, mgr, log, opt.namespace, opt.workerCount, opt.workerName); err != nil {
 		log.Panicw("Failed to add operator-master controller", zap.Error(err))
@@ -127,7 +135,7 @@ func main() {
 		)
 	}
 
-	if err := seedcontrollerlifecycle.Add(ctx, log, mgr, opt.namespace, seedOperatorControllerFactory); err != nil {
+	if err := seedcontrollerlifecycle.Add(ctx, log, mgr, opt.namespace, seedsGetter, seedKubeconfigGetter, seedOperatorControllerFactory); err != nil {
 		log.Panicw("Failed to create seed-lifecycle controller", zap.Error(err))
 	}
 

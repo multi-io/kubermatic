@@ -32,7 +32,7 @@ func TestSeedGetterFactorySetsDefaults(t *testing.T) {
 	t.Parallel()
 	initSeed := &kubermaticv1.Seed{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "testseed",
+			Name:      DefaultSeedName,
 			Namespace: "my-ns",
 		},
 		Spec: kubermaticv1.SeedSpec{
@@ -49,8 +49,11 @@ func TestSeedGetterFactorySetsDefaults(t *testing.T) {
 		WithObjects(initSeed).
 		Build()
 
-	seedGetter := SeedGetterFactory(client, "testseed", "my-ns")
-	seed, err := seedGetter(context.Background())
+	seedGetter, err := SeedGetterFactory(context.Background(), client, DefaultSeedName, "my-ns")
+	if err != nil {
+		t.Fatalf("failed getting seedGetter: %v", err)
+	}
+	seed, err := seedGetter()
 	if err != nil {
 		t.Fatalf("failed calling seedGetter: %v", err)
 	}
@@ -69,7 +72,7 @@ func TestSeedsGetterFactorySetsDefaults(t *testing.T) {
 	t.Parallel()
 	initSeed := &kubermaticv1.Seed{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "testseed",
+			Name:      DefaultSeedName,
 			Namespace: "my-ns",
 		},
 		Spec: kubermaticv1.SeedSpec{
@@ -85,16 +88,19 @@ func TestSeedsGetterFactorySetsDefaults(t *testing.T) {
 		WithObjects(initSeed).
 		Build()
 
-	seedsGetter := SeedsGetterFactory(client, "my-ns")
-	seeds, err := seedsGetter(context.Background())
+	seedsGetter, err := SeedsGetterFactory(context.Background(), client, "my-ns")
+	if err != nil {
+		t.Fatalf("failed getting seedsGetter: %v", err)
+	}
+	seeds, err := seedsGetter()
 	if err != nil {
 		t.Fatalf("failed calling seedsGetter: %v", err)
 	}
-	if _, exists := seeds["testseed"]; !exists || len(seeds) != 1 {
+	if _, exists := seeds[DefaultSeedName]; !exists || len(seeds) != 1 {
 		t.Fatalf("expceted to get a map with exactly one key `my-seed`, got %v", seeds)
 	}
 
-	seed := seeds["testseed"]
+	seed := seeds[DefaultSeedName]
 	nodeSettings := seed.Spec.Datacenters["a"].Node
 	if nodeSettings == nil {
 		t.Fatal("expected the datacenter's node setting to be set, but it's nil")
@@ -109,8 +115,11 @@ func TestSeedsGetterFactoryNoSeed(t *testing.T) {
 	t.Parallel()
 	// No seed is returned by the fake client
 	client := fakectrlruntimeclient.NewClientBuilder().WithScheme(scheme.Scheme).Build()
-	seedsGetter := SeedsGetterFactory(client, "my-ns")
-	seeds, err := seedsGetter(context.Background())
+	seedsGetter, err := SeedsGetterFactory(context.Background(), client, "my-ns")
+	if err != nil {
+		t.Fatalf("failed getting seedsGetter: %v", err)
+	}
+	seeds, err := seedsGetter()
 	if err != nil {
 		t.Fatalf("error occurred while calling seedsGetter: %v", err)
 	}

@@ -422,8 +422,11 @@ func main() {
 	}
 	opts.seedGeneratedClient = seedGeneratedClient
 
-	seedGetter := provider.SeedGetterFactory(seedClusterClient, opts.kubermaticSeedName, opts.kubermaticNamespace)
-	opts.seed, err = seedGetter(rootCtx)
+	seedGetter, err := provider.SeedGetterFactory(rootCtx, seedClusterClient, opts.kubermaticSeedName, opts.kubermaticNamespace)
+	if err != nil {
+		log.Panicw("Failed to construct seedGetter", zap.Error(err))
+	}
+	opts.seed, err = seedGetter()
 	if err != nil {
 		log.Panicw("Failed to get seed", zap.Error(err))
 	}

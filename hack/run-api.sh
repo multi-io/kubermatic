@@ -31,6 +31,9 @@ echodate "Compiling API..."
 make kubermatic-api
 
 API_EXTRA_ARGS=""
+if [ "$KUBERMATIC_EDITION" == "ee" ]; then
+  API_EXTRA_ARGS="-dynamic-datacenters -dynamic-presets"
+fi
 
 if [ -z "${VAULT_ADDR:-}" ]; then
   export VAULT_ADDR=https://vault.kubermatic.com/

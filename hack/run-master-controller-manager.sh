@@ -26,6 +26,11 @@ PPROF_PORT=${PPROF_PORT:-6601}
 echodate "Compiling master-controller-manager..."
 make master-controller-manager
 
+CTRL_EXTRA_ARGS=""
+if [ "$KUBERMATIC_EDITION" == "ee" ]; then
+  CTRL_EXTRA_ARGS="-dynamic-datacenters"
+fi
+
 if [ -z "${VAULT_ADDR:-}" ]; then
   export VAULT_ADDR=https://vault.kubermatic.com/
 fi
@@ -37,7 +42,7 @@ fi
 
 echodate "Starting master-controller-manager..."
 set -x
-./_build/master-controller-manager \
+./_build/master-controller-manager $CTRL_EXTRA_ARGS \
   -kubeconfig=$KUBECONFIG \
   -enable-leader-election=false \
   -internal-address=127.0.0.1:8086 \

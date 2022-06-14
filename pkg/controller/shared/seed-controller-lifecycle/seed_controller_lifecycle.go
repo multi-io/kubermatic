@@ -90,6 +90,8 @@ func Add(
 	log *zap.SugaredLogger,
 	mgr manager.Manager,
 	namespace string,
+	seedsGetter provider.SeedsGetter,
+	seedKubeconfigGetter provider.SeedKubeconfigGetter,
 	controllerFactories ...ControllerFactory,
 ) error {
 	// prepare a shared cache across all future master managers; this cache
@@ -115,14 +117,13 @@ func Add(
 		log.Fatal("failed to wait for caches to synchronize")
 	}
 
-	client := mgr.GetClient()
 	reconciler := &Reconciler{
 		masterKubeCfg:        mgr.GetConfig(),
-		masterClient:         client,
+		masterClient:         mgr.GetClient(),
 		masterCache:          &unstartableCache{cache},
 		log:                  log.Named(ControllerName),
-		seedsGetter:          provider.SeedsGetterFactory(client, namespace),
-		seedKubeconfigGetter: provider.SeedKubeconfigGetterFactory(client),
+		seedsGetter:          seedsGetter,
+		seedKubeconfigGetter: seedKubeconfigGetter,
 		controllerFactories:  controllerFactories,
 	}
 	c, err := controller.New(ControllerName, mgr,
@@ -164,14 +165,14 @@ func (r *Reconciler) Reconcile(ctx context.Context, _ reconcile.Request) (reconc
 }
 
 func (r *Reconciler) reconcile(ctx context.Context) error {
-	seeds, err := r.seedsGetter(ctx)
+	seeds, err := r.seedsGetter()
 	if err != nil {
 		return fmt.Errorf("failed to get seeds: %v", err)
 	}
 
 	seedKubeconfigMap := map[string]rest.Config{}
 	for _, seed := range seeds {
-		cfg, err := r.seedKubeconfigGetter(ctx, seed)
+		cfg, err := r.seedKubeconfigGetter(seed)
 		if err != nil {
 			// Don't let a single broken kubeconfig break everything.
 			r.log.Errorw("failed to get kubeconfig", "seed", seed.Name, zap.Error(err))

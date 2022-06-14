@@ -28,7 +28,7 @@ import (
 // ListSeedNamesEndpoint returns a list of all seed names
 func ListSeedNamesEndpoint(seedsGetter provider.SeedsGetter) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
-		seedMap, err := seedsGetter(ctx)
+		seedMap, err := seedsGetter()
 		if err != nil {
 			return nil, common.KubernetesErrorToHTTPError(err)
 		}

@@ -144,7 +144,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 }
 
 func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, cluster *kubermaticv1.Cluster) (*reconcile.Result, error) {
-	seed, err := r.seedGetter(ctx)
+	seed, err := r.seedGetter()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get seeds: %v", err)
 	}

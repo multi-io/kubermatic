@@ -70,8 +70,14 @@ spec:
         - seed-controller-manager
         args:
         - -external-url={{ .Values.kubermatic.domain }}
-        - -seed-name={{ .Values.kubermatic.controller.seedName }}
+        - -datacenter-name={{ .Values.kubermatic.controller.datacenterName }}
         - -etcd-disk-size={{ .Values.kubermatic.etcd.diskSize }}
+        {{- if .Values.kubermatic.datacenters }}
+        - -datacenters=/opt/datacenter/datacenters.yaml
+        {{- end }}
+        {{- if .Values.kubermatic.dynamicDatacenters }}
+        - -dynamic-datacenters=true
+        {{- end }}
         - -versions=/opt/master-files/versions.yaml
         - -updates=/opt/master-files/updates.yaml
         - -internal-address=0.0.0.0:8085

@@ -298,7 +298,7 @@ func TestController_getExternalURLManifests(t *testing.T) {
 }
 
 func createSeedGetter() provider.SeedGetter {
-	return func(_ context.Context) (*kubermaticv1.Seed, error) {
+	return func() (*kubermaticv1.Seed, error) {
 		return &kubermaticv1.Seed{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "alias-europe-west3-c",

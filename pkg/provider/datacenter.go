@@ -31,25 +31,31 @@ import (
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const (
+	// DefaultSeedName is the name of the Seed resource that is used
+	// in the Community Edition, which is limited to a single seed.
+	DefaultSeedName = "kubermatic"
+)
+
 var (
 	// emptySeedMap is returned when the default seed is not present.
 	emptySeedMap = map[string]*kubermaticv1.Seed{}
 )
 
 // SeedGetter is a function to retrieve a single seed
-type SeedGetter = func(ctx context.Context) (*kubermaticv1.Seed, error)
+type SeedGetter = func() (*kubermaticv1.Seed, error)
 
 // SeedsGetter is a function to retrieve a list of seeds
-type SeedsGetter = func(ctx context.Context) (map[string]*kubermaticv1.Seed, error)
+type SeedsGetter = func() (map[string]*kubermaticv1.Seed, error)
 
 // SeedKubeconfigGetter is used to fetch the kubeconfig for a given seed
-type SeedKubeconfigGetter = func(ctx context.Context, seed *kubermaticv1.Seed) (*rest.Config, error)
+type SeedKubeconfigGetter = func(seed *kubermaticv1.Seed) (*rest.Config, error)
 
 // SeedClientGetter is used to get a ctrlruntimeclient for a given seed
-type SeedClientGetter = func(ctx context.Context, seed *kubermaticv1.Seed) (ctrlruntimeclient.Client, error)
+type SeedClientGetter = func(seed *kubermaticv1.Seed) (ctrlruntimeclient.Client, error)
 
 // ClusterProviderGetter is used to get a clusterProvider
-type ClusterProviderGetter = func(ctx context.Context, seed *kubermaticv1.Seed) (ClusterProvider, error)
+type ClusterProviderGetter = func(seed *kubermaticv1.Seed) (ClusterProvider, error)
 
 // AddonProviderGetter is used to get an AddonProvider
 type AddonProviderGetter = func(seed *kubermaticv1.Seed) (AddonProvider, error)
@@ -76,8 +82,8 @@ type EtcdRestoreProjectProviderGetter = func(seeds map[string]*kubermaticv1.Seed
 type BackupCredentialsProviderGetter = func(seed *kubermaticv1.Seed) (BackupCredentialsProvider, error)
 
 // SeedGetterFactory returns a SeedGetter. It has validation of all its arguments
-func SeedGetterFactory(client ctrlruntimeclient.Reader, seedName string, namespace string) SeedGetter {
-	return func(ctx context.Context) (*kubermaticv1.Seed, error) {
+func SeedGetterFactory(ctx context.Context, client ctrlruntimeclient.Reader, seedName string, namespace string) (SeedGetter, error) {
+	return func() (*kubermaticv1.Seed, error) {
 		seed := &kubermaticv1.Seed{}
 		if err := client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: seedName}, seed); err != nil {
 			// allow callers to handle this gracefully
@@ -91,33 +97,32 @@ func SeedGetterFactory(client ctrlruntimeclient.Reader, seedName string, namespa
 		seed.SetDefaults()
 
 		return seed, nil
-	}
+	}, nil
 }
 
-func SeedsGetterFactory(client ctrlruntimeclient.Client, namespace string) SeedsGetter {
-	return func(ctx context.Context) (map[string]*kubermaticv1.Seed, error) {
-		seeds := kubermaticv1.SeedList{}
-		if err := client.List(ctx, &seeds, ctrlruntimeclient.InNamespace(namespace)); err != nil {
+func SeedsGetterFactory(ctx context.Context, client ctrlruntimeclient.Client, namespace string) (SeedsGetter, error) {
+	return func() (map[string]*kubermaticv1.Seed, error) {
+		seed := &kubermaticv1.Seed{}
+		if err := client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: DefaultSeedName}, seed); err != nil {
 			if kerrors.IsNotFound(err) {
 				// We should not fail if no seed exists and just return an
 				// empty map.
 				return emptySeedMap, nil
 			}
 
-			return nil, fmt.Errorf("failed to get seeds: %v", err)
+			return nil, fmt.Errorf("failed to get seed %q: %v", DefaultSeedName, err)
 		}
 
-		result := make(map[string]*kubermaticv1.Seed)
-		for _, s := range seeds.Items {
-			s.SetDefaults()
-			result[s.Name] = &s
-		}
-		return result, nil
-	}
+		seed.SetDefaults()
+
+		return map[string]*kubermaticv1.Seed{
+			DefaultSeedName: seed,
+		}, nil
+	}, nil
 }
 
-func SeedKubeconfigGetterFactory(client ctrlruntimeclient.Client) SeedKubeconfigGetter {
-	return func(ctx context.Context, seed *kubermaticv1.Seed) (*rest.Config, error) {
+func SeedKubeconfigGetterFactory(ctx context.Context, client ctrlruntimeclient.Client) (SeedKubeconfigGetter, error) {
+	return func(seed *kubermaticv1.Seed) (*rest.Config, error) {
 		secret := &corev1.Secret{}
 		name := types.NamespacedName{
 			Namespace: seed.Spec.Kubeconfig.Namespace,
@@ -143,29 +148,17 @@ func SeedKubeconfigGetterFactory(client ctrlruntimeclient.Client) SeedKubeconfig
 			return nil, fmt.Errorf("failed to load kubeconfig: %v", err)
 		}
 		return cfg, nil
-	}
+	}, nil
 }
 
 // SeedClientGetterFactory returns a SeedClientGetter. It uses a RestMapperCache to cache
 // the discovery data, which considerably speeds up client creation.
-func SeedClientGetterFactory(client ctrlruntimeclient.Client) SeedClientGetter {
+func SeedClientGetterFactory(kubeconfigGetter SeedKubeconfigGetter) SeedClientGetter {
 	cache := restmapper.New()
-	return func(ctx context.Context, seed *kubermaticv1.Seed) (ctrlruntimeclient.Client, error) {
-		var secret corev1.Secret
-		err := client.Get(ctx, types.NamespacedName{
-			Namespace: seed.Spec.Kubeconfig.Namespace,
-			Name:      seed.Spec.Kubeconfig.Name,
-		}, &secret)
+	return func(seed *kubermaticv1.Seed) (ctrlruntimeclient.Client, error) {
+		cfg, err := kubeconfigGetter(seed)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get secret to connect to Seed: %v", err)
-		}
-		d := secret.Data[DefaultKubeconfigFieldPath]
-		if len(d) == 0 {
-			return nil, fmt.Errorf("no '%s' in kubeconfig secret", DefaultKubeconfigFieldPath)
-		}
-		cfg, err := clientcmd.RESTConfigFromKubeConfig(d)
-		if err != nil {
-			return nil, fmt.Errorf("failed to build client for seed '%s': %v", seed.Name, err)
+			return nil, err
 		}
 		return cache.Client(cfg)
 	}

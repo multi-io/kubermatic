@@ -51,6 +51,12 @@ spec:
         - -address=0.0.0.0:8080
         - -v=2
         - -logtostderr
+        {{- if .Values.kubermatic.datacenters }}
+        - -datacenters=/opt/datacenter/datacenters.yaml
+        {{- end }}
+        {{- if .Values.kubermatic.dynamicDatacenters }}
+        - -dynamic-datacenters=true
+        {{- end }}
         {{- if .Values.kubermatic.dynamicPresets }}
         - -dynamic-presets=true
         {{- end }}

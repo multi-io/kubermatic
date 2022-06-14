@@ -17,7 +17,6 @@ limitations under the License.
 package provider_test
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -113,7 +112,7 @@ func TestVsphereEndpoint(t *testing.T) {
 }
 
 func (v *vSphereMock) buildVSphereDatacenter() provider.SeedsGetter {
-	return func(_ context.Context) (map[string]*kubermaticv1.Seed, error) {
+	return func() (map[string]*kubermaticv1.Seed, error) {
 		return map[string]*kubermaticv1.Seed{
 			"my-seed": {
 				ObjectMeta: metav1.ObjectMeta{

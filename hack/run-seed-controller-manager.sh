@@ -30,6 +30,11 @@ echodate "Compiling seed-controller-manager..."
 export KUBERMATICCOMMIT="${KUBERMATICCOMMIT:-$(git rev-parse origin/master)}"
 make seed-controller-manager
 
+CTRL_EXTRA_ARGS=""
+if [ "$KUBERMATIC_EDITION" == "ee" ]; then
+  CTRL_EXTRA_ARGS="-dynamic-datacenters"
+fi
+
 if [ -z "${VAULT_ADDR:-}" ]; then
   export VAULT_ADDR=https://vault.kubermatic.com/
 fi
@@ -54,10 +59,10 @@ fi
 
 echodate "Starting seed-controller-manager..."
 set -x
-./_build/seed-controller-manager \
+./_build/seed-controller-manager $CTRL_EXTRA_ARGS \
   -namespace=kubermatic \
   -enable-leader-election=false \
-  -seed-name=europe-west3-c \
+  -datacenter-name=europe-west3-c \
   -kubeconfig=$KUBECONFIG \
   -ca-bundle=$CA_BUNDLE \
   -versions=charts/kubermatic/static/master/versions.yaml \

@@ -215,7 +215,7 @@ func ListEndpoint(userInfoGetter provider.UserInfoGetter, projectProvider provid
 		}
 
 		if req.DisplayAll && userInfo.IsAdmin {
-			return getAllProjectsForAdmin(ctx, userInfo, projectProvider, memberProvider, userProvider, clusterProviderGetter, seedsGetter)
+			return getAllProjectsForAdmin(userInfo, projectProvider, memberProvider, userProvider, clusterProviderGetter, seedsGetter)
 		}
 		projects := []*apiv1.Project{}
 		userMappings, err := memberMapper.MappingsFor(userInfo.Email)
@@ -248,7 +248,7 @@ func ListEndpoint(userInfoGetter provider.UserInfoGetter, projectProvider provid
 			if err != nil {
 				return nil, common.KubernetesErrorToHTTPError(err)
 			}
-			clustersNumber, err := getNumberOfClustersForProject(ctx, clusterProviderGetter, seedsGetter, projectInternal)
+			clustersNumber, err := getNumberOfClustersForProject(clusterProviderGetter, seedsGetter, projectInternal)
 			if err != nil {
 				return nil, common.KubernetesErrorToHTTPError(err)
 			}
@@ -263,14 +263,14 @@ func ListEndpoint(userInfoGetter provider.UserInfoGetter, projectProvider provid
 	}
 }
 
-func getAllProjectsForAdmin(ctx context.Context, userInfo *provider.UserInfo, projectProvider provider.ProjectProvider, memberProvider provider.ProjectMemberProvider, userProvider provider.UserProvider, clusterProviderGetter provider.ClusterProviderGetter, seedsGetter provider.SeedsGetter) ([]*apiv1.Project, error) {
+func getAllProjectsForAdmin(userInfo *provider.UserInfo, projectProvider provider.ProjectProvider, memberProvider provider.ProjectMemberProvider, userProvider provider.UserProvider, clusterProviderGetter provider.ClusterProviderGetter, seedsGetter provider.SeedsGetter) ([]*apiv1.Project, error) {
 	projects := []*apiv1.Project{}
 	projectList, err := projectProvider.List(nil)
 	if err != nil {
 		return nil, common.KubernetesErrorToHTTPError(err)
 	}
 
-	clustersNumbers, err := getNumberOfClusters(ctx, clusterProviderGetter, seedsGetter)
+	clustersNumbers, err := getNumberOfClusters(clusterProviderGetter, seedsGetter)
 	if err != nil {
 		return nil, common.KubernetesErrorToHTTPError(err)
 	}
@@ -364,7 +364,7 @@ func UpdateEndpoint(projectProvider provider.ProjectProvider, privilegedProjectP
 		if err != nil {
 			return nil, common.KubernetesErrorToHTTPError(err)
 		}
-		clustersNumber, err := getNumberOfClustersForProject(ctx, clusterProviderGetter, seedsGetter, project)
+		clustersNumber, err := getNumberOfClustersForProject(clusterProviderGetter, seedsGetter, project)
 		if err != nil {
 			return nil, common.KubernetesErrorToHTTPError(err)
 		}
@@ -413,7 +413,7 @@ func GetEndpoint(projectProvider provider.ProjectProvider, privilegedProjectProv
 		if err != nil {
 			return nil, common.KubernetesErrorToHTTPError(err)
 		}
-		clustersNumber, err := getNumberOfClustersForProject(ctx, clusterProviderGetter, seedsGetter, kubermaticProject)
+		clustersNumber, err := getNumberOfClustersForProject(clusterProviderGetter, seedsGetter, kubermaticProject)
 		if err != nil {
 			return nil, common.KubernetesErrorToHTTPError(err)
 		}
@@ -521,15 +521,15 @@ func DecodeList(c context.Context, r *http.Request) (interface{}, error) {
 	return req, nil
 }
 
-func getNumberOfClustersForProject(ctx context.Context, clusterProviderGetter provider.ClusterProviderGetter, seedsGetter provider.SeedsGetter, project *kubermaticapiv1.Project) (int, error) {
+func getNumberOfClustersForProject(clusterProviderGetter provider.ClusterProviderGetter, seedsGetter provider.SeedsGetter, project *kubermaticapiv1.Project) (int, error) {
 	var clustersNumber int
-	seeds, err := seedsGetter(ctx)
+	seeds, err := seedsGetter()
 	if err != nil {
 		return clustersNumber, errors.New(http.StatusInternalServerError, fmt.Sprintf("failed to list seeds: %v", err))
 	}
 
 	for datacenter, seed := range seeds {
-		clusterProvider, err := clusterProviderGetter(ctx, seed)
+		clusterProvider, err := clusterProviderGetter(seed)
 		if err != nil {
 			return clustersNumber, errors.NewNotFound("cluster-provider", datacenter)
 		}
@@ -543,15 +543,15 @@ func getNumberOfClustersForProject(ctx context.Context, clusterProviderGetter pr
 	return clustersNumber, nil
 }
 
-func getNumberOfClusters(ctx context.Context, clusterProviderGetter provider.ClusterProviderGetter, seedsGetter provider.SeedsGetter) (map[string]int, error) {
+func getNumberOfClusters(clusterProviderGetter provider.ClusterProviderGetter, seedsGetter provider.SeedsGetter) (map[string]int, error) {
 	clustersNumber := map[string]int{}
-	seeds, err := seedsGetter(ctx)
+	seeds, err := seedsGetter()
 	if err != nil {
 		return nil, errors.New(http.StatusInternalServerError, fmt.Sprintf("failed to list seeds: %v", err))
 	}
 
 	for datacenter, seed := range seeds {
-		clusterProvider, err := clusterProviderGetter(ctx, seed)
+		clusterProvider, err := clusterProviderGetter(seed)
 		if err != nil {
 			return nil, errors.NewNotFound("cluster-provider", datacenter)
 		}
