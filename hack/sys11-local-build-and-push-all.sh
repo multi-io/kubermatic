@@ -95,5 +95,5 @@ docker run -e GOTOOLFLAGS_EXTRA -e LDFLAGS_EXTRA -e KUBERMATICCOMMIT -e GITTAG -
     echo 'logging into $reposerver'
     docker login $reposerver
   fi
-  DOCKER_REPO=$repo KUBERMATIC_EDITION=ee /src/kubermatic/hack/release-docker-images.sh $GITTAG $KUBERMATICCOMMIT;
+  DOCKER_REPO=$repo KUBERMATIC_EDITION=ce /src/kubermatic/hack/release-docker-images.sh $GITTAG $KUBERMATICCOMMIT;
 "

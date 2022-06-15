@@ -47,7 +47,7 @@ source hack/lib.sh
 
 export DOCKER_REPO="${DOCKER_REPO:-quay.io/kubermatic}"
 export GOOS="${GOOS:-linux}"
-export KUBERMATIC_EDITION="${KUBERMATIC_EDITION:-ee}"
+export KUBERMATIC_EDITION="ce"
 export ARCHITECTURES=${ARCHITECTURES:-amd64 arm64}
 
 REPOSUFFIX=""

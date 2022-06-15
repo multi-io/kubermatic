@@ -6,7 +6,6 @@ stages:
 
 variables:
   GO_VERSION: "1.16.10"
-  KUBERMATIC_EDITION: ee
   GO111MODULE: "on"
   KUBERMATICCOMMIT: "${CI_COMMIT_TAG}"
 
@@ -86,7 +85,6 @@ lint:
   stage: test
   image: golangci/golangci-lint:v1.41.1
   script:
-  - export KUBERMATIC_EDITION=ee
   - make lint
   variables:
     GOLANGCI_LINT_CACHE: ${CI_PROJECT_DIR}/vendor/linter-cache
@@ -111,7 +109,7 @@ test-go:
   stage: test
   script:
   - go mod vendor
-  - CGO_ENABLED=1 go test -tags "unit,${KUBERMATIC_EDITION}" -race ./pkg/... ./cmd/... ./codegen/...
+  - CGO_ENABLED=1 go test -tags "unit" -race ./pkg/... ./cmd/... ./codegen/...
   variables:
     GOCACHE: ${CI_PROJECT_DIR}/vendor/cache
   needs: ["go-mod-vendor"]
@@ -120,7 +118,7 @@ test-cloud:
   stage: test
   script:
   - go mod vendor
-  - go test -tags "cloud ${KUBERMATIC_EDITION}" -run nope ./pkg/test/e2e/api/...
+  - go test -tags "cloud" -run nope ./pkg/test/e2e/api/...
   variables:
     GOCACHE: ${CI_PROJECT_DIR}/vendor/cache
   needs: ["go-mod-vendor"]
@@ -129,7 +127,7 @@ test-create:
   stage: test
   script:
   - go mod vendor
-  - go test -tags "create ${KUBERMATIC_EDITION}" -run nope ./pkg/test/e2e/api/...
+  - go test -tags "create" -run nope ./pkg/test/e2e/api/...
   variables:
     GOCACHE: ${CI_PROJECT_DIR}/vendor/cache
   needs: ["go-mod-vendor"]
@@ -138,7 +136,7 @@ test-e2e:
   stage: test
   script:
   - go mod vendor
-  - go test -tags "e2e ${KUBERMATIC_EDITION}" -run nope ./pkg/test/e2e/api/...
+  - go test -tags "e2e" -run nope ./pkg/test/e2e/api/...
   variables:
     GOCACHE: ${CI_PROJECT_DIR}/vendor/cache
   needs: ["go-mod-vendor"]
@@ -147,7 +145,7 @@ test-integration:
   stage: test
   script:
   - go mod vendor
-  - go test -tags "integration,$(KUBERMATIC_EDITION)" -run nope ./pkg/... ./cmd/... ./codegen/...
+  - go test -tags "integration" -run nope ./pkg/... ./cmd/... ./codegen/...
   variables:
     GOCACHE: ${CI_PROJECT_DIR}/vendor/cache
   needs: ["go-mod-vendor"]

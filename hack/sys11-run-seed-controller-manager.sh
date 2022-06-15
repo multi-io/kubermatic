@@ -25,10 +25,9 @@ fi
 : "${DEBUG:="false"}"
 : "${KUBERMATICCOMMIT:="$(git rev-parse HEAD)"}"
 : "${GITTAG:=$(git describe --tags --always)}"
-: "${KUBERMATIC_EDITION:=ee}"
 : "${IS_KUBERMATIC_UPSTREAM:="false"}"
 
-export KUBERMATIC_EDITION
+export KUBERMATIC_EDITION="ce"
 
 # $GITTAG and $KUBERMATICCOMMIT will be compiled into the binary. $GITTAG will only be used for reporting
 # Kubermatic version information via the API; $KUBERMATICCOMMIT will be set as the image tag for
