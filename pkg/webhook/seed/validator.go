@@ -96,7 +96,7 @@ func (v *validator) Validate(ctx context.Context, seed *kubermaticv1.Seed, op ad
 		seed = seedsMap[seed.Name]
 	}
 
-	client, err := v.seedClientGetter(seed)
+	client, err := v.seedClientGetter(ctx, seed)
 	if err != nil {
 		return fmt.Errorf("failed to get client for seed %q: %v", seed.Name, err)
 	}

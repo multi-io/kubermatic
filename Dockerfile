@@ -32,7 +32,6 @@ RUN chmod +x /usr/local/bin/kubectl-* /usr/local/bin/helm && apk add --no-cache 
 COPY ./_build/image-loader \
      ./_build/kubermatic-api \
      ./_build/kubermatic-operator \
-     ./_build/kubermatic-installer \
      ./_build/master-controller-manager \
      ./_build/owner-remover \
      ./_build/seed-controller-manager \

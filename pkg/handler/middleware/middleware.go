@@ -290,14 +290,14 @@ func PrivilegedAddons(clusterProviderGetter provider.ClusterProviderGetter, addo
 }
 
 func getAddonProvider(clusterProviderGetter provider.ClusterProviderGetter, addonProviderGetter provider.AddonProviderGetter, seedsGetter provider.SeedsGetter, seedName, clusterID string) (provider.AddonProvider, error) {
-	seeds, err := seedsGetter()
+	seeds, err := seedsGetter(context.TODO())
 	if err != nil {
 		return nil, err
 	}
 
 	if clusterID != "" {
 		for _, seed := range seeds {
-			clusterProvider, err := clusterProviderGetter(seed)
+			clusterProvider, err := clusterProviderGetter(context.TODO(), seed)
 			if err != nil {
 				return nil, k8cerrors.NewNotFound("cluster-provider", clusterID)
 			}
@@ -345,7 +345,7 @@ func getClusterProvider(ctx context.Context, request interface{}, seedsGetter pr
 	if !ok {
 		return nil, nil, fmt.Errorf("request is no dcGetter")
 	}
-	seeds, err := seedsGetter()
+	seeds, err := seedsGetter(context.TODO())
 	if err != nil {
 		return nil, ctx, k8cerrors.New(http.StatusInternalServerError, fmt.Sprintf("failed to list seeds: %v", err))
 	}
@@ -359,7 +359,7 @@ func getClusterProvider(ctx context.Context, request interface{}, seedsGetter pr
 	}
 	ctx = context.WithValue(ctx, datacenterContextKey, seed)
 
-	clusterProvider, err := clusterProviderGetter(seed)
+	clusterProvider, err := clusterProviderGetter(context.TODO(), seed)
 	if err != nil {
 		return nil, ctx, k8cerrors.NewNotFound("cluster-provider", getter.GetSeedCluster().SeedName)
 	}
@@ -369,7 +369,7 @@ func getClusterProvider(ctx context.Context, request interface{}, seedsGetter pr
 
 func getClusterProviderByClusterID(ctx context.Context, seeds map[string]*kubermaticapiv1.Seed, clusterProviderGetter provider.ClusterProviderGetter, clusterID string) (provider.ClusterProvider, context.Context, error) {
 	for _, seed := range seeds {
-		clusterProvider, err := clusterProviderGetter(seed)
+		clusterProvider, err := clusterProviderGetter(context.TODO(), seed)
 		if err != nil {
 			return nil, ctx, k8cerrors.NewNotFound("cluster-provider", clusterID)
 		}
@@ -440,14 +440,14 @@ func PrivilegedEtcdBackupConfig(clusterProviderGetter provider.ClusterProviderGe
 }
 
 func getEtcdBackupConfigProvider(clusterProviderGetter provider.ClusterProviderGetter, etcdBackupConfigProviderGetter provider.EtcdBackupConfigProviderGetter, seedsGetter provider.SeedsGetter, seedName, clusterID string) (provider.EtcdBackupConfigProvider, error) {
-	seeds, err := seedsGetter()
+	seeds, err := seedsGetter(context.TODO())
 	if err != nil {
 		return nil, err
 	}
 
 	if clusterID != "" {
 		for _, seed := range seeds {
-			clusterProvider, err := clusterProviderGetter(seed)
+			clusterProvider, err := clusterProviderGetter(context.TODO(), seed)
 			if err != nil {
 				return nil, common.KubernetesErrorToHTTPError(err)
 			}
@@ -499,14 +499,14 @@ func PrivilegedEtcdRestore(clusterProviderGetter provider.ClusterProviderGetter,
 }
 
 func getEtcdRestoreProvider(clusterProviderGetter provider.ClusterProviderGetter, etcdRestoreProviderGetter provider.EtcdRestoreProviderGetter, seedsGetter provider.SeedsGetter, seedName, clusterID string) (provider.EtcdRestoreProvider, error) {
-	seeds, err := seedsGetter()
+	seeds, err := seedsGetter(context.TODO())
 	if err != nil {
 		return nil, err
 	}
 
 	if clusterID != "" {
 		for _, seed := range seeds {
-			clusterProvider, err := clusterProviderGetter(seed)
+			clusterProvider, err := clusterProviderGetter(context.TODO(), seed)
 			if err != nil {
 				return nil, common.KubernetesErrorToHTTPError(err)
 			}
@@ -555,7 +555,7 @@ func PrivilegedEtcdBackupConfigProject(etcdBackupConfigProjectProviderGetter pro
 }
 
 func getEtcdBackupConfigProjectProvider(etcdBackupConfigProjectProviderGetter provider.EtcdBackupConfigProjectProviderGetter, seedsGetter provider.SeedsGetter) (provider.EtcdBackupConfigProjectProvider, error) {
-	seeds, err := seedsGetter()
+	seeds, err := seedsGetter(context.TODO())
 	if err != nil {
 		return nil, err
 	}
@@ -593,7 +593,7 @@ func PrivilegedEtcdRestoreProject(etcdRestoreProjectProviderGetter provider.Etcd
 }
 
 func getEtcdRestoreProjectProvider(etcdRestoreProjectProviderGetter provider.EtcdRestoreProjectProviderGetter, seedsGetter provider.SeedsGetter) (provider.EtcdRestoreProjectProvider, error) {
-	seeds, err := seedsGetter()
+	seeds, err := seedsGetter(context.TODO())
 	if err != nil {
 		return nil, err
 	}
@@ -607,7 +607,7 @@ func BackupCredentials(backupCredentialsProviderGetter provider.BackupCredential
 		return func(ctx context.Context, request interface{}) (response interface{}, err error) {
 			seedCluster := request.(seedClusterGetter).GetSeedCluster()
 
-			seeds, err := seedsGetter()
+			seeds, err := seedsGetter(context.TODO())
 			if err != nil {
 				return nil, err
 			}

@@ -48,7 +48,7 @@ func ListSeedEndpoint(userInfoGetter provider.UserInfoGetter, seedsGetter provid
 		if !userInfo.IsAdmin {
 			return nil, k8cerrors.New(http.StatusForbidden, fmt.Sprintf("forbidden: \"%s\" doesn't have admin rights", userInfo.Email))
 		}
-		seedMap, err := seedsGetter()
+		seedMap, err := seedsGetter(ctx)
 		if err != nil {
 			return nil, common.KubernetesErrorToHTTPError(err)
 		}
@@ -159,7 +159,7 @@ func getSeed(ctx context.Context, req seedReq, userInfoGetter provider.UserInfoG
 	if !userInfo.IsAdmin {
 		return nil, k8cerrors.New(http.StatusForbidden, fmt.Sprintf("forbidden: \"%s\" doesn't have admin rights", userInfo.Email))
 	}
-	seedMap, err := seedsGetter()
+	seedMap, err := seedsGetter(ctx)
 	if err != nil {
 		return nil, common.KubernetesErrorToHTTPError(err)
 	}

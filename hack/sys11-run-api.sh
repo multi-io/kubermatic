@@ -52,7 +52,6 @@ cd ${SRC_DIR}
 if [[ "${DEBUG}" == "true" ]]; then
     dlv --listen=:2345 --headless=true --api-version=2 --accept-multiclient exec ./_build/kubermatic-api -- \
       -kubeconfig=${CLUSTER_CONFIG_DIR}/kubeconfig/useradmin.conf \
-      -dynamic-datacenters=true \
       -dynamic-presets=true \
       -swagger=cmd/kubermatic-api/swagger.json \
       -ca-bundle=charts/kubermatic-operator/static/ca-bundle.pem \
@@ -74,7 +73,6 @@ if [[ "${DEBUG}" == "true" ]]; then
 else
     ./_build/kubermatic-api \
       -kubeconfig=${CLUSTER_CONFIG_DIR}/kubeconfig/useradmin.conf \
-      -dynamic-datacenters=true \
       -dynamic-presets=true \
       -swagger=cmd/kubermatic-api/swagger.json \
       -ca-bundle=charts/kubermatic-operator/static/ca-bundle.pem \
