@@ -58,7 +58,7 @@ spec:
           value: apiserver-external.cluster-de-test-01.svc.cluster.local.
         - name: KUBECONFIG
           value: /etc/kubernetes/kubeconfig/kubeconfig
-        image: docker.io/syseleven/machine-controller:v1.37.0-sys11-0
+        image: docker.io/syseleven/machine-controller:v1.37.0-sys11-2
         livenessProbe:
           failureThreshold: 3
           httpGet:
