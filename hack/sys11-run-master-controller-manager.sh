@@ -17,9 +17,9 @@ fi
 : "${DEBUG:="false"}"
 
 if [[ "${DEBUG}" == "true" ]]; then
-    KUBERMATIC_EDITION="ee" GOTOOLFLAGS="-v -gcflags='all=-N -l'" make -C ${SRC_DIR} master-controller-manager
+    KUBERMATIC_EDITION="ce" GOTOOLFLAGS="-v -gcflags='all=-N -l'" make -C ${SRC_DIR} master-controller-manager
 else
-    KUBERMATIC_EDITION="ee" make -C ${SRC_DIR} master-controller-manager
+    KUBERMATIC_EDITION="ce" make -C ${SRC_DIR} master-controller-manager
 fi
 
 cd ${SRC_DIR}

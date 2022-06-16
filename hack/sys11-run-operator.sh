@@ -25,10 +25,9 @@ fi
 : "${DEBUG:="false"}"
 : "${KUBERMATICCOMMIT:="$(git rev-parse HEAD)"}"
 : "${GITTAG:=$(git describe --tags --always)}"
-: "${KUBERMATIC_EDITION:=ee}"
 : "${NAMESPACE:=kubermatic}"
 
-export KUBERMATIC_EDITION
+export KUBERMATIC_EDITION="ce"
 
 if [[ "${TAG_WORKER}" == "true" ]]; then
     WORKER_OPTION="-worker-name=$(tr -cd '[:alnum:]' <<< ${KUBERMATIC_WORKERNAME} | tr '[:upper:]' '[:lower:]')"

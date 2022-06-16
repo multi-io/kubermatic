@@ -1,2 +1,2 @@
 #!/bin/sh
-KUBERMATIC_EDITION=ee make test
+KUBERMATIC_EDITION=ce make test
