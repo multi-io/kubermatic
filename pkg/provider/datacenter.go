@@ -151,21 +151,9 @@ func SeedKubeconfigGetterFactory(client ctrlruntimeclient.Client) SeedKubeconfig
 func SeedClientGetterFactory(client ctrlruntimeclient.Client) SeedClientGetter {
 	cache := restmapper.New()
 	return func(ctx context.Context, seed *kubermaticv1.Seed) (ctrlruntimeclient.Client, error) {
-		var secret corev1.Secret
-		err := client.Get(ctx, types.NamespacedName{
-			Namespace: seed.Spec.Kubeconfig.Namespace,
-			Name:      seed.Spec.Kubeconfig.Name,
-		}, &secret)
+		cfg, err := SeedKubeconfigGetterFactory(client)(ctx, seed)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get secret to connect to Seed: %v", err)
-		}
-		d := secret.Data[DefaultKubeconfigFieldPath]
-		if len(d) == 0 {
-			return nil, fmt.Errorf("no '%s' in kubeconfig secret", DefaultKubeconfigFieldPath)
-		}
-		cfg, err := clientcmd.RESTConfigFromKubeConfig(d)
-		if err != nil {
-			return nil, fmt.Errorf("failed to build client for seed '%s': %v", seed.Name, err)
+			return nil, err
 		}
 		return cache.Client(cfg)
 	}
