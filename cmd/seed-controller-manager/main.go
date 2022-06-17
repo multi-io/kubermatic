@@ -32,6 +32,7 @@ import (
 	clusterv1alpha1 "github.com/kubermatic/machine-controller/pkg/apis/cluster/v1alpha1"
 	"k8c.io/kubermatic/v2/pkg/cluster/client"
 	"k8c.io/kubermatic/v2/pkg/collectors"
+	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/keycloak"
 	kubermaticlog "k8c.io/kubermatic/v2/pkg/log"
 	"k8c.io/kubermatic/v2/pkg/metrics"
@@ -49,6 +50,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/klog"
 	ctrlruntime "sigs.k8s.io/controller-runtime"
+	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlruntimelog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
@@ -186,8 +188,12 @@ Please install the VerticalPodAutoscaler according to the documentation: https:/
 		if err := options.admissionWebhook.Configure(mgr.GetWebhookServer()); err != nil {
 			log.Fatalw("Failed to configure admission webhook server", zap.Error(err))
 		}
+		c := mgr.GetClient()
+		sameClient := func(_ context.Context, _ *kubermaticv1.Seed) (ctrlruntimeclient.Client, error) {
+			return c, nil
+		}
 		// Register Seed validation admission webhook
-		h, err := seedwebhook.NewSeedAdmissionHandler(mgr.GetClient(), options.featureGates, options.workerName)
+		h, err := seedwebhook.NewSeedAdmissionHandler(c, sameClient, options.featureGates, options.workerName)
 		if err != nil {
 			log.Fatalw("Failed to build Seed validation handler", zap.Error(err))
 		}

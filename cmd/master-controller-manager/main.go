@@ -27,6 +27,7 @@ import (
 	"k8c.io/kubermatic/v2/pkg/metrics"
 	metricserver "k8c.io/kubermatic/v2/pkg/metrics/server"
 	"k8c.io/kubermatic/v2/pkg/pprof"
+	"k8c.io/kubermatic/v2/pkg/provider"
 	"k8c.io/kubermatic/v2/pkg/util/cli"
 	"k8c.io/kubermatic/v2/pkg/util/workerlabel"
 	"k8c.io/kubermatic/v2/pkg/webhook"
@@ -162,7 +163,7 @@ func main() {
 		}
 
 		// Register Seed validation handler
-		h, err := seedwebhook.NewSeedAdmissionHandler(mgr.GetClient(), runOpts.featureGates, runOpts.workerName)
+		h, err := seedwebhook.NewSeedAdmissionHandler(mgr.GetClient(), provider.SeedClientGetterFactory(mgr.GetClient()), runOpts.featureGates, runOpts.workerName)
 		if err != nil {
 			log.Fatalw("Failed to build Seed validation handler", zap.Error(err))
 		}

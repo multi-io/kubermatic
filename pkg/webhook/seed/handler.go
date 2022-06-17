@@ -49,11 +49,11 @@ type seedAdmissionHandler struct {
 }
 
 // NewSeedAdmissionHandler returns new AdmissionHandler for Seed CRs.
-func NewSeedAdmissionHandler(client ctrlruntimeclient.Client, ftrs features.FeatureGate, workerName string) (AdmissionHandler, error) {
+func NewSeedAdmissionHandler(client ctrlruntimeclient.Client, seedClientGetter provider.SeedClientGetter, ftrs features.FeatureGate, workerName string) (AdmissionHandler, error) {
 	sv, err := newSeedValidator(
 		workerName,
 		client,
-		provider.SeedClientGetterFactory(client),
+		seedClientGetter,
 		ftrs,
 	)
 	if err != nil {
