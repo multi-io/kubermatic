@@ -98,7 +98,7 @@ type deploymentCreatorData interface {
 }
 
 // DeploymentCreator returns the function to create and update the DNS resolver deployment
-func DeploymentCreator(data deploymentCreatorData) reconciling.NamedDeploymentCreatorGetter {
+func DeploymentCreator(data deploymentCreatorData, priorityClasses bool) reconciling.NamedDeploymentCreatorGetter {
 	return func() (string, reconciling.DeploymentCreator) {
 		return resources.DNSResolverDeploymentName, func(dep *appsv1.Deployment) (*appsv1.Deployment, error) {
 			kubernetesVersion := data.Cluster().Spec.Version.Version
@@ -112,6 +112,10 @@ func DeploymentCreator(data deploymentCreatorData) reconciling.NamedDeploymentCr
 				MatchLabels: resources.BaseAppLabels(resources.DNSResolverDeploymentName, nil),
 			}
 			dep.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: resources.ImagePullSecretName}}
+
+			if priorityClasses {
+				dep.Spec.Template.Spec.PriorityClassName = resources.PriorityClusterDNSResolverDeploymentName
+			}
 
 			volumes := getVolumes()
 			podLabels, err := data.GetPodTemplateLabels(resources.DNSResolverDeploymentName, volumes, nil)

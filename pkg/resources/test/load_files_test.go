@@ -686,8 +686,8 @@ func TestLoadFiles(t *testing.T) {
 						Build()
 
 					var deploymentCreators []reconciling.NamedDeploymentCreatorGetter
-					deploymentCreators = append(deploymentCreators, kubernetescontroller.GetDeploymentCreators(data, true)...)
-					deploymentCreators = append(deploymentCreators, monitoringcontroller.GetDeploymentCreators(data)...)
+					deploymentCreators = append(deploymentCreators, kubernetescontroller.GetDeploymentCreators(data, true, false)...)
+					deploymentCreators = append(deploymentCreators, monitoringcontroller.GetDeploymentCreators(data, false)...)
 					for _, create := range deploymentCreators {
 						_, creator := create()
 						res, err := creator(&appsv1.Deployment{})
@@ -724,8 +724,8 @@ func TestLoadFiles(t *testing.T) {
 					}
 
 					var statefulSetCreators []reconciling.NamedStatefulSetCreatorGetter
-					statefulSetCreators = append(statefulSetCreators, kubernetescontroller.GetStatefulSetCreators(data, false)...)
-					statefulSetCreators = append(statefulSetCreators, monitoringcontroller.GetStatefulSetCreators(data)...)
+					statefulSetCreators = append(statefulSetCreators, kubernetescontroller.GetStatefulSetCreators(data, false, false)...)
+					statefulSetCreators = append(statefulSetCreators, monitoringcontroller.GetStatefulSetCreators(data, false)...)
 					for _, creatorGetter := range statefulSetCreators {
 						_, create := creatorGetter()
 						res, err := create(&appsv1.StatefulSet{})

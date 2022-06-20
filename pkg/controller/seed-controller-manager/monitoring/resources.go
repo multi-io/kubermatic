@@ -87,16 +87,16 @@ func (r *Reconciler) ensureRoleBindings(ctx context.Context, cluster *kubermatic
 }
 
 // GetDeploymentCreators returns all DeploymentCreators that are currently in use
-func GetDeploymentCreators(data *resources.TemplateData) []reconciling.NamedDeploymentCreatorGetter {
+func GetDeploymentCreators(data *resources.TemplateData, priorityClasses bool) []reconciling.NamedDeploymentCreatorGetter {
 	creators := []reconciling.NamedDeploymentCreatorGetter{
-		kubestatemetrics.DeploymentCreator(data),
+		kubestatemetrics.DeploymentCreator(data, priorityClasses),
 	}
 
 	return creators
 }
 
-func (r *Reconciler) ensureDeployments(ctx context.Context, cluster *kubermaticv1.Cluster, data *resources.TemplateData) error {
-	creators := GetDeploymentCreators(data)
+func (r *Reconciler) ensureDeployments(ctx context.Context, cluster *kubermaticv1.Cluster, data *resources.TemplateData, priorityClasses bool) error {
+	creators := GetDeploymentCreators(data, priorityClasses)
 
 	return reconciling.ReconcileDeployments(ctx, creators, cluster.Status.NamespaceName, r.Client, reconciling.OwnerRefWrapper(resources.GetClusterRef(cluster)))
 }
@@ -142,14 +142,14 @@ func (r *Reconciler) ensureConfigMaps(ctx context.Context, cluster *kubermaticv1
 }
 
 // GetStatefulSetCreators returns all StatefulSetCreators that are currently in use
-func GetStatefulSetCreators(data *resources.TemplateData) []reconciling.NamedStatefulSetCreatorGetter {
+func GetStatefulSetCreators(data *resources.TemplateData, priorityClasses bool) []reconciling.NamedStatefulSetCreatorGetter {
 	return []reconciling.NamedStatefulSetCreatorGetter{
-		prometheus.StatefulSetCreator(data),
+		prometheus.StatefulSetCreator(data, priorityClasses),
 	}
 }
 
-func (r *Reconciler) ensureStatefulSets(ctx context.Context, cluster *kubermaticv1.Cluster, data *resources.TemplateData) error {
-	creators := GetStatefulSetCreators(data)
+func (r *Reconciler) ensureStatefulSets(ctx context.Context, cluster *kubermaticv1.Cluster, data *resources.TemplateData, priorityClasses bool) error {
+	creators := GetStatefulSetCreators(data, priorityClasses)
 
 	return reconciling.ReconcileStatefulSets(ctx, creators, cluster.Status.NamespaceName, r.Client, reconciling.OwnerRefWrapper(resources.GetClusterRef(cluster)))
 }

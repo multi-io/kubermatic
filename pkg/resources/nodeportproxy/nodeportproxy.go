@@ -153,7 +153,7 @@ type nodePortProxyData interface {
 	SupportsFailureDomainZoneAntiAffinity() bool
 }
 
-func EnsureResources(ctx context.Context, client ctrlruntimeclient.Client, data nodePortProxyData) error {
+func EnsureResources(ctx context.Context, client ctrlruntimeclient.Client, data nodePortProxyData, priorityClasses bool) error {
 	image := data.ImageRegistry("quay.io") + "/" + imageName + ":" + data.NodePortProxyTag()
 	namespace := data.Cluster().Status.NamespaceName
 	if namespace == "" {
@@ -178,8 +178,8 @@ func EnsureResources(ctx context.Context, client ctrlruntimeclient.Client, data 
 		return fmt.Errorf("failed to ensure RoleBinding: %v", err)
 	}
 
-	deployments := []reconciling.NamedDeploymentCreatorGetter{deploymentEnvoy(image, data),
-		deploymentLBUpdater(image)}
+	deployments := []reconciling.NamedDeploymentCreatorGetter{deploymentEnvoy(image, data, priorityClasses),
+		deploymentLBUpdater(image, priorityClasses)}
 	err = reconciling.ReconcileDeployments(ctx, deployments, namespace, client)
 	if err != nil {
 		return fmt.Errorf("failed to reconcile Deployments: %v", err)
@@ -242,7 +242,7 @@ func roleBinding(ns string) reconciling.NamedRoleBindingCreatorGetter {
 	}
 }
 
-func deploymentEnvoy(image string, data nodePortProxyData) reconciling.NamedDeploymentCreatorGetter {
+func deploymentEnvoy(image string, data nodePortProxyData, priorityClasses bool) reconciling.NamedDeploymentCreatorGetter {
 	volumeMountNameEnvoyConfig := "envoy-config"
 	name := envoyAppLabelValue
 	return func() (string, reconciling.DeploymentCreator) {
@@ -254,6 +254,10 @@ func deploymentEnvoy(image string, data nodePortProxyData) reconciling.NamedDepl
 			d.Spec.Template.Labels = resources.BaseAppLabels(name, nil)
 			d.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{
 				{Name: resources.ImagePullSecretName},
+			}
+
+			if priorityClasses {
+				d.Spec.Template.Spec.PriorityClassName = resources.PriorityClassEnvoyName
 			}
 
 			d.Spec.Template.Spec.InitContainers = []corev1.Container{
@@ -369,7 +373,7 @@ func deploymentEnvoy(image string, data nodePortProxyData) reconciling.NamedDepl
 	}
 }
 
-func deploymentLBUpdater(image string) reconciling.NamedDeploymentCreatorGetter {
+func deploymentLBUpdater(image string, priorityClasses bool) reconciling.NamedDeploymentCreatorGetter {
 	name := name + "-lb-updater"
 	return func() (string, reconciling.DeploymentCreator) {
 		return name, func(d *appsv1.Deployment) (*appsv1.Deployment, error) {
@@ -380,6 +384,9 @@ func deploymentLBUpdater(image string) reconciling.NamedDeploymentCreatorGetter 
 			d.Spec.Template.Labels = resources.BaseAppLabels(name, nil)
 			d.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{
 				{Name: resources.ImagePullSecretName},
+			}
+			if priorityClasses {
+				d.Spec.Template.Spec.PriorityClassName = resources.PriorityClassEnvoyName
 			}
 
 			d.Spec.Template.Spec.Containers = []corev1.Container{{

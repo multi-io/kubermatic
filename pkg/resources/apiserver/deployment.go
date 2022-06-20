@@ -73,7 +73,7 @@ rules:
 }
 
 // DeploymentCreator returns the function to create and update the API server deployment
-func DeploymentCreator(data *resources.TemplateData, enableOIDCAuthentication bool) reconciling.NamedDeploymentCreatorGetter {
+func DeploymentCreator(data *resources.TemplateData, enableOIDCAuthentication, priorityClasses bool) reconciling.NamedDeploymentCreatorGetter {
 	return func() (string, reconciling.DeploymentCreator) {
 		return resources.ApiserverDeploymentName, func(dep *appsv1.Deployment) (*appsv1.Deployment, error) {
 			dep.Name = resources.ApiserverDeploymentName
@@ -88,6 +88,9 @@ func DeploymentCreator(data *resources.TemplateData, enableOIDCAuthentication bo
 				MatchLabels: resources.BaseAppLabels(name, nil),
 			}
 			dep.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: resources.ImagePullSecretName}}
+			if priorityClasses {
+				dep.Spec.Template.Spec.PriorityClassName = resources.PriorityClassApiserverDeploymentName
+			}
 
 			volumes := getVolumes(data.IsKonnectivityEnabled())
 			volumeMounts := getVolumeMounts(data.IsKonnectivityEnabled())

@@ -54,7 +54,7 @@ type clusterautoscalerData interface {
 }
 
 // DeploymentCreator returns the function to create and update the cluster-autoscaler deployment
-func DeploymentCreator(data clusterautoscalerData) reconciling.NamedDeploymentCreatorGetter {
+func DeploymentCreator(data clusterautoscalerData, priorityClasses bool) reconciling.NamedDeploymentCreatorGetter {
 	return func() (string, reconciling.DeploymentCreator) {
 		return resources.ClusterAutoscalerDeploymentName, func(dep *appsv1.Deployment) (*appsv1.Deployment, error) {
 			tag := getTag(data.Cluster())
@@ -96,6 +96,10 @@ func DeploymentCreator(data clusterautoscalerData) reconciling.NamedDeploymentCr
 			}
 
 			dep.Spec.Template.Spec.Volumes = volumes
+
+			if priorityClasses {
+				dep.Spec.Template.Spec.PriorityClassName = resources.PriorityClusterClusterAutoscalerDeploymentName
+			}
 
 			dep.Spec.Template.Spec.InitContainers = []corev1.Container{}
 			dep.Spec.Template.Spec.Containers = []corev1.Container{

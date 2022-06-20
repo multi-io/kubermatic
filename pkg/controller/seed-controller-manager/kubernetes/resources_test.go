@@ -324,7 +324,7 @@ func TestCloudControllerManagerDeployment(t *testing.T) {
 			if err := fc.Create(ctx, tc.kcmDeploymentConfig.Create(td)); err != nil {
 				t.Fatalf("error occurred while creating KCM deployment: %v", err)
 			}
-			creators := GetDeploymentCreators(td, false)
+			creators := GetDeploymentCreators(td, false, false)
 			var ccmDeploymentFound bool
 			for _, c := range creators {
 				name, _ := c()

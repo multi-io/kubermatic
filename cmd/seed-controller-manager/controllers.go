@@ -285,7 +285,8 @@ func createMonitoringController(ctrlCtx *controllerContext) error {
 		ctrlCtx.dockerPullConfigJSON,
 		ctrlCtx.runOptions.concurrentClusterUpdate,
 		monitoring.Features{
-			VPA: ctrlCtx.runOptions.featureGates.Enabled(features.VerticalPodAutoscaler),
+			VPA:             ctrlCtx.runOptions.featureGates.Enabled(features.VerticalPodAutoscaler),
+			PriorityClasses: ctrlCtx.runOptions.featureGates.Enabled(features.PriorityClasses),
 		},
 		ctrlCtx.versions,
 	)

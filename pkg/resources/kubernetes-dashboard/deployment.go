@@ -65,7 +65,7 @@ type kubernetesDashboardData interface {
 }
 
 // DeploymentCreator returns the function to create and update the Kubernetes Dashboard deployment
-func DeploymentCreator(data kubernetesDashboardData) reconciling.NamedDeploymentCreatorGetter {
+func DeploymentCreator(data kubernetesDashboardData, priorityClasses bool) reconciling.NamedDeploymentCreatorGetter {
 	return func() (string, reconciling.DeploymentCreator) {
 		return name, func(dep *appsv1.Deployment) (*appsv1.Deployment, error) {
 			dep.Name = name
@@ -80,6 +80,10 @@ func DeploymentCreator(data kubernetesDashboardData) reconciling.NamedDeployment
 			podLabels, err := data.GetPodTemplateLabels(name, volumes, nil)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create pod labels: %v", err)
+			}
+
+			if priorityClasses {
+				dep.Spec.Template.Spec.PriorityClassName = resources.PriorityClassKubernetesDashboardDeploymentName
 			}
 
 			dep.Spec.Template.ObjectMeta = metav1.ObjectMeta{

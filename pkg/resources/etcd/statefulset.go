@@ -69,7 +69,7 @@ type etcdStatefulSetCreatorData interface {
 }
 
 // StatefulSetCreator returns the function to reconcile the etcd StatefulSet
-func StatefulSetCreator(data etcdStatefulSetCreatorData, enableDataCorruptionChecks bool) reconciling.NamedStatefulSetCreatorGetter {
+func StatefulSetCreator(data etcdStatefulSetCreatorData, enableDataCorruptionChecks, priorityClasses bool) reconciling.NamedStatefulSetCreatorGetter {
 	return func() (string, reconciling.StatefulSetCreator) {
 		return resources.EtcdStatefulSetName, func(set *appsv1.StatefulSet) (*appsv1.StatefulSet, error) {
 
@@ -80,6 +80,10 @@ func StatefulSetCreator(data etcdStatefulSetCreatorData, enableDataCorruptionChe
 			set.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
 			set.Spec.ServiceName = resources.EtcdServiceName
 			set.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: resources.ImagePullSecretName}}
+
+			if priorityClasses {
+				set.Spec.Template.Spec.PriorityClassName = resources.PriorityClassEtcdStatefulSetName
+			}
 
 			baseLabels := getBasePodLabels(data.Cluster())
 			set.Spec.Selector = &metav1.LabelSelector{

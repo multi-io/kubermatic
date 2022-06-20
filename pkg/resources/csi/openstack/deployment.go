@@ -80,7 +80,7 @@ var (
 )
 
 // DeploymentCreator returns the function to create and update the nginx deployment
-func DeploymentCreator(data *resources.TemplateData) reconciling.NamedDeploymentCreatorGetter {
+func DeploymentCreator(data *resources.TemplateData, priorityClasses bool) reconciling.NamedDeploymentCreatorGetter {
 	return func() (string, reconciling.DeploymentCreator) {
 		return resources.CsiCinderControllerPluginDeploymentName, func(dep *appsv1.Deployment) (*appsv1.Deployment, error) {
 
@@ -97,6 +97,10 @@ func DeploymentCreator(data *resources.TemplateData) reconciling.NamedDeployment
 			podLabels, err := data.GetPodTemplateLabels(resources.CsiCinderControllerPluginDeploymentName, volumes, baseLabels)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create pod labels: %v", err)
+			}
+
+			if priorityClasses {
+				dep.Spec.Template.Spec.PriorityClassName = resources.PriorityClassCsiCinderControllerPluginDeploymentName
 			}
 
 			dep.Spec.Template.ObjectMeta = metav1.ObjectMeta{

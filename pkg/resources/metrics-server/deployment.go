@@ -82,7 +82,7 @@ func TLSServingCertSecretCreator(caGetter servingcerthelper.CAGetter) reconcilin
 }
 
 // DeploymentCreator returns the function to create and update the metrics server deployment
-func DeploymentCreator(data metricsServerData) reconciling.NamedDeploymentCreatorGetter {
+func DeploymentCreator(data metricsServerData, priorityClasses bool) reconciling.NamedDeploymentCreatorGetter {
 	return func() (string, reconciling.DeploymentCreator) {
 		return resources.MetricsServerDeploymentName, func(dep *appsv1.Deployment) (*appsv1.Deployment, error) {
 			dep.Name = resources.MetricsServerDeploymentName
@@ -93,6 +93,10 @@ func DeploymentCreator(data metricsServerData) reconciling.NamedDeploymentCreato
 				MatchLabels: resources.BaseAppLabels(name, nil),
 			}
 			dep.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: resources.ImagePullSecretName}}
+
+			if priorityClasses {
+				dep.Spec.Template.Spec.PriorityClassName = resources.PriorityClassMetricsServerDeploymentName
+			}
 
 			volumes := getVolumes()
 			podLabels, err := data.GetPodTemplateLabels(name, volumes, nil)

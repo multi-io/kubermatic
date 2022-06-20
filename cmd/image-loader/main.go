@@ -266,11 +266,11 @@ func getImagesFromCreators(log *zap.SugaredLogger, templateData *resources.Templ
 		return nil, fmt.Errorf("failed to default Seed: %v", err)
 	}
 
-	statefulsetCreators := kubernetescontroller.GetStatefulSetCreators(templateData, false)
-	statefulsetCreators = append(statefulsetCreators, monitoring.GetStatefulSetCreators(templateData)...)
+	statefulsetCreators := kubernetescontroller.GetStatefulSetCreators(templateData, false, false)
+	statefulsetCreators = append(statefulsetCreators, monitoring.GetStatefulSetCreators(templateData, false)...)
 
-	deploymentCreators := kubernetescontroller.GetDeploymentCreators(templateData, false)
-	deploymentCreators = append(deploymentCreators, monitoring.GetDeploymentCreators(templateData)...)
+	deploymentCreators := kubernetescontroller.GetDeploymentCreators(templateData, false, false)
+	deploymentCreators = append(deploymentCreators, monitoring.GetDeploymentCreators(templateData, false)...)
 	deploymentCreators = append(deploymentCreators, masteroperator.APIDeploymentCreator(config, "", kubermaticVersions))
 	deploymentCreators = append(deploymentCreators, masteroperator.MasterControllerManagerDeploymentCreator(config, "", kubermaticVersions))
 	deploymentCreators = append(deploymentCreators, masteroperator.UIDeploymentCreator(config, kubermaticVersions))

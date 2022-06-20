@@ -53,7 +53,7 @@ var (
 )
 
 // StatefulSetCreator returns the function to reconcile the Prometheus StatefulSet
-func StatefulSetCreator(data *resources.TemplateData) reconciling.NamedStatefulSetCreatorGetter {
+func StatefulSetCreator(data *resources.TemplateData, priorityClasses bool) reconciling.NamedStatefulSetCreatorGetter {
 	return func() (string, reconciling.StatefulSetCreator) {
 		return resources.PrometheusStatefulSetName, func(existing *appsv1.StatefulSet) (*appsv1.StatefulSet, error) {
 			var set *appsv1.StatefulSet
@@ -79,6 +79,10 @@ func StatefulSetCreator(data *resources.TemplateData) reconciling.NamedStatefulS
 			podLabels, err := data.GetPodTemplateLabels(name, volumes, requiredBaseLabels)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create pod labels: %v", err)
+			}
+
+			if priorityClasses {
+				set.Spec.Template.Spec.PriorityClassName = resources.PriorityClassPrometheusStatefulSetName
 			}
 
 			set.Spec.Template.ObjectMeta = metav1.ObjectMeta{
