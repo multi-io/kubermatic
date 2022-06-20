@@ -19,7 +19,6 @@ package kubernetes
 import (
 	"context"
 	"fmt"
-
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/resources"
 	"k8c.io/kubermatic/v2/pkg/resources/apiserver"
@@ -283,7 +282,7 @@ func GetServiceCreators(data *resources.TemplateData) []reconciling.NamedService
 		creators = append(creators, rancherserver.ServiceCreator(data.Cluster().Spec.ExposeStrategy))
 	}
 
-	if resources.ExternalCloudProviderEnabled(data.Cluster()) && data.Cluster().Spec.Cloud.Openstack != nil {
+	if data.Cluster().Spec.Features[kubermaticv1.ClusterFeatureExternalCloudProvider] && data.Cluster().Spec.Cloud.Openstack != nil {
 		creators = append(creators, csiopenstack.ServiceCreator(data))
 	}
 
@@ -323,7 +322,7 @@ func GetDeploymentCreators(data *resources.TemplateData, enableAPIserverOIDCAuth
 		deployments = append(deployments, cloudcontroller.DeploymentCreator(data))
 	}
 
-	if resources.ExternalCloudProviderEnabled(data.Cluster()) && data.Cluster().Spec.Cloud.Openstack != nil {
+	if data.Cluster().Spec.Features[kubermaticv1.ClusterFeatureExternalCloudProvider] && data.Cluster().Spec.Cloud.Openstack != nil {
 		deployments = append(deployments, csiopenstack.DeploymentCreator(data))
 	}
 
