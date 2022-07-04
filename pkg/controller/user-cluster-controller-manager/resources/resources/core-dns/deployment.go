@@ -143,7 +143,7 @@ func getContainers(clusterVersion *semver.Version) []corev1.Container {
 	return []corev1.Container{
 		{
 			Name:            resources.CoreDNSDeploymentName,
-			Image:           fmt.Sprintf("%s/coredns/coredns:%s", resources.RegistrySys11Scr, coreDNSVersion),
+			Image:           fmt.Sprintf("%s/n1k6e5t7/coredns/coredns:%s", resources.RegistryAwsEcr, coreDNSVersion),
 			ImagePullPolicy: corev1.PullIfNotPresent,
 
 			Args: []string{"-conf", "/etc/coredns/Corefile"},
