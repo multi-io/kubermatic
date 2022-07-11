@@ -19,6 +19,7 @@ package kubernetes
 import (
 	"context"
 	"fmt"
+
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/resources"
 	"k8c.io/kubermatic/v2/pkg/resources/apiserver"
@@ -40,15 +41,15 @@ import (
 	"k8c.io/kubermatic/v2/pkg/resources/reconciling"
 	"k8c.io/kubermatic/v2/pkg/resources/scheduler"
 	"k8c.io/kubermatic/v2/pkg/resources/usercluster"
-	appsv1 "k8s.io/api/apps/v1"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	autoscalingv1beta2 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1beta2"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 func (r *Reconciler) ensureResourcesAreDeployed(ctx context.Context, cluster *kubermaticv1.Cluster, namespace *corev1.Namespace) (*reconcile.Result, error) {
@@ -173,7 +174,7 @@ func (r *Reconciler) ensureResourcesAreDeployed(ctx context.Context, cluster *ku
 	}
 
 	if cluster.Spec.ExposeStrategy == kubermaticv1.ExposeStrategyLoadBalancer {
-		if err := nodeportproxy.EnsureResources(ctx, r.Client, data); err != nil {
+		if err := nodeportproxy.EnsureResources(ctx, r.Client, data, r.features.PriorityClasses); err != nil {
 			return nil, fmt.Errorf("failed to ensure NodePortProxy resources: %v", err)
 		}
 	}
@@ -295,23 +296,23 @@ func (r *Reconciler) ensureServices(ctx context.Context, c *kubermaticv1.Cluster
 }
 
 // GetDeploymentCreators returns all DeploymentCreators that are currently in use
-func GetDeploymentCreators(data *resources.TemplateData, enableAPIserverOIDCAuthentication bool) []reconciling.NamedDeploymentCreatorGetter {
+func GetDeploymentCreators(data *resources.TemplateData, enableAPIserverOIDCAuthentication, priorityClasses bool) []reconciling.NamedDeploymentCreatorGetter {
 	deployments := []reconciling.NamedDeploymentCreatorGetter{
-		openvpn.DeploymentCreator(data),
-		dns.DeploymentCreator(data),
-		apiserver.DeploymentCreator(data, enableAPIserverOIDCAuthentication),
-		scheduler.DeploymentCreator(data),
-		controllermanager.DeploymentCreator(data),
-		machinecontroller.DeploymentCreator(data),
+		openvpn.DeploymentCreator(data, priorityClasses),
+		dns.DeploymentCreator(data, priorityClasses),
+		apiserver.DeploymentCreator(data, enableAPIserverOIDCAuthentication, priorityClasses),
+		scheduler.DeploymentCreator(data, priorityClasses),
+		controllermanager.DeploymentCreator(data, priorityClasses),
+		machinecontroller.DeploymentCreator(data, priorityClasses),
 		machinecontroller.WebhookDeploymentCreator(data),
-		metricsserver.DeploymentCreator(data),
+		metricsserver.DeploymentCreator(data, priorityClasses),
 		usercluster.DeploymentCreator(data),
-		clusterproxy.DeploymentCreator(data),
+		clusterproxy.DeploymentCreator(data, priorityClasses),
 		// kubernetesdashboard.DeploymentCreator(data),
 	}
 
 	if data.Cluster().Annotations[kubermaticv1.AnnotationNameClusterAutoscalerEnabled] != "" {
-		deployments = append(deployments, clusterautoscaler.DeploymentCreator(data))
+		deployments = append(deployments, clusterautoscaler.DeploymentCreator(data, priorityClasses))
 	}
 	// If CCM migration is ongoing defer the deployment of the CCM to the
 	// moment in which cloud controllers or the full in-tree cloud provider
@@ -319,30 +320,30 @@ func GetDeploymentCreators(data *resources.TemplateData, enableAPIserverOIDCAuth
 	if data.Cluster().Spec.Features[kubermaticv1.ClusterFeatureExternalCloudProvider] &&
 		(!metav1.HasAnnotation(data.Cluster().ObjectMeta, kubermaticv1.CCMMigrationNeededAnnotation) ||
 			data.KCMCloudControllersDeactivated()) {
-		deployments = append(deployments, cloudcontroller.DeploymentCreator(data))
+		deployments = append(deployments, cloudcontroller.DeploymentCreator(data, priorityClasses))
 	}
 
 	if data.Cluster().Spec.Features[kubermaticv1.ClusterFeatureExternalCloudProvider] && data.Cluster().Spec.Cloud.Openstack != nil {
-		deployments = append(deployments, csiopenstack.DeploymentCreator(data))
+		deployments = append(deployments, csiopenstack.DeploymentCreator(data, priorityClasses))
 	}
 
 	return deployments
 }
 
 func (r *Reconciler) ensureDeployments(ctx context.Context, cluster *kubermaticv1.Cluster, data *resources.TemplateData) error {
-	creators := GetDeploymentCreators(data, r.features.KubernetesOIDCAuthentication)
+	creators := GetDeploymentCreators(data, r.features.KubernetesOIDCAuthentication, r.features.PriorityClasses)
 	return reconciling.ReconcileDeployments(ctx, creators, cluster.Status.NamespaceName, r, reconciling.OwnerRefWrapper(resources.GetClusterRef(cluster)))
 }
 
 func (r *Reconciler) ensureKonnectivityDeployments(ctx context.Context, cluster *kubermaticv1.Cluster, data *resources.TemplateData) error {
-	creators := GetKonnectivityDeploymentCreators(data)
+	creators := GetKonnectivityDeploymentCreators(data, r.features.PriorityClasses)
 	return reconciling.ReconcileDeployments(ctx, creators, cluster.Status.NamespaceName, r, reconciling.OwnerRefWrapper(resources.GetClusterRef(cluster)))
 }
 
 // GetKonnectivityDeploymentCreators returns all DeploymentCreators that are currently in use
-func GetKonnectivityDeploymentCreators(data *resources.TemplateData) []reconciling.NamedDeploymentCreatorGetter {
+func GetKonnectivityDeploymentCreators(data *resources.TemplateData, priorityClasses bool) []reconciling.NamedDeploymentCreatorGetter {
 	return []reconciling.NamedDeploymentCreatorGetter{
-		konnectivity.DeploymentCreator(data),
+		konnectivity.DeploymentCreator(data, priorityClasses),
 	}
 }
 
@@ -561,9 +562,9 @@ func (r *Reconciler) ensureConfigMaps(ctx context.Context, c *kubermaticv1.Clust
 }
 
 // GetStatefulSetCreators returns all StatefulSetCreators that are currently in use
-func GetStatefulSetCreators(data *resources.TemplateData, enableDataCorruptionChecks bool) []reconciling.NamedStatefulSetCreatorGetter {
+func GetStatefulSetCreators(data *resources.TemplateData, enableDataCorruptionChecks, priorityClasses bool) []reconciling.NamedStatefulSetCreatorGetter {
 	creators := []reconciling.NamedStatefulSetCreatorGetter{
-		etcd.StatefulSetCreator(data, enableDataCorruptionChecks),
+		etcd.StatefulSetCreator(data, enableDataCorruptionChecks, priorityClasses),
 	}
 	if flag := data.Cluster().Spec.Features[kubermaticv1.ClusterFeatureRancherIntegration]; flag {
 		creators = append(creators, rancherserver.StatefulSetCreator(data))
@@ -760,7 +761,7 @@ func (r *Reconciler) sys11EnsureVerticalPodAutoscalers(ctx context.Context, c *k
 // Sys11: End
 
 func (r *Reconciler) ensureStatefulSets(ctx context.Context, c *kubermaticv1.Cluster, data *resources.TemplateData) error {
-	creators := GetStatefulSetCreators(data, r.features.EtcdDataCorruptionChecks)
+	creators := GetStatefulSetCreators(data, r.features.EtcdDataCorruptionChecks, r.features.PriorityClasses)
 
 	return reconciling.ReconcileStatefulSets(ctx, creators, c.Status.NamespaceName, r.Client, reconciling.OwnerRefWrapper(resources.GetClusterRef(c)))
 }

@@ -29,7 +29,7 @@ import (
 )
 
 // DeploymentCreator returns the function to create and update konnectivity agent deployment in seed-cluster.
-func DeploymentCreator(data *resources.TemplateData) reconciling.NamedDeploymentCreatorGetter {
+func DeploymentCreator(data *resources.TemplateData, priorityClasses bool) reconciling.NamedDeploymentCreatorGetter {
 	return func() (string, reconciling.DeploymentCreator) {
 		const (
 			name    = "k8s-artifacts-prod/kas-network-proxy/proxy-agent"
@@ -43,6 +43,10 @@ func DeploymentCreator(data *resources.TemplateData) reconciling.NamedDeployment
 			dep.Spec.Replicas = intPtr(1)
 
 			metricServerAddr := fmt.Sprintf("metrics-server.cluster-%s.svc.cluster.local", data.Cluster().Name)
+
+			if priorityClasses {
+				dep.Spec.Template.Spec.PriorityClassName = resources.PriorityClassKonnectivityDeploymentName
+			}
 
 			dep.Spec.Template.Spec.Containers = []corev1.Container{
 				{

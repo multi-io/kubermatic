@@ -59,7 +59,8 @@ type userClusterConnectionProvider interface {
 
 // Features describes the enabled features for the monitoring controller
 type Features struct {
-	VPA bool
+	VPA             bool
+	PriorityClasses bool
 }
 
 // Reconciler stores all components required for monitoring
@@ -272,12 +273,12 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, clus
 	}
 
 	// check that all Deployments are available
-	if err := r.ensureDeployments(ctx, cluster, data); err != nil {
+	if err := r.ensureDeployments(ctx, cluster, data, r.features.PriorityClasses); err != nil {
 		return nil, err
 	}
 
 	// check that all StatefulSets are created
-	if err := r.ensureStatefulSets(ctx, cluster, data); err != nil {
+	if err := r.ensureStatefulSets(ctx, cluster, data, r.features.PriorityClasses); err != nil {
 		return nil, err
 	}
 

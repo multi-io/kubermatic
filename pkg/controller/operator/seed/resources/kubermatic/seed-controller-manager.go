@@ -101,6 +101,10 @@ func SeedControllerManagerDeploymentCreator(workerName string, versions kubermat
 			}
 			args = append(args, leaderElectionArgs...)
 
+			if cfg.Spec.FeatureGates.Has(features.PriorityClasses) {
+				d.Spec.Template.Spec.PriorityClassName = common.PriorityClassSeedControllerManagerDeploymentName
+			}
+
 			if seed.Spec.BackupRestore == nil {
 				args = append(args, fmt.Sprintf("-cleanup-container=/opt/backup/%s", cleanupContainerKey))
 			} else if !cfg.Spec.SeedController.BackupRestore.Enabled || cfg.Spec.SeedController.BackupCleanupContainer != "" {

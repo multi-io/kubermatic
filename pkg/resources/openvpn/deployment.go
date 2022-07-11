@@ -76,7 +76,7 @@ type openVPNDeploymentCreatorData interface {
 }
 
 // DeploymentCreator returns the function to create and update the openvpn server deployment
-func DeploymentCreator(data openVPNDeploymentCreatorData) reconciling.NamedDeploymentCreatorGetter {
+func DeploymentCreator(data openVPNDeploymentCreatorData, priorityClasses bool) reconciling.NamedDeploymentCreatorGetter {
 	return func() (string, reconciling.DeploymentCreator) {
 		return resources.OpenVPNServerDeploymentName, func(dep *appsv1.Deployment) (*appsv1.Deployment, error) {
 			dep.Name = resources.OpenVPNServerDeploymentName
@@ -100,6 +100,10 @@ func DeploymentCreator(data openVPNDeploymentCreatorData) reconciling.NamedDeplo
 				},
 			}
 			dep.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: resources.ImagePullSecretName}}
+
+			if priorityClasses {
+				dep.Spec.Template.Spec.PriorityClassName = resources.PriorityClassOpenVPNServerDeploymentName
+			}
 
 			procMountType := corev1.DefaultProcMount
 			volumes := getVolumes()

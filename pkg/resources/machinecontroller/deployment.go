@@ -71,13 +71,16 @@ type machinecontrollerData interface {
 }
 
 // DeploymentCreator returns the function to create and update the machine controller deployment
-func DeploymentCreator(data machinecontrollerData) reconciling.NamedDeploymentCreatorGetter {
+func DeploymentCreator(data machinecontrollerData, priorityClasses bool) reconciling.NamedDeploymentCreatorGetter {
 	return func() (string, reconciling.DeploymentCreator) {
 		return resources.MachineControllerDeploymentName, func(in *appsv1.Deployment) (*appsv1.Deployment, error) {
 			_, creator := DeploymentCreatorWithoutInitWrapper(data)()
 			deployment, err := creator(in)
 			if err != nil {
 				return nil, err
+			}
+			if priorityClasses {
+				deployment.Spec.Template.Spec.PriorityClassName = resources.PriorityClassMachineControllerDeploymentName
 			}
 			wrappedPodSpec, err := apiserver.IsRunningWrapper(data, deployment.Spec.Template.Spec, sets.NewString(Name), "Machine,cluster.k8s.io/v1alpha1")
 			if err != nil {

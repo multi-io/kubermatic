@@ -35,12 +35,16 @@ const (
 )
 
 // DeploymentCreator returns the function to create and update the external cloud provider deployment.
-func DeploymentCreator(data *resources.TemplateData) reconciling.NamedDeploymentCreatorGetter {
+func DeploymentCreator(data *resources.TemplateData, priorityClasses bool) reconciling.NamedDeploymentCreatorGetter {
 	var creatorGetter reconciling.NamedDeploymentCreatorGetter
 
 	switch {
 	case data.Cluster().Spec.Cloud.Openstack != nil:
-		creatorGetter = openStackDeploymentCreator(data)
+		var pc string
+		if priorityClasses {
+			pc = resources.PriorityClassCloudControllerName
+		}
+		creatorGetter = openStackDeploymentCreator(data, pc)
 
 	case data.Cluster().Spec.Cloud.Hetzner != nil:
 		creatorGetter = hetznerDeploymentCreator(data)

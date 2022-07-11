@@ -157,6 +157,8 @@ type KubermaticSeedControllerConfiguration struct {
 	MonitoringEnvironmentLabel string `json:"monitoringEnvironmentLabel,omitempty"`
 	// EnvFromSecretsNames secrets to source environment variables from
 	EnvFromSecretsNames []string `json:"envFromSecretsNames"`
+	// PriorityClass is a priorityclass value for seed controller pods
+	PriorityClass string `json:"priorityClass,omitempty"`
 }
 
 // Deprecated: Use SeedBackupRestoreConfiguration.
