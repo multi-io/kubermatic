@@ -72,7 +72,7 @@ func TestCreateClusterEndpoint(t *testing.T) {
 		{
 			Name:             "scenario 2: cluster is created when valid spec and ssh key are passed",
 			Body:             `{"cluster":{"name":"keen-snyder","spec":{"version":"1.22.5","cloud":{"fake":{"token":"dummy_token"},"dc":"fake-dc"}}}}`,
-			ExpectedResponse: `{"id":"%s","name":"keen-snyder","creationTimestamp":"0001-01-01T00:00:00Z","type":"kubernetes","spec":{"cloud":{"dc":"fake-dc","fake":{}},"version":"1.22.5","oidc":{},"sys11auth":{},"enableUserSSHKeyAgent":true,"containerRuntime":"containerd","clusterNetwork":{"services":{"cidrBlocks":null},"pods":{"cidrBlocks":null},"dnsDomain":"","proxyMode":""}},"status":{"version":"1.22.5","url":"","externalCCMMigration":"Unsupported"}}`,
+			ExpectedResponse: `{"id":"%s","name":"keen-snyder","creationTimestamp":"0001-01-01T00:00:00Z","type":"kubernetes","spec":{"cloud":{"dc":"fake-dc","fake":{}},"version":"1.22.5","oidc":{},"sys11auth":{},"enableUserSSHKeyAgent":true,"containerRuntime":"containerd","clusterNetwork":{"services":{"cidrBlocks":null},"pods":{"cidrBlocks":null},"dnsDomain":"","proxyMode":"ipvs"}},"status":{"version":"1.22.5","url":"","externalCCMMigration":"Unsupported"}}`,
 			RewriteClusterID: true,
 			HTTPStatus:       http.StatusCreated,
 			ProjectToSync:    test.GenDefaultProject().Name,
@@ -186,7 +186,7 @@ func TestCreateClusterEndpoint(t *testing.T) {
 		*/{
 			Name:             "scenario 11: create a cluster in audit-logging-enforced datacenter, without explicitly enabling audit logging",
 			Body:             `{"cluster":{"name":"keen-snyder","spec":{"version":"1.22.5","cloud":{"fake":{"token":"dummy_token"},"dc":"audited-dc"}}}}`,
-			ExpectedResponse: `{"id":"%s","name":"keen-snyder","creationTimestamp":"0001-01-01T00:00:00Z","type":"kubernetes","spec":{"cloud":{"dc":"audited-dc","fake":{}},"version":"1.22.5","oidc":{},"sys11auth":{},"enableUserSSHKeyAgent":true,"auditLogging":{"enabled":true},"containerRuntime":"containerd","clusterNetwork":{"services":{"cidrBlocks":null},"pods":{"cidrBlocks":null},"dnsDomain":"","proxyMode":""}},"status":{"version":"1.22.5","url":"","externalCCMMigration":"Unsupported"}}`,
+			ExpectedResponse: `{"id":"%s","name":"keen-snyder","creationTimestamp":"0001-01-01T00:00:00Z","type":"kubernetes","spec":{"cloud":{"dc":"audited-dc","fake":{}},"version":"1.22.5","oidc":{},"sys11auth":{},"enableUserSSHKeyAgent":true,"auditLogging":{"enabled":true},"containerRuntime":"containerd","clusterNetwork":{"services":{"cidrBlocks":null},"pods":{"cidrBlocks":null},"dnsDomain":"","proxyMode":"ipvs"}},"status":{"version":"1.22.5","url":"","externalCCMMigration":"Unsupported"}}`,
 			RewriteClusterID: true,
 			HTTPStatus:       http.StatusCreated,
 			ProjectToSync:    test.GenDefaultProject().Name,
@@ -200,7 +200,7 @@ func TestCreateClusterEndpoint(t *testing.T) {
 		{
 			Name:             "scenario 12: the admin user can create cluster for any project",
 			Body:             `{"cluster":{"name":"keen-snyder","spec":{"version":"1.22.5","cloud":{"fake":{"token":"dummy_token"},"dc":"fake-dc"}}}}`,
-			ExpectedResponse: `{"id":"%s","name":"keen-snyder","creationTimestamp":"0001-01-01T00:00:00Z","type":"kubernetes","spec":{"cloud":{"dc":"fake-dc","fake":{}},"version":"1.22.5","oidc":{},"sys11auth":{},"enableUserSSHKeyAgent":true,"containerRuntime":"containerd","clusterNetwork":{"services":{"cidrBlocks":null},"pods":{"cidrBlocks":null},"dnsDomain":"","proxyMode":""}},"status":{"version":"1.22.5","url":"","externalCCMMigration":"Unsupported"}}`,
+			ExpectedResponse: `{"id":"%s","name":"keen-snyder","creationTimestamp":"0001-01-01T00:00:00Z","type":"kubernetes","spec":{"cloud":{"dc":"fake-dc","fake":{}},"version":"1.22.5","oidc":{},"sys11auth":{},"enableUserSSHKeyAgent":true,"containerRuntime":"containerd","clusterNetwork":{"services":{"cidrBlocks":null},"pods":{"cidrBlocks":null},"dnsDomain":"","proxyMode":"ipvs"}},"status":{"version":"1.22.5","url":"","externalCCMMigration":"Unsupported"}}`,
 			RewriteClusterID: true,
 			HTTPStatus:       http.StatusCreated,
 			ProjectToSync:    test.GenDefaultProject().Name,

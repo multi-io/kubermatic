@@ -204,3 +204,9 @@ type S3BackupCredentials struct {
 	AccessKeyID     string `json:"accessKeyId,omitempty"`
 	SecretAccessKey string `json:"secretAccessKey,omitempty"`
 }
+
+// FeatureGates represents an object holding feature gate settings
+// swagger:model FeatureGates
+type FeatureGates struct {
+	KonnectivityService *bool `json:"konnectivityService,omitempty"`
+}

@@ -46,17 +46,22 @@ func TLSServingCertificateCreator(data tlsServingCertCreatorData) reconciling.Na
 
 			ca, err := data.GetRootCA()
 			if err != nil {
-				return nil, fmt.Errorf("failed to get cluster ca: %v", err)
+				return nil, fmt.Errorf("failed to get cluster ca: %w", err)
 			}
 
 			inClusterIP, err := resources.InClusterApiserverIP(data.Cluster())
 			if err != nil {
-				return nil, fmt.Errorf("failed to get the in-cluster ClusterIP for the apiserver: %v", err)
+				return nil, fmt.Errorf("failed to get the in-cluster ClusterIP for the apiserver: %w", err)
 			}
+
+			address := data.Cluster().GetAddress()
 
 			altNames := certutil.AltNames{
 				DNSNames: []string{
-					fmt.Sprintf("konnectivity-server.%s", data.Cluster().Address.ExternalName),
+					// external address - nodeport / LB expose strategy
+					address.ExternalName,
+					// external address - tunneling expose strategy
+					fmt.Sprintf("%s.%s", resources.KonnectivityProxyServiceName, address.ExternalName),
 				},
 				IPs: []net.IP{
 					*inClusterIP,
@@ -65,7 +70,7 @@ func TLSServingCertificateCreator(data tlsServingCertCreatorData) reconciling.Na
 			}
 
 			if data.Cluster().Spec.ExposeStrategy != kubermaticv1.ExposeStrategyTunneling {
-				externalIP := data.Cluster().Address.IP
+				externalIP := address.IP
 				if externalIP == "" {
 					return nil, errors.New("externalIP is unset")
 				}
@@ -80,7 +85,7 @@ func TLSServingCertificateCreator(data tlsServingCertCreatorData) reconciling.Na
 			if b, exists := se.Data[resources.KonnectivityProxyTLSSecretName+".crt"]; exists {
 				certs, err := certutil.ParseCertsPEM(b)
 				if err != nil {
-					return nil, fmt.Errorf("failed to parse certificate (key=%s) from existing secret: %v", resources.KonnectivityProxyTLSSecretName+".crt", err)
+					return nil, fmt.Errorf("failed to parse certificate (key=%s) from existing secret: %w", resources.KonnectivityProxyTLSSecretName+".crt", err)
 				}
 
 				if resources.IsServerCertificateValidForAllOf(certs[0], "konnectivity-proxy", altNames, ca.Cert) {
@@ -90,7 +95,7 @@ func TLSServingCertificateCreator(data tlsServingCertCreatorData) reconciling.Na
 
 			key, err := triple.NewPrivateKey()
 			if err != nil {
-				return nil, fmt.Errorf("unable to create a server private key: %v", err)
+				return nil, fmt.Errorf("unable to create a server private key: %w", err)
 			}
 
 			config := certutil.Config{
@@ -101,7 +106,7 @@ func TLSServingCertificateCreator(data tlsServingCertCreatorData) reconciling.Na
 
 			cert, err := triple.NewSignedCert(config, key, ca.Cert, ca.Key)
 			if err != nil {
-				return nil, fmt.Errorf("unable to sign the server certificate: %v", err)
+				return nil, fmt.Errorf("unable to sign the server certificate: %w", err)
 			}
 
 			se.Data[resources.KonnectivityProxyTLSSecretName+".key"] = triple.EncodePrivateKeyPEM(key)

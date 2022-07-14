@@ -59,6 +59,10 @@ const (
 	// PriorityClasses if enabled will apply priority classes to all managed seed infrastructure
 	// with levels depending on criticality
 	PriorityClasses = "PriorityClasses"
+
+	// KubeSystemNetworkPolicies enables the deployment of network policies to kube-system namespace that
+	// restrict traffic from all pods in the namespace.
+	KubeSystemNetworkPolicies = "kubeSystemNetworkPolicies"
 )
 
 // FeatureGate is map of key=value pairs that enables/disables various features.

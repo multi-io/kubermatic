@@ -309,6 +309,8 @@ func createInitProviders(ctx context.Context, options serverRunOptions, masterCf
 		return providers{}, fmt.Errorf("failed to create user watcher due to %v", err)
 	}
 
+	featureGatesProvider := kubernetesprovider.NewFeatureGatesProvider(options.featureGates)
+
 	return providers{
 		mdRequestProviderGetter:               machineDeploymentRequestProviderGetter,
 		sshKey:                                sshKeyProvider,
@@ -331,6 +333,7 @@ func createInitProviders(ctx context.Context, options serverRunOptions, masterCf
 		addonConfigProvider:                   addonConfigProvider,
 		userInfoGetter:                        userInfoGetter,
 		settingsProvider:                      settingsProvider,
+		featureGatesProvider:                  featureGatesProvider,
 		adminProvider:                         adminProvider,
 		presetProvider:                        presetsProvider,
 		admissionPluginProvider:               admissionPluginProvider,
@@ -452,6 +455,7 @@ func createAPIHandler(options serverRunOptions, prov providers, oidcIssuerVerifi
 		UserWatcher:                           prov.userWatcher,
 		ExternalClusterProvider:               prov.externalClusterProvider,
 		PrivilegedExternalClusterProvider:     prov.privilegedExternalClusterProvider,
+		FeatureGatesProvider:                  prov.featureGatesProvider,
 		ClusterTemplateProvider:               prov.clusterTemplateProvider,
 		ClusterTemplateInstanceProviderGetter: prov.clusterTemplateInstanceProviderGetter,
 		EtcdBackupConfigProviderGetter:        prov.etcdBackupConfigProviderGetter,

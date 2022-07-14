@@ -81,30 +81,34 @@ func Add(
 	caBundle resources.CABundle,
 	clusterName string,
 	konnectivity bool,
+	konnectivityServerHost string,
+	konnectivityServerPort int,
 	ccmMigration bool,
 	ccmMigrationCompleted bool,
 	log *zap.SugaredLogger) error {
 	r := &reconciler{
-		version:               version,
-		rLock:                 &sync.Mutex{},
-		namespace:             namespace,
-		clusterURL:            clusterURL,
-		clusterIsPaused:       clusterIsPaused,
-		openvpnServerPort:     openvpnServerPort,
-		kasSecurePort:         kasSecurePort,
-		tunnelingAgentIP:      tunnelingAgentIP,
-		log:                   log,
-		dnsClusterIP:          dnsClusterIP,
-		nodeLocalDNSCache:     nodeLocalDNSCache,
-		userSSHKeyAgent:       userSSHKeyAgent,
-		versions:              versions,
-		caBundle:              caBundle,
-		clusterDNSDomain:      clusterDNSDomain,
-		cloudProvider:         kubermaticv1.ProviderType(cloudProviderName),
-		clusterName:           clusterName,
-		isKonnectivityEnabled: konnectivity,
-		ccmMigration:          ccmMigration,
-		ccmMigrationCompleted: ccmMigrationCompleted,
+		version:                version,
+		rLock:                  &sync.Mutex{},
+		namespace:              namespace,
+		clusterURL:             clusterURL,
+		clusterIsPaused:        clusterIsPaused,
+		openvpnServerPort:      openvpnServerPort,
+		kasSecurePort:          kasSecurePort,
+		tunnelingAgentIP:       tunnelingAgentIP,
+		log:                    log,
+		dnsClusterIP:           dnsClusterIP,
+		nodeLocalDNSCache:      nodeLocalDNSCache,
+		userSSHKeyAgent:        userSSHKeyAgent,
+		versions:               versions,
+		caBundle:               caBundle,
+		clusterDNSDomain:       clusterDNSDomain,
+		cloudProvider:          kubermaticv1.ProviderType(cloudProviderName),
+		clusterName:            clusterName,
+		isKonnectivityEnabled:  konnectivity,
+		konnectivityServerHost: konnectivityServerHost,
+		konnectivityServerPort: konnectivityServerPort,
+		ccmMigration:           ccmMigration,
+		ccmMigrationCompleted:  ccmMigrationCompleted,
 	}
 
 	var err error
@@ -202,27 +206,29 @@ func Add(
 // reconcileUserCluster reconciles objects in the user cluster
 type reconciler struct {
 	ctrlruntimeclient.Client
-	seedClient            ctrlruntimeclient.Client
-	version               string
-	clusterSemVer         *semver.Version
-	cache                 cache.Cache
-	namespace             string
-	clusterURL            *url.URL
-	clusterIsPaused       userclustercontrollermanager.IsPausedChecker
-	openvpnServerPort     uint32
-	kasSecurePort         uint32
-	tunnelingAgentIP      net.IP
-	clusterDNSDomain      string
-	dnsClusterIP          string
-	nodeLocalDNSCache     bool
-	userSSHKeyAgent       bool
-	versions              kubermatic.Versions
-	caBundle              resources.CABundle
-	cloudProvider         kubermaticv1.ProviderType
-	clusterName           string
-	isKonnectivityEnabled bool
-	ccmMigration          bool
-	ccmMigrationCompleted bool
+	seedClient             ctrlruntimeclient.Client
+	version                string
+	clusterSemVer          *semver.Version
+	cache                  cache.Cache
+	namespace              string
+	clusterURL             *url.URL
+	clusterIsPaused        userclustercontrollermanager.IsPausedChecker
+	openvpnServerPort      uint32
+	kasSecurePort          uint32
+	tunnelingAgentIP       net.IP
+	clusterDNSDomain       string
+	dnsClusterIP           string
+	nodeLocalDNSCache      bool
+	userSSHKeyAgent        bool
+	versions               kubermatic.Versions
+	caBundle               resources.CABundle
+	cloudProvider          kubermaticv1.ProviderType
+	clusterName            string
+	isKonnectivityEnabled  bool
+	konnectivityServerHost string
+	konnectivityServerPort int
+	ccmMigration           bool
+	ccmMigrationCompleted  bool
 
 	rLock                      *sync.Mutex
 	reconciledSuccessfullyOnce bool
@@ -289,4 +295,30 @@ func (r *reconciler) cloudConfig(ctx context.Context, cloudConfigConfigmapName s
 		return nil, fmt.Errorf("cloud-config configmap contains no data for key %s", resources.CloudConfigConfigMapKey)
 	}
 	return []byte(value), nil
+}
+
+func (r *reconciler) networkingData(ctx context.Context) (address *kubermaticv1.ClusterAddress, ipFamily kubermaticv1.IPFamily, k8sServiceAPI *net.IP, reconcileK8sSvcEndpoints bool, err error) {
+	cluster := &kubermaticv1.Cluster{}
+	if err = r.seedClient.Get(ctx, types.NamespacedName{
+		Name: r.clusterName,
+	}, cluster); err != nil {
+		return nil, "", nil, false, fmt.Errorf("failed to get cluster: %w", err)
+	}
+
+	ip, err := resources.InClusterApiserverIP(cluster)
+	if err != nil {
+		return nil, "", nil, false, fmt.Errorf("failed to get Cluster Apiserver IP: %w", err)
+	}
+
+	// Reconcile kubernetes service endpoints, unless it is not supported or disabled in the apiserver override settings.
+	reconcileK8sSvcEndpoints = true
+
+	if cluster.Spec.ComponentsOverride.Apiserver.EndpointReconcilingDisabled != nil && *cluster.Spec.ComponentsOverride.Apiserver.EndpointReconcilingDisabled {
+		// Do not reconcile if explicitly disabled.
+		reconcileK8sSvcEndpoints = false
+	}
+
+	addr := cluster.GetAddress()
+
+	return &addr, kubermaticv1.IPFamilyUnspecified, ip, reconcileK8sSvcEndpoints, nil
 }

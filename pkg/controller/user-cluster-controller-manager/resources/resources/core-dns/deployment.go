@@ -29,7 +29,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -126,7 +126,7 @@ func DeploymentCreator(kubernetesVersion *semver.Version) reconciling.NamedDeplo
 // PodDisruptionBudgetCreator returns function to create PodDisruptionBudget for core-dns.
 func PodDisruptionBudgetCreator() reconciling.NamedPodDisruptionBudgetCreatorGetter {
 	return func() (string, reconciling.PodDisruptionBudgetCreator) {
-		return resources.CoreDNSPodDisruptionBudgetName, func(pdb *policyv1beta1.PodDisruptionBudget) (*policyv1beta1.PodDisruptionBudget, error) {
+		return resources.CoreDNSPodDisruptionBudgetName, func(pdb *policyv1.PodDisruptionBudget) (*policyv1.PodDisruptionBudget, error) {
 			iptr := intstr.FromInt(1)
 			pdb.Spec.MinAvailable = &iptr
 			pdb.Spec.Selector = &metav1.LabelSelector{

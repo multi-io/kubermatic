@@ -28,7 +28,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -95,6 +95,7 @@ type deploymentCreatorData interface {
 	Cluster() *kubermaticv1.Cluster
 	GetPodTemplateLabels(string, []corev1.Volume, map[string]string) (map[string]string, error)
 	ImageRegistry(string) string
+	IsKonnectivityEnabled() bool
 }
 
 // DeploymentCreator returns the function to create and update the DNS resolver deployment
@@ -117,7 +118,7 @@ func DeploymentCreator(data deploymentCreatorData, priorityClasses bool) reconci
 				dep.Spec.Template.Spec.PriorityClassName = resources.PriorityClusterDNSResolverDeploymentName
 			}
 
-			volumes := getVolumes()
+			volumes := getVolumes(data.IsKonnectivityEnabled())
 			podLabels, err := data.GetPodTemplateLabels(resources.DNSResolverDeploymentName, volumes, nil)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get pod labels: %v", err)
@@ -193,8 +194,8 @@ func DeploymentCreator(data deploymentCreatorData, priorityClasses bool) reconci
 	}
 }
 
-func getVolumes() []corev1.Volume {
-	return []corev1.Volume{
+func getVolumes(isKonnectivityEnabled bool) []corev1.Volume {
+	vs := []corev1.Volume{
 		{
 			Name: resources.DNSResolverConfigMapName,
 			VolumeSource: corev1.VolumeSource{
@@ -202,14 +203,6 @@ func getVolumes() []corev1.Volume {
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: resources.DNSResolverConfigMapName,
 					},
-				},
-			},
-		},
-		{
-			Name: resources.OpenVPNClientCertificatesSecretName,
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: resources.OpenVPNClientCertificatesSecretName,
 				},
 			},
 		},
@@ -228,6 +221,17 @@ func getVolumes() []corev1.Volume {
 			},
 		},
 	}
+	if !isKonnectivityEnabled {
+		vs = append(vs, corev1.Volume{
+			Name: resources.OpenVPNClientCertificatesSecretName,
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: resources.OpenVPNClientCertificatesSecretName,
+				},
+			},
+		})
+	}
+	return vs
 }
 
 type configMapCreatorData interface {
@@ -273,9 +277,9 @@ func ConfigMapCreator(data configMapCreatorData) reconciling.NamedConfigMapCreat
 // PodDisruptionBudgetCreator returns a func to create/update the apiserver PodDisruptionBudget
 func PodDisruptionBudgetCreator() reconciling.NamedPodDisruptionBudgetCreatorGetter {
 	return func() (string, reconciling.PodDisruptionBudgetCreator) {
-		return resources.DNSResolverPodDisruptionBudetName, func(pdb *policyv1beta1.PodDisruptionBudget) (*policyv1beta1.PodDisruptionBudget, error) {
+		return resources.DNSResolverPodDisruptionBudetName, func(pdb *policyv1.PodDisruptionBudget) (*policyv1.PodDisruptionBudget, error) {
 			minAvailable := intstr.FromInt(1)
-			pdb.Spec = policyv1beta1.PodDisruptionBudgetSpec{
+			pdb.Spec = policyv1.PodDisruptionBudgetSpec{
 				Selector: &metav1.LabelSelector{
 					MatchLabels: resources.BaseAppLabels(resources.DNSResolverDeploymentName, nil),
 				},

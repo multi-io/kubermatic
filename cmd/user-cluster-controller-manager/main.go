@@ -66,33 +66,35 @@ const (
 )
 
 type controllerRunOptions struct {
-	clusterDNSDomain      string
-	metricsListenAddr     string
-	healthListenAddr      string
-	version               string
-	networks              networkFlags
-	namespace             string
-	clusterURL            string
-	clusterName           string
-	openvpnServerPort     int
-	kasSecurePort         int
-	tunnelingAgentIP      flagopts.IPValue
-	overwriteRegistry     string
-	cloudProviderName     string
-	nodelabels            string
-	seedKubeconfig        string
-	ownerEmail            string
-	updateWindowStart     string
-	updateWindowLength    string
-	dnsClusterIP          string
-	nodeLocalDNSCache     bool
-	useSSHKeyAgent        bool
-	caBundleFile          string
-	userClusterLogging    bool
-	userClusterMonitoring bool
-	ccmMigration          bool
-	ccmMigrationCompleted bool
-	isKonnectivityEnabled bool
+	clusterDNSDomain       string
+	metricsListenAddr      string
+	healthListenAddr       string
+	version                string
+	networks               networkFlags
+	namespace              string
+	clusterURL             string
+	clusterName            string
+	openvpnServerPort      int
+	kasSecurePort          int
+	tunnelingAgentIP       flagopts.IPValue
+	overwriteRegistry      string
+	cloudProviderName      string
+	nodelabels             string
+	seedKubeconfig         string
+	ownerEmail             string
+	updateWindowStart      string
+	updateWindowLength     string
+	dnsClusterIP           string
+	nodeLocalDNSCache      bool
+	useSSHKeyAgent         bool
+	caBundleFile           string
+	userClusterLogging     bool
+	userClusterMonitoring  bool
+	ccmMigration           bool
+	ccmMigrationCompleted  bool
+	isKonnectivityEnabled  bool
+	konnectivityServerHost string
+	konnectivityServerPort int
 }
 
 func main() {
@@ -130,6 +132,8 @@ func main() {
 	flag.BoolVar(&runOp.ccmMigration, "ccm-migration", false, "Enable ccm migration in user cluster.")
 	flag.BoolVar(&runOp.ccmMigrationCompleted, "ccm-migration-completed", false, "cluster has been successfully migrated.")
 	flag.BoolVar(&runOp.isKonnectivityEnabled, "konnectivity-enabled", false, "Enable Konnectivity.")
+	flag.StringVar(&runOp.konnectivityServerHost, "konnectivity-server-host", "", "Konnectivity Server host.")
+	flag.IntVar(&runOp.konnectivityServerPort, "konnectivity-server-port", 6443, "Konnectivity Server port.")
 
 	flag.Parse()
 
@@ -161,11 +165,14 @@ func main() {
 	if err != nil {
 		log.Fatalw("Failed parsing clusterURL", zap.Error(err))
 	}
+	if !runOp.isKonnectivityEnabled && runOp.openvpnServerPort == 0 {
+		log.Fatal("-openvpn-server-port must be set")
+	}
+	if runOp.isKonnectivityEnabled && runOp.konnectivityServerHost == "" {
+		log.Fatal("-konnectivity-server-host must be set when Konnectivity is enabled")
+	}
 	if runOp.clusterDNSDomain == "" {
 		runOp.clusterDNSDomain = defaultClusterDNSDomain
-	}
-	if runOp.openvpnServerPort == 0 {
-		log.Fatal("-openvpn-server-port must be set")
 	}
 	if len(runOp.caBundleFile) == 0 {
 		log.Fatal("-ca-bundle must be set")
@@ -263,6 +270,8 @@ func main() {
 		caBundle,
 		runOp.clusterName,
 		runOp.isKonnectivityEnabled,
+		runOp.konnectivityServerHost,
+		runOp.konnectivityServerPort,
 		runOp.ccmMigration,
 		runOp.ccmMigrationCompleted,
 		log,

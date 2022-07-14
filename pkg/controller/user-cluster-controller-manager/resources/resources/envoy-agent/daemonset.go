@@ -51,7 +51,7 @@ const (
 )
 
 // DaemonSetCreator returns the function to create and update the Envoy DaemonSet
-func DaemonSetCreator(agentIP net.IP, versions kubermatic.Versions) reconciling.NamedDaemonSetCreatorGetter {
+func DaemonSetCreator(agentIP net.IP, versions kubermatic.Versions, configHash string) reconciling.NamedDaemonSetCreatorGetter {
 	return func() (string, reconciling.DaemonSetCreator) {
 		return resources.EnvoyAgentDaemonSetName, func(ds *appsv1.DaemonSet) (*appsv1.DaemonSet, error) {
 			ds.Name = resources.EnvoyAgentDaemonSetName
@@ -67,6 +67,10 @@ func DaemonSetCreator(agentIP net.IP, versions kubermatic.Versions) reconciling.
 			ds.Spec.Template.ObjectMeta = metav1.ObjectMeta{
 				Labels: resources.BaseAppLabels(resources.EnvoyAgentDaemonSetName,
 					map[string]string{"app.kubernetes.io/name": "envoy-agent"}),
+
+				// Used to force the restart of the envoy-agent to re-read its configuration
+				// from the configMap when it changes. Necessary to support switching to/from Konnectivity.
+				Annotations: map[string]string{"checksum/config": configHash},
 			}
 
 			ds.Spec.Template.Spec = getAgentPodSpec(agentIP, versions)

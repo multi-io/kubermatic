@@ -87,7 +87,7 @@ func DeploymentCreator(data *resources.TemplateData, priorityClasses bool) recon
 				MatchLabels: resources.BaseAppLabels(name, nil),
 			}
 
-			volumes := getVolumes()
+			volumes := getVolumes(data.IsKonnectivityEnabled())
 			volumeMounts := getVolumeMounts()
 			podLabels, err := data.GetPodTemplateLabels(name, volumes, nil)
 			if err != nil {
@@ -109,11 +109,6 @@ func DeploymentCreator(data *resources.TemplateData, priorityClasses bool) recon
 				},
 			}
 
-			openvpnSidecar, err := vpnsidecar.OpenVPNSidecarContainer(data, "openvpn-client")
-			if err != nil {
-				return nil, fmt.Errorf("failed to get openvpn sidecar: %v", err)
-			}
-
 			// Configure user cluster DNS resolver for this pod.
 			dep.Spec.Template.Spec.DNSPolicy, dep.Spec.Template.Spec.DNSConfig, err = resources.UserClusterDNSPolicyAndConfig(data)
 			if err != nil {
@@ -130,7 +125,6 @@ func DeploymentCreator(data *resources.TemplateData, priorityClasses bool) recon
 
 			dep.Spec.Template.Spec.InitContainers = []corev1.Container{}
 			dep.Spec.Template.Spec.Containers = []corev1.Container{
-				*openvpnSidecar,
 				{
 					Name:    resources.SchedulerDeploymentName,
 					Image:   data.ImageRegistry(resources.RegistryK8SGCR) + "/kube-scheduler:v" + data.Cluster().Spec.Version.String(),
@@ -165,9 +159,18 @@ func DeploymentCreator(data *resources.TemplateData, priorityClasses bool) recon
 				},
 			}
 			defResourceRequirements := map[string]*corev1.ResourceRequirements{
-				name:                defaultResourceRequirements.DeepCopy(),
-				openvpnSidecar.Name: openvpnSidecar.Resources.DeepCopy(),
+				name: defaultResourceRequirements.DeepCopy(),
 			}
+
+			if !data.IsKonnectivityEnabled() {
+				openvpnSidecar, err := vpnsidecar.OpenVPNSidecarContainer(data, "openvpn-client")
+				if err != nil {
+					return nil, fmt.Errorf("failed to get openvpn sidecar: %w", err)
+				}
+				dep.Spec.Template.Spec.Containers = append(dep.Spec.Template.Spec.Containers, *openvpnSidecar)
+				defResourceRequirements[openvpnSidecar.Name] = openvpnSidecar.Resources.DeepCopy()
+			}
+
 			err = resources.SetResourceRequirements(dep.Spec.Template.Spec.Containers, dep.Annotations, defResourceRequirements, resources.GetOverrides(data.Cluster().Spec.ComponentsOverride))
 			if err != nil {
 				return nil, fmt.Errorf("failed to set resource requirements: %v", err)
@@ -211,16 +214,8 @@ func getVolumeMounts() []corev1.VolumeMount {
 	}
 }
 
-func getVolumes() []corev1.Volume {
-	return []corev1.Volume{
-		{
-			Name: resources.OpenVPNClientCertificatesSecretName,
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: resources.OpenVPNClientCertificatesSecretName,
-				},
-			},
-		},
+func getVolumes(isKonnectivityEnabled bool) []corev1.Volume {
+	vs := []corev1.Volume{
 		{
 			Name: resources.CASecretName,
 			VolumeSource: corev1.VolumeSource{
@@ -265,4 +260,15 @@ func getVolumes() []corev1.Volume {
 			},
 		},
 	}
+	if !isKonnectivityEnabled {
+		vs = append(vs, corev1.Volume{
+			Name: resources.OpenVPNClientCertificatesSecretName,
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: resources.OpenVPNClientCertificatesSecretName,
+				},
+			},
+		})
+	}
+	return vs
 }

@@ -172,6 +172,7 @@ type providers struct {
 	userWatcher                           watcher.UserWatcher
 	externalClusterProvider               provider.ExternalClusterProvider
 	privilegedExternalClusterProvider     provider.PrivilegedExternalClusterProvider
+	featureGatesProvider                  provider.FeatureGatesProvider
 	clusterTemplateProvider               provider.ClusterTemplateProvider
 	clusterTemplateInstanceProviderGetter provider.ClusterTemplateInstanceProviderGetter
 	etcdBackupConfigProviderGetter        provider.EtcdBackupConfigProviderGetter

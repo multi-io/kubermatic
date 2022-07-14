@@ -134,6 +134,10 @@ const (
 	PriorityClassEtcdStatefulSetName = "user-cluster-etcd"
 	// EtcdDefaultBackupConfigName is the name for the default (preinstalled) EtcdBackupConfig of a cluster.
 	EtcdDefaultBackupConfigName = "default-backups"
+	// NodePortProxyEnvoyDeploymentName is the name of the nodeport-proxy deployment in the user cluster.
+	NodePortProxyEnvoyDeploymentName = "nodeport-proxy-envoy"
+	// NodePortProxyEnvoyContainerName is the name of the envoy container in the nodeport-proxy deployment.
+	NodePortProxyEnvoyContainerName = "envoy"
 	// CsiCinderControllerPluginDeploymentName is the name for the CSI cinder controller plugin deployment
 	CsiCinderControllerPluginDeploymentName = "csi-cinder-controllerplugin"
 	// PriorityClassCsiCinderControllerPluginDeploymentName
@@ -299,6 +303,8 @@ const (
 	KubeStateMetricsCertUsername = "kube-state-metrics"
 	// MetricsServerCertUsername is the name of the user coming from kubeconfig cert
 	MetricsServerCertUsername = "metrics-server"
+	// MetricsServerServiceAccountName is the name of the metrics server service account.
+	MetricsServerServiceAccountName = "metrics-server"
 	// ControllerManagerCertUsername is the name of the user coming from kubeconfig cert
 	ControllerManagerCertUsername = "system:kube-controller-manager"
 	// CSICinderControllerCertUsername is the name of the user coming from kubeconfig cert
@@ -391,6 +397,8 @@ const (
 
 	// RegistryK8SGCR defines the kubernetes specific docker registry at google
 	RegistryK8SGCR = "k8s.gcr.io"
+	// RegistryEUGCR defines the docker registry at google EU.
+	RegistryEUGCR = "eu.gcr.io"
 	// RegistryUSGCR defines the docker registry at google US
 	RegistryUSGCR = "us.gcr.io"
 	// RegistryGCR defines the kubernetes docker registry at google
@@ -613,6 +621,7 @@ const (
 
 const (
 	EnvoyAgentConfigMapName                    = "envoy-agent"
+	EnvoyAgentConfigFileName                   = "envoy.yaml"
 	EnvoyAgentDaemonSetName                    = "envoy-agent"
 	EnvoyAgentCreateInterfaceInitContainerName = "create-dummy-interface"
 	EnvoyAgentAssignAddressInitContainerName   = "assign-address"
@@ -669,18 +678,28 @@ const (
 	KonnectivityClusterRoleBindingUsername = "system:konnectivity-server"
 	KonnectivityServiceAccountName         = "system-konnectivity-agent"
 	KonnectivityAgentContainer             = "konnectivity-agent"
+	KonnectivityServerContainer            = "konnectivity-server"
 	KonnectivityAgentToken                 = "system-konnectivity-agent-token"
 	KonnectivityProxyServiceName           = "konnectivity-server"
 	KonnectivityProxyTLSSecretName         = "konnectivityproxy-tls"
 	KonnectivityKubeconfigSecretName       = "konnectivity-kubeconfig"
 	KonnectivityServerConf                 = "konnectivity-server.conf"
-	KonnectivityStolenAgentTokenSecretName = "stolen-agent-ca"
-	KonnectivityStolenAgentTokenNameCert   = "agentca.crt"
-	KonnectivityStolenAgentTokenNameToken  = "agenttoken.txt"
 	KonnectivityKubeApiserverEgress        = "kube-apiserver-egress"
 	KonnectivityUDS                        = "konnectivity-uds"
+	KonnectivityPodDisruptionBudgetName    = "konnectivity-agent"
 
 	PriorityClassKonnectivityDeploymentName = "user-cluster-konnectivity-agent"
+)
+
+const (
+	NetworkPolicyDefaultDenyAllEgress          = "default-deny-all-egress"
+	NetworkPolicyEtcdAllow                     = "etcd-allow"
+	NetworkPolicyDNSAllow                      = "dns-allow"
+	NetworkPolicyOpenVPNServerAllow            = "openvpn-server-allow"
+	NetworkPolicyMachineControllerWebhookAllow = "machine-controller-webhook-allow"
+	NetworkPolicyMetricsServerAllow            = "metrics-server-allow"
+	NetworkPolicyClusterExternalAddrAllow      = "cluster-external-addr-allow"
+	NetworkPolicyOIDCIssuerAllow               = "oidc-issuer-allow"
 )
 
 // ECDSAKeyPair is a ECDSA x509 certificate and private key
@@ -774,13 +793,18 @@ func InClusterApiserverIP(cluster *kubermaticv1.Cluster) (*net.IP, error) {
 type userClusterDNSPolicyAndConfigData interface {
 	Cluster() *kubermaticv1.Cluster
 	ClusterIPByServiceName(name string) (string, error)
+	IsKonnectivityEnabled() bool
 }
 
 // UserClusterDNSPolicyAndConfig returns a DNSPolicy and DNSConfig to configure Pods to use user cluster DNS
 func UserClusterDNSPolicyAndConfig(d userClusterDNSPolicyAndConfigData) (corev1.DNSPolicy, *corev1.PodDNSConfig, error) {
-	// DNSNone indicates that the pod should use empty DNS settings. DNS
-	// parameters such as nameservers and search paths should be defined via
-	// DNSConfig.
+	if d.IsKonnectivityEnabled() {
+		// custom DNS resolver in not needed in Konnectivity setup
+		return corev1.DNSClusterFirst, nil, nil
+	}
+	// If Konnectivity is NOT enabled, we deploy a custom DNS resolver
+	// for the user cluster in Seed. To use it, we set the DNS policy to DNSNone
+	// and set the custom DNS resolver's CLusterIP in the DNSConfig.
 	dnsConfigOptionNdots := "5"
 	dnsConfigResolverIP, err := d.ClusterIPByServiceName(DNSResolverServiceName)
 	if err != nil {
@@ -1174,6 +1198,9 @@ func GetOverrides(componentSettings kubermaticv1.ComponentSettings) map[string]*
 	r := map[string]*corev1.ResourceRequirements{}
 	if componentSettings.Apiserver.Resources != nil {
 		r[ApiserverDeploymentName] = componentSettings.Apiserver.Resources.DeepCopy()
+	}
+	if componentSettings.KonnectivityProxy.Resources != nil {
+		r[KonnectivityServerContainer] = componentSettings.KonnectivityProxy.Resources.DeepCopy()
 	}
 	if componentSettings.ControllerManager.Resources != nil {
 		r[ControllerManagerDeploymentName] = componentSettings.ControllerManager.Resources.DeepCopy()

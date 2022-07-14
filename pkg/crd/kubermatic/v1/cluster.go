@@ -89,6 +89,42 @@ type Cluster struct {
 	Status  ClusterStatus  `json:"status,omitempty"`
 }
 
+// GetAddress returns the address and can handle both KKP 2.20 clusters
+// (where the address is a top-level element in the CRD) and 2.21+ clusters
+// (where the address is part of the ClusterStatus). In KKP 2.22+ this function
+// should be removed and all components should just use cluster.Status.Address
+// directly.
+func (c *Cluster) GetAddress() ClusterAddress {
+	// address := c.Status.Address.DeepCopy()
+	address := c.Address.DeepCopy()
+
+	if address.AdminToken == "" {
+		address.AdminToken = c.Address.AdminToken
+	}
+
+	if address.URL == "" {
+		address.URL = c.Address.URL
+	}
+
+	if address.ExternalName == "" {
+		address.ExternalName = c.Address.ExternalName
+	}
+
+	if address.InternalName == "" {
+		address.InternalName = c.Address.InternalName
+	}
+
+	if address.IP == "" {
+		address.IP = c.Address.IP
+	}
+
+	if address.Port == 0 {
+		address.Port = c.Address.Port
+	}
+
+	return *address
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ClusterList specifies a list of clusters
@@ -391,8 +427,14 @@ type ComponentSettings struct {
 	Prometheus        StatefulSetSettings     `json:"prometheus"`
 	OpenVPN           OpenVPNSettings         `json:"openvpn"`
 	NodeLocalDNS      NodeLocalDNSSettings    `json:"nodeLocalDNS"`
+	// KonnectivityProxy configures resources limits/requests for konnectivity-server sidecar.
+	KonnectivityProxy KonnectvityProxySettings `json:"konnectivityProxy,omitempty"`
 
 	Openstack OpenstackSettings `json:"openstack"`
+}
+
+type KonnectvityProxySettings struct {
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 type OpenstackSettings struct {
@@ -480,6 +522,17 @@ type LeaderElectionSettings struct {
 	RetryPeriodSeconds *int32 `json:"retryPeriodSeconds,omitempty"`
 }
 
+type IPFamily string
+
+const (
+	// IPFamilyUnspecified represents unspecified IP address family, which is interpreted as IPv4.
+	IPFamilyUnspecified IPFamily = ""
+	// IPFamilyIPv4 represents IPv4-only address family.
+	IPFamilyIPv4 IPFamily = "IPv4"
+	// IPFamilyDualStack represents dual-stack address family with IPv4 as the primary address family.
+	IPFamilyDualStack IPFamily = "IPv4+IPv6"
+)
+
 // ClusterNetworkingConfig specifies the different networking
 // parameters for a cluster.
 type ClusterNetworkingConfig struct {
@@ -504,7 +557,7 @@ type ClusterNetworkingConfig struct {
 	NodeLocalDNSCacheEnabled *bool `json:"nodeLocalDNSCacheEnabled,omitempty"`
 
 	// KonnectivityEnabled enables konnectivity for controlplane to node network communication.
-	KonnectivityEnabled bool `json:"konnectivityEnabled,omitempty"`
+	KonnectivityEnabled *bool `json:"konnectivityEnabled,omitempty"`
 }
 
 // MachineNetworkingConfig specifies the networking parameters used for IPAM.
@@ -798,6 +851,7 @@ type ExtendedClusterHealth struct {
 	MachineController            HealthStatus `json:"machineController"`
 	Etcd                         HealthStatus `json:"etcd"`
 	OpenVPN                      HealthStatus `json:"openvpn"`
+	Konnectivity                 HealthStatus `json:"konnectivity,omitempty"`
 	CloudProviderInfrastructure  HealthStatus `json:"cloudProviderInfrastructure"`
 	UserClusterControllerManager HealthStatus `json:"userClusterControllerManager"`
 }
@@ -855,39 +909,39 @@ func NewBytes(b64 string) Bytes {
 	return Bytes(bs)
 }
 
-func (cluster *Cluster) GetSecretName() string {
-	if cluster.Spec.Cloud.AWS != nil {
-		return fmt.Sprintf("%s-aws-%s", CredentialPrefix, cluster.Name)
+func (c *Cluster) GetSecretName() string {
+	if c.Spec.Cloud.AWS != nil {
+		return fmt.Sprintf("%s-aws-%s", CredentialPrefix, c.Name)
 	}
-	if cluster.Spec.Cloud.Azure != nil {
-		return fmt.Sprintf("%s-azure-%s", CredentialPrefix, cluster.Name)
+	if c.Spec.Cloud.Azure != nil {
+		return fmt.Sprintf("%s-azure-%s", CredentialPrefix, c.Name)
 	}
-	if cluster.Spec.Cloud.Digitalocean != nil {
-		return fmt.Sprintf("%s-digitalocean-%s", CredentialPrefix, cluster.Name)
+	if c.Spec.Cloud.Digitalocean != nil {
+		return fmt.Sprintf("%s-digitalocean-%s", CredentialPrefix, c.Name)
 	}
-	if cluster.Spec.Cloud.GCP != nil {
-		return fmt.Sprintf("%s-gcp-%s", CredentialPrefix, cluster.Name)
+	if c.Spec.Cloud.GCP != nil {
+		return fmt.Sprintf("%s-gcp-%s", CredentialPrefix, c.Name)
 	}
-	if cluster.Spec.Cloud.Hetzner != nil {
-		return fmt.Sprintf("%s-hetzner-%s", CredentialPrefix, cluster.Name)
+	if c.Spec.Cloud.Hetzner != nil {
+		return fmt.Sprintf("%s-hetzner-%s", CredentialPrefix, c.Name)
 	}
-	if cluster.Spec.Cloud.Openstack != nil {
-		return fmt.Sprintf("%s-openstack-%s", CredentialPrefix, cluster.Name)
+	if c.Spec.Cloud.Openstack != nil {
+		return fmt.Sprintf("%s-openstack-%s", CredentialPrefix, c.Name)
 	}
-	if cluster.Spec.Cloud.Packet != nil {
-		return fmt.Sprintf("%s-packet-%s", CredentialPrefix, cluster.Name)
+	if c.Spec.Cloud.Packet != nil {
+		return fmt.Sprintf("%s-packet-%s", CredentialPrefix, c.Name)
 	}
-	if cluster.Spec.Cloud.Kubevirt != nil {
-		return fmt.Sprintf("%s-kubevirt-%s", CredentialPrefix, cluster.Name)
+	if c.Spec.Cloud.Kubevirt != nil {
+		return fmt.Sprintf("%s-kubevirt-%s", CredentialPrefix, c.Name)
 	}
-	if cluster.Spec.Cloud.VSphere != nil {
-		return fmt.Sprintf("%s-vsphere-%s", CredentialPrefix, cluster.Name)
+	if c.Spec.Cloud.VSphere != nil {
+		return fmt.Sprintf("%s-vsphere-%s", CredentialPrefix, c.Name)
 	}
-	if cluster.Spec.Cloud.Alibaba != nil {
-		return fmt.Sprintf("%s-alibaba-%s", CredentialPrefix, cluster.Name)
+	if c.Spec.Cloud.Alibaba != nil {
+		return fmt.Sprintf("%s-alibaba-%s", CredentialPrefix, c.Name)
 	}
-	if cluster.Spec.Cloud.Anexia != nil {
-		return fmt.Sprintf("%s-anexia-%s", CredentialPrefix, cluster.Name)
+	if c.Spec.Cloud.Anexia != nil {
+		return fmt.Sprintf("%s-anexia-%s", CredentialPrefix, c.Name)
 	}
 	return ""
 }
