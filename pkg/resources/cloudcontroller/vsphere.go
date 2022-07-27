@@ -75,23 +75,25 @@ func vsphereDeploymentCreator(data *resources.TemplateData) reconciling.NamedDep
 			if err != nil {
 				return nil, err
 			}
+
 			dep.Spec.Template.Spec.AutomountServiceAccountToken = pointer.BoolPtr(false)
 
-			version, err := getVsphereCPIVersion(data.Cluster().Spec.Version)
-			if err != nil {
-				return nil, err
-			}
-			openvpnSidecar, err := vpnsidecar.OpenVPNSidecarContainer(data, openvpnClientContainerName)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get openvpn sidecar: %v", err)
-			}
+			version := getVsphereCPIVersion(data.Cluster().Spec.Version)
+
 			container := getCPIContainer(version, data)
 			dep.Spec.Template.Spec.Containers = []corev1.Container{
 				container,
-				*openvpnSidecar,
 			}
 
-			dep.Spec.Template.Spec.Volumes = append(getVolumes(),
+			if !data.IsKonnectivityEnabled() {
+				openvpnSidecar, err := vpnsidecar.OpenVPNSidecarContainer(data, openvpnClientContainerName)
+				if err != nil {
+					return nil, fmt.Errorf("failed to get openvpn sidecar: %w", err)
+				}
+				dep.Spec.Template.Spec.Containers = append(dep.Spec.Template.Spec.Containers, *openvpnSidecar)
+			}
+
+			dep.Spec.Template.Spec.Volumes = append(getVolumes(data.IsKonnectivityEnabled()),
 				corev1.Volume{
 					Name: resources.CloudConfigConfigMapName,
 					VolumeSource: corev1.VolumeSource{
@@ -124,6 +126,9 @@ func getCPIContainer(version string, data *resources.TemplateData) corev1.Contai
 	c := corev1.Container{
 		Name:  ccmContainerName,
 		Image: controllerManagerImage,
+		SecurityContext: &corev1.SecurityContext{
+			RunAsUser: pointer.Int64(1001),
+		},
 		Command: []string{
 			"/bin/vsphere-cloud-controller-manager",
 		},
@@ -159,19 +164,18 @@ func getCPIContainer(version string, data *resources.TemplateData) corev1.Contai
 	return c
 }
 
-const latestVsphereCPIVersion = "1.21.0"
-
-func getVsphereCPIVersion(version semver.Semver) (string, error) {
-	switch version.Minor() {
-	case 19:
-		return "1.19.1", nil
-	case 20:
-		return "1.20.0", nil
-	case 21:
+func getVsphereCPIVersion(version semver.Semver) string {
+	switch version.MajorMinor() {
+	case v121:
+		return "1.21.3"
+	case v122:
+		return "1.22.6"
+	case v123:
 		fallthrough
-	case 22:
+	case v124:
 		fallthrough
+	//	By default return latest version
 	default:
-		return latestVsphereCPIVersion, nil
+		return "1.23.0"
 	}
 }

@@ -14,7 +14,7 @@ import (
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	autoscalingv1beta2 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1beta2"
@@ -353,7 +353,7 @@ func ReconcileDaemonSets(ctx context.Context, namedGetters []NamedDaemonSetCreat
 }
 
 // PodDisruptionBudgetCreator defines an interface to create/update PodDisruptionBudgets
-type PodDisruptionBudgetCreator = func(existing *policyv1beta1.PodDisruptionBudget) (*policyv1beta1.PodDisruptionBudget, error)
+type PodDisruptionBudgetCreator = func(existing *policyv1.PodDisruptionBudget) (*policyv1.PodDisruptionBudget, error)
 
 // NamedPodDisruptionBudgetCreatorGetter returns the name of the resource and the corresponding creator function
 type NamedPodDisruptionBudgetCreatorGetter = func() (name string, create PodDisruptionBudgetCreator)
@@ -363,9 +363,9 @@ type NamedPodDisruptionBudgetCreatorGetter = func() (name string, create PodDisr
 func PodDisruptionBudgetObjectWrapper(create PodDisruptionBudgetCreator) ObjectCreator {
 	return func(existing ctrlruntimeclient.Object) (ctrlruntimeclient.Object, error) {
 		if existing != nil {
-			return create(existing.(*policyv1beta1.PodDisruptionBudget))
+			return create(existing.(*policyv1.PodDisruptionBudget))
 		}
-		return create(&policyv1beta1.PodDisruptionBudget{})
+		return create(&policyv1.PodDisruptionBudget{})
 	}
 }
 
@@ -385,7 +385,7 @@ func ReconcilePodDisruptionBudgets(ctx context.Context, namedGetters []NamedPodD
 		objs = append(objs, EnsureObject{
 			Name:             types.NamespacedName{Namespace: namespace, Name: name},
 			Creator:          createObject,
-			EmptyObj:         &policyv1beta1.PodDisruptionBudget{},
+			EmptyObj:         &policyv1.PodDisruptionBudget{},
 			RequiresRecreate: true,
 		})
 	}

@@ -47,6 +47,8 @@ import (
 const (
 	ControllerName  = "kubermatic_addoninstaller_controller"
 	addonDefaultKey = ".spec.isDefault"
+
+	openVPNAddonName = "openvpn"
 )
 
 type Reconciler struct {
@@ -184,6 +186,9 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, clus
 func (r *Reconciler) ensureAddons(ctx context.Context, log *zap.SugaredLogger, cluster *kubermaticv1.Cluster, addons kubermaticv1.AddonList) error {
 	ensuredAddonsMap := map[string]struct{}{}
 	for _, addon := range addons.Items {
+		if skipAddonInstallation(addon, cluster) {
+			continue
+		}
 		ensuredAddonsMap[addon.Name] = struct{}{}
 		name := types.NamespacedName{Namespace: cluster.Status.NamespaceName, Name: addon.Name}
 		addonLog := log.With("addon", name)
@@ -279,4 +284,12 @@ func (r *Reconciler) deleteAddon(ctx context.Context, log *zap.SugaredLogger, ad
 		return fmt.Errorf("failed to delete addon %s from cluster %s: %v", addon.Name, addon.ClusterName, err)
 	}
 	return nil
+}
+
+// skipAddonInstallation returns true if the addon installation should be skipped based on the Cluster spec, false otherwise.
+func skipAddonInstallation(addon kubermaticv1.Addon, cluster *kubermaticv1.Cluster) bool {
+	if addon.Name == openVPNAddonName && cluster.Spec.ClusterNetwork.KonnectivityEnabled != nil && *cluster.Spec.ClusterNetwork.KonnectivityEnabled {
+		return true // skip openvpn if Konnectivity is enabled
+	}
+	return false
 }

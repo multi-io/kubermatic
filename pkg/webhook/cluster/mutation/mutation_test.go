@@ -172,6 +172,13 @@ func TestHandle(t *testing.T) {
 						},
 					},
 				},
+				KonnectivityProxy: kubermaticv1.KonnectvityProxySettings{
+					Resources: &corev1.ResourceRequirements{
+						Requests: map[corev1.ResourceName]resource.Quantity{
+							"memory": resource.MustParse("500M"),
+						},
+					},
+				},
 			},
 			wantAllowed: true,
 			wantPatches: []jsonpatch.JsonPatchOperation{
@@ -197,6 +204,7 @@ func TestHandle(t *testing.T) {
 				jsonpatch.NewOperation("add", "/spec/componentsOverride/etcd/diskSize", "1G"),
 				jsonpatch.NewOperation("add", "/spec/componentsOverride/etcd/resources", map[string]interface{}{"requests": map[string]interface{}{"memory": "500M"}}),
 				jsonpatch.NewOperation("add", "/spec/componentsOverride/prometheus/resources", map[string]interface{}{"requests": map[string]interface{}{"memory": "500M"}}),
+				jsonpatch.NewOperation("add", "/spec/componentsOverride/konnectivityProxy/resources", map[string]interface{}{"requests": map[string]interface{}{"memory": "500M"}}),
 				jsonpatch.NewOperation("add", "/spec/features/apiserverNetworkPolicy", true),
 			},
 		},
@@ -585,7 +593,7 @@ func (r rawClusterGen) Do() []byte {
 func TestNumberOfFields(t *testing.T) {
 	settings := kubermaticv1.ComponentSettings{}
 	t.Log("If this test is failing, you probably added or deleted field from kubermaticv1.ComponentSettings struct, and did not update mutation handler yet.")
-	if want, got := 8, reflect.ValueOf(settings).NumField(); want != got {
+	if want, got := 9, reflect.ValueOf(settings).NumField(); want != got {
 		t.Fatalf("want kubermaticv1.ComponentSettings{}.NumField=%d, got %d", want, got)
 	}
 
@@ -638,6 +646,9 @@ func TestNumberOfFields(t *testing.T) {
 		t.Fatalf("want kubermaticv1.ComponentSettings{}.Prometheus.NumField=%d, got %d", want, got)
 	}
 	if want, got := 1, reflect.ValueOf(settings.Openstack).NumField(); want != got {
+		t.Fatalf("want kubermaticv1.ComponentSettings{}.Openstack.NumField=%d, got %d", want, got)
+	}
+	if want, got := 1, reflect.ValueOf(settings.KonnectivityProxy).NumField(); want != got {
 		t.Fatalf("want kubermaticv1.ComponentSettings{}.Openstack.NumField=%d, got %d", want, got)
 	}
 }

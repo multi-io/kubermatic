@@ -21,6 +21,7 @@ import (
 
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/provider"
+	"k8c.io/kubermatic/v2/pkg/resources"
 )
 
 // DefaultCreateClusterSpec defaults the cluster spec when creating a new cluster
@@ -30,6 +31,10 @@ func DefaultCreateClusterSpec(
 
 	if err := cloudProvider.DefaultCloudSpec(&spec.Cloud); err != nil {
 		return fmt.Errorf("failed to default cloud spec: %v", err)
+	}
+
+	if spec.ClusterNetwork.ProxyMode == "" {
+		spec.ClusterNetwork.ProxyMode = resources.IPVSProxyMode
 	}
 	return nil
 }

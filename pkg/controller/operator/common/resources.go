@@ -46,6 +46,9 @@ const (
 	// VersionLabel is the label containing the application's version.
 	VersionLabel = "app.kubernetes.io/version"
 
+	// ComponentLabel is the label of the component within the architecture.
+	ComponentLabel = "app.kubernetes.io/component"
+
 	// VersionsFileName is the name of the YAML file containing the enabled and
 	// default Kubernetes versions.
 	VersionsFileName = "versions.yaml"

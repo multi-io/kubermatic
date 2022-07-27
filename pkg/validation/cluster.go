@@ -127,6 +127,11 @@ func ValidateClusterNetworkConfig(n *kubermaticv1.ClusterNetworkingConfig, fldPa
 			[]string{resources.IPVSProxyMode, resources.IPTablesProxyMode}))
 	}
 
+	if n.ProxyMode != resources.IPVSProxyMode && n.ProxyMode != resources.IPTablesProxyMode {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("proxyMode"), n.ProxyMode,
+			[]string{resources.IPVSProxyMode, resources.IPTablesProxyMode}))
+	}
+
 	return allErrs
 }
 

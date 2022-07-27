@@ -23,6 +23,7 @@ import (
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/etcdbackupconfig"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/etcdrestore"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/gcp"
+	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/get"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/hetzner"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/metric"
 	"k8c.io/kubermatic/v2/pkg/test/e2e/utils/apiclient/client/openstack"
@@ -95,6 +96,7 @@ func New(transport runtime.ClientTransport, formats strfmt.Registry) *MetaKubeAP
 	cli.Etcdbackupconfig = etcdbackupconfig.New(transport, formats)
 	cli.Etcdrestore = etcdrestore.New(transport, formats)
 	cli.Gcp = gcp.New(transport, formats)
+	cli.Get = get.New(transport, formats)
 	cli.Hetzner = hetzner.New(transport, formats)
 	cli.Metric = metric.New(transport, formats)
 	cli.Openstack = openstack.New(transport, formats)
@@ -180,6 +182,8 @@ type MetaKubeAPI struct {
 
 	Gcp gcp.ClientService
 
+	Get get.ClientService
+
 	Hetzner hetzner.ClientService
 
 	Metric metric.ClientService
@@ -229,6 +233,7 @@ func (c *MetaKubeAPI) SetTransport(transport runtime.ClientTransport) {
 	c.Etcdbackupconfig.SetTransport(transport)
 	c.Etcdrestore.SetTransport(transport)
 	c.Gcp.SetTransport(transport)
+	c.Get.SetTransport(transport)
 	c.Hetzner.SetTransport(transport)
 	c.Metric.SetTransport(transport)
 	c.Openstack.SetTransport(transport)

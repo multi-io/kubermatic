@@ -17,8 +17,13 @@ limitations under the License.
 package kubernetes
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"net"
+	"net/url"
+	"sort"
+	"time"
 
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/resources"
@@ -27,7 +32,6 @@ import (
 	"k8c.io/kubermatic/v2/pkg/resources/cloudconfig"
 	"k8c.io/kubermatic/v2/pkg/resources/cloudcontroller"
 	"k8c.io/kubermatic/v2/pkg/resources/clusterautoscaler"
-	"k8c.io/kubermatic/v2/pkg/resources/clusterproxy"
 	"k8c.io/kubermatic/v2/pkg/resources/controllermanager"
 	csiopenstack "k8c.io/kubermatic/v2/pkg/resources/csi/openstack"
 	"k8c.io/kubermatic/v2/pkg/resources/dns"
@@ -45,10 +49,10 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	autoscalingv1beta2 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1beta2"
-	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -143,19 +147,6 @@ func (r *Reconciler) ensureResourcesAreDeployed(ctx context.Context, cluster *ku
 		return nil, err
 	}
 
-	// This needs to happen after other secrets are created
-	// because it uses some secrets created in previous steps.
-	if data.IsKonnectivityEnabled() {
-		if err := r.ensureKonnectivitySecrets(ctx, cluster, data); err != nil {
-			return nil, err
-		}
-
-		// check that all Deployments are available
-		if err := r.ensureKonnectivityDeployments(ctx, cluster, data); err != nil {
-			return nil, err
-		}
-	}
-
 	// check that all CronJobs are created
 	if err := r.ensureCronJobs(ctx, cluster, data); err != nil {
 		return nil, err
@@ -179,6 +170,20 @@ func (r *Reconciler) ensureResourcesAreDeployed(ctx context.Context, cluster *ku
 		}
 	}
 
+	// This code supports switching between OpenVPN and Konnectivity setup (in both directions).
+	// It can be removed one release after deprecating OpenVPN.
+	if r.features.Konnectivity {
+		if cluster.Spec.ClusterNetwork.KonnectivityEnabled != nil && *cluster.Spec.ClusterNetwork.KonnectivityEnabled {
+			if err := r.ensureOpenVPNSetupIsRemoved(ctx, data); err != nil {
+				return nil, err
+			}
+		} else {
+			if err := r.ensureKonnectivitySetupIsRemoved(ctx, data); err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	return &reconcile.Result{}, nil
 }
 
@@ -192,6 +197,9 @@ func (r *Reconciler) getClusterTemplateData(ctx context.Context, cluster *kuberm
 	if err != nil {
 		return nil, err
 	}
+
+	// Konnectivity is enabled if the feature gate is enabled and the cluster flag is enabled as well
+	konnectivityEnabled := r.features.Konnectivity && cluster.Spec.ClusterNetwork.KonnectivityEnabled != nil && *cluster.Spec.ClusterNetwork.KonnectivityEnabled
 
 	return resources.NewTemplateDataBuilder().
 		WithContext(ctx).
@@ -211,7 +219,7 @@ func (r *Reconciler) getClusterTemplateData(ctx context.Context, cluster *kuberm
 		WithInClusterPrometheusRemoteWriteConfigsFile(r.inClusterPrometheusRemoteWriteConfigsFile).
 		WithExternalURL(r.externalURL).
 		WithKeycloakFacade(r.keycloakFacade).
-		WithKonnectivityEnabled(r.features.Konnectivity && cluster.Spec.ClusterNetwork.KonnectivityEnabled).
+		WithKonnectivityEnabled(konnectivityEnabled).
 		WithCABundle(r.caBundle).
 		WithOIDCIssuerURL(r.oidcIssuerURL).
 		WithOIDCIssuerClientID(r.oidcIssuerClientID).
@@ -261,14 +269,22 @@ func (r *Reconciler) ensureNamespaceExists(ctx context.Context, cluster *kuberma
 
 // GetServiceCreators returns all service creators that are currently in use
 func GetServiceCreators(data *resources.TemplateData) []reconciling.NamedServiceCreatorGetter {
+	extName := data.Cluster().GetAddress().ExternalName
+
 	creators := []reconciling.NamedServiceCreatorGetter{
 		apiserver.ServiceCreator(data.Cluster().Spec.ExposeStrategy, data.Cluster().Address.ExternalName),
-		openvpn.ServiceCreator(data.Cluster().Spec.ExposeStrategy),
 		etcd.ServiceCreator(data),
-		dns.ServiceCreator(),
 		machinecontroller.ServiceCreator(),
-		metricsserver.ServiceCreator(),
-		clusterproxy.ServiceCreator(data),
+	}
+
+	if data.IsKonnectivityEnabled() {
+		creators = append(creators, konnectivity.ServiceCreator(data.Cluster().Spec.ExposeStrategy, extName))
+	} else {
+		creators = append(creators,
+			openvpn.ServiceCreator(data.Cluster().Spec.ExposeStrategy),
+			metricsserver.ServiceCreator(),
+			dns.ServiceCreator(),
+		)
 	}
 
 	if data.IsKonnectivityEnabled() {
@@ -298,22 +314,27 @@ func (r *Reconciler) ensureServices(ctx context.Context, c *kubermaticv1.Cluster
 // GetDeploymentCreators returns all DeploymentCreators that are currently in use
 func GetDeploymentCreators(data *resources.TemplateData, enableAPIserverOIDCAuthentication, priorityClasses bool) []reconciling.NamedDeploymentCreatorGetter {
 	deployments := []reconciling.NamedDeploymentCreatorGetter{
-		openvpn.DeploymentCreator(data, priorityClasses),
-		dns.DeploymentCreator(data, priorityClasses),
 		apiserver.DeploymentCreator(data, enableAPIserverOIDCAuthentication, priorityClasses),
 		scheduler.DeploymentCreator(data, priorityClasses),
 		controllermanager.DeploymentCreator(data, priorityClasses),
 		machinecontroller.DeploymentCreator(data, priorityClasses),
 		machinecontroller.WebhookDeploymentCreator(data),
-		metricsserver.DeploymentCreator(data, priorityClasses),
 		usercluster.DeploymentCreator(data),
-		clusterproxy.DeploymentCreator(data, priorityClasses),
 		// kubernetesdashboard.DeploymentCreator(data),
 	}
 
 	if data.Cluster().Annotations[kubermaticv1.AnnotationNameClusterAutoscalerEnabled] != "" {
 		deployments = append(deployments, clusterautoscaler.DeploymentCreator(data, priorityClasses))
 	}
+
+	if !data.IsKonnectivityEnabled() {
+		deployments = append(deployments,
+			openvpn.DeploymentCreator(data, priorityClasses),
+			metricsserver.DeploymentCreator(data, priorityClasses),
+			dns.DeploymentCreator(data, priorityClasses),
+		)
+	}
+
 	// If CCM migration is ongoing defer the deployment of the CCM to the
 	// moment in which cloud controllers or the full in-tree cloud provider
 	// have been deactivated.
@@ -335,24 +356,11 @@ func (r *Reconciler) ensureDeployments(ctx context.Context, cluster *kubermaticv
 	return reconciling.ReconcileDeployments(ctx, creators, cluster.Status.NamespaceName, r, reconciling.OwnerRefWrapper(resources.GetClusterRef(cluster)))
 }
 
-func (r *Reconciler) ensureKonnectivityDeployments(ctx context.Context, cluster *kubermaticv1.Cluster, data *resources.TemplateData) error {
-	creators := GetKonnectivityDeploymentCreators(data, r.features.PriorityClasses)
-	return reconciling.ReconcileDeployments(ctx, creators, cluster.Status.NamespaceName, r, reconciling.OwnerRefWrapper(resources.GetClusterRef(cluster)))
-}
-
-// GetKonnectivityDeploymentCreators returns all DeploymentCreators that are currently in use
-func GetKonnectivityDeploymentCreators(data *resources.TemplateData, priorityClasses bool) []reconciling.NamedDeploymentCreatorGetter {
-	return []reconciling.NamedDeploymentCreatorGetter{
-		konnectivity.DeploymentCreator(data, priorityClasses),
-	}
-}
-
 // GetSecretCreators returns all SecretCreators that are currently in use
 func (r *Reconciler) GetSecretCreators(data *resources.TemplateData) [][]reconciling.NamedSecretCreatorGetter {
 	creators := [][]reconciling.NamedSecretCreatorGetter{
 		{
 			certificates.RootCACreator(data),
-			openvpn.CACreator(),
 			certificates.FrontProxyCACreator(),
 		},
 		{
@@ -363,18 +371,13 @@ func (r *Reconciler) GetSecretCreators(data *resources.TemplateData) [][]reconci
 			apiserver.TLSServingCertificateCreator(data),
 			apiserver.KubeletClientCertificateCreator(data),
 			apiserver.ServiceAccountKeyCreator(),
-			openvpn.TLSServingCertificateCreator(data),
-			openvpn.InternalClientCertificateCreator(data),
 			machinecontroller.TLSServingCertificateCreator(data),
-			metricsserver.TLSServingCertSecretCreator(data.GetRootCA),
 
 			// Kubeconfigs
 			resources.GetInternalKubeconfigCreator(resources.SchedulerKubeconfigSecretName, resources.SchedulerCertUsername, nil, data),
-			resources.GetInternalKubeconfigCreator(resources.KubeletDnatControllerKubeconfigSecretName, resources.KubeletDnatControllerCertUsername, nil, data),
 			resources.GetInternalKubeconfigCreator(resources.MachineControllerKubeconfigSecretName, resources.MachineControllerCertUsername, nil, data),
 			resources.GetInternalKubeconfigCreator(resources.ControllerManagerKubeconfigSecretName, resources.ControllerManagerCertUsername, nil, data),
 			resources.GetInternalKubeconfigCreator(resources.KubeStateMetricsKubeconfigSecretName, resources.KubeStateMetricsCertUsername, nil, data),
-			resources.GetInternalKubeconfigCreator(resources.MetricsServerKubeconfigSecretName, resources.MetricsServerCertUsername, nil, data),
 			resources.GetInternalKubeconfigCreator(resources.InternalUserClusterAdminKubeconfigSecretName, resources.InternalUserClusterAdminKubeconfigCertUsername, []string{"system:masters"}, data),
 			resources.GetInternalKubeconfigCreator(resources.KubernetesDashboardKubeconfigSecretName, resources.KubernetesDashboardCertUsername, nil, data),
 			resources.GetInternalKubeconfigCreator(resources.CSICinderControllerKubeconfigSecretName, resources.CSICinderControllerCertUsername, nil, data),
@@ -387,9 +390,18 @@ func (r *Reconciler) GetSecretCreators(data *resources.TemplateData) [][]reconci
 	}
 
 	if data.IsKonnectivityEnabled() {
-		creators[len(creators)-1] = append(creators[len(creators)-1],
+		creators[1] = append(creators[1],
 			konnectivity.TLSServingCertificateCreator(data),
-			konnectivity.ProxyKubeconfig(data))
+			konnectivity.ProxyKubeconfig(data),
+		)
+	} else {
+		creators[0] = append(creators[0], openvpn.CACreator())
+		creators[1] = append(creators[1],
+			openvpn.TLSServingCertificateCreator(data),
+			openvpn.InternalClientCertificateCreator(data),
+			metricsserver.TLSServingCertSecretCreator(data.GetRootCA),
+			resources.GetInternalKubeconfigCreator(resources.MetricsServerKubeconfigSecretName, resources.MetricsServerCertUsername, nil, data),
+			resources.GetInternalKubeconfigCreator(resources.KubeletDnatControllerKubeconfigSecretName, resources.KubeletDnatControllerCertUsername, nil, data))
 	}
 
 	if flag := data.Cluster().Spec.Features[kubermaticv1.ClusterFeatureExternalCloudProvider]; flag {
@@ -403,31 +415,6 @@ func (r *Reconciler) GetSecretCreators(data *resources.TemplateData) [][]reconci
 	}
 
 	return creators
-}
-
-// GetKonnectivitySecretCreators returns all SecretCreators for konnectivity
-func (r *Reconciler) GetKonnectivitySecretCreators(data *resources.TemplateData, userClusterClient ctrlruntimeclient.Client) []reconciling.NamedSecretCreatorGetter {
-	return []reconciling.NamedSecretCreatorGetter{
-		konnectivity.AgentTokenCreator(userClusterClient),
-	}
-}
-
-func (r *Reconciler) ensureKonnectivitySecrets(ctx context.Context, c *kubermaticv1.Cluster, data *resources.TemplateData) error {
-	var userClusterClient ctrlruntimeclient.Client
-	var err error
-
-	userClusterClient, err = r.userClusterConnProvider.GetClient(ctx, c)
-	if err != nil {
-		return fmt.Errorf("failed to get user-cluster client: %v", err)
-	}
-
-	namedSecretCreatorGetters := r.GetKonnectivitySecretCreators(data, userClusterClient)
-
-	if err := reconciling.ReconcileSecrets(ctx, namedSecretCreatorGetters, c.Status.NamespaceName, r.Client, reconciling.OwnerRefWrapper(resources.GetClusterRef(c))); err != nil {
-		return fmt.Errorf("failed to ensure that the Secret exists: %v", err)
-	}
-
-	return nil
 }
 
 func (r *Reconciler) ensureSecrets(ctx context.Context, c *kubermaticv1.Cluster, data *resources.TemplateData) error {
@@ -499,28 +486,74 @@ func (r *Reconciler) ensureNetworkPolicies(ctx context.Context, c *kubermaticv1.
 	if c.Spec.Features[kubermaticv1.ApiserverNetworkPolicy] {
 		namedNetworkPolicyCreatorGetters := []reconciling.NamedNetworkPolicyCreatorGetter{
 			apiserver.DenyAllPolicyCreator(),
-			apiserver.DNSAllowCreator(c),
+			apiserver.DNSAllowCreator(c, data),
 			apiserver.EctdAllowCreator(c),
-			apiserver.OpenVPNServerAllowCreator(c),
 			apiserver.MachineControllerWebhookCreator(c),
-			apiserver.MetricsServerAllowCreator(c),
+		}
+		// one shared limited context for all hostname resolutions
+		resolverCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+
+		if data.IsKonnectivityEnabled() {
+			extName := data.Cluster().GetAddress().ExternalName
+
+			// allow egress traffic to all resolved cluster external IPs
+			ipList, err := hostnameToIPList(resolverCtx, extName)
+			if err != nil {
+				return fmt.Errorf("failed to resolve cluster external name %q: %w", extName, err)
+			}
+
+			namedNetworkPolicyCreatorGetters = append(namedNetworkPolicyCreatorGetters, apiserver.ClusterExternalAddrAllowCreator(ipList, c.Spec.ExposeStrategy))
+		} else {
+			namedNetworkPolicyCreatorGetters = append(namedNetworkPolicyCreatorGetters,
+				apiserver.OpenVPNServerAllowCreator(c),
+				apiserver.MetricsServerAllowCreator(c),
+			)
+		}
+
+		issuerURL := c.Spec.OIDC.IssuerURL
+		if issuerURL == "" && r.features.KubernetesOIDCAuthentication {
+			issuerURL = data.OIDCIssuerURL()
+		}
+
+		if issuerURL != "" {
+			ipList, err := urlToIPList(resolverCtx, issuerURL)
+			if err != nil {
+				return fmt.Errorf("failed to resolve OIDC issuer URL %q: %w", issuerURL, err)
+			}
+
+			namedNetworkPolicyCreatorGetters = append(namedNetworkPolicyCreatorGetters, apiserver.OIDCIssuerAllowCreator(ipList))
 		}
 
 		// todo make the urls configurable for every seed
 		if c.Spec.Sys11Auth.Realm != "" {
-			namedNetworkPolicyCreatorGetters = append(namedNetworkPolicyCreatorGetters, apiserver.ExternalURLAllowCreator("prod-keycloak-public", "https://login.syseleven.de"))
-			namedNetworkPolicyCreatorGetters = append(namedNetworkPolicyCreatorGetters, apiserver.ExternalURLAllowCreator("prod-keycloak-internal", "https://login-internal.syseleven.de"))
-			namedNetworkPolicyCreatorGetters = append(namedNetworkPolicyCreatorGetters, apiserver.ExternalURLAllowCreator("dev-keycloak-public", "https://login-stage.syseleven.de"))
-			namedNetworkPolicyCreatorGetters = append(namedNetworkPolicyCreatorGetters, apiserver.ExternalURLAllowCreator("dev-keycloak-internal", "https://login-internal-stage.syseleven.de"))
+			ipList, err := urlToIPList(resolverCtx, "https://login.syseleven.de")
+			if err != nil {
+				return fmt.Errorf("failed to resolve OIDC issuer URL %q: %w", "https://login.syseleven.de", err)
+			}
+			namedNetworkPolicyCreatorGetters = append(namedNetworkPolicyCreatorGetters, apiserver.ExternalURLAllowCreator("prod-keycloak-public", ipList))
+
+			ipList, err = urlToIPList(resolverCtx, "https://login-internal.syseleven.de")
+			if err != nil {
+				return fmt.Errorf("failed to resolve OIDC issuer URL %q: %w", "https://login-internal.syseleven.de", err)
+			}
+			namedNetworkPolicyCreatorGetters = append(namedNetworkPolicyCreatorGetters, apiserver.ExternalURLAllowCreator("prod-keycloak-internal", ipList))
+
+			ipList, err = urlToIPList(resolverCtx, "https://login-stage.syseleven.de")
+			if err != nil {
+				return fmt.Errorf("failed to resolve OIDC issuer URL %q: %w", "https://login.syseleven.de", err)
+			}
+			namedNetworkPolicyCreatorGetters = append(namedNetworkPolicyCreatorGetters, apiserver.ExternalURLAllowCreator("dev-keycloak-public", ipList))
+
+			ipList, err = urlToIPList(resolverCtx, "https://login-internal-stage.syseleven.de")
+			if err != nil {
+				return fmt.Errorf("failed to resolve OIDC issuer URL %q: %w", "https://login.syseleven.de", err)
+			}
+			namedNetworkPolicyCreatorGetters = append(namedNetworkPolicyCreatorGetters, apiserver.ExternalURLAllowCreator("dev-keycloak-internal", ipList))
 		}
 
-		if c.Spec.OIDC.IssuerURL != "" {
-			namedNetworkPolicyCreatorGetters = append(namedNetworkPolicyCreatorGetters, apiserver.OIDCIssuerAllowCreator(c.Spec.OIDC.IssuerURL))
-		} else if r.features.KubernetesOIDCAuthentication {
-			namedNetworkPolicyCreatorGetters = append(namedNetworkPolicyCreatorGetters, apiserver.OIDCIssuerAllowCreator(data.OIDCIssuerURL()))
-		}
 		if err := reconciling.ReconcileNetworkPolicies(ctx, namedNetworkPolicyCreatorGetters, c.Status.NamespaceName, r.Client); err != nil {
-			return fmt.Errorf("failed to ensure Network Policies: %v", err)
+			return fmt.Errorf("failed to ensure Network Policies: %w", err)
 		}
 	}
 
@@ -531,9 +564,6 @@ func (r *Reconciler) ensureNetworkPolicies(ctx context.Context, c *kubermaticv1.
 func GetConfigMapCreators(data *resources.TemplateData) []reconciling.NamedConfigMapCreatorGetter {
 	creators := []reconciling.NamedConfigMapCreatorGetter{
 		cloudconfig.ConfigMapCreator(data),
-		openvpn.ServerClientConfigsConfigMapCreator(data),
-		dns.ConfigMapCreator(data),
-		clusterproxy.ConfigMapCreator(data),
 		scheduler.ConfigMapCreator(data),
 		apiserver.AuditConfigMapCreator(),
 		apiserver.AdmissionControlCreator(data),
@@ -542,6 +572,11 @@ func GetConfigMapCreators(data *resources.TemplateData) []reconciling.NamedConfi
 
 	if data.IsKonnectivityEnabled() {
 		creators = append(creators, apiserver.EgressSelectorConfigCreator())
+	} else {
+		creators = append(creators,
+			openvpn.ServerClientConfigsConfigMapCreator(data),
+			dns.ConfigMapCreator(data),
+		)
 	}
 
 	if data.Cluster().Spec.Cloud.VSphere != nil {
@@ -582,12 +617,18 @@ func GetEtcdBackupConfigCreators(data *resources.TemplateData) []reconciling.Nam
 
 // GetPodDisruptionBudgetCreators returns all PodDisruptionBudgetCreators that are currently in use
 func GetPodDisruptionBudgetCreators(data *resources.TemplateData) []reconciling.NamedPodDisruptionBudgetCreatorGetter {
-	return []reconciling.NamedPodDisruptionBudgetCreatorGetter{
+	creators := []reconciling.NamedPodDisruptionBudgetCreatorGetter{
 		etcd.PodDisruptionBudgetCreator(data),
 		apiserver.PodDisruptionBudgetCreator(),
-		metricsserver.PodDisruptionBudgetCreator(),
-		dns.PodDisruptionBudgetCreator(),
 	}
+
+	if !data.IsKonnectivityEnabled() {
+		creators = append(creators,
+			metricsserver.PodDisruptionBudgetCreator(),
+			dns.PodDisruptionBudgetCreator(),
+		)
+	}
+	return creators
 }
 
 func (r *Reconciler) ensurePodDisruptionBudgets(ctx context.Context, c *kubermaticv1.Cluster, data *resources.TemplateData) error {
@@ -619,14 +660,18 @@ func (r *Reconciler) ensureCronJobs(ctx context.Context, c *kubermaticv1.Cluster
 
 func (r *Reconciler) ensureVerticalPodAutoscalers(ctx context.Context, c *kubermaticv1.Cluster, data *resources.TemplateData) error {
 	controlPlaneDeploymentNames := []string{
-		resources.DNSResolverDeploymentName,
 		resources.MachineControllerDeploymentName,
 		resources.MachineControllerWebhookDeploymentName,
-		resources.OpenVPNServerDeploymentName,
 		resources.ApiserverDeploymentName,
 		resources.ControllerManagerDeploymentName,
 		resources.SchedulerDeploymentName,
-		resources.MetricsServerDeploymentName,
+	}
+	if !data.IsKonnectivityEnabled() {
+		controlPlaneDeploymentNames = append(controlPlaneDeploymentNames,
+			resources.OpenVPNServerDeploymentName,
+			resources.MetricsServerDeploymentName,
+			resources.DNSResolverDeploymentName,
+		)
 	}
 
 	creators, err := resources.GetVerticalPodAutoscalersForAll(ctx, r.Client, controlPlaneDeploymentNames, []string{resources.EtcdStatefulSetName}, c.Status.NamespaceName, r.features.VPA)
@@ -701,21 +746,20 @@ func (r *Reconciler) sys11EnsureVerticalPodAutoscalers(ctx context.Context, c *k
 	if err != nil {
 		return err
 	}
-	openvpnServerOwnerRef, err := getDeploymentOwnerReference(resources.OpenVPNServerDeploymentName)
-	if err != nil {
-		return err
-	}
-	dnsResolverOwnerRef, err := getDeploymentOwnerReference(resources.DNSResolverDeploymentName)
-	if err != nil {
-		return err
-	}
-	metricsServerOwnerRef, err := getDeploymentOwnerReference(resources.MetricsServerDeploymentName)
-	if err != nil {
-		return err
-	}
-	clusterProxyOwnerRef, err := getDeploymentOwnerReference(resources.ClusterProxyDeploymentName)
-	if err != nil {
-		return err
+	var openvpnServerOwnerRef, dnsResolverOwnerRef, metricsServerOwnerRef *metav1.OwnerReference
+	if !data.IsKonnectivityEnabled() {
+		openvpnServerOwnerRef, err = getDeploymentOwnerReference(resources.OpenVPNServerDeploymentName)
+		if err != nil {
+			return err
+		}
+		dnsResolverOwnerRef, err = getDeploymentOwnerReference(resources.DNSResolverDeploymentName)
+		if err != nil {
+			return err
+		}
+		metricsServerOwnerRef, err = getDeploymentOwnerReference(resources.MetricsServerDeploymentName)
+		if err != nil {
+			return err
+		}
 	}
 
 	creators := []reconciling.NamedVerticalPodAutoscalerCreatorGetter{
@@ -727,10 +771,12 @@ func (r *Reconciler) sys11EnsureVerticalPodAutoscalers(ctx context.Context, c *k
 		// machinecontroller.VPACreator(machineControllerOwnerRef, updateMode),
 		// machinecontroller.WebhookVPACreator(machineControllerWebhookOwnerRef, updateMode),
 		usercluster.VPACreator(userClusterControllerOwnerRef, updateMode),
-		openvpn.VPACreator(openvpnServerOwnerRef, updateMode),
-		dns.VPACreator(dnsResolverOwnerRef, updateMode),
-		metricsserver.VPACreator(metricsServerOwnerRef, updateMode),
-		clusterproxy.VPACreator(clusterProxyOwnerRef, updateMode),
+	}
+
+	if !data.IsKonnectivityEnabled() {
+		creators = append(creators, openvpn.VPACreator(openvpnServerOwnerRef, updateMode),
+			dns.VPACreator(dnsResolverOwnerRef, updateMode),
+			metricsserver.VPACreator(metricsServerOwnerRef, updateMode))
 	}
 
 	// If CCM migration is ongoing defer the deployment of the CCM to the
@@ -770,4 +816,75 @@ func (r *Reconciler) ensureEtcdBackupConfigs(ctx context.Context, c *kubermaticv
 	creators := GetEtcdBackupConfigCreators(data)
 
 	return reconciling.ReconcileEtcdBackupConfigs(ctx, creators, c.Status.NamespaceName, r.Client, reconciling.OwnerRefWrapper(resources.GetClusterRef(c)))
+}
+
+func (r *Reconciler) ensureOpenVPNSetupIsRemoved(ctx context.Context, data *resources.TemplateData) error {
+	for _, resource := range openvpn.ResourcesForDeletion(data.Cluster().Status.NamespaceName) {
+		if err := r.Client.Delete(ctx, resource); err != nil && !apierrors.IsNotFound(err) {
+			return fmt.Errorf("failed to ensure OpenVPN resources are removed/not present: %w", err)
+		}
+	}
+	for _, resource := range metricsserver.ResourcesForDeletion(data.Cluster().Status.NamespaceName) {
+		if err := r.Client.Delete(ctx, resource); err != nil && !apierrors.IsNotFound(err) {
+			return fmt.Errorf("failed to ensure metrics-server resources are removed/not present: %w", err)
+		}
+	}
+	for _, resource := range dns.ResourcesForDeletion(data.Cluster().Status.NamespaceName) {
+		if err := r.Client.Delete(ctx, resource); err != nil && !apierrors.IsNotFound(err) {
+			return fmt.Errorf("failed to ensure dns-resolver resources are removed/not present: %w", err)
+		}
+	}
+	dnatControllerSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      resources.KubeletDnatControllerKubeconfigSecretName,
+			Namespace: data.Cluster().Status.NamespaceName,
+		},
+	}
+	if err := r.Client.Delete(ctx, dnatControllerSecret); err != nil && !apierrors.IsNotFound(err) {
+		return fmt.Errorf("failed to ensure DNAT controller resources are removed/not present: %w", err)
+	}
+	return nil
+}
+
+func (r *Reconciler) ensureKonnectivitySetupIsRemoved(ctx context.Context, data *resources.TemplateData) error {
+	for _, resource := range konnectivity.ResourcesForDeletion(data.Cluster().Status.NamespaceName) {
+		if err := r.Client.Delete(ctx, resource); err != nil && !apierrors.IsNotFound(err) {
+			return fmt.Errorf("failed to ensure Konnectivity resources are removed/not present: %w", err)
+		}
+	}
+	return nil
+}
+
+func urlToIPList(ctx context.Context, urlString string) ([]net.IP, error) {
+	u, err := url.Parse(urlString)
+	if err != nil {
+		return nil, err
+	}
+	return hostnameToIPList(ctx, u.Hostname())
+}
+
+// hostnameToIPList returns a list of IP addresses used to reach the provided hostname.
+// If it is an IP address, returns it. If it is a domain name, resolves it.
+// The returned list of IPs is always sorted to produce the same result on each resolution attempt.
+func hostnameToIPList(ctx context.Context, hostname string) ([]net.IP, error) {
+	if ip := net.ParseIP(hostname); ip != nil {
+		// hostname is an IP address
+		return []net.IP{ip}, nil
+	}
+
+	// hostname is a domain name - resolve it
+	var r net.Resolver
+	ipList, err := r.LookupIP(ctx, "ip", hostname)
+	if err != nil {
+		return nil, err
+	}
+	if len(ipList) == 0 {
+		return nil, fmt.Errorf("no resolved IP address for hostname %s", hostname)
+	}
+
+	sort.Slice(ipList, func(i, j int) bool {
+		return bytes.Compare(ipList[i], ipList[j]) < 0
+	})
+
+	return ipList, nil
 }

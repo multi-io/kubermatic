@@ -349,9 +349,6 @@ spec:
       - name: tokens
         secret:
           secretName: tokens
-      - name: openvpn-client-certificates
-        secret:
-          secretName: openvpn-client-certificates
       - name: kubelet-client-certificates
         secret:
           secretName: kubelet-client-certificates
@@ -379,9 +376,6 @@ spec:
       - name: front-proxy-ca
         secret:
           secretName: front-proxy-ca
-      - name: kubeletdnatcontroller-kubeconfig
-        secret:
-          secretName: kubeletdnatcontroller-kubeconfig
       - configMap:
           name: audit-config
           optional: false
@@ -391,4 +385,10 @@ spec:
       - configMap:
           name: adm-control
         name: adm-control
+      - name: openvpn-client-certificates
+        secret:
+          secretName: openvpn-client-certificates
+      - name: kubeletdnatcontroller-kubeconfig
+        secret:
+          secretName: kubeletdnatcontroller-kubeconfig
 status: {}

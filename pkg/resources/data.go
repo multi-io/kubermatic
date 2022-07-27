@@ -493,6 +493,21 @@ func (d *TemplateData) GetOpenVPNServerPort() (int32, error) {
 	return service.Spec.Ports[0].NodePort, nil
 }
 
+// GetKonnectivityServerPort returns the nodeport of the external Konnectivity Server service.
+func (d *TemplateData) GetKonnectivityServerPort() (int32, error) {
+	// When using tunneling expose strategy the port is fixed and equal to apiserver port
+	if d.Cluster().Spec.ExposeStrategy == kubermaticv1.ExposeStrategyTunneling {
+		return d.Cluster().GetAddress().Port, nil
+	}
+	service := &corev1.Service{}
+	key := types.NamespacedName{Namespace: d.cluster.Status.NamespaceName, Name: KonnectivityProxyServiceName}
+	if err := d.client.Get(d.ctx, key, service); err != nil {
+		return 0, fmt.Errorf("failed to get NodePort for Konnectivity Server service: %w", err)
+	}
+
+	return service.Spec.Ports[0].NodePort, nil
+}
+
 func (d *TemplateData) NodeLocalDNSCacheEnabled() bool {
 	// NOTE: even if NodeLocalDNSCacheEnabled is nil, we assume it is enabled (backward compatibility for already existing clusters)
 	return d.Cluster().Spec.ClusterNetwork.NodeLocalDNSCacheEnabled == nil || *d.Cluster().Spec.ClusterNetwork.NodeLocalDNSCacheEnabled

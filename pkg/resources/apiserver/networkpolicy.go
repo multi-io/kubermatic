@@ -17,14 +17,11 @@ limitations under the License.
 package apiserver
 
 import (
-	"bytes"
-	"context"
 	"fmt"
 	"net"
-	"net/url"
-	"sort"
-	"time"
 
+	"k8c.io/kubermatic/v2/pkg/controller/operator/common"
+	"k8c.io/kubermatic/v2/pkg/controller/operator/seed/resources/nodeportproxy"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	kubermaticmaster "k8c.io/kubermatic/v2/pkg/install/stack/kubermatic-master"
 	"k8c.io/kubermatic/v2/pkg/resources"
@@ -33,13 +30,14 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 // DenyAllPolicyCreator returns a func to create/update the apiserver
 // deny all egress policy.
 func DenyAllPolicyCreator() reconciling.NamedNetworkPolicyCreatorGetter {
 	return func() (string, reconciling.NetworkPolicyCreator) {
-		return "default-deny-all-egress", func(np *networkingv1.NetworkPolicy) (*networkingv1.NetworkPolicy, error) {
+		return resources.NetworkPolicyDefaultDenyAllEgress, func(np *networkingv1.NetworkPolicy) (*networkingv1.NetworkPolicy, error) {
 			np.Spec = networkingv1.NetworkPolicySpec{
 				PolicyTypes: []networkingv1.PolicyType{
 					networkingv1.PolicyTypeEgress,
@@ -57,11 +55,10 @@ func DenyAllPolicyCreator() reconciling.NamedNetworkPolicyCreatorGetter {
 	}
 }
 
-// EtcdAllowCreator returns a func to create/update the apiserver
-// deny all egress policy.
+// EctdAllowCreator returns a func to create/update the apiserver ETCD allow egress policy.
 func EctdAllowCreator(c *kubermaticv1.Cluster) reconciling.NamedNetworkPolicyCreatorGetter {
 	return func() (string, reconciling.NetworkPolicyCreator) {
-		return "etcd-allow", func(np *networkingv1.NetworkPolicy) (*networkingv1.NetworkPolicy, error) {
+		return resources.NetworkPolicyEtcdAllow, func(np *networkingv1.NetworkPolicy) (*networkingv1.NetworkPolicy, error) {
 			np.Spec = networkingv1.NetworkPolicySpec{
 				PolicyTypes: []networkingv1.PolicyType{
 					networkingv1.PolicyTypeEgress,
@@ -92,11 +89,14 @@ func EctdAllowCreator(c *kubermaticv1.Cluster) reconciling.NamedNetworkPolicyCre
 	}
 }
 
-// DNSAllowCreator returns a func to create/update the apiserver
-// deny all egress policy.
-func DNSAllowCreator(c *kubermaticv1.Cluster) reconciling.NamedNetworkPolicyCreatorGetter {
+// DNSAllowCreator returns a func to create/update the apiserver DNS allow egress policy.
+func DNSAllowCreator(c *kubermaticv1.Cluster, data *resources.TemplateData) reconciling.NamedNetworkPolicyCreatorGetter {
 	return func() (string, reconciling.NetworkPolicyCreator) {
-		return "dns-allow", func(np *networkingv1.NetworkPolicy) (*networkingv1.NetworkPolicy, error) {
+		return resources.NetworkPolicyDNSAllow, func(np *networkingv1.NetworkPolicy) (*networkingv1.NetworkPolicy, error) {
+			dnsPort := intstr.FromInt(53)
+			protoUDP := corev1.ProtocolUDP
+			protoTCP := corev1.ProtocolTCP
+
 			np.Spec = networkingv1.NetworkPolicySpec{
 				PolicyTypes: []networkingv1.PolicyType{
 					networkingv1.PolicyTypeEgress,
@@ -108,30 +108,28 @@ func DNSAllowCreator(c *kubermaticv1.Cluster) reconciling.NamedNetworkPolicyCrea
 				},
 				Egress: []networkingv1.NetworkPolicyEgressRule{
 					{
-						To: []networkingv1.NetworkPolicyPeer{
+						Ports: []networkingv1.NetworkPolicyPort{
 							{
-								PodSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{
-										resources.AppLabelKey: "dns-resolver",
-										"cluster":             c.ObjectMeta.Name,
-									},
-								},
+								Protocol: &protoUDP,
+								Port:     &dnsPort,
+							},
+							{
+								Protocol: &protoTCP,
+								Port:     &dnsPort,
 							},
 						},
 					},
 				},
 			}
-
 			return np, nil
 		}
 	}
 }
 
-// OpenVPNServerAllowCreator returns a func to create/update the apiserver
-// deny all egress policy.
+// OpenVPNServerAllowCreator returns a func to create/update the apiserver OpenVPN allow egress policy.
 func OpenVPNServerAllowCreator(c *kubermaticv1.Cluster) reconciling.NamedNetworkPolicyCreatorGetter {
 	return func() (string, reconciling.NetworkPolicyCreator) {
-		return "openvpn-server-allow", func(np *networkingv1.NetworkPolicy) (*networkingv1.NetworkPolicy, error) {
+		return resources.NetworkPolicyOpenVPNServerAllow, func(np *networkingv1.NetworkPolicy) (*networkingv1.NetworkPolicy, error) {
 			np.Spec = networkingv1.NetworkPolicySpec{
 				PolicyTypes: []networkingv1.PolicyType{
 					networkingv1.PolicyTypeEgress,
@@ -164,7 +162,7 @@ func OpenVPNServerAllowCreator(c *kubermaticv1.Cluster) reconciling.NamedNetwork
 
 func MachineControllerWebhookCreator(c *kubermaticv1.Cluster) reconciling.NamedNetworkPolicyCreatorGetter {
 	return func() (string, reconciling.NetworkPolicyCreator) {
-		return "machine-controller-webhook-allow", func(np *networkingv1.NetworkPolicy) (*networkingv1.NetworkPolicy, error) {
+		return resources.NetworkPolicyMachineControllerWebhookAllow, func(np *networkingv1.NetworkPolicy) (*networkingv1.NetworkPolicy, error) {
 			np.Spec = networkingv1.NetworkPolicySpec{
 				PolicyTypes: []networkingv1.PolicyType{
 					networkingv1.PolicyTypeEgress,
@@ -196,7 +194,7 @@ func MachineControllerWebhookCreator(c *kubermaticv1.Cluster) reconciling.NamedN
 
 func MetricsServerAllowCreator(c *kubermaticv1.Cluster) reconciling.NamedNetworkPolicyCreatorGetter {
 	return func() (string, reconciling.NetworkPolicyCreator) {
-		return "metrics-server-allow", func(np *networkingv1.NetworkPolicy) (*networkingv1.NetworkPolicy, error) {
+		return resources.NetworkPolicyMetricsServerAllow, func(np *networkingv1.NetworkPolicy) (*networkingv1.NetworkPolicy, error) {
 			np.Spec = networkingv1.NetworkPolicySpec{
 				PolicyTypes: []networkingv1.PolicyType{
 					networkingv1.PolicyTypeEgress,
@@ -226,36 +224,12 @@ func MetricsServerAllowCreator(c *kubermaticv1.Cluster) reconciling.NamedNetwork
 	}
 }
 
-// OIDCIssuerAllowCreator returns a func to create/update the apiserver oidc-issuer-allow egress policy.
-func OIDCIssuerAllowCreator(issuerURL string) reconciling.NamedNetworkPolicyCreatorGetter {
-	return ExternalURLAllowCreator("oidc-issuer-allow", issuerURL)
-}
-
-// ExternalURLAllowCreator returns a func to create/update the apiserver egress policy to a named external URL.
-func ExternalURLAllowCreator(ruleName, issuerURL string) reconciling.NamedNetworkPolicyCreatorGetter {
+// ClusterExternalAddrAllowCreator returns a func to create/update the apiserver cluster-external-addr-allow egress policy.
+// This policy is necessary in Konnectivity setup, so that konnectivity-server can connect to the apiserver via
+// the external URL (used as service-account-issuer) to validate konnectivity-agent authentication token.
+func ClusterExternalAddrAllowCreator(egressIPs []net.IP, exposeStrategy kubermaticv1.ExposeStrategy) reconciling.NamedNetworkPolicyCreatorGetter {
 	return func() (string, reconciling.NetworkPolicyCreator) {
-		return ruleName, func(np *networkingv1.NetworkPolicy) (*networkingv1.NetworkPolicy, error) {
-			var ipList []net.IP
-			u, err := url.Parse(issuerURL)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse OIDC issuer URL %s: %v", issuerURL, err)
-			}
-			if ip := net.ParseIP(u.Hostname()); ip != nil {
-				// hostname is an IP address
-				ipList = append(ipList, ip)
-			} else {
-				// hostname is a domain name
-				ipList, err = lookupIPWithTimeout(u.Hostname(), 5*time.Second)
-				if err != nil {
-					return nil, fmt.Errorf("failed to resolve OIDC issuer hostname %s: %v", u.Hostname(), err)
-				}
-				if len(ipList) == 0 {
-					return nil, fmt.Errorf("failed to resolve OIDC issuer hostname: no resolved IP address for %s", u.Hostname())
-				}
-			}
-			sort.Slice(ipList, func(i, j int) bool {
-				return bytes.Compare(ipList[i], ipList[j]) < 0
-			})
+		return resources.NetworkPolicyClusterExternalAddrAllow, func(np *networkingv1.NetworkPolicy) (*networkingv1.NetworkPolicy, error) {
 			np.Spec = networkingv1.NetworkPolicySpec{
 				PolicyTypes: []networkingv1.PolicyType{
 					networkingv1.PolicyTypeEgress,
@@ -267,40 +241,92 @@ func ExternalURLAllowCreator(ruleName, issuerURL string) reconciling.NamedNetwor
 				},
 				Egress: []networkingv1.NetworkPolicyEgressRule{
 					{
-						To: []networkingv1.NetworkPolicyPeer{
-							{
-								// allow egress traffic to the nginx-ingress-controller as for some CNI + kube-proxy
-								// mode combinations a local path to it may be used to reach OIDC issuer installed in KKP
-								NamespaceSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{
-										corev1.LabelMetadataName: kubermaticmaster.NginxIngressControllerNamespace,
-									},
-								},
-							},
-						},
+						To: ipListToPeers(egressIPs),
 					},
 				},
 			}
-			// allow egress traffic to OIDC issuer's external IPs
-			for _, ip := range ipList {
-				cidr := fmt.Sprintf("%s/%d", ip.String(), net.IPv4len*8)
-				if ip.To4() == nil {
-					cidr = fmt.Sprintf("%s/%d", ip.String(), net.IPv6len*8)
-				}
+
+			// allow egress traffic to the nodeport-proxy as for some CNI + kube-proxy mode
+			// combinations a local path to it may be used to reach the external apiserver address
+			if exposeStrategy == kubermaticv1.ExposeStrategyLoadBalancer {
+				// allows traffic to the nodeport-proxy running in the user cluster namespace used for the LB expose strategy
 				np.Spec.Egress[0].To = append(np.Spec.Egress[0].To, networkingv1.NetworkPolicyPeer{
-					IPBlock: &networkingv1.IPBlock{
-						CIDR: cidr,
+					PodSelector: &metav1.LabelSelector{
+						MatchLabels: resources.BaseAppLabels(resources.NodePortProxyEnvoyDeploymentName, nil),
+					},
+				})
+			} else {
+				// allows traffic to the nodeport-proxy running in the kubermatic namespace used for other expose strategies
+				np.Spec.Egress[0].To = append(np.Spec.Egress[0].To, networkingv1.NetworkPolicyPeer{
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							corev1.LabelMetadataName: resources.KubermaticNamespace,
+						},
+					},
+					PodSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							common.NameLabel: nodeportproxy.EnvoyDeploymentName,
+						},
 					},
 				})
 			}
+
 			return np, nil
 		}
 	}
 }
 
-func lookupIPWithTimeout(host string, timeout time.Duration) ([]net.IP, error) {
-	var r net.Resolver
-	ctx, cancel := context.WithTimeout(context.TODO(), timeout)
-	defer cancel() // to avoid possible resource leak
-	return r.LookupIP(ctx, "ip", host)
+// OIDCIssuerAllowCreator returns a func to create/update the apiserver oidc-issuer-allow egress policy.
+func OIDCIssuerAllowCreator(egressIPs []net.IP) reconciling.NamedNetworkPolicyCreatorGetter {
+	return ExternalURLAllowCreator(resources.NetworkPolicyOIDCIssuerAllow, egressIPs)
+}
+
+func ExternalURLAllowCreator(ruleName string, egressIPs []net.IP) reconciling.NamedNetworkPolicyCreatorGetter {
+	return func() (string, reconciling.NetworkPolicyCreator) {
+		return ruleName, func(np *networkingv1.NetworkPolicy) (*networkingv1.NetworkPolicy, error) {
+			np.Spec = networkingv1.NetworkPolicySpec{
+				PolicyTypes: []networkingv1.PolicyType{
+					networkingv1.PolicyTypeEgress,
+				},
+				PodSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						resources.AppLabelKey: name,
+					},
+				},
+				Egress: []networkingv1.NetworkPolicyEgressRule{
+					{
+						To: append(ipListToPeers(egressIPs), networkingv1.NetworkPolicyPeer{
+							// allow egress traffic to the nginx-ingress-controller as for some CNI + kube-proxy
+							// mode combinations a local path to it may be used to reach OIDC issuer installed in KKP
+							NamespaceSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									corev1.LabelMetadataName: kubermaticmaster.NginxIngressControllerNamespace,
+								},
+							},
+						}),
+					},
+				},
+			}
+
+			return np, nil
+		}
+	}
+}
+
+func ipListToPeers(ips []net.IP) []networkingv1.NetworkPolicyPeer {
+	result := []networkingv1.NetworkPolicyPeer{}
+
+	for _, ip := range ips {
+		cidr := fmt.Sprintf("%s/%d", ip.String(), net.IPv4len*8)
+		if ip.To4() == nil {
+			cidr = fmt.Sprintf("%s/%d", ip.String(), net.IPv6len*8)
+		}
+		result = append(result, networkingv1.NetworkPolicyPeer{
+			IPBlock: &networkingv1.IPBlock{
+				CIDR: cidr,
+			},
+		})
+	}
+
+	return result
 }

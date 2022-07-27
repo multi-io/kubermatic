@@ -244,8 +244,7 @@ func TestValidateClusterNetworkingConfig(t *testing.T) {
 		{
 			name:          "empty network config",
 			networkConfig: kubermaticv1.ClusterNetworkingConfig{},
-			wantErr:       false,
-			allowEmpty:    true,
+			wantErr:       true,
 		},
 		{
 			name: "valid network config",

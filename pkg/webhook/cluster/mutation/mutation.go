@@ -257,6 +257,9 @@ func (h *AdmissionHandler) defaultClusterComponentSettings(c *kubermaticv1.Clust
 	if settings.NodeLocalDNS.Resources == nil {
 		settings.NodeLocalDNS.Resources = h.defaultComponentSettings.NodeLocalDNS.Resources
 	}
+	if settings.KonnectivityProxy.Resources == nil {
+		settings.KonnectivityProxy.Resources = h.defaultComponentSettings.KonnectivityProxy.Resources
+	}
 
 	// Always enable external CCM
 	if c.Spec.Cloud.Anexia != nil || c.Spec.Cloud.Kubevirt != nil {

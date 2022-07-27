@@ -80,7 +80,7 @@ func DeploymentCreator(data *resources.TemplateData, priorityClasses bool) recon
 				dep.Spec.Template.Spec.PriorityClassName = resources.PriorityClusterControllerManagerDeploymentName
 			}
 
-			volumes := getVolumes()
+			volumes := getVolumes(data.IsKonnectivityEnabled())
 			volumeMounts := getVolumeMounts()
 
 			if data.Cluster().Spec.Cloud.GCP != nil {
@@ -116,11 +116,6 @@ func DeploymentCreator(data *resources.TemplateData, priorityClasses bool) recon
 			}
 
 			dep.Spec.Template.Spec.Volumes = volumes
-
-			openvpnSidecar, err := vpnsidecar.OpenVPNSidecarContainer(data, "openvpn-client")
-			if err != nil {
-				return nil, fmt.Errorf("failed to get openvpn sidecar: %v", err)
-			}
 
 			if data.Cluster().Spec.Cloud.VSphere != nil {
 				fakeVMWareUUIDMount := corev1.VolumeMount{
@@ -189,7 +184,6 @@ func DeploymentCreator(data *resources.TemplateData, priorityClasses bool) recon
 
 			dep.Spec.Template.Spec.InitContainers = []corev1.Container{}
 			dep.Spec.Template.Spec.Containers = []corev1.Container{
-				*openvpnSidecar,
 				{
 					Name:    resources.ControllerManagerDeploymentName,
 					Image:   controllerImage,
@@ -219,9 +213,18 @@ func DeploymentCreator(data *resources.TemplateData, priorityClasses bool) recon
 				},
 			}
 			defResourceRequirements := map[string]*corev1.ResourceRequirements{
-				name:                defaultResourceRequirements.DeepCopy(),
-				openvpnSidecar.Name: openvpnSidecar.Resources.DeepCopy(),
+				name: defaultResourceRequirements.DeepCopy(),
 			}
+
+			if !data.IsKonnectivityEnabled() {
+				openvpnSidecar, err := vpnsidecar.OpenVPNSidecarContainer(data, "openvpn-client")
+				if err != nil {
+					return nil, fmt.Errorf("failed to get openvpn sidecar: %w", err)
+				}
+				dep.Spec.Template.Spec.Containers = append(dep.Spec.Template.Spec.Containers, *openvpnSidecar)
+				defResourceRequirements[openvpnSidecar.Name] = openvpnSidecar.Resources.DeepCopy()
+			}
+
 			err = resources.SetResourceRequirements(dep.Spec.Template.Spec.Containers, dep.Annotations, defResourceRequirements, resources.GetOverrides(data.Cluster().Spec.ComponentsOverride))
 			if err != nil {
 				return nil, fmt.Errorf("failed to set resource requirements: %v", err)
@@ -343,8 +346,8 @@ func getVolumeMounts() []corev1.VolumeMount {
 	}
 }
 
-func getVolumes() []corev1.Volume {
-	return []corev1.Volume{
+func getVolumes(isKonnectivityEnabled bool) []corev1.Volume {
+	vs := []corev1.Volume{
 		{
 			Name: resources.CASecretName,
 			VolumeSource: corev1.VolumeSource{
@@ -382,14 +385,6 @@ func getVolumes() []corev1.Volume {
 			},
 		},
 		{
-			Name: resources.OpenVPNClientCertificatesSecretName,
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: resources.OpenVPNClientCertificatesSecretName,
-				},
-			},
-		},
-		{
 			Name: resources.ControllerManagerKubeconfigSecretName,
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
@@ -398,6 +393,17 @@ func getVolumes() []corev1.Volume {
 			},
 		},
 	}
+	if !isKonnectivityEnabled {
+		vs = append(vs, corev1.Volume{
+			Name: resources.OpenVPNClientCertificatesSecretName,
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: resources.OpenVPNClientCertificatesSecretName,
+				},
+			},
+		})
+	}
+	return vs
 }
 
 type kubeControllerManagerEnvData interface {

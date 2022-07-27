@@ -49,6 +49,7 @@ type Routing struct {
 	sshKeyProvider                        provider.SSHKeyProvider
 	privilegedSSHKeyProvider              provider.PrivilegedSSHKeyProvider
 	userProvider                          provider.UserProvider
+	featureGatesProvider                  provider.FeatureGatesProvider
 	serviceAccountProvider                provider.ServiceAccountProvider
 	privilegedServiceAccountProvider      provider.PrivilegedServiceAccountProvider
 	serviceAccountTokenProvider           provider.ServiceAccountTokenProvider
@@ -105,6 +106,7 @@ func NewV2Routing(routingParams handler.RoutingParams) Routing {
 		addonConfigProvider:                   routingParams.AddonConfigProvider,
 		sshKeyProvider:                        routingParams.SSHKeyProvider,
 		privilegedSSHKeyProvider:              routingParams.PrivilegedSSHKeyProvider,
+		featureGatesProvider:                  routingParams.FeatureGatesProvider,
 		userProvider:                          routingParams.UserProvider,
 		serviceAccountProvider:                routingParams.ServiceAccountProvider,
 		privilegedServiceAccountProvider:      routingParams.PrivilegedServiceAccountProvider,

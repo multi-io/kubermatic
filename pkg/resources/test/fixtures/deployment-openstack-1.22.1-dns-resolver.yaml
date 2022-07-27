@@ -131,13 +131,13 @@ spec:
       - configMap:
           name: dns-resolver
         name: dns-resolver
-      - name: openvpn-client-certificates
-        secret:
-          secretName: openvpn-client-certificates
       - name: ca
         secret:
           items:
           - key: ca.crt
             path: ca.crt
           secretName: ca
+      - name: openvpn-client-certificates
+        secret:
+          secretName: openvpn-client-certificates
 status: {}

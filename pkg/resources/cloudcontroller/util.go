@@ -26,6 +26,13 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+const (
+	v121 = "1.21"
+	v122 = "1.22"
+	v123 = "1.23"
+	v124 = "1.24"
+)
+
 // ExternalCloudControllerFeatureSupported checks if the cloud provider supports
 // external CCM.
 func ExternalCloudControllerFeatureSupported(dc *kubermaticv1.Datacenter, cluster *kubermaticv1.Cluster, incompatibilities ...*version.ProviderIncompatibility) bool {
@@ -118,16 +125,8 @@ func isOTC(dc *kubermaticv1.DatacenterSpecOpenstack) bool {
 	return u.Host == "iam.eu-de.otc.t-systems.com"
 }
 
-func getVolumes() []corev1.Volume {
-	return []corev1.Volume{
-		{
-			Name: resources.OpenVPNClientCertificatesSecretName,
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: resources.OpenVPNClientCertificatesSecretName,
-				},
-			},
-		},
+func getVolumes(isKonnectivityEnabled bool) []corev1.Volume {
+	vs := []corev1.Volume{
 		{
 			Name: resources.CloudControllerManagerKubeconfigSecretName,
 			VolumeSource: corev1.VolumeSource{
@@ -137,6 +136,17 @@ func getVolumes() []corev1.Volume {
 			},
 		},
 	}
+	if !isKonnectivityEnabled {
+		vs = append(vs, corev1.Volume{
+			Name: resources.OpenVPNClientCertificatesSecretName,
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: resources.OpenVPNClientCertificatesSecretName,
+				},
+			},
+		})
+	}
+	return vs
 }
 
 func getVolumeMounts() []corev1.VolumeMount {

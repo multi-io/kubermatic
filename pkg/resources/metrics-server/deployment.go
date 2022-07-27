@@ -66,6 +66,7 @@ type metricsServerData interface {
 	DNATControllerImage() string
 	DNATControllerTag() string
 	NodeAccessNetwork() string
+	IsKonnectivityEnabled() bool
 }
 
 // TLSServingCertSecretCreator returns a function to manage the TLS serving cert for the metrics
@@ -98,7 +99,7 @@ func DeploymentCreator(data metricsServerData, priorityClasses bool) reconciling
 				dep.Spec.Template.Spec.PriorityClassName = resources.PriorityClassMetricsServerDeploymentName
 			}
 
-			volumes := getVolumes()
+			volumes := getVolumes(data.IsKonnectivityEnabled())
 			podLabels, err := data.GetPodTemplateLabels(name, volumes, nil)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create pod labels: %v", err)
@@ -109,16 +110,6 @@ func DeploymentCreator(data metricsServerData, priorityClasses bool) reconciling
 			}
 
 			dep.Spec.Template.Spec.Volumes = volumes
-
-			openvpnSidecar, err := vpnsidecar.OpenVPNSidecarContainer(data, "openvpn-client")
-			if err != nil {
-				return nil, fmt.Errorf("failed to get openvpn-client sidecar: %v", err)
-			}
-
-			dnatControllerSidecar, err := vpnsidecar.DnatControllerContainer(data, "dnat-controller", "")
-			if err != nil {
-				return nil, fmt.Errorf("failed to get dnat-controller sidecar: %v", err)
-			}
 
 			dep.Spec.Template.Spec.InitContainers = []corev1.Container{}
 			dep.Spec.Template.Spec.Containers = []corev1.Container{
@@ -151,13 +142,25 @@ func DeploymentCreator(data metricsServerData, priorityClasses bool) reconciling
 						},
 					},
 				},
-				*openvpnSidecar,
-				*dnatControllerSidecar,
 			}
 			defResourceRequirements := map[string]*corev1.ResourceRequirements{
-				name:                       defaultResourceRequirements.DeepCopy(),
-				openvpnSidecar.Name:        openvpnSidecar.Resources.DeepCopy(),
-				dnatControllerSidecar.Name: dnatControllerSidecar.Resources.DeepCopy(),
+				name: defaultResourceRequirements.DeepCopy(),
+			}
+			if !data.IsKonnectivityEnabled() {
+				openvpnSidecar, err := vpnsidecar.OpenVPNSidecarContainer(data, "openvpn-client")
+				if err != nil {
+					return nil, fmt.Errorf("failed to get openvpn-client sidecar: %w", err)
+				}
+				dnatControllerSidecar, err := vpnsidecar.DnatControllerContainer(data, "dnat-controller", "")
+				if err != nil {
+					return nil, fmt.Errorf("failed to get dnat-controller sidecar: %w", err)
+				}
+				dep.Spec.Template.Spec.Containers = append(dep.Spec.Template.Spec.Containers,
+					*openvpnSidecar,
+					*dnatControllerSidecar,
+				)
+				defResourceRequirements[openvpnSidecar.Name] = openvpnSidecar.Resources.DeepCopy()
+				defResourceRequirements[dnatControllerSidecar.Name] = dnatControllerSidecar.Resources.DeepCopy()
 			}
 			err = resources.SetResourceRequirements(dep.Spec.Template.Spec.Containers, dep.Annotations, defResourceRequirements, nil)
 			if err != nil {
@@ -177,29 +180,13 @@ func DeploymentCreator(data metricsServerData, priorityClasses bool) reconciling
 	}
 }
 
-func getVolumes() []corev1.Volume {
-	return []corev1.Volume{
+func getVolumes(isKonnectivityEnabled bool) []corev1.Volume {
+	vs := []corev1.Volume{
 		{
 			Name: resources.MetricsServerKubeconfigSecretName,
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName: resources.MetricsServerKubeconfigSecretName,
-				},
-			},
-		},
-		{
-			Name: resources.OpenVPNClientCertificatesSecretName,
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: resources.OpenVPNClientCertificatesSecretName,
-				},
-			},
-		},
-		{
-			Name: resources.KubeletDnatControllerKubeconfigSecretName,
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: resources.KubeletDnatControllerKubeconfigSecretName,
 				},
 			},
 		},
@@ -212,4 +199,25 @@ func getVolumes() []corev1.Volume {
 			},
 		},
 	}
+	if !isKonnectivityEnabled {
+		vs = append(vs, []corev1.Volume{
+			{
+				Name: resources.OpenVPNClientCertificatesSecretName,
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName: resources.OpenVPNClientCertificatesSecretName,
+					},
+				},
+			},
+			{
+				Name: resources.KubeletDnatControllerKubeconfigSecretName,
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName: resources.KubeletDnatControllerKubeconfigSecretName,
+					},
+				},
+			},
+		}...)
+	}
+	return vs
 }

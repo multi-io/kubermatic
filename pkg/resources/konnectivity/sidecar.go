@@ -22,26 +22,40 @@ import (
 	"k8c.io/kubermatic/v2/pkg/resources"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
+)
+
+var (
+	defResourceRequirements = corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("10Mi"),
+			corev1.ResourceCPU:    resource.MustParse("10m"),
+		},
+		Limits: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("200Mi"),
+			corev1.ResourceCPU:    resource.MustParse("2"),
+		},
+	}
 )
 
 // ProxySidecar returns container that runs konnectivity proxy server as a sidecar in apiserver pods.
 func ProxySidecar(data *resources.TemplateData, serverCount int32) (*corev1.Container, error) {
 	const (
 		name    = "k8s-artifacts-prod/kas-network-proxy/proxy-server"
-		version = "v0.0.24"
+		version = "v0.0.31"
 	)
 
 	return &corev1.Container{
-		Name:            "konnectivity-server-container",
-		Image:           fmt.Sprintf("%s/%s:%s", data.ImageRegistry(resources.RegistryUSGCR), name, version),
+		Name:            resources.KonnectivityServerContainer,
+		Image:           fmt.Sprintf("%s/%s:%s", data.ImageRegistry(resources.RegistryEUGCR), name, version),
 		ImagePullPolicy: corev1.PullAlways,
 		Command: []string{
 			"/proxy-server",
 		},
 		Args: []string{
 			"--logtostderr=true",
-			"-v=100",
+			"-v=3",
 			fmt.Sprintf("--cluster-key=/etc/kubernetes/pki/%s.key", resources.KonnectivityProxyTLSSecretName),
 			fmt.Sprintf("--cluster-cert=/etc/kubernetes/pki/%s.crt", resources.KonnectivityProxyTLSSecretName),
 			"--uds-name=/etc/kubernetes/konnectivity-server/konnectivity-server.socket",
@@ -56,20 +70,25 @@ func ProxySidecar(data *resources.TemplateData, serverCount int32) (*corev1.Cont
 			fmt.Sprintf("--agent-service-account=%s", resources.KonnectivityServiceAccountName),
 			"--delete-existing-uds-file=true",
 			"--authentication-audience=system:konnectivity-server",
-			"--proxy-strategies=destHost,defaultRoute",
+			// TODO rastislavs: switch to "--proxy-strategies=destHost,default" with "--agent-identifiers=ipv4=$(HOST_IP)"
+			// once the upstream issue is resolved: https://github.com/kubernetes-sigs/apiserver-network-proxy/issues/261
+			"--proxy-strategies=default",
 		},
 		Ports: []corev1.ContainerPort{
 			{
 				Name:          "agentport",
 				ContainerPort: 8132,
+				Protocol:      corev1.ProtocolTCP,
 			},
 			{
 				Name:          "adminport",
 				ContainerPort: 8133,
+				Protocol:      corev1.ProtocolTCP,
 			},
 			{
 				Name:          "healthport",
 				ContainerPort: 8134,
+				Protocol:      corev1.ProtocolTCP,
 			},
 		},
 		VolumeMounts: []corev1.VolumeMount{
@@ -94,12 +113,16 @@ func ProxySidecar(data *resources.TemplateData, serverCount int32) (*corev1.Cont
 				HTTPGet: &corev1.HTTPGetAction{
 					Path:   "/healthz",
 					Port:   intstr.IntOrString{IntVal: 8134},
-					Scheme: "HTTP",
+					Scheme: corev1.URISchemeHTTP,
 				},
 				TCPSocket: nil,
 			},
-			InitialDelaySeconds: 30,
-			TimeoutSeconds:      60,
+			InitialDelaySeconds: 15,
+			TimeoutSeconds:      15,
+			PeriodSeconds:       10,
+			SuccessThreshold:    1,
+			FailureThreshold:    3,
 		},
+		Resources: defResourceRequirements,
 	}, nil
 }
