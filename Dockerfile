@@ -26,7 +26,8 @@ ADD https://storage.googleapis.com/kubernetes-release/release/v1.20.10/bin/linux
 RUN wget -q -O- https://get.helm.sh/helm-v3.5.0-linux-amd64.tar.gz | tar xzOf - linux-amd64/helm > /usr/local/bin/helm
 
 # We need the ca-certs so they api doesn't crash because it can't verify the certificate of Dex
-RUN chmod +x /usr/local/bin/kubectl-* /usr/local/bin/helm && apk add --no-cache ca-certificates=~20211220
+# hadolint ignore=DL3018
+RUN chmod +x /usr/local/bin/kubectl-* /usr/local/bin/helm && apk add --no-cache ca-certificates && update-ca-certificates
 
 # Do not needless copy all binaries into the image.
 COPY ./_build/image-loader \
