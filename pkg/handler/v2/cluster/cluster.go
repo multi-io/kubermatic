@@ -23,9 +23,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"strconv"
-
-	"github.com/go-kit/kit/endpoint"
 
 	apiv1 "k8c.io/kubermatic/v2/pkg/api/v1"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
@@ -37,6 +34,7 @@ import (
 	"k8c.io/kubermatic/v2/pkg/util/errors"
 	kubermaticerrors "k8c.io/kubermatic/v2/pkg/util/errors"
 
+	"github.com/go-kit/kit/endpoint"
 	"k8s.io/klog"
 )
 
@@ -97,7 +95,7 @@ func GetEndpoint(projectProvider provider.ProjectProvider, privilegedProjectProv
 func DeleteEndpoint(sshKeyProvider provider.SSHKeyProvider, privilegedSSHKeyProvider provider.PrivilegedSSHKeyProvider, projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider, userInfoGetter provider.UserInfoGetter) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(DeleteReq)
-		return handlercommon.DeleteEndpoint(ctx, userInfoGetter, req.ProjectID, req.ClusterID, req.DeleteVolumes, req.DeleteLoadBalancers, sshKeyProvider, privilegedSSHKeyProvider, projectProvider, privilegedProjectProvider)
+		return handlercommon.DeleteEndpoint(ctx, userInfoGetter, req.ProjectID, req.ClusterID, sshKeyProvider, privilegedSSHKeyProvider, projectProvider, privilegedProjectProvider)
 	}
 }
 
@@ -387,12 +385,6 @@ type DeleteReq struct {
 	// in: path
 	// required: true
 	ClusterID string `json:"cluster_id"`
-	// in: header
-	// DeleteVolumes if true all cluster PV's and PVC's will be deleted from cluster
-	DeleteVolumes bool
-	// in: header
-	// DeleteLoadBalancers if true all load balancers will be deleted from cluster
-	DeleteLoadBalancers bool
 }
 
 // GetSeedCluster returns the SeedCluster object
@@ -416,24 +408,6 @@ func DecodeDeleteReq(c context.Context, r *http.Request) (interface{}, error) {
 		return nil, err
 	}
 	req.ProjectReq = projectReq.(common.ProjectReq)
-
-	headerValue := r.Header.Get("DeleteVolumes")
-	if len(headerValue) > 0 {
-		deleteVolumes, err := strconv.ParseBool(headerValue)
-		if err != nil {
-			return nil, err
-		}
-		req.DeleteVolumes = deleteVolumes
-	}
-
-	headerValue = r.Header.Get("DeleteLoadBalancers")
-	if len(headerValue) > 0 {
-		deleteLB, err := strconv.ParseBool(headerValue)
-		if err != nil {
-			return nil, err
-		}
-		req.DeleteLoadBalancers = deleteLB
-	}
 
 	return req, nil
 }
