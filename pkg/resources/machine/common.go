@@ -67,18 +67,18 @@ func getOsName(nodeSpec apiv1.NodeSpec) (providerconfig.OperatingSystem, error) 
 	return "", errors.New("unknown operating system")
 }
 
-func stringProviderConfig(s string) *providerconfig.ConfigVarString {
-	if s == "" {
+func stringProviderConfig(s *string) *providerconfig.ConfigVarString {
+	if s == nil || *s == "" {
 		return nil
 	}
-	return &providerconfig.ConfigVarString{Value: s}
+	return &providerconfig.ConfigVarString{Value: *s}
 }
 
-func boolProviderConfig(v bool) *providerconfig.ConfigVarBool {
-	if !v {
+func boolProviderConfig(v *bool) *providerconfig.ConfigVarBool {
+	if v == nil || !*v {
 		return nil
 	}
-	return &providerconfig.ConfigVarBool{Value: v}
+	return &providerconfig.ConfigVarBool{Value: *v}
 }
 
 func getAWSProviderSpec(c *kubermaticv1.Cluster, nodeSpec apiv1.NodeSpec, dc *kubermaticv1.Datacenter) (*runtime.RawExtension, error) {
@@ -93,23 +93,23 @@ func getAWSProviderSpec(c *kubermaticv1.Cluster, nodeSpec apiv1.NodeSpec, dc *ku
 
 	spotConfig := &aws.SpotInstanceConfig{}
 	if nodeSpec.Cloud.AWS.IsSpotInstance != nil && *nodeSpec.Cloud.AWS.IsSpotInstance {
-		spotConfig.MaxPrice = stringProviderConfig(*nodeSpec.Cloud.AWS.SpotInstanceMaxPrice)
-		spotConfig.PersistentRequest = boolProviderConfig(*nodeSpec.Cloud.AWS.SpotInstancePersistentRequest)
-		spotConfig.InterruptionBehavior = stringProviderConfig(*nodeSpec.Cloud.AWS.SpotInstanceInterruptionBehavior)
+		spotConfig.MaxPrice = stringProviderConfig(nodeSpec.Cloud.AWS.SpotInstanceMaxPrice)
+		spotConfig.PersistentRequest = boolProviderConfig(nodeSpec.Cloud.AWS.SpotInstancePersistentRequest)
+		spotConfig.InterruptionBehavior = stringProviderConfig(nodeSpec.Cloud.AWS.SpotInstanceInterruptionBehavior)
 	}
 
 	config := aws.RawConfig{
 		// If the node spec doesn't provide a subnet ID, AWS will just pick the AZ's default subnet.
-		SubnetID:           stringProviderConfig(nodeSpec.Cloud.AWS.SubnetID),
-		VpcID:              stringProviderConfig(c.Spec.Cloud.AWS.VPCID),
+		SubnetID:           stringProviderConfig(&nodeSpec.Cloud.AWS.SubnetID),
+		VpcID:              stringProviderConfig(&c.Spec.Cloud.AWS.VPCID),
 		SecurityGroupIDs:   []providerconfig.ConfigVarString{{Value: c.Spec.Cloud.AWS.SecurityGroupID}},
-		Region:             stringProviderConfig(dc.Spec.AWS.Region),
-		AvailabilityZone:   stringProviderConfig(nodeSpec.Cloud.AWS.AvailabilityZone),
-		InstanceProfile:    stringProviderConfig(c.Spec.Cloud.AWS.InstanceProfileName),
-		InstanceType:       stringProviderConfig(nodeSpec.Cloud.AWS.InstanceType),
-		DiskType:           stringProviderConfig(nodeSpec.Cloud.AWS.VolumeType),
+		Region:             stringProviderConfig(&dc.Spec.AWS.Region),
+		AvailabilityZone:   stringProviderConfig(&nodeSpec.Cloud.AWS.AvailabilityZone),
+		InstanceProfile:    stringProviderConfig(&c.Spec.Cloud.AWS.InstanceProfileName),
+		InstanceType:       stringProviderConfig(&nodeSpec.Cloud.AWS.InstanceType),
+		DiskType:           stringProviderConfig(&nodeSpec.Cloud.AWS.VolumeType),
 		DiskSize:           nodeSpec.Cloud.AWS.VolumeSize,
-		AMI:                stringProviderConfig(ami),
+		AMI:                stringProviderConfig(&ami),
 		AssignPublicIP:     nodeSpec.Cloud.AWS.AssignPublicIP,
 		IsSpotInstance:     nodeSpec.Cloud.AWS.IsSpotInstance,
 		SpotInstanceConfig: spotConfig,
@@ -144,23 +144,23 @@ func getAWSProviderSpec(c *kubermaticv1.Cluster, nodeSpec apiv1.NodeSpec, dc *ku
 
 func getAzureProviderSpec(c *kubermaticv1.Cluster, nodeSpec apiv1.NodeSpec, dc *kubermaticv1.Datacenter) (*runtime.RawExtension, error) {
 	config := azure.RawConfig{
-		Location:              stringProviderConfig(dc.Spec.Azure.Location),
-		ResourceGroup:         stringProviderConfig(c.Spec.Cloud.Azure.ResourceGroup),
-		VNetResourceGroup:     stringProviderConfig(c.Spec.Cloud.Azure.VNetResourceGroup),
-		VMSize:                stringProviderConfig(nodeSpec.Cloud.Azure.Size),
+		Location:              stringProviderConfig(&dc.Spec.Azure.Location),
+		ResourceGroup:         stringProviderConfig(&c.Spec.Cloud.Azure.ResourceGroup),
+		VNetResourceGroup:     stringProviderConfig(&c.Spec.Cloud.Azure.VNetResourceGroup),
+		VMSize:                stringProviderConfig(&nodeSpec.Cloud.Azure.Size),
 		OSDiskSize:            nodeSpec.Cloud.Azure.OSDiskSize,
 		DataDiskSize:          nodeSpec.Cloud.Azure.DataDiskSize,
-		VNetName:              stringProviderConfig(c.Spec.Cloud.Azure.VNetName),
-		SubnetName:            stringProviderConfig(c.Spec.Cloud.Azure.SubnetName),
-		RouteTableName:        stringProviderConfig(c.Spec.Cloud.Azure.RouteTableName),
-		AvailabilitySet:       stringProviderConfig(c.Spec.Cloud.Azure.AvailabilitySet),
+		VNetName:              stringProviderConfig(&c.Spec.Cloud.Azure.VNetName),
+		SubnetName:            stringProviderConfig(&c.Spec.Cloud.Azure.SubnetName),
+		RouteTableName:        stringProviderConfig(&c.Spec.Cloud.Azure.RouteTableName),
+		AvailabilitySet:       stringProviderConfig(&c.Spec.Cloud.Azure.AvailabilitySet),
 		AssignAvailabilitySet: c.Spec.Cloud.Azure.AssignAvailabilitySet,
-		SecurityGroupName:     stringProviderConfig(c.Spec.Cloud.Azure.SecurityGroup),
+		SecurityGroupName:     stringProviderConfig(&c.Spec.Cloud.Azure.SecurityGroup),
 		Zones:                 nodeSpec.Cloud.Azure.Zones,
-		ImageID:               stringProviderConfig(nodeSpec.Cloud.Azure.ImageID),
+		ImageID:               stringProviderConfig(&nodeSpec.Cloud.Azure.ImageID),
 
 		// https://github.com/kubermatic/kubermatic/issues/5013#issuecomment-580357280
-		AssignPublicIP: boolProviderConfig(nodeSpec.Cloud.Azure.AssignPublicIP),
+		AssignPublicIP: boolProviderConfig(&nodeSpec.Cloud.Azure.AssignPublicIP),
 	}
 	config.Tags = map[string]string{}
 	for key, value := range nodeSpec.Cloud.Azure.Tags {
@@ -192,18 +192,18 @@ func getVSphereProviderSpec(c *kubermaticv1.Cluster, nodeSpec apiv1.NodeSpec, dc
 	}
 
 	config := vsphere.RawConfig{
-		TemplateVMName:   stringProviderConfig(nodeSpec.Cloud.VSphere.Template),
-		VMNetName:        stringProviderConfig(c.Spec.Cloud.VSphere.VMNetName),
+		TemplateVMName:   stringProviderConfig(&nodeSpec.Cloud.VSphere.Template),
+		VMNetName:        stringProviderConfig(&c.Spec.Cloud.VSphere.VMNetName),
 		CPUs:             int32(nodeSpec.Cloud.VSphere.CPUs),
 		MemoryMB:         int64(nodeSpec.Cloud.VSphere.Memory),
 		DiskSizeGB:       nodeSpec.Cloud.VSphere.DiskSizeGB,
-		Datacenter:       stringProviderConfig(dc.Spec.VSphere.Datacenter),
-		Datastore:        stringProviderConfig(datastore),
-		DatastoreCluster: stringProviderConfig(c.Spec.Cloud.VSphere.DatastoreCluster),
-		Cluster:          stringProviderConfig(dc.Spec.VSphere.Cluster),
-		Folder:           stringProviderConfig(c.Spec.Cloud.VSphere.Folder),
-		AllowInsecure:    boolProviderConfig(dc.Spec.VSphere.AllowInsecure),
-		ResourcePool:     stringProviderConfig(c.Spec.Cloud.VSphere.ResourcePool),
+		Datacenter:       stringProviderConfig(&dc.Spec.VSphere.Datacenter),
+		Datastore:        stringProviderConfig(&datastore),
+		DatastoreCluster: stringProviderConfig(&c.Spec.Cloud.VSphere.DatastoreCluster),
+		Cluster:          stringProviderConfig(&dc.Spec.VSphere.Cluster),
+		Folder:           stringProviderConfig(&c.Spec.Cloud.VSphere.Folder),
+		AllowInsecure:    boolProviderConfig(&dc.Spec.VSphere.AllowInsecure),
+		ResourcePool:     stringProviderConfig(&c.Spec.Cloud.VSphere.ResourcePool),
 	}
 
 	ext := &runtime.RawExtension{}
@@ -320,18 +320,18 @@ func writeOpenstackProviderConfig(spec clusterv1alpha1.ProviderSpec, c *openstac
 
 func getOpenstackProviderSpec(c *kubermaticv1.Cluster, nodeSpec apiv1.NodeSpec, dc *kubermaticv1.Datacenter) (*runtime.RawExtension, error) {
 	config := &openstack.RawConfig{
-		Image:                 stringProviderConfig(nodeSpec.Cloud.Openstack.Image),
-		Flavor:                stringProviderConfig(nodeSpec.Cloud.Openstack.Flavor),
-		AvailabilityZone:      stringProviderConfig(dc.Spec.Openstack.AvailabilityZone),
-		Region:                stringProviderConfig(dc.Spec.Openstack.Region),
-		IdentityEndpoint:      stringProviderConfig(dc.Spec.Openstack.AuthURL),
-		Network:               stringProviderConfig(c.Spec.Cloud.Openstack.Network),
-		Subnet:                stringProviderConfig(c.Spec.Cloud.Openstack.SubnetID),
+		Image:                 stringProviderConfig(&nodeSpec.Cloud.Openstack.Image),
+		Flavor:                stringProviderConfig(&nodeSpec.Cloud.Openstack.Flavor),
+		AvailabilityZone:      stringProviderConfig(&dc.Spec.Openstack.AvailabilityZone),
+		Region:                stringProviderConfig(&dc.Spec.Openstack.Region),
+		IdentityEndpoint:      stringProviderConfig(&dc.Spec.Openstack.AuthURL),
+		Network:               stringProviderConfig(&c.Spec.Cloud.Openstack.Network),
+		Subnet:                stringProviderConfig(&c.Spec.Cloud.Openstack.SubnetID),
 		NodeVolumeAttachLimit: dc.Spec.Openstack.NodeVolumeAttachLimit,
 		// Sys11: Set soft-anti-affinity server group name to be set on machines as schedule hint
-		ServerGroupID:             stringProviderConfig(c.Spec.Cloud.Openstack.ServerGroupID),
-		InstanceReadyCheckPeriod:  stringProviderConfig(nodeSpec.Cloud.Openstack.InstanceReadyCheckPeriod),
-		InstanceReadyCheckTimeout: stringProviderConfig(nodeSpec.Cloud.Openstack.InstanceReadyCheckTimeout),
+		ServerGroupID:             stringProviderConfig(&c.Spec.Cloud.Openstack.ServerGroupID),
+		InstanceReadyCheckPeriod:  stringProviderConfig(&nodeSpec.Cloud.Openstack.InstanceReadyCheckPeriod),
+		InstanceReadyCheckTimeout: stringProviderConfig(&nodeSpec.Cloud.Openstack.InstanceReadyCheckTimeout),
 	}
 
 	if v := c.Spec.Cloud.Openstack.SecurityGroups; v != "" {
@@ -339,7 +339,7 @@ func getOpenstackProviderSpec(c *kubermaticv1.Cluster, nodeSpec apiv1.NodeSpec, 
 	}
 
 	if nodeSpec.Cloud.Openstack.UseFloatingIP || dc.Spec.Openstack.EnforceFloatingIP {
-		config.FloatingIPPool = stringProviderConfig(c.Spec.Cloud.Openstack.FloatingIPPool)
+		config.FloatingIPPool = stringProviderConfig(&c.Spec.Cloud.Openstack.FloatingIPPool)
 	}
 
 	if nodeSpec.Cloud.Openstack.RootDiskSizeGB != nil && *nodeSpec.Cloud.Openstack.RootDiskSizeGB > 0 {
@@ -347,12 +347,12 @@ func getOpenstackProviderSpec(c *kubermaticv1.Cluster, nodeSpec apiv1.NodeSpec, 
 	}
 
 	if dc.Spec.Openstack.TrustDevicePath != nil {
-		config.TrustDevicePath = boolProviderConfig(*dc.Spec.Openstack.TrustDevicePath)
+		config.TrustDevicePath = boolProviderConfig(dc.Spec.Openstack.TrustDevicePath)
 	}
 
 	// Use the nodeDeployment spec AvailabilityZone if set, otherwise we stick to the default from the datacenter
 	if nodeSpec.Cloud.Openstack.AvailabilityZone != "" {
-		config.AvailabilityZone = stringProviderConfig(nodeSpec.Cloud.Openstack.AvailabilityZone)
+		config.AvailabilityZone = stringProviderConfig(&nodeSpec.Cloud.Openstack.AvailabilityZone)
 	}
 
 	config.Tags = map[string]string{}

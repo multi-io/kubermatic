@@ -303,9 +303,18 @@ func extractSpotInstanceConfigs(config *aws.RawConfig) (*string, *string, *bool)
 	if config.IsSpotInstance != nil &&
 		*config.IsSpotInstance &&
 		config.SpotInstanceConfig != nil {
-		return &config.SpotInstanceConfig.MaxPrice.Value,
-			&config.SpotInstanceConfig.InterruptionBehavior.Value,
-			&config.SpotInstanceConfig.PersistentRequest.Value
+		var price, behavior string
+		var persistentrqst bool
+		if config.SpotInstanceConfig.MaxPrice != nil {
+			price = config.SpotInstanceConfig.MaxPrice.Value
+		}
+		if config.SpotInstanceConfig.InterruptionBehavior != nil {
+			behavior = config.SpotInstanceConfig.InterruptionBehavior.Value
+		}
+		if config.SpotInstanceConfig.PersistentRequest != nil {
+			persistentrqst = config.SpotInstanceConfig.PersistentRequest.Value
+		}
+		return &price, &behavior, &persistentrqst
 	}
 
 	return nil, nil, nil
