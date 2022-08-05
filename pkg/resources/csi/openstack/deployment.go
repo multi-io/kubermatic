@@ -333,6 +333,8 @@ func getCsiDriverVersion(cluster *kubermaticv1.Cluster) string {
 		return "v1.21.0"
 	case "1.22":
 		return "v1.22.0"
+	case "1.23":
+		return "v1.23.0"
 	default:
 		return fmt.Sprintf("v%s.0", cluster.Spec.Version.MajorMinor())
 	}
