@@ -334,7 +334,7 @@ func GetEndpoint(ctx context.Context, projectProvider provider.ProjectProvider, 
 	return ConvertInternalClusterToExternal(cluster, dc, true, supportManager.GetIncompatibilities()...), nil
 }
 
-func DeleteEndpoint(ctx context.Context, userInfoGetter provider.UserInfoGetter, projectID, clusterID string, deleteVolumes, deleteLoadBalancers bool, sshKeyProvider provider.SSHKeyProvider, privilegedSSHKeyProvider provider.PrivilegedSSHKeyProvider, projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider) (interface{}, error) {
+func DeleteEndpoint(ctx context.Context, userInfoGetter provider.UserInfoGetter, projectID, clusterID string, sshKeyProvider provider.SSHKeyProvider, privilegedSSHKeyProvider provider.PrivilegedSSHKeyProvider, projectProvider provider.ProjectProvider, privilegedProjectProvider provider.PrivilegedProjectProvider) (interface{}, error) {
 	clusterProvider := ctx.Value(middleware.ClusterProviderContextKey).(provider.ClusterProvider)
 	privilegedClusterProvider := ctx.Value(middleware.PrivilegedClusterProviderContextKey).(provider.PrivilegedClusterProvider)
 
@@ -360,16 +360,17 @@ func DeleteEndpoint(ctx context.Context, userInfoGetter provider.UserInfoGetter,
 		return nil, err
 	}
 
+	/*
+		FIXME:	The NodeDeletion finalizer acts as the source of truth for if the cluster has ever reached a functioning state.
+				It would be much better, if this was replaced by an actual condition.
+				Then, we could always add all appropriate finalizers right from the start and remove them with no-op, if the cluster was never up.
+	*/
 	// Use the NodeDeletionFinalizer to determine if the cluster was ever up, the LB and PV finalizers
 	// will prevent cluster deletion if the APIserver was never created
 	wasUpOnce := kuberneteshelper.HasFinalizer(existingCluster, apiv1.NodeDeletionFinalizer)
-	if wasUpOnce && (deleteVolumes || deleteLoadBalancers) {
-		if deleteLoadBalancers {
-			kuberneteshelper.AddFinalizer(existingCluster, apiv1.InClusterLBCleanupFinalizer)
-		}
-		if deleteVolumes {
-			kuberneteshelper.AddFinalizer(existingCluster, apiv1.InClusterPVCleanupFinalizer)
-		}
+	if wasUpOnce {
+		kuberneteshelper.AddFinalizer(existingCluster, apiv1.InClusterLBCleanupFinalizer)
+		kuberneteshelper.AddFinalizer(existingCluster, apiv1.InClusterPVCleanupFinalizer)
 	}
 
 	return nil, updateAndDeleteCluster(ctx, userInfoGetter, clusterProvider, privilegedClusterProvider, project, existingCluster)

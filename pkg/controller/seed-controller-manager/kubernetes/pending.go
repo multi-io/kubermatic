@@ -77,9 +77,8 @@ func (r *Reconciler) reconcileCluster(ctx context.Context, cluster *kubermaticv1
 		// Only add the node deletion finalizer when the cluster is actually running
 		// Otherwise we fail to delete the nodes and are stuck in a loop
 		if !kuberneteshelper.HasFinalizer(cluster, kubermaticapiv1.NodeDeletionFinalizer) {
-			finalizers = append(finalizers, kubermaticapiv1.NodeDeletionFinalizer)
+			finalizers = append(finalizers, kubermaticapiv1.NodeDeletionFinalizer, kubermaticapiv1.InClusterLBCleanupFinalizer, kubermaticapiv1.InClusterPVCleanupFinalizer)
 		}
-
 	}
 
 	if len(finalizers) > 0 {
