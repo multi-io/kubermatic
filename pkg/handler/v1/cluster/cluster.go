@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"strconv"
 
 	"github.com/go-kit/kit/endpoint"
 	"github.com/gorilla/mux"
@@ -429,12 +428,6 @@ func RevokeViewerTokenEndpoint(projectProvider provider.ProjectProvider, privile
 // swagger:parameters deleteCluster
 type DeleteReq struct {
 	common.GetClusterReq
-	// in: header
-	// DeleteVolumes if true all cluster PV's and PVC's will be deleted from cluster
-	DeleteVolumes bool
-	// in: header
-	// DeleteLoadBalancers if true all load balancers will be deleted from cluster
-	DeleteLoadBalancers bool
 }
 
 func DecodeDeleteReq(c context.Context, r *http.Request) (interface{}, error) {
@@ -446,24 +439,6 @@ func DecodeDeleteReq(c context.Context, r *http.Request) (interface{}, error) {
 	}
 	clusterReq := clusterReqRaw.(common.GetClusterReq)
 	req.GetClusterReq = clusterReq
-
-	headerValue := r.Header.Get("DeleteVolumes")
-	if len(headerValue) > 0 {
-		deleteVolumes, err := strconv.ParseBool(headerValue)
-		if err != nil {
-			return nil, err
-		}
-		req.DeleteVolumes = deleteVolumes
-	}
-
-	headerValue = r.Header.Get("DeleteLoadBalancers")
-	if len(headerValue) > 0 {
-		deleteLB, err := strconv.ParseBool(headerValue)
-		if err != nil {
-			return nil, err
-		}
-		req.DeleteLoadBalancers = deleteLB
-	}
 
 	return req, nil
 }
