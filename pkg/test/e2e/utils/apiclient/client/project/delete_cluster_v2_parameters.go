@@ -14,7 +14,6 @@ import (
 	"github.com/go-openapi/runtime"
 	cr "github.com/go-openapi/runtime/client"
 	"github.com/go-openapi/strfmt"
-	"github.com/go-openapi/swag"
 )
 
 // NewDeleteClusterV2Params creates a new DeleteClusterV2Params object,
@@ -59,12 +58,6 @@ func NewDeleteClusterV2ParamsWithHTTPClient(client *http.Client) *DeleteClusterV
    Typically these are written to a http.Request.
 */
 type DeleteClusterV2Params struct {
-
-	// DeleteLoadBalancers.
-	DeleteLoadBalancers *bool
-
-	// DeleteVolumes.
-	DeleteVolumes *bool
 
 	// ClusterID.
 	ClusterID string
@@ -125,28 +118,6 @@ func (o *DeleteClusterV2Params) SetHTTPClient(client *http.Client) {
 	o.HTTPClient = client
 }
 
-// WithDeleteLoadBalancers adds the deleteLoadBalancers to the delete cluster v2 params
-func (o *DeleteClusterV2Params) WithDeleteLoadBalancers(deleteLoadBalancers *bool) *DeleteClusterV2Params {
-	o.SetDeleteLoadBalancers(deleteLoadBalancers)
-	return o
-}
-
-// SetDeleteLoadBalancers adds the deleteLoadBalancers to the delete cluster v2 params
-func (o *DeleteClusterV2Params) SetDeleteLoadBalancers(deleteLoadBalancers *bool) {
-	o.DeleteLoadBalancers = deleteLoadBalancers
-}
-
-// WithDeleteVolumes adds the deleteVolumes to the delete cluster v2 params
-func (o *DeleteClusterV2Params) WithDeleteVolumes(deleteVolumes *bool) *DeleteClusterV2Params {
-	o.SetDeleteVolumes(deleteVolumes)
-	return o
-}
-
-// SetDeleteVolumes adds the deleteVolumes to the delete cluster v2 params
-func (o *DeleteClusterV2Params) SetDeleteVolumes(deleteVolumes *bool) {
-	o.DeleteVolumes = deleteVolumes
-}
-
 // WithClusterID adds the clusterID to the delete cluster v2 params
 func (o *DeleteClusterV2Params) WithClusterID(clusterID string) *DeleteClusterV2Params {
 	o.SetClusterID(clusterID)
@@ -176,22 +147,6 @@ func (o *DeleteClusterV2Params) WriteToRequest(r runtime.ClientRequest, reg strf
 		return err
 	}
 	var res []error
-
-	if o.DeleteLoadBalancers != nil {
-
-		// header param DeleteLoadBalancers
-		if err := r.SetHeaderParam("DeleteLoadBalancers", swag.FormatBool(*o.DeleteLoadBalancers)); err != nil {
-			return err
-		}
-	}
-
-	if o.DeleteVolumes != nil {
-
-		// header param DeleteVolumes
-		if err := r.SetHeaderParam("DeleteVolumes", swag.FormatBool(*o.DeleteVolumes)); err != nil {
-			return err
-		}
-	}
 
 	// path param cluster_id
 	if err := r.SetPathParam("cluster_id", o.ClusterID); err != nil {

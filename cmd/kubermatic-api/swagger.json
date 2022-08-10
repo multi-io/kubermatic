@@ -1434,16 +1434,6 @@
             "name": "cluster_id",
             "in": "path",
             "required": true
-          },
-          {
-            "type": "boolean",
-            "name": "DeleteVolumes",
-            "in": "header"
-          },
-          {
-            "type": "boolean",
-            "name": "DeleteLoadBalancers",
-            "in": "header"
           }
         ],
         "responses": {
