@@ -33,9 +33,17 @@ func ClusterRoleCreator() reconciling.NamedClusterRoleCreatorGetter {
 				{
 					APIGroups: []string{""},
 					Resources: []string{
+						"nodes/metrics",
+					},
+					Verbs: []string{
+						"get",
+					},
+				},
+				{
+					APIGroups: []string{""},
+					Resources: []string{
 						"pods",
 						"nodes",
-						"nodes/stats",
 						"namespaces",
 					},
 					Verbs: []string{
@@ -43,13 +51,6 @@ func ClusterRoleCreator() reconciling.NamedClusterRoleCreatorGetter {
 						"list",
 						"watch",
 					},
-				},
-				{
-					APIGroups: []string{"extensions"},
-					Resources: []string{
-						"deployments",
-					},
-					Verbs: []string{"get", "list", "watch"},
 				},
 			}
 			return cr, nil
