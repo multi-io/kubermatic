@@ -87,17 +87,25 @@ func Deployment(c *kubermaticv1.Cluster, nd *apiv1.NodeDeployment, dc *kubermati
 	replicas := nd.Spec.Replicas
 	md.Spec.Replicas = &replicas
 
+	legacyVersionCutOff := semver.MustParse("1.18")
 	if nd.Spec.MaxReplicas > 0 {
 		if md.Annotations == nil {
 			md.Annotations = map[string]string{}
 		}
-		legacyVersionCutOff := semver.MustParse("1.18")
 		if c.Spec.Version.LessThan(legacyVersionCutOff) {
 			md.Annotations[apiv1.AutoscalerLegacyMinSizeAnnotation] = strconv.Itoa(int(nd.Spec.MinReplicas))
 			md.Annotations[apiv1.AutoscalerLegacyMaxSizeAnnotation] = strconv.Itoa(int(nd.Spec.MaxReplicas))
 		} else {
 			md.Annotations[apiv1.AutoscalerMinSizeAnnotation] = strconv.Itoa(int(nd.Spec.MinReplicas))
 			md.Annotations[apiv1.AutoscalerMaxSizeAnnotation] = strconv.Itoa(int(nd.Spec.MaxReplicas))
+		}
+	} else if md.Annotations != nil {
+		if c.Spec.Version.LessThan(legacyVersionCutOff) {
+			delete(md.Annotations, apiv1.AutoscalerLegacyMinSizeAnnotation)
+			delete(md.Annotations, apiv1.AutoscalerLegacyMaxSizeAnnotation)
+		} else {
+			delete(md.Annotations, apiv1.AutoscalerMinSizeAnnotation)
+			delete(md.Annotations, apiv1.AutoscalerMaxSizeAnnotation)
 		}
 	}
 
