@@ -202,6 +202,7 @@ var (
 			semver.MustParse("v1.21.8"),
 			// Kubernetes 1.22
 			semver.MustParse("v1.22.5"),
+			semver.MustParse("v1.23.5"),
 		},
 		Updates: []operatorv1alpha1.Update{
 			// ======= 1.18 =======
@@ -275,7 +276,6 @@ var (
 				From: "1.21.*",
 				To:   "1.22.*",
 			},
-
 			// ======= 1.22 =======
 			{
 				// Allow to change to any patch version
@@ -292,6 +292,14 @@ var (
 				From:      ">= 1.22.0, < 1.22.5",
 				To:        "1.22.5",
 				Automatic: pointer.BoolPtr(true),
+			},
+			{
+				From: "1.22.*",
+				To:   "1.23.*",
+			},
+			{
+				From: "1.23.*",
+				To:   "1.23.*",
 			},
 		},
 		ProviderIncompatibilities: []operatorv1alpha1.Incompatibility{

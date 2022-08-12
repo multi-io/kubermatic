@@ -113,6 +113,8 @@ type ComponentSettings struct {
 	Prometheus        StatefulSetSettings     `json:"prometheus"`
 	OpenVPN           OpenVPNSettings         `json:"openvpn"`
 	NodeLocalDNS      NodeLocalDNSSettings    `json:"nodeLocalDNS"`
+	// KonnectivityProxy configures resources limits/requests for konnectivity-server sidecar.
+	KonnectivityProxy KonnectvityProxySettings `json:"konnectivityProxy,omitempty"`
 
 	Openstack OpenstackSettings `json:"openstack"`
 }
@@ -234,6 +236,10 @@ type OpenVPNIPTablesInitContainerSettings struct {
 }
 
 type NodeLocalDNSSettings struct {
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+type KonnectvityProxySettings struct {
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 

@@ -718,6 +718,8 @@ func ExternalCloudProviderEnabled(cluster *kubermaticv1.Cluster) bool {
 
 func GetCSIMigrationFeatureGates(cluster *kubermaticv1.Cluster) []string {
 	var featureFlags []string
+	gte23, _ := semver.NewConstraint(">= 1.23.0")
+	ccm := cluster.Spec.Features[kubermaticv1.ClusterFeatureExternalCloudProvider]
 	if metav1.HasAnnotation(cluster.ObjectMeta, kubermaticv1.CSIMigrationNeededAnnotation) {
 		// The following feature gates are always enabled when the
 		// 'externalCloudProvider' feature is activated.
@@ -748,6 +750,19 @@ func GetCSIMigrationFeatureGates(cluster *kubermaticv1.Cluster) []string {
 					featureFlags = append(featureFlags, "InTreePluginvSphereUnregister=true")
 				}
 			}
+		}
+	} else if !ccm && gte23.Check(cluster.Spec.Version.Semver()) {
+		// We disable CSIMigration only if Kubernetes version is >= 1.23 and
+		// there's no external CCM.
+		// If there's external CCM, in-tree volumes plugin is not enabled
+		// anyways, so CSIMigration doesn't affect existing volumes.
+		// OpenStack is known to have working fallback, so we don't disable
+		// CSIMigrationOpenStack
+		switch {
+		case cluster.Spec.Cloud.AWS != nil:
+			featureFlags = append(featureFlags, "CSIMigrationAWS=false")
+		case cluster.Spec.Cloud.Azure != nil:
+			featureFlags = append(featureFlags, "CSIMigrationAzureDisk=false", "CSIMigrationAzureFile=false")
 		}
 	}
 	return featureFlags
