@@ -82,7 +82,7 @@ func StatefulSetCreator(data *resources.TemplateData, priorityClasses bool) reco
 			}
 
 			if priorityClasses {
-				set.Spec.Template.Spec.PriorityClassName = resources.PriorityClassPrometheusStatefulSetName
+				set.Spec.Template.Spec.PriorityClassName = resources.PrometheusPriorityClassName
 			}
 
 			set.Spec.Template.ObjectMeta = metav1.ObjectMeta{

@@ -43,7 +43,7 @@ func MasterControllerManagerDeploymentCreator(cfg *operatorv1alpha1.KubermaticCo
 	return func() (string, reconciling.DeploymentCreator) {
 		return common.MasterControllerManagerDeploymentName, func(d *appsv1.Deployment) (*appsv1.Deployment, error) {
 			if cfg.Spec.FeatureGates.Has(features.PriorityClasses) {
-				d.Spec.Template.Spec.PriorityClassName = common.PriorityClassMasterControllerManagerDeploymentName
+				d.Spec.Template.Spec.PriorityClassName = common.MasterControllerManagerPriorityClassName
 			}
 			d.Spec.Replicas = cfg.Spec.MasterController.Replicas
 			d.Spec.Selector = &metav1.LabelSelector{

@@ -89,7 +89,7 @@ func DeploymentCreator(data *resources.TemplateData, enableOIDCAuthentication, p
 			}
 			dep.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: resources.ImagePullSecretName}}
 			if priorityClasses {
-				dep.Spec.Template.Spec.PriorityClassName = resources.PriorityClassApiserverDeploymentName
+				dep.Spec.Template.Spec.PriorityClassName = resources.ApiserverPriorityClassName
 			}
 
 			volumes := getVolumes(data.IsKonnectivityEnabled())
