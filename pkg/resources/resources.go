@@ -89,7 +89,7 @@ const (
 	// MetricsServerDeploymentName is the name for the metrics-server deployment
 	MetricsServerDeploymentName = "metrics-server"
 	// PriorityClassMetricsServerDeploymentName
-	PriorityClassMetricsServerDeploymentName = "metrics-server"
+	PriorityClassMetricsServerDeploymentName = "user-cluster-metrics-server"
 	// PriorityClassEnvoyName
 	PriorityClassEnvoyName = "user-cluster-envoy"
 	// OpenVPNServerDeploymentName is the name for the openvpn server deployment
