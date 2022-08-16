@@ -88,6 +88,8 @@ func DeploymentCreator(kServerHost string, kServerPort int) reconciling.NamedDep
 						fmt.Sprintf("--proxy-server-port=%d", kServerPort),
 						"--admin-server-port=8133",
 						"--health-server-port=8134",
+						// K8s-7196: avoid letting Midonet drop the flow rule for an idle connection
+						"--keepalive-time=50s",
 						fmt.Sprintf("--service-account-token-path=/var/run/secrets/tokens/%s", resources.KonnectivityAgentToken),
 						// TODO rastislavs: use "--agent-identifiers=ipv4=$(HOST_IP)" with "--proxy-strategies=destHost,default"
 						// once the upstream issue is resolved: https://github.com/kubernetes-sigs/apiserver-network-proxy/issues/261
