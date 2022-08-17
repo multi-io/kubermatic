@@ -310,7 +310,7 @@ func TestHandle(t *testing.T) {
 							},
 							CNIPlugin: &kubermaticv1.CNIPluginSettings{
 								Type:    "canal",
-								Version: "v3.19",
+								Version: "v3.23",
 							},
 						}.Do(),
 					},

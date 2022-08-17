@@ -75,7 +75,7 @@ func TestHandle(t *testing.T) {
 							CloudSpec: kubermaticv1.CloudSpec{Openstack: &kubermaticv1.OpenstackCloudSpec{}},
 							CNIPluginSpec: &kubermaticv1.CNIPluginSettings{
 								Type:    kubermaticv1.CNIPluginTypeCanal,
-								Version: "v3.19",
+								Version: "v3.23",
 							},
 							ExternalCloudProvider: true,
 							NetworkConfig: kubermaticv1.ClusterNetworkingConfig{
@@ -225,7 +225,7 @@ func TestHandle(t *testing.T) {
 							CloudSpec: kubermaticv1.CloudSpec{Openstack: &kubermaticv1.OpenstackCloudSpec{}},
 							CNIPluginSpec: &kubermaticv1.CNIPluginSettings{
 								Type:    kubermaticv1.CNIPluginTypeCanal,
-								Version: "v3.19",
+								Version: "v3.23",
 							},
 							ExternalCloudProvider: true,
 							NetworkConfig: kubermaticv1.ClusterNetworkingConfig{
@@ -263,7 +263,7 @@ func TestHandle(t *testing.T) {
 							CloudSpec: kubermaticv1.CloudSpec{Openstack: &kubermaticv1.OpenstackCloudSpec{}},
 							CNIPluginSpec: &kubermaticv1.CNIPluginSettings{
 								Type:    kubermaticv1.CNIPluginTypeCanal,
-								Version: "v3.19",
+								Version: "v3.23",
 							},
 							ExternalCloudProvider: true,
 							NetworkConfig: kubermaticv1.ClusterNetworkingConfig{
@@ -317,7 +317,7 @@ func TestHandle(t *testing.T) {
 			wantPatches: []jsonpatch.JsonPatchOperation{
 				jsonpatch.NewOperation("add", "/spec/cniPlugin", map[string]interface{}{
 					"type":    "canal",
-					"version": "v3.19",
+					"version": "v3.23",
 				}),
 			},
 		},
@@ -338,7 +338,7 @@ func TestHandle(t *testing.T) {
 							CloudSpec: kubermaticv1.CloudSpec{Openstack: &kubermaticv1.OpenstackCloudSpec{}},
 							CNIPluginSpec: &kubermaticv1.CNIPluginSettings{
 								Type:    kubermaticv1.CNIPluginTypeCanal,
-								Version: "v3.19",
+								Version: "v3.23",
 							},
 							Features: map[string]bool{
 								kubermaticv1.ApiserverNetworkPolicy: true,
@@ -373,7 +373,7 @@ func TestHandle(t *testing.T) {
 							CloudSpec: kubermaticv1.CloudSpec{Kubevirt: &kubermaticv1.KubevirtCloudSpec{}},
 							CNIPluginSpec: &kubermaticv1.CNIPluginSettings{
 								Type:    kubermaticv1.CNIPluginTypeCanal,
-								Version: "v3.19",
+								Version: "v3.23",
 							},
 							Features: map[string]bool{
 								kubermaticv1.ApiserverNetworkPolicy: true,
@@ -409,7 +409,7 @@ func TestHandle(t *testing.T) {
 							CloudSpec: kubermaticv1.CloudSpec{Openstack: &kubermaticv1.OpenstackCloudSpec{}},
 							CNIPluginSpec: &kubermaticv1.CNIPluginSettings{
 								Type:    kubermaticv1.CNIPluginTypeCanal,
-								Version: "v3.19",
+								Version: "v3.23",
 							},
 							NetworkConfig: kubermaticv1.ClusterNetworkingConfig{
 								IPVS: &kubermaticv1.IPVSConfiguration{},
