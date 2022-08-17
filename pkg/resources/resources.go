@@ -70,12 +70,12 @@ const (
 	ApiserverPriorityClassName = "user-cluster-apiserver"
 	// ClusterProxyDeploymentName is the name of the clusterproxy deployment
 	ClusterProxyDeploymentName = "clusterproxy"
-	// PriorityClusterClusterProxyDeploymentName
-	PriorityClusterClusterProxyDeploymentName = "user-cluster-clusterproxy"
+	// ClusterProxyPriorityClassName
+	ClusterProxyPriorityClassName = "user-cluster-clusterproxy"
 	// ControllerManagerDeploymentName is the name for the controller manager deployment
 	ControllerManagerDeploymentName = "controller-manager"
-	// PriorityClusterControllerManagerDeploymentName
-	PriorityClusterControllerManagerDeploymentName = "user-cluster-controller-manager"
+	// ControllerManagerPriorityClassName
+	ControllerManagerPriorityClassName = "user-cluster-controller-manager"
 	// SchedulerDeploymentName is the name for the scheduler deployment
 	SchedulerDeploymentName = "scheduler"
 	// SchedulerPriorityClassName
@@ -96,8 +96,8 @@ const (
 	OpenVPNServerPriorityClassName = "user-cluster-openvpn-server"
 	// DNSResolverDeploymentName is the name of the dns resolver deployment
 	DNSResolverDeploymentName = "dns-resolver"
-	// PriorityClusterDNSResolverDeploymentName
-	PriorityClusterDNSResolverDeploymentName = "user-cluster-dns-resolver"
+	// DNSResolverPriorityClassName
+	DNSResolverPriorityClassName = "user-cluster-dns-resolver"
 	// DNSResolverConfigMapName is the name of the dns resolvers configmap
 	DNSResolverConfigMapName = "dns-resolver"
 	// DNSResolverServiceName is the name of the dns resolvers service
@@ -112,8 +112,8 @@ const (
 	UserClusterControllerDeploymentName = "usercluster-controller"
 	// ClusterAutoscalerDeploymentName is the name of the cluster-autoscaler deployment
 	ClusterAutoscalerDeploymentName = "cluster-autoscaler"
-	// PriorityClusterClusterAutoscalerDeploymentName
-	PriorityClusterClusterAutoscalerDeploymentName = "user-cluster-cluster-autoscaler"
+	// ClusterAutoscalerPriorityClassName
+	ClusterAutoscalerPriorityClassName = "user-cluster-cluster-autoscaler"
 	// KubernetesDashboardDeploymentName is the name of the Kubernetes Dashboard deployment
 	KubernetesDashboardDeploymentName = "kubernetes-dashboard"
 	// KubernetesDashboardPriorityClassName
