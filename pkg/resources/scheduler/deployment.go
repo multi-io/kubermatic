@@ -95,7 +95,7 @@ func DeploymentCreator(data *resources.TemplateData, priorityClasses bool) recon
 			}
 
 			if priorityClasses {
-				dep.Spec.Template.Spec.PriorityClassName = resources.PriorityClassSchedulerDeploymentName
+				dep.Spec.Template.Spec.PriorityClassName = resources.SchedulerPriorityClassName
 			}
 
 			dep.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: resources.ImagePullSecretName}}

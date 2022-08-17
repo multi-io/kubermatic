@@ -78,11 +78,11 @@ const (
 	WebhookServingCASecretName   = "webhook-ca"
 	WebhookServingCertSecretName = "webhook-cert"
 
-	IngressName                                        = "kubermatic"
-	MasterControllerManagerDeploymentName              = "kubermatic-master-controller-manager"
-	PriorityClassMasterControllerManagerDeploymentName = "kubermatic-master-controller-manager"
-	SeedControllerManagerDeploymentName                = "kubermatic-seed-controller-manager"
-	PriorityClassSeedControllerManagerDeploymentName   = "kubermatic-seed-controller-manager"
+	IngressName                              = "kubermatic"
+	MasterControllerManagerDeploymentName    = "kubermatic-master-controller-manager"
+	MasterControllerManagerPriorityClassName = "kubermatic-master-controller-manager"
+	SeedControllerManagerDeploymentName      = "kubermatic-seed-controller-manager"
+	SeedControllerManagerPriorityClassName   = "kubermatic-seed-controller-manager"
 
 	CleanupFinalizer = "operator.kubermatic.io/cleanup"
 

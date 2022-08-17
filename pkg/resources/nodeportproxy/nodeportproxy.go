@@ -257,7 +257,7 @@ func deploymentEnvoy(image string, data nodePortProxyData, priorityClasses bool)
 			}
 
 			if priorityClasses {
-				d.Spec.Template.Spec.PriorityClassName = resources.PriorityClassEnvoyName
+				d.Spec.Template.Spec.PriorityClassName = resources.NodePortProxyEnvoyPriorityClassName
 			}
 
 			d.Spec.Template.Spec.InitContainers = []corev1.Container{
@@ -386,7 +386,7 @@ func deploymentLBUpdater(image string, priorityClasses bool) reconciling.NamedDe
 				{Name: resources.ImagePullSecretName},
 			}
 			if priorityClasses {
-				d.Spec.Template.Spec.PriorityClassName = resources.PriorityClassEnvoyName
+				d.Spec.Template.Spec.PriorityClassName = resources.NodePortProxyEnvoyPriorityClassName
 			}
 
 			d.Spec.Template.Spec.Containers = []corev1.Container{{

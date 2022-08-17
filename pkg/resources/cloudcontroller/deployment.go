@@ -42,7 +42,7 @@ func DeploymentCreator(data *resources.TemplateData, priorityClasses bool) recon
 	case data.Cluster().Spec.Cloud.Openstack != nil:
 		var pc string
 		if priorityClasses {
-			pc = resources.PriorityClassCloudControllerName
+			pc = resources.CloudControllerPriorityClassName
 		}
 		creatorGetter = openStackDeploymentCreator(data, pc)
 

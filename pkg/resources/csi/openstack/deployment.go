@@ -100,7 +100,7 @@ func DeploymentCreator(data *resources.TemplateData, priorityClasses bool) recon
 			}
 
 			if priorityClasses {
-				dep.Spec.Template.Spec.PriorityClassName = resources.PriorityClassCsiCinderControllerPluginDeploymentName
+				dep.Spec.Template.Spec.PriorityClassName = resources.CsiCinderControllerPluginPriorityClassName
 			}
 
 			dep.Spec.Template.ObjectMeta = metav1.ObjectMeta{

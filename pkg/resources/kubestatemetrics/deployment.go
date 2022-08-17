@@ -65,7 +65,7 @@ func DeploymentCreator(data *resources.TemplateData, priorityClasses bool) recon
 			dep.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: resources.ImagePullSecretName}}
 
 			if priorityClasses {
-				dep.Spec.Template.Spec.PriorityClassName = resources.PriorityClassKubeStateMetricsDeploymentName
+				dep.Spec.Template.Spec.PriorityClassName = resources.KubeStateMetricsPriorityClassName
 			}
 
 			volumes := getVolumes()

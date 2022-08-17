@@ -102,7 +102,7 @@ func SeedControllerManagerDeploymentCreator(workerName string, versions kubermat
 			args = append(args, leaderElectionArgs...)
 
 			if cfg.Spec.FeatureGates.Has(features.PriorityClasses) {
-				d.Spec.Template.Spec.PriorityClassName = common.PriorityClassSeedControllerManagerDeploymentName
+				d.Spec.Template.Spec.PriorityClassName = common.SeedControllerManagerPriorityClassName
 			}
 
 			if seed.Spec.BackupRestore == nil {

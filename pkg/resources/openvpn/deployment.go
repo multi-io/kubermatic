@@ -102,7 +102,7 @@ func DeploymentCreator(data openVPNDeploymentCreatorData, priorityClasses bool) 
 			dep.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: resources.ImagePullSecretName}}
 
 			if priorityClasses {
-				dep.Spec.Template.Spec.PriorityClassName = resources.PriorityClassOpenVPNServerDeploymentName
+				dep.Spec.Template.Spec.PriorityClassName = resources.OpenVPNServerPriorityClassName
 			}
 
 			procMountType := corev1.DefaultProcMount

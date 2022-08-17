@@ -66,8 +66,8 @@ const (
 const (
 	// ApiserverDeploymentName is the name of the apiserver deployment
 	ApiserverDeploymentName = "apiserver"
-	// PriorityClassApiserverDeploymentName
-	PriorityClassApiserverDeploymentName = "user-cluster-apiserver"
+	// ApiserverPriorityClassName
+	ApiserverPriorityClassName = "user-cluster-apiserver"
 	// ClusterProxyDeploymentName is the name of the clusterproxy deployment
 	ClusterProxyDeploymentName = "clusterproxy"
 	// PriorityClusterClusterProxyDeploymentName
@@ -78,24 +78,22 @@ const (
 	PriorityClusterControllerManagerDeploymentName = "user-cluster-controller-manager"
 	// SchedulerDeploymentName is the name for the scheduler deployment
 	SchedulerDeploymentName = "scheduler"
-	// PriorityClassSchedulerDeploymentName
-	PriorityClassSchedulerDeploymentName = "user-cluster-scheduler"
+	// SchedulerPriorityClassName
+	SchedulerPriorityClassName = "user-cluster-scheduler"
 	// MachineControllerDeploymentName is the name for the machine-controller deployment
 	MachineControllerDeploymentName = "machine-controller"
-	// PriorityClassMachineControllerDeploymentName
-	PriorityClassMachineControllerDeploymentName = "user-cluster-machine-controller"
+	// MachineControllerPriorityClassName
+	MachineControllerPriorityClassName = "user-cluster-machine-controller"
 	// MachineControllerWebhookDeploymentName is the name for the machine-controller webhook deployment
 	MachineControllerWebhookDeploymentName = "machine-controller-webhook"
 	// MetricsServerDeploymentName is the name for the metrics-server deployment
 	MetricsServerDeploymentName = "metrics-server"
-	// PriorityClassMetricsServerDeploymentName
-	PriorityClassMetricsServerDeploymentName = "user-cluster-metrics-server"
-	// PriorityClassEnvoyName
-	PriorityClassEnvoyName = "user-cluster-envoy"
+	// MetricsServerPriorityClassName
+	MetricsServerPriorityClassName = "user-cluster-metrics-server"
 	// OpenVPNServerDeploymentName is the name for the openvpn server deployment
 	OpenVPNServerDeploymentName = "openvpn-server"
-	// PriorityClassOpenVPNServerDeploymentName
-	PriorityClassOpenVPNServerDeploymentName = "user-cluster-openvpn-server"
+	// OpenVPNServerPriorityClassName
+	OpenVPNServerPriorityClassName = "user-cluster-openvpn-server"
 	// DNSResolverDeploymentName is the name of the dns resolver deployment
 	DNSResolverDeploymentName = "dns-resolver"
 	// PriorityClusterDNSResolverDeploymentName
@@ -108,8 +106,8 @@ const (
 	DNSResolverPodDisruptionBudetName = "dns-resolver"
 	// DNSResolverVPAName is the name of the dns resolvers VerticalPodAutoscaler
 	KubeStateMetricsDeploymentName = "kube-state-metrics"
-	// PriorityClassKubeStateMetricsDeploymentName
-	PriorityClassKubeStateMetricsDeploymentName = "user-cluster-kube-state-metrics"
+	// KubeStateMetricsPriorityClassName
+	KubeStateMetricsPriorityClassName = "user-cluster-kube-state-metrics"
 	// UserClusterControllerDeploymentName is the name of the usercluster-controller deployment
 	UserClusterControllerDeploymentName = "usercluster-controller"
 	// ClusterAutoscalerDeploymentName is the name of the cluster-autoscaler deployment
@@ -118,30 +116,32 @@ const (
 	PriorityClusterClusterAutoscalerDeploymentName = "user-cluster-cluster-autoscaler"
 	// KubernetesDashboardDeploymentName is the name of the Kubernetes Dashboard deployment
 	KubernetesDashboardDeploymentName = "kubernetes-dashboard"
-	// PriorityClassKubernetesDashboardDeploymentName
-	PriorityClassKubernetesDashboardDeploymentName = "user-cluster-kubernetes-dashboard"
+	// KubernetesDashboardPriorityClassName
+	KubernetesDashboardPriorityClassName = "user-cluster-kubernetes-dashboard"
 	// MetricsScraperDeploymentName is the name of dashboard-metrics-scraper deployment
 	MetricsScraperDeploymentName = "dashboard-metrics-scraper"
 	// MetricsScraperServiceName is the name of dashboard-metrics-scraper service
 	MetricsScraperServiceName = "dashboard-metrics-scraper"
 	//  PrometheusStatefulSetName is the name for the prometheus StatefulSet
 	PrometheusStatefulSetName = "prometheus"
-	// PriorityClassPrometheusStatefulSetName
-	PriorityClassPrometheusStatefulSetName = "user-cluster-prometheus"
+	// PrometheusPriorityClassName
+	PrometheusPriorityClassName = "user-cluster-prometheus"
 	// EtcdStatefulSetName is the name for the etcd StatefulSet
 	EtcdStatefulSetName = "etcd"
-	// PriorityClassEtcdStatefulSetName is the name for the etcd StatefulSet
-	PriorityClassEtcdStatefulSetName = "user-cluster-etcd"
+	// EtcdPriorityClassName is the name for the etcd StatefulSet
+	EtcdPriorityClassName = "user-cluster-etcd"
 	// EtcdDefaultBackupConfigName is the name for the default (preinstalled) EtcdBackupConfig of a cluster.
 	EtcdDefaultBackupConfigName = "default-backups"
 	// NodePortProxyEnvoyDeploymentName is the name of the nodeport-proxy deployment in the user cluster.
 	NodePortProxyEnvoyDeploymentName = "nodeport-proxy-envoy"
 	// NodePortProxyEnvoyContainerName is the name of the envoy container in the nodeport-proxy deployment.
 	NodePortProxyEnvoyContainerName = "envoy"
+	// NodePortProxyEnvoyPriorityClassName
+	NodePortProxyEnvoyPriorityClassName = "user-cluster-nodeport-proxy-envoy"
 	// CsiCinderControllerPluginDeploymentName is the name for the CSI cinder controller plugin deployment
 	CsiCinderControllerPluginDeploymentName = "csi-cinder-controllerplugin"
-	// PriorityClassCsiCinderControllerPluginDeploymentName
-	PriorityClassCsiCinderControllerPluginDeploymentName = "user-cluster-csi-cinder-controllerplugin"
+	// CsiCinderControllerPluginPriorityClassName
+	CsiCinderControllerPluginPriorityClassName = "user-cluster-csi-cinder-controllerplugin"
 	// CsiCinderControllerPluginServiceName is the name for the CSI cinder controller plugin service
 	CsiCinderControllerPluginServiceName = "csi-cinder-controller-service"
 
@@ -188,8 +188,8 @@ const (
 	MachineControllerKubeconfigSecretName = "machinecontroller-kubeconfig"
 	// CloudControllerManagerKubeconfigSecretName is the name for the secret containing the kubeconfig used by the external cloud provider
 	CloudControllerManagerKubeconfigSecretName = "cloud-controller-manager-kubeconfig"
-	// PriorityClassCloudControllerName
-	PriorityClassCloudControllerName = "user-cluster-cloud-controller-manager"
+	// CloudControllerPriorityClassName
+	CloudControllerPriorityClassName = "user-cluster-cloud-controller-manager"
 	// MachineControllerWebhookServingCertSecretName is the name for the secret containing the serving cert for the
 	// machine-controller webhook
 	MachineControllerWebhookServingCertSecretName = "machinecontroller-webhook-serving-cert"
@@ -687,8 +687,6 @@ const (
 	KonnectivityKubeApiserverEgress        = "kube-apiserver-egress"
 	KonnectivityUDS                        = "konnectivity-uds"
 	KonnectivityPodDisruptionBudgetName    = "konnectivity-agent"
-
-	PriorityClassKonnectivityDeploymentName = "user-cluster-konnectivity-agent"
 )
 
 const (

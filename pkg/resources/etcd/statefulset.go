@@ -82,7 +82,7 @@ func StatefulSetCreator(data etcdStatefulSetCreatorData, enableDataCorruptionChe
 			set.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: resources.ImagePullSecretName}}
 
 			if priorityClasses {
-				set.Spec.Template.Spec.PriorityClassName = resources.PriorityClassEtcdStatefulSetName
+				set.Spec.Template.Spec.PriorityClassName = resources.EtcdPriorityClassName
 			}
 
 			baseLabels := getBasePodLabels(data.Cluster())

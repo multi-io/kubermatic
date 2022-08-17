@@ -96,7 +96,7 @@ func DeploymentCreator(data metricsServerData, priorityClasses bool) reconciling
 			dep.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: resources.ImagePullSecretName}}
 
 			if priorityClasses {
-				dep.Spec.Template.Spec.PriorityClassName = resources.PriorityClassMetricsServerDeploymentName
+				dep.Spec.Template.Spec.PriorityClassName = resources.MetricsServerPriorityClassName
 			}
 
 			volumes := getVolumes(data.IsKonnectivityEnabled())

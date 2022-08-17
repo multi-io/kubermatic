@@ -83,7 +83,7 @@ func DeploymentCreator(data kubernetesDashboardData, priorityClasses bool) recon
 			}
 
 			if priorityClasses {
-				dep.Spec.Template.Spec.PriorityClassName = resources.PriorityClassKubernetesDashboardDeploymentName
+				dep.Spec.Template.Spec.PriorityClassName = resources.KubernetesDashboardPriorityClassName
 			}
 
 			dep.Spec.Template.ObjectMeta = metav1.ObjectMeta{
