@@ -250,6 +250,19 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, addo
 		return &reconcile.Result{}, nil
 	}
 
+	if !addon.DeletionTimestamp.IsZero() {
+		softDeleted, err := addonIsSoftDeleted(addon)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check, if addon is soft-deleted: %v", err)
+		}
+		if softDeleted {
+			if err := r.removeCleanupFinalizer(ctx, log, addon); err != nil {
+				return nil, fmt.Errorf("failed to ensure that the cleanup finalizer got removed from the addon: %v", err)
+			}
+			return nil, nil
+		}
+	}
+
 	if cluster.Status.ExtendedHealth.Apiserver != kubermaticv1.HealthStatusUp {
 		log.Debug("API server is not running, trying again in 10 seconds")
 		return &reconcile.Result{RequeueAfter: kubermaticv1.ControllerRequeueAddonReconcileOnClusterNotReadyPeriod}, nil
@@ -264,6 +277,9 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, addo
 	}
 
 	if addon.DeletionTimestamp != nil {
+		if !kuberneteshelper.HasFinalizer(addon, cleanupFinalizerName) {
+			return nil, nil
+		}
 		// call ensureIsInstalled to ensure that resources that might be missing in manifest but were
 		// created with previous version of that manifest are deleted.
 		if err := r.ensureIsInstalled(ctx, log, addon, cluster); err != nil {
@@ -580,18 +596,31 @@ func (r *Reconciler) ensureFinalizerIsSet(ctx context.Context, addon *kubermatic
 // ensureSoftDeletion checks if addon is marked for soft deletion and if so, it removes addon ensure label so that
 // it's ignored in the next reconcile.
 func (r *Reconciler) ensureSoftDeletion(ctx context.Context, addon *kubermaticv1.Addon) error {
-	if addon.Labels[addonEnsureLabelKey] == "true" && len(addon.Spec.Variables.Raw) > 0 {
-		var m map[string]interface{}
-		if err := json.Unmarshal(addon.Spec.Variables.Raw, &m); err != nil {
-			return fmt.Errorf("failed to unmarshal addon variable: %v", err)
-		}
-		if m[addonSoftDeletionVariable] != nil {
-			cpy := addon.DeepCopy()
-			delete(cpy.Labels, addonEnsureLabelKey)
-			return r.Client.Patch(ctx, cpy, ctrlruntimeclient.MergeFrom(addon))
-		}
+	if addon.Labels[addonEnsureLabelKey] == "false" {
+		return nil
+	}
+	softDeleted, err := addonIsSoftDeleted(addon)
+	if err != nil {
+		return err
+	}
+	if softDeleted {
+		cpy := addon.DeepCopy()
+		cpy.Labels[addonEnsureLabelKey] = "false"
+		return r.Client.Patch(ctx, cpy, ctrlruntimeclient.MergeFrom(addon))
 	}
 	return nil
+}
+
+func addonIsSoftDeleted(addon *kubermaticv1.Addon) (bool, error) {
+	if len(addon.Spec.Variables.Raw) == 0 {
+		return false, nil
+	}
+
+	var m map[string]interface{}
+	if err := json.Unmarshal(addon.Spec.Variables.Raw, &m); err != nil {
+		return false, fmt.Errorf("failed to unmarshal addon variable: %v", err)
+	}
+	return m[addonSoftDeletionVariable] != nil, nil
 }
 
 func (r *Reconciler) ensureResourcesCreatedConditionIsSet(ctx context.Context, addon *kubermaticv1.Addon) error {
