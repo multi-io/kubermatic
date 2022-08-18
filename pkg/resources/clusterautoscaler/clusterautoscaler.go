@@ -98,7 +98,7 @@ func DeploymentCreator(data clusterautoscalerData, priorityClasses bool) reconci
 			dep.Spec.Template.Spec.Volumes = volumes
 
 			if priorityClasses {
-				dep.Spec.Template.Spec.PriorityClassName = resources.PriorityClusterClusterAutoscalerDeploymentName
+				dep.Spec.Template.Spec.PriorityClassName = resources.ClusterAutoscalerPriorityClassName
 			}
 
 			dep.Spec.Template.Spec.InitContainers = []corev1.Container{}

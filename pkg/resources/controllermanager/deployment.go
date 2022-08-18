@@ -77,7 +77,7 @@ func DeploymentCreator(data *resources.TemplateData, priorityClasses bool) recon
 			dep.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: resources.ImagePullSecretName}}
 
 			if priorityClasses {
-				dep.Spec.Template.Spec.PriorityClassName = resources.PriorityClusterControllerManagerDeploymentName
+				dep.Spec.Template.Spec.PriorityClassName = resources.ControllerManagerPriorityClassName
 			}
 
 			volumes := getVolumes(data.IsKonnectivityEnabled())

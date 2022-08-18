@@ -115,7 +115,7 @@ func DeploymentCreator(data deploymentCreatorData, priorityClasses bool) reconci
 			dep.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: resources.ImagePullSecretName}}
 
 			if priorityClasses {
-				dep.Spec.Template.Spec.PriorityClassName = resources.PriorityClusterDNSResolverDeploymentName
+				dep.Spec.Template.Spec.PriorityClassName = resources.DNSResolverPriorityClassName
 			}
 
 			volumes := getVolumes(data.IsKonnectivityEnabled())
