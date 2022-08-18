@@ -24,6 +24,7 @@ import (
 	kubermaticv1helper "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1/helper"
 	"k8c.io/kubermatic/v2/pkg/provider/kubernetes"
 	"k8c.io/kubermatic/v2/pkg/resources"
+	"k8c.io/kubermatic/v2/pkg/resources/etcd"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -70,7 +71,8 @@ func (r *Reconciler) clusterHealth(ctx context.Context, cluster *kubermaticv1.Cl
 	var err error
 	key := types.NamespacedName{Namespace: ns, Name: resources.EtcdStatefulSetName}
 
-	etcdHealthStatus, err := resources.HealthyStatefulSet(ctx, r, key, 2)
+	etcdMinAvailable := etcd.GetClusterSize(cluster.Spec.ComponentsOverride.Etcd)/2 + 1
+	etcdHealthStatus, err := resources.HealthyStatefulSet(ctx, r, key, etcdMinAvailable)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get etcd health: %v", err)
 	}
