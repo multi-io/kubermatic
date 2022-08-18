@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"net/http"
 
-	semverlib "github.com/Masterminds/semver/v3"
+	"github.com/Masterminds/semver/v3"
 	"github.com/go-logr/logr"
 	kubermaticv1 "k8c.io/kubermatic/v2/pkg/crd/kubermatic/v1"
 	"k8c.io/kubermatic/v2/pkg/resources"
@@ -286,7 +286,7 @@ func (h *AdmissionHandler) mutateUpdate(ctx context.Context, oldCluster, newClus
 	// This part handles CNI upgrade from unspecified (= very old) CNI version to the default Canal version.
 	// This upgrade is necessary for k8s versions >= 1.22, where v1beta1 CRDs are not supported anymore.
 	if newCluster.Spec.CNIPlugin == nil {
-		upgradeConstraint, err := semverlib.NewConstraint(">= 1.22")
+		upgradeConstraint, err := semver.NewConstraint(">= 1.22")
 		if err != nil {
 			return fmt.Errorf("parsing CNI upgrade constraint failed: %v", err)
 		}
@@ -299,15 +299,15 @@ func (h *AdmissionHandler) mutateUpdate(ctx context.Context, oldCluster, newClus
 	} else if newCluster.Spec.CNIPlugin.Type == kubermaticv1.CNIPluginTypeCanal {
 		// This part handles Canal version upgrade for clusters with Kubernetes version 1.23 and higher,
 		// where the minimal Canal version is v3.22.
-		cniVersion, err := semverlib.NewVersion(newCluster.Spec.CNIPlugin.Version)
+		cniVersion, err := semver.NewVersion(newCluster.Spec.CNIPlugin.Version)
 		if err != nil {
 			return fmt.Errorf("CNI plugin version parsing failed: %w", err)
 		}
-		lowerThan322, err := semverlib.NewConstraint("< 3.22")
+		lowerThan322, err := semver.NewConstraint("< 3.22")
 		if err != nil {
 			return fmt.Errorf("semver constraint parsing failed: %w", err)
 		}
-		equalOrHigherThan123, err := semverlib.NewConstraint(">= 1.23")
+		equalOrHigherThan123, err := semver.NewConstraint(">= 1.23")
 		if err != nil {
 			return fmt.Errorf("semver constraint parsing failed: %w", err)
 		}
