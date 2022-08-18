@@ -34,6 +34,7 @@ func ClusterRoleCreator() reconciling.NamedClusterRoleCreatorGetter {
 					APIGroups: []string{""},
 					Resources: []string{
 						"nodes/metrics",
+						"nodes/stats",
 					},
 					Verbs: []string{
 						"get",
