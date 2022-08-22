@@ -40,8 +40,8 @@ func NewClusterPausedChecker(seedClient client.Client, clusterName string) IsPau
 			return false, fmt.Errorf("failed to get cluster %q: %w", clusterName, err)
 		}
 
-		// skip 1.18 because 2.18 does not support it. The change is to be reverted later.
-		if v := cluster.Spec.Version; v.Major() == 1 && v.Minor() <= 18 {
+		// skip <=1.19 because we don't support it. The change is to be reverted later.
+		if v := cluster.Spec.Version; v.Major() == 1 && v.Minor() <= 19 {
 			return true, nil
 		}
 		return cluster.Spec.Pause, nil

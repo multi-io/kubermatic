@@ -66,7 +66,7 @@ func TestConcurrencyLimitReached(t *testing.T) {
 						Name: "unsupported",
 					},
 					Spec: kubermaticv1.ClusterSpec{
-						Version: *semver.NewSemverOrDie("1.18.0"),
+						Version: *semver.NewSemverOrDie("1.19.0"),
 					},
 				},
 			).Build(), testCase.maxConcurrentLimit)
