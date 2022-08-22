@@ -29,7 +29,6 @@ import (
 	hetzner "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/hetzner/types"
 	kubevirt "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/kubevirt/types"
 	openstack "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/openstack/types"
-	packet "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/packet/types"
 	vsphere "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/vsphere/types"
 	providerconfig "github.com/kubermatic/machine-controller/pkg/providerconfig/types"
 	"github.com/kubermatic/machine-controller/pkg/userdata/centos"
@@ -223,17 +222,6 @@ func GetAPIV2NodeCloudSpec(machineSpec clusterv1alpha1.MachineSpec) (*apiv1.Node
 			Memory:     int(config.MemoryMB),
 			DiskSizeGB: config.DiskSizeGB,
 			Template:   config.TemplateVMName.Value,
-		}
-	case providerconfig.CloudProviderPacket:
-		config := &packet.RawConfig{}
-		if err := json.Unmarshal(decodedProviderSpec.CloudProviderSpec.Raw, &config); err != nil {
-			return nil, fmt.Errorf("failed to parse packet config: %v", err)
-		}
-		cloudSpec.Packet = &apiv1.PacketNodeSpec{
-			InstanceType: config.InstanceType.Value,
-		}
-		for _, v := range config.Tags {
-			cloudSpec.Packet.Tags = append(cloudSpec.Packet.Tags, v.Value)
 		}
 	case providerconfig.CloudProviderGoogle:
 		config := &gce.CloudProviderSpec{}
