@@ -39,7 +39,7 @@ import (
 var (
 	supportedCNIPlugins        = sets.NewString(kubermaticv1.CNIPluginTypeCanal.String())
 	supportedCNIPluginVersions = map[kubermaticv1.CNIPluginType]sets.String{
-		kubermaticv1.CNIPluginTypeCanal: sets.NewString("v3.8", "v3.19"),
+		kubermaticv1.CNIPluginTypeCanal: sets.NewString("v3.8", "v3.20", "v3.21", "v3.22", "v3.23"),
 	}
 )
 
@@ -160,16 +160,8 @@ func validateUpdateImmutability(c, oldC *kubermaticv1.Cluster) field.ErrorList {
 		c.Spec.Features[kubermaticv1.ClusterFeatureExternalCloudProvider]; vOld && !v {
 		allErrs = append(allErrs, field.Invalid(specFldPath.Child("features").Key(kubermaticv1.ClusterFeatureExternalCloudProvider), v, fmt.Sprintf("feature gate %q cannot be disabled once it's enabled", kubermaticv1.ClusterFeatureExternalCloudProvider)))
 	}
-	if c.Spec.CNIPlugin != nil && oldC.Spec.CNIPlugin != nil {
-		// Immutable fields
-		// TODO: this constraint should be relaxed to provide the
-		// possibility to upgrade CNI plugin version.
-		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(
-			*c.Spec.CNIPlugin,
-			*oldC.Spec.CNIPlugin,
-			specFldPath.Child("cniPlugin"),
-		)...)
-	} else if oldC.Spec.CNIPlugin != nil {
+	// TODO(furkhat): CNI plugin allow only one minor version upgrade
+	/* if oldC.Spec.CNIPlugin != nil {
 		// If there was no CNI setting, we allow the initial mutation to happen.
 		// Otherwise, the mutation is denied.
 		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(
@@ -177,7 +169,7 @@ func validateUpdateImmutability(c, oldC *kubermaticv1.Cluster) field.ErrorList {
 			oldC.Spec.CNIPlugin,
 			specFldPath.Child("cniPlugin"),
 		)...)
-	}
+	}*/
 	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(
 		c.Spec.ExposeStrategy,
 		oldC.Spec.ExposeStrategy,
