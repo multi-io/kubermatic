@@ -374,6 +374,18 @@ func (os *Provider) InitializeCloudProvider(cluster *kubermaticv1.Cluster, updat
 // CleanUpCloudProvider does the clean-up in particular:
 // removes security group and network configuration
 func (os *Provider) CleanUpCloudProvider(cluster *kubermaticv1.Cluster, update provider.ClusterUpdater) (*kubermaticv1.Cluster, error) {
+	// Skip clean up, if there's no finalizers
+	// If a cluster has no valid credentials (anymore), this can otherwise create a deadlock
+	if !kubernetes.HasFinalizer(cluster, SecurityGroupCleanupFinalizer) &&
+		!kubernetes.HasFinalizer(cluster, RouterSubnetLinkCleanupFinalizer) &&
+		!kubernetes.HasFinalizer(cluster, OldNetworkCleanupFinalizer) &&
+		!kubernetes.HasFinalizer(cluster, SubnetCleanupFinalizer) &&
+		!kubernetes.HasFinalizer(cluster, NetworkCleanupFinalizer) &&
+		!kubernetes.HasFinalizer(cluster, RouterCleanupFinalizer) &&
+		!kubernetes.HasFinalizer(cluster, ServerGroupCleanupFinalizer) {
+		return cluster, nil
+	}
+
 	netClient, err := os.getClientFunc(cluster.Spec.Cloud, os.dc, os.secretKeySelector, os.caBundle)
 	if err != nil {
 		return nil, err
