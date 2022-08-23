@@ -448,14 +448,6 @@ func (os *Provider) CleanUpCloudProvider(cluster *kubermaticv1.Cluster, update p
 		}
 	}
 
-	if kubernetes.HasFinalizer(cluster, RouterCleanupFinalizer) || kubernetes.HasFinalizer(cluster, OldNetworkCleanupFinalizer) {
-		if err = deleteRouter(netClient, cluster.Spec.Cloud.Openstack.RouterID); err != nil {
-			if !isNotFoundErr(err) {
-				return nil, fmt.Errorf("failed to delete router '%s': %v", cluster.Spec.Cloud.Openstack.RouterID, err)
-			}
-		}
-	}
-
 	// Relying on the idempotence of the clean-up steps we remove all finalizers in
 	// one shot only when the clean-up is completed.
 	cluster, err = update(cluster.Name, func(cluster *kubermaticv1.Cluster) {
