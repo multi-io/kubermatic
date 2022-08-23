@@ -206,6 +206,7 @@ func TestHandle(t *testing.T) {
 				jsonpatch.NewOperation("add", "/spec/componentsOverride/prometheus/resources", map[string]interface{}{"requests": map[string]interface{}{"memory": "500M"}}),
 				jsonpatch.NewOperation("add", "/spec/componentsOverride/konnectivityProxy/resources", map[string]interface{}{"requests": map[string]interface{}{"memory": "500M"}}),
 				jsonpatch.NewOperation("add", "/spec/features/apiserverNetworkPolicy", true),
+				jsonpatch.NewOperation("add", "/spec/clusterNetwork/konnectivityEnabled", true),
 			},
 		},
 		{
@@ -244,7 +245,9 @@ func TestHandle(t *testing.T) {
 				},
 			},
 			wantAllowed: true,
-			wantPatches: []jsonpatch.JsonPatchOperation{},
+			wantPatches: []jsonpatch.JsonPatchOperation{
+				jsonpatch.NewOperation("add", "/spec/clusterNetwork/konnectivityEnabled", true),
+			},
 		},
 		{
 			name: "Default features",
@@ -280,6 +283,7 @@ func TestHandle(t *testing.T) {
 			wantAllowed: true,
 			wantPatches: []jsonpatch.JsonPatchOperation{
 				jsonpatch.NewOperation("add", "/spec/features/apiserverNetworkPolicy", true),
+				jsonpatch.NewOperation("add", "/spec/clusterNetwork/konnectivityEnabled", true),
 			},
 		},
 		{
@@ -315,6 +319,7 @@ func TestHandle(t *testing.T) {
 			},
 			wantAllowed: true,
 			wantPatches: []jsonpatch.JsonPatchOperation{
+				jsonpatch.NewOperation("add", "/spec/clusterNetwork/konnectivityEnabled", true),
 				jsonpatch.NewOperation("add", "/spec/cniPlugin", map[string]interface{}{
 					"type":    "canal",
 					"version": "v3.23",
@@ -354,6 +359,7 @@ func TestHandle(t *testing.T) {
 				jsonpatch.NewOperation("replace", "/spec/clusterNetwork/proxyMode", "ipvs"),
 				jsonpatch.NewOperation("replace", "/spec/clusterNetwork/dnsDomain", "cluster.local"),
 				jsonpatch.NewOperation("add", "/spec/clusterNetwork/nodeLocalDNSCacheEnabled", true),
+				jsonpatch.NewOperation("add", "/spec/clusterNetwork/konnectivityEnabled", true),
 			},
 		},
 		{
@@ -390,6 +396,7 @@ func TestHandle(t *testing.T) {
 				jsonpatch.NewOperation("replace", "/spec/clusterNetwork/dnsDomain", "cluster.local"),
 				jsonpatch.NewOperation("add", "/spec/clusterNetwork/nodeLocalDNSCacheEnabled", true),
 				jsonpatch.NewOperation("replace", "/spec/features/externalCloudProvider", true),
+				jsonpatch.NewOperation("add", "/spec/clusterNetwork/konnectivityEnabled", true),
 			},
 		},
 		{
@@ -429,6 +436,7 @@ func TestHandle(t *testing.T) {
 				jsonpatch.NewOperation("replace", "/spec/clusterNetwork/dnsDomain", "cluster.local"),
 				jsonpatch.NewOperation("add", "/spec/clusterNetwork/nodeLocalDNSCacheEnabled", true),
 				jsonpatch.NewOperation("add", "/spec/clusterNetwork/ipvs/strictArp", true),
+				jsonpatch.NewOperation("add", "/spec/clusterNetwork/konnectivityEnabled", true),
 			},
 		},
 		{

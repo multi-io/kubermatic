@@ -159,6 +159,10 @@ func (h *AdmissionHandler) applyDefaults(c *kubermaticv1.Cluster) {
 		c.Spec.ClusterNetwork.NodeLocalDNSCacheEnabled = pointer.BoolPtr(true)
 	}
 
+	if c.Spec.ClusterNetwork.KonnectivityEnabled == nil {
+		c.Spec.ClusterNetwork.KonnectivityEnabled = pointer.BoolPtr(true)
+	}
+
 	// Default component settings
 	h.defaultClusterComponentSettings(c)
 }
