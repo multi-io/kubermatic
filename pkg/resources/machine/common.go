@@ -30,6 +30,7 @@ import (
 	hetzner "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/hetzner/types"
 	kubevirt "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/kubevirt/types"
 	openstack "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/openstack/types"
+	packet "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/packet/types"
 	vsphere "github.com/kubermatic/machine-controller/pkg/cloudprovider/provider/vsphere/types"
 	providerconfig "github.com/kubermatic/machine-controller/pkg/providerconfig/types"
 	"github.com/kubermatic/machine-controller/pkg/userdata/centos"
@@ -413,6 +414,38 @@ func getDigitaloceanProviderSpec(c *kubermaticv1.Cluster, nodeSpec apiv1.NodeSpe
 	config.Tags = make([]providerconfig.ConfigVarString, len(tags.List()))
 	for i, tag := range tags.List() {
 		config.Tags[i].Value = tag
+	}
+
+	ext := &runtime.RawExtension{}
+	b, err := json.Marshal(config)
+	if err != nil {
+		return nil, err
+	}
+
+	ext.Raw = b
+	return ext, nil
+}
+
+func getPacketProviderSpec(c *kubermaticv1.Cluster, nodeSpec apiv1.NodeSpec, dc *kubermaticv1.Datacenter) (*runtime.RawExtension, error) {
+	config := packet.RawConfig{
+		InstanceType: &providerconfig.ConfigVarString{Value: nodeSpec.Cloud.Packet.InstanceType},
+	}
+
+	tags := sets.NewString(nodeSpec.Cloud.Packet.Tags...)
+	tags.Insert("kubernetes", fmt.Sprintf("kubernetes-cluster-%s", c.Name), fmt.Sprintf("system/cluster:%s", c.Name))
+	projectID, ok := c.Labels[kubermaticv1.ProjectIDLabelKey]
+	if ok {
+		tags.Insert(fmt.Sprintf("system/project:%s", projectID))
+	}
+	config.Tags = make([]providerconfig.ConfigVarString, len(tags.List()))
+	for i, tag := range tags.List() {
+		config.Tags[i].Value = tag
+	}
+
+	facilities := sets.NewString(dc.Spec.Packet.Facilities...)
+	config.Facilities = make([]providerconfig.ConfigVarString, len(facilities.List()))
+	for i, facility := range facilities.List() {
+		config.Facilities[i].Value = facility
 	}
 
 	ext := &runtime.RawExtension{}
