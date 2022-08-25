@@ -10,16 +10,12 @@ require (
 	github.com/Azure/go-autorest/autorest/to v0.4.0
 	github.com/Masterminds/semver/v3 v3.1.1
 	github.com/Masterminds/sprig/v3 v3.2.2
-	github.com/ajeddeloh/go-json v0.0.0-00010101000000-000000000000 // indirect
-	github.com/ajeddeloh/yaml v0.0.0-20170912190910-6b94386aeefd // indirect
 	github.com/aliyun/alibaba-cloud-sdk-go v1.61.751
 	github.com/anexia-it/go-anxcloud v0.3.8
 	github.com/apparentlymart/go-cidr v1.1.0
 	github.com/aws/aws-sdk-go v1.37.22
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/coreos/go-oidc v2.2.1+incompatible
-	github.com/coreos/go-systemd v0.0.0-20190620071333-e64a0ec8b42a // indirect
-	github.com/coreos/ignition v0.35.0 // indirect
 	github.com/coreos/locksmith v0.6.2
 	github.com/cristim/ec2-instances-info v0.0.0-20201110114654-2dfcc09f67d4
 	github.com/digitalocean/godo v1.65.0
@@ -47,7 +43,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hetznercloud/hcloud-go v1.32.0
 	github.com/jetstack/cert-manager v1.1.0
-	github.com/kubermatic/machine-controller v1.35.2
+	github.com/kubermatic/machine-controller v1.41.1
 	github.com/minio/minio-go v6.0.14+incompatible
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.16.0
@@ -66,9 +62,7 @@ require (
 	go.etcd.io/etcd/v3 v3.3.0-rc.0.0.20200728214110-6c81b20ec8de
 	go.uber.org/zap v1.19.0
 	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
-	golang.org/x/net v0.0.0-20210525063256-abc453219eb5 // indirect
 	golang.org/x/oauth2 v0.0.0-20210514164344-f6687ab2804c
-	golang.org/x/term v0.0.0-20210503060354-a79de5458b56 // indirect
 	golang.org/x/tools v0.1.2
 	gomodules.xyz/jsonpatch/v2 v2.2.0
 	google.golang.org/api v0.36.0
@@ -88,7 +82,6 @@ require (
 	k8s.io/code-generator v0.22.2
 	k8s.io/klog v1.0.0
 	k8s.io/kube-aggregator v0.21.3
-	k8s.io/kube-openapi v0.0.0-20210527164424-3c818078ee3d // indirect
 	k8s.io/kubectl v0.21.3
 	k8s.io/metrics v0.22.2
 	k8s.io/test-infra v0.0.0-20210826180422-39483c498f0f
@@ -120,6 +113,6 @@ replace (
 	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.22.2
 )
 
-replace github.com/kubermatic/machine-controller => github.com/syseleven/machine-controller v1.37.0-sys11-0
+replace github.com/kubermatic/machine-controller => github.com/syseleven/machine-controller v1.41.1-sys11-1
 
 replace github.com/ajeddeloh/go-json => github.com/coreos/go-json v0.0.0-20211020211907-c63f628265de
