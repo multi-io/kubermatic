@@ -224,6 +224,12 @@ func getProviderConfig(c *kubermaticv1.Cluster, nd *apiv1.NodeDeployment, dc *ku
 		if err != nil {
 			return nil, err
 		}
+	case nd.Spec.Template.Cloud.Packet != nil:
+		config.CloudProvider = providerconfig.CloudProviderPacket
+		cloudExt, err = getPacketProviderSpec(c, nd.Spec.Template, dc)
+		if err != nil {
+			return nil, err
+		}
 	case nd.Spec.Template.Cloud.GCP != nil:
 		config.CloudProvider = providerconfig.CloudProviderGoogle
 		cloudExt, err = getGCPProviderSpec(c, nd.Spec.Template, dc)
