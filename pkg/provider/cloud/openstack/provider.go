@@ -433,7 +433,6 @@ func (os *Provider) CleanUpCloudProvider(cluster *kubermaticv1.Cluster, update p
 			if !isNotFoundErr(err) {
 				return nil, fmt.Errorf("delete server group for cluster '%s': %v", cluster.Name, err)
 			}
-			return cluster, fmt.Errorf("delete server group for cluster '%s': %v", cluster.Name, err)
 		}
 	}
 
