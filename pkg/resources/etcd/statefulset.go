@@ -360,7 +360,7 @@ func ImageTag(c *kubermaticv1.Cluster) string {
 	if c.Spec.Version.Minor() < 22 {
 		return "v3.4.3"
 	}
-	return "v3.5.1"
+	return "v3.5.4"
 }
 
 func computeReplicas(data etcdStatefulSetCreatorData, set *appsv1.StatefulSet) int32 {
