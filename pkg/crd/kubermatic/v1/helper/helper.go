@@ -79,7 +79,7 @@ func ClusterReconcileWrapper(
 // TODO: extract somewhere where it can be used from everywhere
 func clusterVersionUnsupported(cluster *kubermaticv1.Cluster) bool {
 	v := cluster.Spec.Version
-	return v.Version != nil && v.Major() == 1 && v.Minor() <= 18
+	return v.Version != nil && v.Major() == 1 && v.Minor() <= 19
 }
 
 // GetClusterCondition returns the index of the given condition or -1 and the condition itself

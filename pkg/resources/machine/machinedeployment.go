@@ -87,7 +87,7 @@ func Deployment(c *kubermaticv1.Cluster, nd *apiv1.NodeDeployment, dc *kubermati
 	replicas := nd.Spec.Replicas
 	md.Spec.Replicas = &replicas
 
-	legacyVersionCutOff := semver.MustParse("1.18")
+	legacyVersionCutOff := semver.MustParse("1.19")
 	if nd.Spec.MaxReplicas > 0 {
 		if md.Annotations == nil {
 			md.Annotations = map[string]string{}

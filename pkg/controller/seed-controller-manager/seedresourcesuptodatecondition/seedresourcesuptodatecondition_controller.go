@@ -114,7 +114,7 @@ func (r *reconciler) reconcile(ctx context.Context, cluster *kubermaticv1.Cluste
 	if cluster.Spec.Pause {
 		return nil
 	}
-	if v := cluster.Spec.Version; v.Version != nil && v.Major() == 1 && v.Minor() <= 18 {
+	if v := cluster.Spec.Version; v.Version != nil && v.Major() == 1 && v.Minor() <= 19 {
 		return nil
 	}
 
