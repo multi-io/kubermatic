@@ -374,6 +374,18 @@ func (os *Provider) InitializeCloudProvider(cluster *kubermaticv1.Cluster, updat
 // CleanUpCloudProvider does the clean-up in particular:
 // removes security group and network configuration
 func (os *Provider) CleanUpCloudProvider(cluster *kubermaticv1.Cluster, update provider.ClusterUpdater) (*kubermaticv1.Cluster, error) {
+	// Skip clean up, if there's no finalizers
+	// If a cluster has no valid credentials (anymore), this can otherwise create a deadlock
+	if !kubernetes.HasFinalizer(cluster, SecurityGroupCleanupFinalizer) &&
+		!kubernetes.HasFinalizer(cluster, RouterSubnetLinkCleanupFinalizer) &&
+		!kubernetes.HasFinalizer(cluster, OldNetworkCleanupFinalizer) &&
+		!kubernetes.HasFinalizer(cluster, SubnetCleanupFinalizer) &&
+		!kubernetes.HasFinalizer(cluster, NetworkCleanupFinalizer) &&
+		!kubernetes.HasFinalizer(cluster, RouterCleanupFinalizer) &&
+		!kubernetes.HasFinalizer(cluster, ServerGroupCleanupFinalizer) {
+		return cluster, nil
+	}
+
 	netClient, err := os.getClientFunc(cluster.Spec.Cloud, os.dc, os.secretKeySelector, os.caBundle)
 	if err != nil {
 		return nil, err
@@ -432,14 +444,6 @@ func (os *Provider) CleanUpCloudProvider(cluster *kubermaticv1.Cluster, update p
 		if err := deleteServerGroup(computeClient, id); err != nil {
 			if !isNotFoundErr(err) {
 				return nil, fmt.Errorf("delete server group for cluster '%s': %v", cluster.Name, err)
-			}
-		}
-	}
-
-	if kubernetes.HasFinalizer(cluster, RouterCleanupFinalizer) || kubernetes.HasFinalizer(cluster, OldNetworkCleanupFinalizer) {
-		if err = deleteRouter(netClient, cluster.Spec.Cloud.Openstack.RouterID); err != nil {
-			if !isNotFoundErr(err) {
-				return nil, fmt.Errorf("failed to delete router '%s': %v", cluster.Spec.Cloud.Openstack.RouterID, err)
 			}
 		}
 	}
