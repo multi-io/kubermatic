@@ -506,10 +506,18 @@ func FindSeedNameForDatacenter(ctx context.Context, datacenter string) (string, 
 	if err != nil {
 		return "", fmt.Errorf("failed to list seeds: %v", err)
 	}
+	found := ""
 	for name, seed := range seeds {
 		if _, ok := seed.Spec.Datacenters[datacenter]; ok {
-			return name, nil
+			// hack for POC: prefer seed2
+			if name == "seed2" {
+				return name, nil
+			}
+			found = name
 		}
+	}
+	if found != "" {
+		return found, nil
 	}
 	return "", fmt.Errorf("can not find seed for datacenter %s", datacenter)
 }

@@ -44,6 +44,10 @@ func DatacenterFromSeedMap(_ *UserInfo, seedsGetter SeedsGetter, datacenterName 
 		if dc, exists := seed.Spec.Datacenters[datacenterName]; exists {
 			matchingDatacenters = append(matchingDatacenters, dc)
 			matchingSeeds = append(matchingSeeds, seed)
+			// hack for POC: prefer seed2
+			if seed.Name == "seed2" {
+				return seed, &dc, nil
+			}
 		}
 	}
 
