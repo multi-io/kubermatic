@@ -126,17 +126,6 @@ func (v *validator) validate(ctx context.Context, subject *kubermaticv1.Seed, se
 		subjectDatacenters = sets.StringKeySet(subject.Spec.Datacenters)
 	}
 
-	// check if the subject introduces a datacenter that already exists
-	for _, existingSeed := range existingSeeds {
-		datacenters := sets.StringKeySet(existingSeed.Spec.Datacenters)
-
-		if duplicates := subjectDatacenters.Intersection(datacenters); duplicates.Len() > 0 {
-			return fmt.Errorf("seed redefines existing datacenters %v from seed %q; datacenter names must be globally unique", duplicates.List(), existingSeed.Name)
-		}
-
-		existingDatacenters = existingDatacenters.Union(datacenters)
-	}
-
 	// check if all DCs have exactly one provider and that the provider
 	// is never changed after it has been set once
 	for dcName, dc := range subject.Spec.Datacenters {
