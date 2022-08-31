@@ -417,7 +417,7 @@ const (
 	// TopologyKeyHostname defines the topology key for the node hostname
 	TopologyKeyHostname = "kubernetes.io/hostname"
 	// TopologyKeyPhysicalHostID defines the topology key for the physical host id the node is running on.
-	TopologyKeyPhysicalHostID = "node.syseleven.de/physical-host-id"
+	TopologyKeyPhysicalHostID = "machine-controller/physical-host-id"
 	// TopologyKeyFailureDomainZone defines the topology key for the node's cloud provider zone
 	TopologyKeyFailureDomainZone = "failure-domain.beta.kubernetes.io/zone"
 

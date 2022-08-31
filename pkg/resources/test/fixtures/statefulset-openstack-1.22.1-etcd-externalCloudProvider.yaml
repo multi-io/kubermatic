@@ -43,7 +43,7 @@ spec:
                 matchLabels:
                   app: etcd
                   cluster: de-test-01
-              topologyKey: node.syseleven.de/physical-host-id
+              topologyKey: machine-controller/physical-host-id
             weight: 100
       containers:
       - command:
