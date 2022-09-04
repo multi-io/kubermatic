@@ -493,6 +493,7 @@ func createAPIHandler(options serverRunOptions, prov providers, oidcIssuerVerifi
 	r.RegisterV1SysEleven(v1Router)
 	r.RegisterV1Websocket(v1Router)
 	rv2.RegisterV2(v2Router, metrics)
+	rv2.RegisterV2SysEleven(v2Router, metrics)
 
 	mainRouter.Methods(http.MethodGet).
 		Path("/api/swagger.json").
