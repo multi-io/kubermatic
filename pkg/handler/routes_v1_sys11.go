@@ -33,6 +33,7 @@ func (r Routing) RegisterV1SysEleven(mux *mux.Router) {
 		Path("/providers/openstack/quotalimits").
 		Handler(r.listOpenstackQuotaLimits())
 
+	// deprecated. Clients should use the v2 API instead.
 	mux.Methods(http.MethodGet).
 		Path("/projects/{project_id}/dc/{dc}/clusters/{cluster_id}/providers/openstack/images").
 		Handler(r.listOpenstackImagesNoCredentials())
