@@ -17,6 +17,7 @@ import (
 
 // RegisterV1SysEleven registers additional endpoints used by SysEleven.
 func (r Routing) RegisterV1SysEleven(mux *mux.Router) {
+	// deprecated. Clients should use the v2 version of the prometheus proxy api instead
 	mux.Methods(http.MethodGet).
 		Path("/projects/{project_id}/dc/{dc}/cluster/{cluster_id}/prometheus/{query_path}").
 		Handler(r.prometheusProxyHandler())

@@ -35,6 +35,10 @@ func (r Routing) RegisterV2SysEleven(mux *mux.Router, metrics common.ServerMetri
 	mux.Methods(http.MethodGet).
 		Path("/projects/{project_id}/clusters/{cluster_id}/providers/openstack/images").
 		Handler(r.listOpenstackImagesNoCredentials())
+
+	mux.Methods(http.MethodGet).
+		Path("/projects/{project_id}/cluster/{cluster_id}/prometheus/{query_path}").
+		Handler(r.prometheusProxyHandler())
 }
 
 // swagger:route GET /api/v2/projects/{project_id}/clusters/{cluster_id}/providers/openstack/images openstack listOpenstackImagesNoCredentialsV2

@@ -1,5 +1,7 @@
 package handler
 
+// deprecated. Clients should use the v2 version of the prometheus proxy api instead
+
 import (
 	"context"
 	goerrors "errors"
